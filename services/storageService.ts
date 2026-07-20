@@ -2,6 +2,7 @@ import { SavedGameData, Campaign, GameState, Message, AppStage } from '../types'
 import { isDebugMode } from '../utils/debug';
 import { supabase } from './supabaseClient';
 import { getRewindGeneration } from './rewindGeneration';
+import { ANONYMOUS_CAMPAIGN_ID, isSyncableCampaign } from '../utils/campaign';
 
 const LS_KEY = 'diceonrails_game_data';
 const CAMPAIGNS_TABLE = 'campaigns';
@@ -34,8 +35,25 @@ export const storageService = {
         return () => { supabase.removeChannel(channel); };
     },
 
-    /** Queues a sync of the game state and messages to Supabase for the given campaign (coalesced via microtask). */
+    /** Persists game state for a campaign: localStorage for anonymous play, Supabase (coalesced via microtask) for syncable campaigns. */
     syncCampaignState(campaignId: string, gameState: GameState, messages?: Message[]): Promise<void> {
+        if (campaignId === ANONYMOUS_CAMPAIGN_ID) {
+            const data: SavedGameData = {
+                version: '1.0',
+                campaignId: ANONYMOUS_CAMPAIGN_ID,
+                campaignName: 'Local Campaign',
+                gameState,
+                messages: messages ?? [],
+                stage: AppStage.PLAY,
+                timestamp: Date.now(),
+            };
+            try {
+                localStorage.setItem(LS_KEY, JSON.stringify(data));
+            } catch (e) {
+                if (isDebugMode) console.warn('[storageService] anonymous localStorage write failed:', e);
+            }
+            return Promise.resolve();
+        }
         const payload: Record<string, unknown> = { game_state: { ...gameState, _rewindGeneration: getRewindGeneration() } };
         if (messages) payload.messages = messages;
         enqueueSync(campaignId, payload);
@@ -108,7 +126,7 @@ export const storageService = {
 
     /** Loads a game from Supabase (by campaign ID) or falls back to localStorage for anonymous/local saves. */
     async loadGame(userId?: string, campaignId?: string): Promise<{ data?: SavedGameData; error?: string }> {
-        if (userId && campaignId && campaignId !== 'anonymous') {
+        if (userId && isSyncableCampaign(campaignId)) {
             try {
                 const { data, error } = await supabase
                     .from(CAMPAIGNS_TABLE)
@@ -167,7 +185,7 @@ export const storageService = {
 
     /** Saves game data to Supabase (for named campaigns) or localStorage (for anonymous). */
     async saveGame(data: SavedGameData, userId?: string, campaignId?: string): Promise<{ error?: string }> {
-        if (userId && campaignId && campaignId !== 'anonymous') {
+        if (userId && isSyncableCampaign(campaignId)) {
             try {
                 await this.syncCampaignState(campaignId, data.gameState, data.messages);
                 return {};

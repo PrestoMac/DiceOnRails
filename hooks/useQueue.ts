@@ -48,7 +48,7 @@ export const useQueue = (
     const applyUpdate = async (newState: GameState) => {
         setGameState(newState);
         mcpServer.loadState(newState);
-        if (currentCampaignId && currentCampaignId !== 'anonymous') {
+        if (currentCampaignId) {
             await storageService.syncCampaignState(currentCampaignId, newState);
         }
     };

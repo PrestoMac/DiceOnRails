@@ -97,7 +97,7 @@ export const useProgression = (
     const idx = mcpServer.getFullState().party.findIndex(c => c.id === characterId);
     if (idx > -1) mcpServer.getFullState().party[idx] = result.character;
     syncState();
-    if (currentCampaignId && currentCampaignId !== 'anonymous') {
+    if (currentCampaignId) {
       await storageService.syncCampaignState(currentCampaignId, mcpServer.getFullState());
     }
     return false;
@@ -139,7 +139,7 @@ export const useProgression = (
       };
     }
     syncState();
-    if (currentCampaignId && currentCampaignId !== 'anonymous') {
+    if (currentCampaignId) {
       await storageService.syncCampaignState(currentCampaignId, mcpServer.getFullState());
     }
   }, [levelUpCharacterId, levelUpCharacter, syncState, currentCampaignId]);

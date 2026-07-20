@@ -5,6 +5,7 @@ import { useProgressionContext } from '../../contexts/ProgressionContext';
 import { useUIContext } from '../../contexts/UIContext';
 import { useAuthContext } from '../../contexts/AuthContext';
 import { AppStage } from '../../types';
+import { isSyncableCampaign } from '../../utils/campaign';
 import ChatLog from '../ChatLog';
 import ActionQueuePanel from '../ActionQueuePanel';
 import InputArea from '../InputArea';
@@ -134,7 +135,7 @@ const DesktopLayout: React.FC = () => {
           <button onClick={handleBackOrReset} className="p-2 hover:bg-stone-900 rounded-lg text-stone-400 transition-colors" title={userId ? "Return to Dashboard" : "Reset Game"}><i className={`fas ${userId ? 'fa-arrow-left' : 'fa-undo'} text-xl`} /></button>
           <button onClick={() => setSettingsOpen(true)} className="p-2 hover:bg-stone-900 rounded-lg text-stone-400 transition-colors group" title="Settings"><i className="fas fa-cog text-xl group-hover:rotate-90 transition-transform duration-500" /></button>
           <button onClick={handleLogout} className="p-2 hover:bg-stone-900 rounded-lg text-stone-400 transition-colors"><i className="fas fa-sign-out-alt text-xl" /></button>
-          {stage === AppStage.PLAY && currentCampaignId && currentCampaignId !== 'anonymous' && <div className="flex items-center gap-2 bg-stone-900/50 px-3 py-1.5 rounded-lg border border-stone-800"><span className="text-[10px] uppercase font-bold tracking-wider text-stone-500">Share Campaign</span><span className="text-xs text-stone-300 truncate max-w-[140px]">{campaignName || currentCampaignId}</span><button onClick={() => { navigator.clipboard.writeText(currentCampaignId); alert("Campaign ID copied to clipboard!"); }} className="text-amber-600 hover:text-amber-500 transition-colors"><i className="fas fa-copy" /></button></div>}
+          {stage === AppStage.PLAY && isSyncableCampaign(currentCampaignId) && <div className="flex items-center gap-2 bg-stone-900/50 px-3 py-1.5 rounded-lg border border-stone-800"><span className="text-[10px] uppercase font-bold tracking-wider text-stone-500">Share Campaign</span><span className="text-xs text-stone-300 truncate max-w-[140px]">{campaignName || currentCampaignId}</span><button onClick={() => { navigator.clipboard.writeText(currentCampaignId); alert("Campaign ID copied to clipboard!"); }} className="text-amber-600 hover:text-amber-500 transition-colors"><i className="fas fa-copy" /></button></div>}
           <ActivityBell activities={recentActivity} />
           <div className="h-2 w-2 rounded-full bg-green-500 shadow-sm shadow-green-900 animate-pulse" />
         </div>

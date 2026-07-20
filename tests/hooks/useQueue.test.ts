@@ -474,7 +474,7 @@ describe('useQueue', () => {
       expect(storageService.syncCampaignState).not.toHaveBeenCalled();
     });
 
-    it('Skips syncCampaignState when campaignId is "anonymous"', async () => {
+    it('Persists via syncCampaignState when campaignId is "anonymous" (localStorage routing)', async () => {
       const { result } = renderHook(() => useQueue(makeState(), setGameState, 'anonymous', 'user-1', null));
 
       await act(async () => {
@@ -482,7 +482,8 @@ describe('useQueue', () => {
       });
 
       const { storageService } = await import('../../services/storageService');
-      expect(storageService.syncCampaignState).not.toHaveBeenCalled();
+      expect(storageService.syncCampaignState).toHaveBeenCalledTimes(1);
+      expect(storageService.syncCampaignState).toHaveBeenCalledWith('anonymous', expect.anything());
     });
 
     it('Passes correct state through all three calls', async () => {

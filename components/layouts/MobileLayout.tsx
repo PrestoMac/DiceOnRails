@@ -5,6 +5,7 @@ import { useProgressionContext } from '../../contexts/ProgressionContext';
 import { useUIContext } from '../../contexts/UIContext';
 import { useAuthContext } from '../../contexts/AuthContext';
 import { AppStage, Character, InventoryItem } from '../../types';
+import { isSyncableCampaign } from '../../utils/campaign';
 import ChatLog from '../ChatLog';
 import ActionQueuePanel from '../ActionQueuePanel';
 import InputArea from '../InputArea';
@@ -88,7 +89,7 @@ const MobileLayout: React.FC = () => {
         <div className="flex items-center gap-3">
           <button onClick={handleBackOrReset} className="p-2 hover:bg-stone-900 rounded-lg text-stone-400 transition-colors"><i className={`fas ${userId?'fa-arrow-left':'fa-undo'} text-lg`}></i></button>
           <button onClick={handleLogout} className="p-2 hover:bg-stone-900 rounded-lg text-stone-400 transition-colors"><i className="fas fa-sign-out-alt text-lg"></i></button>
-          {stage===AppStage.PLAY&&currentCampaignId&&currentCampaignId!=='anonymous'&&<button onClick={()=>{navigator.clipboard.writeText(currentCampaignId);alert("Campaign ID copied to clipboard!");}} className="p-2 hover:bg-stone-900 rounded-lg text-amber-600 transition-colors"><i className="fas fa-link text-lg"></i></button>}
+          {stage===AppStage.PLAY&&isSyncableCampaign(currentCampaignId)&&<button onClick={()=>{navigator.clipboard.writeText(currentCampaignId);alert("Campaign ID copied to clipboard!");}} className="p-2 hover:bg-stone-900 rounded-lg text-amber-600 transition-colors"><i className="fas fa-link text-lg"></i></button>}
           <ActivityBell activities={recentActivity} />
           <div className="h-2 w-2 rounded-full bg-green-500 shadow-sm shadow-green-900 animate-pulse"></div>
         </div>

@@ -18,6 +18,7 @@ import { mcpServer } from './services/mcpService';
 import { initAudio } from './services/audioService';
 import { buildChatCompletionUrl, buildChatCompletionHeaders, resolveProvider, resolveRequestModel } from './services/llmClient';
 import { useAtmospherePrewarm } from './hooks/useAtmospherePrewarm';
+import { ANONYMOUS_CAMPAIGN_ID } from './utils/campaign';
 
 import { AuthProvider, useAuthContext } from './contexts/AuthContext';
 import { UIProvider, useUIContext } from './contexts/UIContext';
@@ -67,7 +68,7 @@ const AppContent: React.FC = () => {
   const {
     stage, gameState, messages, isLoading,
     isNewCampaign, setStage,
-    setCurrentCampaignId, loadGameData, syncState,
+    currentCampaignId, setCurrentCampaignId, loadGameData, syncState,
     queueNotification
   } = useGameContext();
   const { settings, settingsOpen, setSettingsOpen, saveSettings, isMobile, diceRollData, clearDiceRoll } = useUIContext();
@@ -93,13 +94,14 @@ const AppContent: React.FC = () => {
 
   const handleAuthComplete = (uid?: string) => {
     setUserId(uid);
-    if (uid) { setStage(AppStage.DASHBOARD); } else { setCurrentCampaignId('anonymous'); loadGameData(undefined, 'anonymous'); }
+    if (uid) { setStage(AppStage.DASHBOARD); } else { setCurrentCampaignId(ANONYMOUS_CAMPAIGN_ID); loadGameData(undefined, ANONYMOUS_CAMPAIGN_ID); }
   };
 
   useEffect(() => {
     if (userId && stage === AppStage.AUTH) setStage(AppStage.DASHBOARD);
-    else if (!userId && stage !== AppStage.AUTH) setStage(AppStage.AUTH);
-  }, [userId, stage, setStage]);
+    // Anonymous players have no userId by design — don't bounce them back to AUTH.
+    else if (!userId && stage !== AppStage.AUTH && currentCampaignId !== ANONYMOUS_CAMPAIGN_ID) setStage(AppStage.AUTH);
+  }, [userId, stage, setStage, currentCampaignId]);
 
   useEffect(() => {
     if (stage === AppStage.DASHBOARD && userId) loadCampaigns();

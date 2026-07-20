@@ -261,6 +261,27 @@ describe('useGameActions', () => {
     expect(setMessagesCall[0].text).toContain('Greetings');
   });
 
+  it('handleCharacterCreated persists via syncCampaignState for anonymous campaigns (no Supabase createCampaign)', async () => {
+    const char = makeBaseState().party[0];
+    defaultProps.currentCampaignId = 'anonymous';
+    defaultProps.userId = undefined;
+    defaultProps.isNewCampaign = true;
+    const { result } = render();
+
+    await act(async () => {
+      await result.current.handleCharacterCreated(char);
+    });
+
+    expect(storageService.syncCampaignState).toHaveBeenCalledWith('anonymous', expect.anything(), expect.anything());
+    expect(storageService.createCampaign).not.toHaveBeenCalled();
+    expect(setIsNewCampaign).toHaveBeenCalledWith(false);
+
+    // Reset for downstream tests
+    defaultProps.currentCampaignId = undefined;
+    defaultProps.userId = undefined;
+    defaultProps.isNewCampaign = false;
+  });
+
   it('handleRewind returns early when no snapshot and no user message', () => {
     mcpServerMock.loadRewindPoint.mockReturnValue(null);
     const { result } = render();

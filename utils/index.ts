@@ -10,4 +10,5 @@ export * from './random';
 export * from './envHelper';
 export * from './debug';
 export * from './dice';
+export * from './campaign';
 

@@ -105,6 +105,34 @@ describe('useGameState', () => {
     vi.unstubAllGlobals();
   });
 
+  it('loadGameData advances first-time anonymous users to CREATION when no save exists', async () => {
+    mockLoadGame.mockResolvedValue({ data: undefined });
+
+    const { result } = renderHook(() => useGameState(undefined));
+
+    await act(async () => {
+      await result.current.loadGameData(undefined, 'anonymous');
+    });
+
+    expect(result.current.stage).toBe(AppStage.CREATION);
+    expect(result.current.isNewCampaign).toBe(true);
+  });
+
+  it('loadGameData does NOT advance to CREATION for missing data on non-anonymous campaigns (preserves existing behavior)', async () => {
+    mockLoadGame.mockResolvedValue({ data: undefined });
+
+    const { result } = renderHook(() => useGameState(undefined));
+
+    await act(async () => {
+      await result.current.loadGameData('user-1', 'camp-1');
+    });
+
+    // Authenticated users with no save should not be auto-advanced; they stay on AUTH
+    // and rely on the dashboard / campaign-creation flow instead.
+    expect(result.current.stage).toBe(AppStage.AUTH);
+    expect(result.current.isNewCampaign).toBe(false);
+  });
+
   it('resetGame resets mcpServer and goes to CREATION', async () => {
     mockGetFullState.mockReturnValue({
       party: [], worldDescription: 'Reset', sessionLogs: [],
@@ -169,6 +197,38 @@ describe('useGameState', () => {
 
     expect(mockUpdateInventoryDirectly).toHaveBeenCalledWith(newInv);
     expect(mockGetFullState).toHaveBeenCalled();
+  });
+
+  it('handleUpdateInventory persists for anonymous campaigns via syncCampaignState', async () => {
+    mockGetFullState.mockReturnValue({
+      party: [], worldDescription: 'test', sessionLogs: [],
+      quests: [], lore: [], actionQueue: [],
+    });
+
+    const { result } = renderHook(() => useGameState(undefined));
+    act(() => { result.current.setCurrentCampaignId('anonymous'); });
+
+    await act(async () => {
+      await result.current.handleUpdateInventory([{ name: 'Sword', quantity: 1 }]);
+    });
+
+    expect(mockSyncCampaignState).toHaveBeenCalledWith('anonymous', expect.anything());
+  });
+
+  it('handleUpdateCurrency persists for anonymous campaigns via syncCampaignState', async () => {
+    mockGetFullState.mockReturnValue({
+      party: [], worldDescription: 'test', sessionLogs: [],
+      quests: [], lore: [], actionQueue: [],
+    });
+
+    const { result } = renderHook(() => useGameState(undefined));
+    act(() => { result.current.setCurrentCampaignId('anonymous'); });
+
+    await act(async () => {
+      await result.current.handleUpdateCurrency({ gp: 50, sp: 0, cp: 0 });
+    });
+
+    expect(mockSyncCampaignState).toHaveBeenCalledWith('anonymous', expect.anything());
   });
 
   it('handleUpdateCurrency updates currency and syncs', () => {

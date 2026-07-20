@@ -6,6 +6,7 @@ import { generateAtmosphere } from '../services/llm';
 import { AppSettings } from '../types';
 import { isDebugMode } from '../utils/debug';
 import { getRewindGeneration } from '../services/rewindGeneration';
+import { isSyncableCampaign, ANONYMOUS_CAMPAIGN_ID } from '../utils/campaign';
 
 /** Central state management hook for the game: stage, gameState, messages, campaign metadata, sync, and atmosphere updates. */
 export const useGameState = (userId: string | undefined) => {
@@ -27,10 +28,8 @@ export const useGameState = (userId: string | undefined) => {
         setGameState(mcpServer.getFullState());
     }, []);
 
-    const isSyncableCampaign = (id?: string) => id != null && id !== 'anonymous';
-
     const syncCampaignState = useCallback(async () => {
-        if (isSyncableCampaign(currentCampaignId)) {
+        if (currentCampaignId) {
             await storageService.syncCampaignState(currentCampaignId, mcpServer.getFullState());
         }
     }, [currentCampaignId]);
@@ -69,6 +68,10 @@ export const useGameState = (userId: string | undefined) => {
                     }
                 }
                 setStage(data.stage);
+            } else if (campaignId === ANONYMOUS_CAMPAIGN_ID) {
+                // First-time anonymous user with no local save → advance to character creation.
+                setIsNewCampaign(true);
+                setStage(AppStage.CREATION);
             }
         } catch (e) {
             console.error('[loadGameData] Error:', e);
@@ -116,7 +119,7 @@ export const useGameState = (userId: string | undefined) => {
     }, [userId, currentCampaignId]);
 
     useEffect(() => {
-        if (currentCampaignId && stage === AppStage.PLAY && currentCampaignId !== 'anonymous') {
+        if (isSyncableCampaign(currentCampaignId) && stage === AppStage.PLAY) {
             if (isDebugMode) console.log('[DEBUG useGameState] subscribing to campaign', currentCampaignId);
             const unsubscribe = storageService.subscribeToCampaign(currentCampaignId, (newData) => {
                 const remoteState = newData.game_state;

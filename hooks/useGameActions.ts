@@ -37,6 +37,7 @@ import { storageService } from '../services/storageService';
 import { speakText, stopSpeaking } from '../services/audioService';
 import { isDebugMode } from '../utils/debug';
 import { bumpRewindGeneration } from '../services/rewindGeneration';
+import { isSyncableCampaign, ANONYMOUS_CAMPAIGN_ID } from '../utils/campaign';
 import {
   isLazyNarration, buildDeterministicNarration, buildToolSummary, cleanSpeak,
   dispatchToolRolls, DiceRollFn, buildContextString
@@ -89,10 +90,8 @@ export const useGameActions = (
 
     const syncFinished = (msgs: Message[], extras?: Partial<GameState>) => {
         const finalState = syncStateHelper(ctxRef.current, msgs, mcpServer, setGameState, currentCampaignId, campaignName, extras);
-        if (currentCampaignId && currentCampaignId !== 'anonymous') {
+        if (currentCampaignId) {
             storageService.syncCampaignState(currentCampaignId, finalState, msgs).catch(e => console.warn('[Sync] failed:', e));
-        } else {
-            storageService.saveGame({ version: '1.0', campaignId: 'anonymous', campaignName: campaignName || 'Local Campaign', gameState: finalState, messages: msgs, stage: AppStage.PLAY, timestamp: Date.now() }, undefined, 'anonymous').catch(e => console.warn('[Save] failed:', e));
         }
     };
 
@@ -137,7 +136,7 @@ export const useGameActions = (
         setMessages(prev => [...prev, userMsg]);
         setIsLoading(true);
 
-        if (currentCampaignId && currentCampaignId !== 'anonymous') {
+        if (isSyncableCampaign(currentCampaignId)) {
             const lockedState = { ...mcpServer.getFullState(), isProcessing: true, processingUser: senderName };
             mcpServer.loadState(lockedState); setGameState(lockedState);
             storageService.syncCampaignState(currentCampaignId, lockedState, [...currentMessages, userMsg]).catch(e => console.warn('[Sync] failed:', e));
@@ -198,7 +197,7 @@ export const useGameActions = (
         } catch (err) {
             if (isDebugMode) console.error("[DEBUG handleSendMessage] Critical failure:", err);
             processingRef.current = false;
-            if (currentCampaignId && currentCampaignId !== 'anonymous') {
+            if (isSyncableCampaign(currentCampaignId)) {
                 const finalState = { ...mcpServer.getFullState(), isProcessing: false, processingUser: undefined };
                 mcpServer.loadState(finalState); setGameState(finalState);
                 storageService.syncCampaignState(currentCampaignId, finalState).catch(e => console.warn('[Sync] failed:', e));
@@ -217,7 +216,7 @@ export const useGameActions = (
         const currentMessages = messagesRef.current;
         const lockedState = { ...gameState, isProcessing: true, processingUser: "Party" };
         setGameState(lockedState); mcpServer.loadState(lockedState);
-        if (currentCampaignId && currentCampaignId !== 'anonymous') storageService.syncCampaignState(currentCampaignId, lockedState).catch(e => console.warn('[Sync] failed:', e));
+        if (isSyncableCampaign(currentCampaignId)) storageService.syncCampaignState(currentCampaignId, lockedState).catch(e => console.warn('[Sync] failed:', e));
 
         const batchText = "[Collaborative Turn]\n" + gameState.actionQueue.map(item => `[${item.playerName}]: ${item.type === 'dialogue' ? `"${item.text}"` : item.text}`).join("\n");
         const turnStart = Date.now();
@@ -267,7 +266,7 @@ export const useGameActions = (
             processingRef.current = false;
             const finalState = { ...gameState, isProcessing: false };
             setGameState(finalState);
-            if (currentCampaignId && currentCampaignId !== 'anonymous') storageService.syncCampaignState(currentCampaignId, finalState).catch(e => console.warn('[Sync] failed:', e));
+            if (isSyncableCampaign(currentCampaignId)) storageService.syncCampaignState(currentCampaignId, finalState).catch(e => console.warn('[Sync] failed:', e));
         } finally {
             setIsLoading(false);
         }
@@ -286,7 +285,7 @@ export const useGameActions = (
         const introMsg: Message = { id: 'welcome-' + Date.now(), role: MessageRole.MODEL, text: `Greetings, ${character.name}. Your journey begins in ${locName}. ${desc} ${hook} What do you do?`, timestamp: Date.now() };
         setMessages([introMsg]);
 
-        if (userId && currentCampaignId && currentCampaignId !== 'anonymous') {
+        if (userId && isSyncableCampaign(currentCampaignId)) {
             const fullState = mcpServer.getFullState();
             if (isNewCampaign) {
                 await storageService.createCampaign(userId, campaignName || "New Campaign", fullState, currentCampaignId);
@@ -295,6 +294,10 @@ export const useGameActions = (
             } else {
                 await storageService.syncCampaignState(currentCampaignId, fullState, messages);
             }
+        } else if (currentCampaignId === ANONYMOUS_CAMPAIGN_ID) {
+            // Persist the freshly created character + intro for anonymous players
+            await storageService.syncCampaignState(currentCampaignId, mcpServer.getFullState(), [introMsg]);
+            setIsNewCampaign(false);
         }
         if (settings.enableAtmosphere && startingLoc) performAtmosphereUpdate(startingLoc.name, startingLoc.description, settings);
         autoSpeak(introMsg.text);
@@ -343,10 +346,13 @@ export const useGameActions = (
                 generation: (gs.ctx?.generation ?? 0) + 1,
             };
 
-            if (currentCampaignId && currentCampaignId !== 'anonymous') {
+            if (isSyncableCampaign(currentCampaignId)) {
                 const cleanState = { ...mcpServer.getFullState(), isProcessing: false, processingUser: undefined };
                 mcpServer.loadState(cleanState); setGameState(cleanState);
                 await storageService.syncCampaignState(currentCampaignId, cleanState, restoredMessages);
+            } else if (currentCampaignId === ANONYMOUS_CAMPAIGN_ID) {
+                // Persist the rewound state locally so a refresh doesn't undo the rewind
+                await storageService.syncCampaignState(currentCampaignId, mcpServer.getFullState(), restoredMessages);
             }
             setViewingCharacterId(myCharacterId);
             mcpServer.clearRewindPoint();
@@ -377,10 +383,12 @@ export const useGameActions = (
             generation: (gs.ctx?.generation ?? 0) + 1,
         };
 
-        if (currentCampaignId && currentCampaignId !== 'anonymous') {
+        if (isSyncableCampaign(currentCampaignId)) {
             const cleanState = { ...mcpServer.getFullState(), isProcessing: false, processingUser: undefined };
             mcpServer.loadState(cleanState); setGameState(cleanState);
             await storageService.syncCampaignState(currentCampaignId, cleanState, snapshot.messages.slice(0, -1));
+        } else if (currentCampaignId === ANONYMOUS_CAMPAIGN_ID) {
+            await storageService.syncCampaignState(currentCampaignId, mcpServer.getFullState(), snapshot.messages.slice(0, -1));
         }
         setViewingCharacterId(myCharacterId);
         mcpServer.clearRewindPoint();

@@ -151,6 +151,41 @@ describe('storageService', () => {
 
       await expect(storageService.syncCampaignState('bad', {} as unknown as GameState)).resolves.toBeUndefined();
     });
+
+    it('writes to localStorage (not Supabase) when campaignId is "anonymous"', async () => {
+      const gs = { party: [{ id: 'c1' }] } as unknown as GameState;
+      const msgs = [{ id: 'm1', text: 'hi' }];
+
+      await storageService.syncCampaignState('anonymous', gs, msgs as unknown as typeof msgs);
+
+      // Supabase must not have been touched
+      expect(supabase.from).not.toHaveBeenCalled();
+      // localStorage must hold the snapshot
+      const raw = localStorage.getItem(LS_KEY);
+      expect(raw).toBeTruthy();
+      const parsed = JSON.parse(raw as string);
+      expect(parsed.campaignId).toBe('anonymous');
+      expect(parsed.campaignName).toBe('Local Campaign');
+      expect(parsed.stage).toBe(AppStage.PLAY);
+      expect(parsed.gameState).toEqual(gs);
+      expect(parsed.messages).toEqual(msgs);
+    });
+
+    it('anonymous sync does not throw when localStorage is unavailable', async () => {
+      const original = globalThis.localStorage;
+      // Simulate a quota/security error
+      Object.defineProperty(globalThis, 'localStorage', {
+        configurable: true,
+        get: () => { throw new Error('Security'); },
+      });
+      try {
+        await expect(
+          storageService.syncCampaignState('anonymous', {} as unknown as GameState),
+        ).resolves.toBeUndefined();
+      } finally {
+        Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: original });
+      }
+    });
   });
 
   describe('createCampaign', () => {

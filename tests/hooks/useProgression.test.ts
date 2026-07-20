@@ -502,7 +502,7 @@ describe('useProgression', () => {
       expect(mockSyncState).toHaveBeenCalled();
     });
 
-    it('anonymous campaignId skips storage sync', async () => {
+    it('anonymous campaignId persists via syncCampaignState (localStorage routing)', async () => {
       const { result } = renderHook(() => useProgression('anonymous', mockSyncState));
 
       act(() => { result.current.handleOpenLevelUp('char-1'); });
@@ -512,7 +512,7 @@ describe('useProgression', () => {
         await result.current.handleConfirmAllocation();
       });
 
-      expect(mockSyncCampaignState).not.toHaveBeenCalled();
+      expect(mockSyncCampaignState).toHaveBeenCalledWith('anonymous', expect.anything());
       expect(mockSyncState).toHaveBeenCalled();
     });
 
