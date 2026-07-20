@@ -1,0 +1,40 @@
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { GameState, Message } from '../types';
+
+export function useActivityTracking(gameState: GameState, messages: Message[], userId?: string) {
+  const [recentActivity, setRecentActivity] = useState<string[]>([]);
+  const prevProcessingUserRef = useRef<string | undefined>(undefined);
+  const prevMessageCountRef = useRef(0);
+  const prevQueueLengthRef = useRef(0);
+
+  const addActivity = useCallback((msg: string) => {
+    setRecentActivity(prev => [msg, ...prev].slice(0, 5));
+    setTimeout(() => setRecentActivity(prev => prev.slice(0, -1)), 8000);
+  }, []);
+
+  useEffect(() => {
+    const cur = gameState.processingUser;
+    if (cur && cur !== prevProcessingUserRef.current) addActivity(`${cur} is taking their turn`);
+    prevProcessingUserRef.current = cur;
+  }, [gameState.processingUser, addActivity]);
+
+  useEffect(() => {
+    const count = messages.length;
+    if (prevMessageCountRef.current > 0 && count > prevMessageCountRef.current) {
+      const other = messages.slice(prevMessageCountRef.current).find(m => m.senderName && m.senderName !== 'You' && m.senderName !== 'GameMaster');
+      if (other) addActivity(`${other.senderName} sent a message`);
+    }
+    prevMessageCountRef.current = count;
+  }, [messages, addActivity]);
+
+  useEffect(() => {
+    const len = gameState.actionQueue?.length || 0;
+    if (prevQueueLengthRef.current > 0 && len > prevQueueLengthRef.current) {
+      const other = (gameState.actionQueue || []).slice(prevQueueLengthRef.current).find(i => i.playerId !== userId);
+      if (other) addActivity(`${other.playerName} added to queue`);
+    }
+    prevQueueLengthRef.current = len;
+  }, [gameState.actionQueue, userId, addActivity]);
+
+  return { recentActivity, addActivity };
+}

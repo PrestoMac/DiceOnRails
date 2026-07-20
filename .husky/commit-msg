@@ -1,0 +1,29 @@
+#!/usr/bin/env sh
+. "$(dirname "$0")/_/husky.sh"
+
+commit_message=$(cat "$1")
+
+# Check if both test and source files are staged
+has_tests=false
+has_source=false
+for file in $(git diff --cached --name-only); do
+  if echo "$file" | grep -q "\.test\."; then
+    has_tests=true
+  elif echo "$file" | grep -q "\.\(ts\|tsx\)$"; then
+    has_source=true
+  fi
+done
+
+if $has_tests && $has_source; then
+  if ! echo "$commit_message" | grep -qE "^\[RED\]|^\[GREEN\]"; then
+    echo ""
+    echo "⚠️  Commandment XI violation: Commit touches both test files AND source files."
+    echo "    Split into two commits:"
+    echo "      [RED]   — the test asserting correct behavior (test files only)"
+    echo "      [GREEN] — the production fix (source files only)"
+    echo ""
+    exit 1
+  fi
+fi
+
+exit 0

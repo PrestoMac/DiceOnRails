@@ -1,0 +1,907 @@
+# Architecture
+
+> Developer reference for DiceOnRails. This is the source of truth for the file layout, services, data flow, and how every subsystem ties together.
+
+For a friendly introduction, see **[README.md](./README.md)** first.
+
+---
+
+## Table of Contents
+
+1. [Technology Stack](#1-technology-stack)
+2. [Top-Level Layout](#2-top-level-layout)
+3. [Application Bootstrap & Stage Machine](#3-application-bootstrap--stage-machine)
+4. [State Management: The Context Layer](#4-state-management-the-context-layer)
+5. [The Game Engine (`services/mcpService.ts`)](#5-the-game-engine-servicesmcpservicets)
+6. [The LLM Subsystem (`services/llm/`)](#6-the-llm-subsystem-servicesllm)
+7. [The Turn Lifecycle (end-to-end)](#7-the-turn-lifecycle-end-to-end)
+8. [Context Pipeline (memory & token budget)](#8-context-pipeline-memory--token-budget)
+9. [Engine Subsystems](#9-engine-subsystems)
+10. [Persistence Layer](#10-persistence-layer)
+11. [Character Creation Pipeline](#11-character-creation-pipeline)
+12. [Components & UI Layouts](#12-components--ui-layouts)
+13. [Types System](#13-types-system)
+14. [Static Game Data](#14-static-game-data)
+15. [Build, Test & CI](#15-build-test--ci)
+16. [Configuration Reference](#16-configuration-reference)
+17. [Key Invariants & Conventions](#17-key-invariants--conventions)
+
+---
+
+## 1. Technology Stack
+
+| Concern | Choice |
+|---|---|
+| Language | TypeScript 5.8 (strict mode, `noImplicitAny`, `strictNullChecks`) |
+| UI | React 19.2 |
+| Build tool | Vite 6.2 (`@vitejs/plugin-react`) |
+| Styling | Tailwind via CDN + custom CSS in `index.html`; Font Awesome 6; Google Fonts (Crimson Pro / Inter) |
+| State | React Context + hooks (no Redux/Zustand) |
+| Backend / DB | Supabase (Postgres + Realtime + Auth) |
+| AI transport | OpenAI-compatible Chat Completions API over `fetch` + SSE streaming |
+| AI provider | OpenRouter by default; any OpenAI-compatible endpoint works |
+| Image gen | ImageRouter (`stabilityai/sdxl-turbo` default) |
+| Markdown | `react-markdown` |
+| Tests | Vitest 4 + `@testing-library/react` + `jsdom` |
+| Lint | ESLint 8 + `@typescript-eslint` |
+| Git hooks | Husky 9 |
+| Deploy | Vercel (SPA + serverless proxy) |
+| Analytics | `@vercel/analytics` + `@vercel/speed-insights` |
+
+`moduleResolution: bundler`, `target: ES2022`, JSX via `react-jsx`. Path alias `@/*` → repo root.
+
+---
+
+## 2. Top-Level Layout
+
+```
+DiceOnRails/
+├── api/                      # Serverless functions (Vercel)
+│   └── chat/completions.ts   # CORS proxy to upstream LLM provider
+├── App.tsx                   # Root component: stage machine + providers
+├── index.tsx                 # ReactDOM.createRoot entry
+├── index.html                # Vite HTML shell (Tailwind CDN, fonts, animations)
+├── constants.ts              # Re-exports + SYSTEM_INSTRUCTION + INITIAL_CHARACTER
+├── components/               # All React UI components
+│   ├── chat/                 # ChatLog subcomponents
+│   ├── creation/             # Character creation wizard (12 steps)
+│   ├── dice/                 # DiceEngine component
+│   ├── layouts/              # DesktopLayout, MobileLayout
+│   ├── levelup/              # Level-up modal panels
+│   ├── shared/               # Reusable atoms (HpBar, BaseModal, Toggle, …)
+│   ├── sheet/                # CharacterSheet subpanels
+│   ├── wizard/               # Generic StepWizard framework
+│   └── *.tsx                 # Top-level screens & modals
+├── contexts/                 # 6 React Context providers
+├── data/                     # Static SRD catalogs (classes, races, spells, …)
+├── hooks/                    # 11 custom hooks backing the contexts
+├── public/                   # Static assets (splash-bg.png)
+├── scripts/                  # Node tooling (preflight, installer, benchmarks)
+├── services/                 # All business logic
+│   ├── llm/                  # LLM client, agent loop, narration, context mgmt
+│   │   ├── prompts/          # System/tool-mode prompts
+│   │   └── tools/            # OpenAI function-calling tool schemas
+│   ├── mcp/                  # Sub-services consumed by MockMCPServer
+│   └── *.ts                  # Engine + infra services
+├── supabase/migrations/      # SQL schema (campaigns, game_saves, srd_items, monsters)
+├── tests/                    # Vitest test suite
+│   ├── helpers/              # Test factories & mocks
+│   ├── live/                 # Tier-3+ live LLM scenario tests
+│   ├── services/ hooks/ components/ utils/
+├── types/                    # All TypeScript types (character, combat, spell, game, common)
+├── utils/                    # Pure helpers (random, dice, time, env, catalogs)
+├── .env.example              # Documented env-var template
+├── .eslintrc.cjs
+├── .github/workflows/test.yml
+├── vite.config.ts            # Dev server, setup-wizard middleware, proxy, build chunks
+├── vitest.config.ts
+├── tsconfig.json
+└── vercel.json               # SPA rewrites
+```
+
+---
+
+## 3. Application Bootstrap & Stage Machine
+
+### Entry chain
+
+`index.html` → `/index.tsx` → `App.tsx` (default export).
+
+`App.tsx:38-62` — the root `App` component decides what to render:
+
+1. If `import.meta.env.VITE_SETUP_MODE === 'true'` → render `<SetupWizard />` (first-run installer that writes `.env`). The flag is injected by `vite.config.ts:80-85` based on whether `.env` contains `VITE_SUPABASE_URL`.
+2. `initAudio()` on mount (primes `speechSynthesis` voices).
+3. Show `<SplashScreen />` once per page load (purely decorative).
+4. Wrap the rest in the provider stack:
+
+```
+AuthProvider
+└─ UIProvider
+  └─ GameProvider
+    └─ ProgressionProvider
+      └─ CampaignProvider
+        └─ ActionsProvider
+          └─ <AppContent />
+```
+
+The order matters: each provider consumes the contexts above it.
+
+### Stage machine
+
+`AppStage` enum (`types/common.ts:8`) drives the entire UX:
+
+| Stage | Rendered by `AppContent.getContent()` | When |
+|---|---|---|
+| `AUTH` | `<AuthScreen />` | No user id and not anonymous |
+| `DASHBOARD` | `<CampaignDashboard />` | User signed in, not yet in a campaign |
+| `CREATION` | `<WizardShell />` | New/joined campaign, character not yet built |
+| `PLAY` | `<DesktopLayout />` or `<MobileLayout />` (wrapped in `<ErrorBoundary>`) | Active game |
+
+Layout choice (`isMobile`) comes from `UIContext` which listens to `window.innerWidth < 768`.
+
+Overlays rendered on top regardless of stage: `<SettingsModal>`, `<CampaignModal>`, `<DiceRollModal>`, `<QueueNotification>`, plus `<Analytics />` and `<SpeedInsights />`.
+
+A `useEffect` in `AppContent` does a one-time "warmup" POST to the LLM (a `ping` with `max_tokens: 1`) when entering the PLAY stage — this primes the provider's cache for faster first-turn response.
+
+---
+
+## 4. State Management: The Context Layer
+
+There is **no external state library**. Six contexts, each backed by a hook, expose a flat API to the rest of the app.
+
+| Context | Hook | File | Owns |
+|---|---|---|---|
+| `AuthContext` | `useAuth` | `hooks/useAuth.ts` | `userId` (from Supabase session), `setUserId`, `handleLogout` |
+| `UIContext` | `useSettings` + local state | `contexts/UIContext.tsx` | `AppSettings`, settings modal open state, `isMobile`, dice-roll modal data |
+| `GameContext` | `useGameState` + `useQueue` | `contexts/GameContext.tsx` | `GameState`, `messages`, `stage`, campaign id/name, character ids, queue actions, atmosphere updates |
+| `ProgressionContext` | `useProgression` | `contexts/ProgressionContext.tsx` | Level-up modal state, stat allocations, feat/subclass choices |
+| `CampaignContext` | `useCampaigns` | `contexts/CampaignContext.tsx` | Campaign list CRUD, create/join/delete/rename |
+| `ActionsContext` | `useGameActions` + local | `contexts/ActionsContext.tsx` | `handleSendMessage`, `handleRewind`, `handleExecuteBatch`, `handleCharacterCreated`, `handleResolveEnemyTurn` |
+
+Every context throws if `useXContext` is called outside its provider (`Error: useXContext must be used within XProvider`). The contexts compose the underlying hooks — the hooks themselves are also independently testable and are the actual loci of logic.
+
+### Two singletons
+
+- **`mcpServer`** — proxy around `MockMCPServer`, defined in `services/mcpService.ts:328`. Lazy-instantiated, accessed globally.
+- **`supabase`** — proxy around the Supabase client, defined in `services/supabaseClient.ts:25`. Lazy-instantiated, falls back to placeholder URLs if env is missing.
+
+Both are `Proxy` objects that bind method calls to a lazily-created underlying instance, so importing them never crashes even when misconfigured.
+
+---
+
+## 5. The Game Engine (`services/mcpService.ts`)
+
+The single most important file in the repo. The `MockMCPServer` class is the **in-memory source of truth for game state**. "Mock" is historical — it's a real engine, just in-process (vs. an external MCP server).
+
+### State
+
+Holds a single `GameState` object (shape in `types/game.ts:40`):
+
+```ts
+GameState = {
+  party: Character[],            // all PCs
+  worldDescription: string,
+  sessionLogs: string[],
+  quests: Quest[],
+  lore: LoreEntry[],
+  startingLocation?: StartingLocation,
+  locationImages?: Record<string, string>,   // name → image URL cache
+  currentAtmosphereUrl?: string,
+  isProcessing?: boolean,                     // multiplayer lock
+  processingUser?: string,
+  actionQueue: QueuedAction[],                // multiplayer queued turns
+  combat?: CombatState,
+  lastDiceRoll?: { sides, count, modifier, results, total },
+  ctx?: ContextMetadata,                      // context pipeline state
+  gameTime?: number,                          // minutes since epoch
+  lastLongRestTime?: number,
+  _tiredWarningFired?: boolean,
+  factionReputations?: Record<string, number>,
+}
+```
+
+### Service composition
+
+`MockMCPServer` delegates to **8 sub-services** in `services/mcp/`, all created in the constructor and sharing the same `state` reference:
+
+| Sub-service | File | Domain |
+|---|---|---|
+| `stateManager` | `stateService.ts` | load/reset/snapshot, transactions, rewind points, emergency snapshots, field initialization |
+| `party` | `partyService.ts` | add/replace characters, look up by id/name, expose `campaign://` resources |
+| `inventory` | `inventoryService.ts` | items, currency, damage application |
+| `combat` | `combatService.ts` | initiative, attacks, enemy AI, saves, death saves |
+| `spells` | `spellcastingService.ts` | spell casting, slots, concentration, rituals, counterspell/dispel |
+| `progression` | `progressionService.ts` | XP, leveling, stat allocation |
+| `content` | `contentService.ts` | quests, lore, reputation |
+| `travel` | `travelService.ts` | movement, routes, narration/time, rests, dice, skill checks |
+
+Sub-services are factory functions (`createXService(state, deps?)`) that close over the shared `state` and a small dependency object. The wiring lives in `mcpService.ts:43-72`. This is a lightweight **dependency injection** pattern — combat needs `inflict_damage` from inventory, travel needs `update_inventory`/`adjust_currency` from inventory + `log_lore`/`upsert_quest` from content, etc.
+
+### Tool dispatcher
+
+`MockMCPServer.executeToolCall(name, args)` (`mcpService.ts:232-321`) is the **canonical entry point for all mutations**. It's a switch over ~30 tool names. Every branch:
+
+1. Coerces args to the correct types (LLMs send strings; engine needs numbers).
+2. Delegates to the relevant sub-service method.
+3. Returns an `MCPResponse = { success: boolean; data: any; message?: string }`.
+
+This same method is called by the agent loop **and** by the React layer (e.g. `mcpServer.resolveAllPendingEnemyTurns()` from `ActionsContext.handleResolveEnemyTurn`).
+
+### Transactions, snapshots & rewind
+
+The state manager supports:
+- **`beginTransaction / rollbackTransaction / commitTransaction`** — deep clone for atomic ops (used by batched party turns).
+- **`captureRewindSnapshot`** — captures the in-flight transaction snapshot.
+- **`saveRewindPoint(gameState, messages)` / `loadRewindPoint`** — full state+messages snapshot saved before every player turn so a "retry" can restore it.
+- **`saveEmergencySnapshot / loadEmergencySnapshot`** — second-chance snapshot in case the rewind point itself was lost.
+
+`handleRewind` in `hooks/useGameActions.ts:305-385` orchestrates all of this and either replays the user's message or falls back to the emergency snapshot.
+
+---
+
+## 6. The LLM Subsystem (`services/llm/`)
+
+```
+services/llm/
+├── index.ts              # Re-exports
+├── agentLoop.ts          # runAgentLoop — the multi-turn tool-use driver
+├── llmApiClient.ts       # resolveLLMConfig, mapHistoryToMessages, fetchWithTimeout
+├── narration.ts          # generateNarration, generateNarrationStream, generateTightNarration
+├── atmosphere.ts         # generateAtmosphere (image), generateStartingLocations, compressRawToCheckpoint
+├── contextManager.ts     # Token-budget enforcement + episode-checkpoint pipeline
+├── tokenEstimation.ts    # Heuristic length→token estimator + budget constants
+├── toolFilter.ts         # Strips irrelevant tools from the schema based on state
+├── prompts/
+│   └── toolModePrompt.ts # TOOL_MODE_INSTRUCTION — the giant system instruction
+└── tools/                # OpenAI function-calling schemas (one file per domain)
+    ├── index.ts          # Aggregates all tool defs into `tools[]`
+    ├── shared.ts         # Shared JSON-schema fragments
+    ├── combat.ts         # add_enemy, start_combat, next_turn, end_combat, player_attack, …
+    ├── spells.ts         # cast_spell, spell_effect, manage_spellbook, use_resource, cast_ritual
+    ├── character.ts      # roll_dice, check_skill, make_save, roll_death_save, inflict_damage
+    ├── inventory.ts      # update_inventory, adjust_currency
+    ├── movement.ts       # move_to, narrate_turn
+    ├── journal.ts        # upsert_quest, log_lore
+    └── rest.ts           # award_experience, long_rest, short_rest, level_up
+```
+
+### `tools[]`
+
+A flat array of OpenAI-style `{ type: "function", function: { name, description, parameters } }` definitions. Aggregated in `tools/index.ts:9`. The `description` of each tool is **the most important cue the LLM gets** for picking the right one — they're written in a punchy, instruction-heavy style ("COMBAT. Adds an enemy combatant. Call this BEFORE start_combat.").
+
+### `TOOL_MODE_INSTRUCTION`
+
+`prompts/toolModePrompt.ts` — a ~90-line supplement appended to the system prompt during the agent loop. It contains:
+- The strict combat sequence (`start_combat` → `player_attack` → `next_turn` → `narrate_turn`)
+- A "QUICK REFERENCE" table mapping natural-language verbs to tools
+- Class-feature narration guidance (Rage, Sneak Attack, Fighting Style, …)
+- Race-trait narration guidance (Darkvision, Lucky, Hellish Resistance, …)
+- Spell-combat prerequisites ("Enemies must be registered FIRST")
+- An outright ban on writing `[System:tool_name]` patterns in narration
+
+### `resolveLLMConfig`
+
+`llmApiClient.ts:6` — picks model, URL, and headers based on env (`VITE_LLM_MODEL`, `VITE_LLM_API_BASE`, `VITE_LLM_API_KEY`) and an optional provider override. The provider resolution logic is in `services/llmClient.ts`:
+
+- `resolveProvider` → `'openai'` if the base isn't openrouter.ai, else `'openrouter'`
+- `normalizeModelName` → strips the `vendor/` prefix for non-OpenRouter bases (OpenAI's API doesn't accept `deepseek/...`)
+- `buildChatCompletionUrl` / `buildChatCompletionHeaders` — OpenRouter needs `HTTP-Referer` and `X-Title` headers; OpenAI doesn't
+
+### `streamChatCompletion`
+
+`services/streamingClient.ts` — an **async generator** that parses Server-Sent Events. Emits typed chunks: `content`, `reasoning`, `tool_calls`, `usage`, `done`, `error`. Includes a 60s-read-timeout watchdog. Used by `generateNarrationStream`; the agent loop itself uses non-streaming `fetch` because it needs the full tool-call payload per iteration.
+
+### `filterTools`
+
+`toolFilter.ts` — shrinks the tool schema sent to the LLM based on current state. Examples: hide `next_turn`/`player_attack` outside combat; hide `long_rest`/`short_rest` when the party is full; hide `cast_ritual`/`summon_creature` if nobody has spells. Smaller schema = lower latency, less confusion.
+
+---
+
+## 7. The Turn Lifecycle (end-to-end)
+
+The single most important flow to understand. Entry point: `useGameActions.handleSendMessage` in `hooks/useGameActions.ts:126`.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ handleSendMessage(text)                                                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+  │
+  ├─ 1. Bail if already processing (processingRef / gameState.isProcessing)
+  ├─ 2. Build userMsg, append to messages
+  ├─ 3. Lock the campaign:
+  │      - mcpServer.loadState({ ...state, isProcessing: true, processingUser })
+  │      - storageService.syncCampaignState(...) so other players see the lock
+  ├─ 4. Snapshot for rewind:
+  │      - mcpServer.saveRewindPoint(currentState, [...msgs, userMsg])
+  │      - mcpServer.saveEmergencySnapshot(currentState)
+  │
+  ├─ 5. prepareContext(...) → { frozen, activeMessages }
+  │      (episode checkpoints + frozen raw history prepended; budget enforced)
+  │
+  ├─ 6. Decide what kind of input this is:
+  │      - isClientSideAction  → starts with "[" (e.g. potion-use from sheet)
+  │      - isTrivialInput      → "hi", "ok", "lol" (regex matchers, <40 chars)
+  │      - otherwise: real action → run the agent loop
+  │
+  ├─ 7. runAgentLoop(history, contextString, frozen, onToolResult, opts)
+  │      ↓ see "Inside runAgentLoop" below
+  │      Returns: { toolMessages, inlineNarration, usage }
+  │
+  ├─ 8. Append toolMessages + a placeholder model message
+  │
+  ├─ 9. resolveNarration(text, toolMessages, inlineNarration, …)
+  │      - If agent loop produced ≥50-char narration → use it
+  │      - Else call generateTightNarration (single-shot, max 500 tokens)
+  │      - If even that is lazy → buildDeterministicNarration (templated)
+  │      - Falls back to "The adventure continues..."
+  │
+  ├─ 10. autoSpeak(modelMsg.text) — TTS if settings.autoSpeak
+  │
+  ├─ 11. syncFinished(messagesToSync):
+  │       - ctxRef → game_state.ctx metadata
+  │       - mcpServer.loadState({ ...state, isProcessing: false })
+  │       - storageService.syncCampaignState(...)
+  │
+  ├─ 12. runContextPipeline(): increment turnCounter, maybe freeze messages,
+  │       maybe compress raw → checkpoint asynchronously
+  │
+  └─ 13. finally: setIsLoading(false); syncState();
+```
+
+### Inside `runAgentLoop`
+
+`services/llm/agentLoop.ts:55`. A bounded loop (default `MAX_ITERS = 20`) that drives the LLM:
+
+1. **Build the message array:**
+   - system: `SYSTEM_INSTRUCTION + PROGRESSION_SYSTEM_PROMPT + TOOL_MODE_INSTRUCTION`
+   - frozen messages (episode checkpoints + raw history, prepended as system entries)
+   - mapped chat history (roles translated to `user`/`assistant`/`tool`/`system`)
+   - a context message: live combat state, current turn, enemies, active effects
+
+2. **Per iteration:**
+   - Re-filter tools against current state.
+   - POST `/chat/completions` with `tools`, `tool_choice: "auto"`, `temperature: 0.7`, 60s timeout.
+   - Add usage tokens to running totals (prompt, completion, cached).
+   - If no tool calls:
+     - Iteration 0 → push "you MUST call at least one tool" and continue.
+     - Active combat, current actor is enemy, <5 iters → push "call next_turn".
+     - Otherwise break.
+   - **End-of-turn detection:** if any tool call is `narrate_turn`, or a rest/move with narration/route → execute pre-end calls first, then `narrate_turn`, then break. The narration returned by `narrate_turn` is captured as `inlineNarration` (passed up to `handleSendMessage`).
+   - Otherwise batch-execute all tool calls in parallel via `executeToolBatch`, append `{role: assistant, tool_calls}` + per-tool `{role: tool, tool_call_id}` messages, loop.
+   - **Critical-tool tracking:** `cast_spell`, `inflict_damage`, `roll_dice`, `player_attack` — if any fails, set `criticalToolFailed` so we don't trust inline narration.
+   - **Budget guard:** if estimated payload exceeds 95% of `CONTEXT_BUDGET`, break early.
+   - **Combat shortcut:** if `next_turn` succeeded, break (turn is over).
+
+3. **Post-loop enforcement:** if no `narrate_turn` / rest / move-with-route fired, synthesize a `narrate_turn(narration='', timePassed=0)` so conditions/DoTs/concentration still tick consistently.
+
+4. **Return:** `{ toolMessages, iterationCount, promptTokens, completionTokens, cachedTokens, inlineNarration }`.
+
+### Batched party turns (`handleExecuteBatch`)
+
+`useGameActions.ts:210`. When multiplayer action queue is flushed:
+
+- Builds a `[Collaborative Turn]` user message containing every queued entry tagged with player name.
+- Same agent-loop flow but with a `batchContext` that emphasizes "process ALL actions".
+- Wraps the whole thing in `beginTransaction`/`rollbackTransaction` so a mid-batch failure rolls back cleanly.
+- Clears `actionQueue` on success.
+
+### Rewind flow (`handleRewind`)
+
+`useGameActions.ts:305`:
+
+1. If currently processing → bail.
+2. Load the rewind point (state + messages from before the user's last message).
+3. If no rewind point → fall back to emergency snapshot, slice messages back to the last user msg, **bump `ctx.generation`** (invalidates in-flight compression), and re-call `handleSendMessage(text, isRetry=true)`.
+4. Otherwise restore the snapshot, restore messages, **bump generation**, sync to Supabase, and re-call `handleSendMessage(originalText, isRetry=true)`.
+
+---
+
+## 8. Context Pipeline (memory & token budget)
+
+A custom episodic-memory system so the LLM can remember hours of play without overflowing context. Lives in `services/llm/contextManager.ts`.
+
+### Concepts
+
+| Concept | Description |
+|---|---|
+| **Active window** | The last `ACTIVE_MSG_WINDOW = 20` messages, sent verbatim. |
+| **Frozen raw history** | Messages that aged out of the active window, concatenated into one string with `[Player]/[GM]/[System]` prefixes. Capped at `RAW_CAP` (30K tokens, 80K chars). |
+| **Episode checkpoints** | Compressed summaries of frozen raw history. Each ~4K tokens, written by a fast non-thinking model (`VITE_SUMMARIZATION_MODEL`, default `xiaomi/mimo-v2.5`). |
+| **Generation** | Monotonic counter; bumped on rewind. Stale in-flight compression results are discarded by comparing generations. |
+| **CONTEXT_BUDGET** | Hard cap (default 180K tokens). When the payload exceeds it, oldest checkpoints are evicted, then raw history is trimmed. |
+
+### Flow
+
+Per turn (`runContextPipeline` in `contextManager.ts:145`):
+
+1. Increment `turnCounter`.
+2. Every `FREEZE_INTERVAL = 5` turns → `freezeMessages`: slide messages older than the active window into `frozenRawHistory`, update `frozenMessageCount`.
+3. `compressToCheckpointIfNeeded`: if raw tokens exceed `RAW_CAP` **or** no checkpoints exist yet and raw > 1K → kick off **async** compression (sets `isCompressing`, stores `compressPromise`). On success, the raw history is cleared and the checkpoint pushed onto `episodeCheckpoints`. Failures are logged and swallowed.
+
+Before each turn (`prepareContext` in `contextManager.ts:151`):
+
+1. Rebuild "frozen messages" array from `episodeCheckpoints` (as `[RECENT SESSION]`) and `frozenRawHistory` (as `[EARLIER EVENTS]`).
+2. `enforceTokenBudget`: while payload > budget, drop oldest checkpoint, then drop raw, then trim the active window from the front.
+3. Return `{ frozen, activeMessages }` — `activeMessages` is what gets sent to the LLM.
+
+### Checkpoint compression prompt
+
+`atmosphere.ts:151-169`. A dense ~1000-word archival prompt instructing the summarizer to preserve every NPC, quest, item, transaction, combat, skill check, XP award, lore entry, player decision, and character-development event in `[T#] Type: description.` format. These are the **only** record of those turns after compression — the model is told to be exhaustive.
+
+### Persistence
+
+The `ContextState` is serialized into `GameState.ctx` (`ContextMetadata` in `types/game.ts:31`) on every `syncFinishedState` call. On load, `useGameActions`'s `useEffect` at line 71 hydrates `ctxRef.current` from `gameState.ctx`. This means checkpoints survive page reloads and sync to other multiplayer clients.
+
+---
+
+## 9. Engine Subsystems
+
+All engine services are **pure functions or close-over-state factories**. They never touch React.
+
+### `diceEngine.ts`
+
+Cryptographically-secure dice (`cryptoRoll` from `utils/random.ts`). Public API: `rollDice`, `rollDiceWithAdvantage`, `rollAttackRoll`, `rollDamage`, `rollSkillCheck`, `rollSavingThrow`, `rollDeathSave`, `calculateModifier`. Honors feats: Great Weapon Fighting (reroll 1s and 2s on heavy melee), Two-Weapon Fighting (off-hand ability mod), Sharpshooter/Great Weapon Master flags. Skill checks map free-text skill names to stats via `SKILLS_LIST`.
+
+### `combatEngine.ts`
+
+The math layer behind `mcp/combatService.ts`. `addEnemyToCombat` auto-fills stats from the SRD monster manual (`lookupMonster`). `initializeCombat` rolls initiative (with Alert feat bonus). `advanceToNextTurn` ticks conditions, handles DoTs, expires transformations. `resolveEnemySingleTurn` / `resolveAllEnemyTurns` are the auto-AI for enemy turns. Uses `getConditionEffects`, `isUnconscious`, `isIncapacitated`, etc.
+
+### `classEngine.ts`
+
+~350 lines. The class/race/Subsystem authority. Key exports: `getClassDef`, `getRaceDef`, `getSubclassDef`, `calculateMaxHp`, `calculateAc`, `calculateSpeed`, `getDarkvisionRange`, `getSavingThrowBonus`, `getProficiencyBonus`, `getSpellSaveDc`, `getSpellAttackBonus`, `getDamageResistances`, `canEquipArmor`, `recalculateResourcePools`. Handles Unarmored Defense (Barbarian/Monk), Draconic Resilience, fighting styles, armor proficiency gating, etc.
+
+### `spellcastingEngine.ts`
+
+~500 lines. Slot tracking, spell attack rolls, saving throws, damage/healing rolls, cantrip scaling, concentration tracking, ritual casting, spell preparation/learning. Powers `mcp/spellcastingService.ts`.
+
+### `inventoryEngine.ts`
+
+Currency normalization (10 cp = 1 sp = 1/10 gp), equipment equip/unequip effects (mutually-exclusive armor/shield), SRD item lookup (`utils/srdItems`), market price deduction. Powers `mcp/inventoryService.ts`.
+
+### `conditionEngine.ts`
+
+The conditions subsystem: 16 standard conditions (blinded, charmed, frightened, paralyzed, …), exhaustion levels, concentration checks, save-ending conditions, duration ticking per round or per minute. `applyCondition`, `removeCondition`, `tickConditions`, `tickConditionsByTime`, `tickConditionsByRounds`, `rollSaveAgainstCondition`, `getExhaustionPenalty`. Used by combat, spells, and the time system.
+
+### `featsService.ts`
+
+~350 lines. All ASI/feat logic: `hasFeat`, `getFeat`, `getAllFeats`, `validateFeatPrereqs`, `applyAsiChoice`, `applyFeatChoice`, plus per-feat helpers (`getAlertInitiativeBonus`, `getToughHpBonus`, `getMobileSpeedBonus`, `getHeavyArmorMasterReduction`, etc.). Backed by `FEATS_CATALOG` in `utils/feats.ts`.
+
+### `progressionService.ts`
+
+XP table lookups, `calculateXPToNextLevel`, `awardExperience` (with multi-level ups, ASI flags, subclass-feature-unlock flags), `applyStatAllocation`, `calculateHPGainForLevelUp`, `getProgressionContext` (string summary for the LLM). Honors the **Solo Adventurer Buff** (+25% XP when party size = 1) and **party-wide XP split** when no `targetId` is supplied.
+
+### `summoningEngine.ts` / `teleportationEngine.ts` / `transformationEngine.ts`
+
+Specialized mechanics for summons (create summoned creatures with CR caps), teleportation (Misty Step, Dimension Door range checks), and transformations (Polymorph, Wild Shape, True Polymorph with beast CR caps by level / class).
+
+### `auditor.ts`
+
+A data-integrity checker. Runs a battery of rules over `GameState` and reports `AuditResult[]` — checks feats exist in the catalog, race/class IDs are valid, spell IDs resolve, armor proficiencies match class, etc. Most rules also have a `repair` function for auto-fix. Not currently wired into the runtime but available for diagnostics and tests.
+
+### `characterCreationService.ts`
+
+`buildCharacterFromWizard(wizard, options)` — pure function that turns the wizard state into a valid `Character`. Used by both `WizardShell.handleFinalize` (production) and tests.
+
+### `audioService.ts`
+
+Thin wrapper over `window.speechSynthesis`. Chunks text by sentence, picks a preferred male English voice, applies rate/pitch/volume from `AppSettings`. `initAudio` primes the voice list.
+
+### `storageService.ts` / `authService.ts` / `supabaseClient.ts`
+
+[Persistence layer — see §10](#10-persistence-layer).
+
+### `streamingClient.ts`
+
+[See §6 — LLM subsystem](#6-the-llm-subsystem-servicesllm).
+
+---
+
+## 10. Persistence Layer
+
+### `supabaseClient.ts`
+
+Lazily creates a Supabase client from `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`. Falls back to placeholder URLs and logs a warning if missing (so the app doesn't crash on first load). Exposes both `getSupabaseClient()` and a `Proxy` named `supabase` that auto-binds methods.
+
+### `authService.ts`
+
+Thin wrapper: `signUp`, `signIn`, `signOut`, `getSession`, `updatePassword`, `resetPasswordForEmail`. All return `{ error }` or `{ session }` shapes.
+
+### `storageService.ts`
+
+The persistence facade. Behavior switches on whether `userId` and a real `campaignId` (not `'anonymous'`) are present:
+
+- **Cloud mode:** Supabase `campaigns` table.
+- **Local mode:** `localStorage` under key `diceonrails_game_data`.
+
+Key methods:
+
+- `subscribeToCampaign(campaignId, onUpdate)` — Supabase Realtime channel on the `campaigns` table; used by `useGameState` to sync multiplayer state.
+- `syncCampaignState(campaignId, gameState, messages?)` — **batched** update. Multiple calls within a microtask are coalesced into a single Supabase UPDATE via `enqueueSync`/`drain` (lines 206-236). This prevents one player's turn from generating 20 separate DB writes.
+- `createCampaign`, `loadCampaigns`, `loadGame`, `saveGame`, `deleteCampaign`, `renameCampaign`, `clearLocalSave`.
+
+`loadCampaigns` queries both the modern `campaigns` table **and** the legacy `game_saves` table (tagged `[LEGACY]`), preserving saves from older versions of the app.
+
+### Schema (`supabase/migrations/`)
+
+- **`20240101000000_initial_schema.sql`** — `campaigns(id, host_id, name, game_state JSONB, messages JSONB, created_at)` with public read/insert/update policies and host-only delete. Also creates legacy `game_saves` table.
+- **`20260627000000_add_progression.sql`** — SQL functions (`get_character_xp`, `get_character_level`, `get_character_unused_points`) and the `campaign_party_progression` view for dashboards.
+- **`20260706000000_create_srd_items.sql`** — `srd_items` reference table.
+- **`20260710000000_create_monsters.sql`** — `monsters` reference table.
+
+The runtime uses static TS catalogs (`data/srdItems.ts`, `data/monsters.ts`) — the SQL tables exist for community tooling / dashboards. The setup wizard (`components/SetupWizard.tsx`) ships the same schema as a string and will execute it via the Supabase REST endpoint if the user pastes their keys during install.
+
+### Multiplayer lock
+
+Before any turn, `handleSendMessage` sets `isProcessing: true` and `processingUser: <name>` and writes that to Supabase. Other clients in `useGameState`'s subscription handler (lines 116-146) check `isProcessingRef`: if the local client thinks it's processing and the remote cleared the flag, that's the "unlock" signal; otherwise incoming remote state is applied.
+
+---
+
+## 11. Character Creation Pipeline
+
+### Components
+
+```
+components/creation/
+├── WizardShell.tsx       # Orchestrator — owns wizardState, assembles steps
+├── types.ts              # WizardState interface
+├── constants.ts          # STEP_LABELS, DRAGON_ANCESTRIES, sub-class lists
+├── SharedComponents.tsx  # StepH, NavBtn, SubclassList, DragonColorPicker
+├── NameStep.tsx
+├── RaceStep.tsx
+├── ClassStep.tsx
+├── StatsStep.tsx
+├── SkillsStep.tsx
+├── FeatsStep.tsx
+├── SpellsStep.tsx
+├── GearStep.tsx
+├── ReviewStep.tsx
+└── StartingGroundsStep.tsx
+```
+
+Plus the generic framework:
+
+```
+components/wizard/
+├── WizardStep.ts        # WizardStep<TState> interface + context type
+├── StepWizard.tsx       # Generic visible-step / history / navigation engine
+└── StepRegistry.ts      # (helper)
+```
+
+### How it works
+
+1. `WizardShell` declares an array of `WizardStep<WizardState>` objects. Each step has `{ key, label, isVisible?, validate?, render({state, updateState, context}) }`.
+2. `StepWizard` filters by `isVisible` (e.g. the subclass step only shows if `selectedClass.subclassLevel <= level`), maintains a step-history stack for back-navigation, and renders the current step plus a progress bar.
+3. Steps mutate `wizardState` via `updateWizard` (a stable `useCallback`).
+4. The wizard includes two "Path" steps — `subclass-early` (for classes like Cleric whose subclass is chosen at L1) and `subclass-late` (for classes whose subclass comes at L2+). Only one is visible depending on the class.
+5. On the **Review** step, `handleFinalize` (WizardShell:90) computes final stats, applies racial ASIs (including Half-Elf flexible choices), collects feats, builds the resource pools (`recalculateResourcePools`), assigns HP from class hit die + CON mod, and calls `onComplete(character)`.
+6. For **new campaigns**, a final **StartingGrounds** step calls `onGenerateStartingLocations` (which hits the LLM with `STARTING_LOCATIONS_PROMPT`) to produce 4 unique taverns, each with an LLM-generated atmosphere image. The chosen location seeds the world.
+
+### `onComplete` → `handleCharacterCreated`
+
+`useGameActions.ts:275`:
+
+1. Tag character with `ownerId = userId`.
+2. Set `myCharacterId`, `viewingCharacterId`.
+3. Read starting location from state, set character location.
+4. `mcpServer.joinParty(character)` → adds to `state.party`.
+5. `setStage(AppStage.PLAY)`.
+6. Build an intro message (`"Greetings, X. Your journey begins in Y…"`) and set messages.
+7. If part of a real campaign: `storageService.createCampaign(...)` (new) or `syncCampaignState(...)` (existing).
+8. If atmosphere art is enabled, fetch and cache the starting image.
+
+---
+
+## 12. Components & UI Layouts
+
+### Layouts
+
+`DesktopLayout.tsx` and `MobileLayout.tsx` are the two Play-stage shells. Both:
+
+- Pull state from all 6 contexts.
+- Render `<ChatLog>`, `<InputArea>`, `<CharacterSheet>`, `<Journal>`, `<LevelUpModal>`, `<CombatTracker>`, `<ActivityBell>`, `<AtmosphereOverlay>`.
+- Use `useActivityTracking` to summarize recent events for the bell.
+
+Differences:
+
+- **Desktop** — three-column resizable sidebar (Character/Journal tabs), top header with location/time/share/Activity Bell, combat tracker as a floating bar, queue panel below the sidebar.
+- **Mobile** — bottom nav (`Adventure` / `Hero` / `Journal` / `Settings`), atmosphere strip above chat, slide-up queue sheet, persistent HP/AC status bar.
+
+### Top-level screens & modals
+
+| Component | Purpose |
+|---|---|
+| `SplashScreen` | Decorative intro; calls `onComplete` after animation. |
+| `AuthScreen` | Sign-in / sign-up / anonymous play; calls `onComplete(uid?)`. |
+| `CampaignDashboard` | Lists campaigns; create / join (by ID) / delete / rename. |
+| `CampaignModal` | Modal for naming a new campaign. |
+| `SetupWizard` | First-run installer; writes `.env` via dev-server middleware or pastes SQL into Supabase. |
+| `SettingsModal` | Toggles for voice, atmosphere, debug mode, TTS sliders, account actions, debug-log export. |
+| `DiceRollModal` | Big animated dice popup for skill checks / attacks. |
+| `LevelUpModal` | Allocates stat points, picks ASI vs. Feat, picks subclass features. |
+| `FeatDetailModal` | Reference modal for feat definitions. |
+| `ErrorBoundary` | Wraps the Play layout; catches render errors so a single bad turn doesn't kill the session. |
+
+### `ChatLog.tsx`
+
+The story view. Notable features:
+- Parses `[System:*]` log prefixes and renders them as bordered "System Log" cards.
+- Two regex-based roll parsers (`ATTACK_ROLL_RE`, `SKILL_ROLL_RE`) extract roll data from older message text and render `RollCard` components inline.
+- Modern messages carry `msg.rollData` directly (set by `extractRollData` in `narration.ts`) and render via `DiceRollCard`.
+- Filters: All / Narration / Player / System; plus full-text search.
+- Export menu: copy to clipboard or download `.txt`.
+- Per-message TTS button.
+- Rewind button next to the latest user message.
+- Auto-scroll-to-bottom with a manual "jump to latest" button when the user scrolls up.
+
+### `InputArea.tsx`
+
+The input box. Notable features:
+- **Quick Actions** — auto-generated from the character's prepared/known spells, equipped weapons, and class resources. Plus hardcoded Short Rest / Long Rest shortcuts.
+- **Voice input** via `webkitSpeechRecognition` (browser support gated).
+- **Queue Action / Queue Dialogue** buttons for multiplayer turn queueing.
+- **Resolve Turn** button appears during enemy turns; calls `handleResolveEnemyTurn`.
+- Input is disabled (`effectivelyLocked`) while the LLM is processing or it's an enemy's turn.
+
+### `CharacterSheet.tsx`
+
+~400 lines. Renders everything about a character: name, race/class/level, HP bar, AC, XP bar, stats grid, speed/darkvision/proficiency/hit dice/spell DC chips, class & subclass feature accordions, saving throws, resources, spell slots (visualized as pip circles), conditions (with mechanical summaries), damage resistances, proficient skills, full inventory (with edit/remove/equip/drink-potion affordances and rarity-colored hover tooltips via `createPortal`), currency editor, current location.
+
+A level-up CTA appears whenever `unusedStatPoints` or `unusedSkillPoints` is non-zero.
+
+### `CombatTracker.tsx`
+
+Two rendering modes (`isMobile` prop). Lists initiative order with HP bars, current-turn highlight, expandable rows showing raw roll + modifier + AC + conditions. Collapsible.
+
+### `shared/`
+
+Reusable atoms:
+
+- `HpBar` — colored HP bar.
+- `BaseModal` — generic modal shell with backdrop and escape handling.
+- `Toggle` — settings switch.
+- `SectionH`, `TabButton`, `CategoryButton`, `AddBtn`, `AdjBtn` — small styled primitives.
+- `AtmosphereOverlay` — fullscreen background image with parallax.
+- `ActivityBell` — dropdown of recent party activity (level-ups, combat, discoveries).
+
+---
+
+## 13. Types System
+
+```
+types/
+├── index.ts        # Re-exports everything
+├── common.ts       # MessageRole, AppStage, AppSettings, Message, Campaign, RollData, MCPResponse, SavedGameData, QueuedAction
+├── character.ts    # Character, InventoryItem, Currency, ResourcePool, ClassFeature, SubclassSummary, RacialTrait, ActiveCondition, FeatSelection, TransformationState, LevelUpSummary, DeathSaveStatus, …
+├── combat.ts       # Enemy, EnemyAttack, InitiativeEntry, CombatState (with activeDoTs)
+├── spell.ts        # SpellDefinition, SpellSchool, SpellScaling, SpellcastingProfile
+└── game.ts         # GameState, Quest, LoreEntry, StartingLocation, ContextMetadata, XPTableEntry
+```
+
+### Key invariants
+
+- `Character.stats` is always `{ str, dex, con, int, wis, cha }` (all six).
+- `Character.conditions?: ActiveCondition[]` — duration is in **rounds** unless `durationUnit: 'minute'` is set.
+- `Message.role` uses the `MessageRole` enum; mapped to lowercase strings for the LLM API by `mapHistoryToMessages`.
+- `AppStage` enum has exactly 4 values: `CREATION`, `PLAY`, `AUTH`, `DASHBOARD`.
+- `RollData.type` is one of `'attack' | 'skill' | 'damage' | 'cast_spell' | 'save' | 'death_save'`.
+- `MCPResponse = { success: boolean; data: any; message?: string }` — every tool returns this shape.
+
+The `Character` interface has ~50 optional fields covering every subclass choice (divine domain, sorcerous origin, warlock patron, arcane tradition, fighting style, draconic ancestry, sneak attack dice, …). The `stateService.ensureCharacterFields` function (in `mcp/stateService.ts:46`) hydrates sane defaults whenever a character enters the engine.
+
+---
+
+## 14. Static Game Data
+
+```
+data/
+├── constants.ts    # SKILLS_LIST (18 skills), XP_TABLE (levels 1-20), STAT_POINTS_PER_LEVEL, MAX_STAT_VALUE, ASI_LEVELS, FALLBACK_STARTING_LOCATION
+├── classes.ts      # 12 SRD classes with full class features, subclasses, spellcasting profiles, proficiencies
+├── races.ts        # SRD races with ASIs, traits (darkvision, lucky, relentless endurance, …), size, speed
+├── feats.ts        # SRD feat catalog (Alert, Great Weapon Master, Sharpshooter, Tough, Resilient, …)
+├── spells.ts       # SRD spell definitions (level, school, damage, save, scaling, components, …)
+├── monsters.ts     # SRD monster stat blocks (goblin, orc, dragon, …) — used by lookupMonster
+├── srdItems.ts     # SRD weapons, armor, shields, potions with mechanical stats
+└── shopItems.ts    # Purchaseable shop stock
+```
+
+These same catalogs are re-exported via `utils/classes.ts`, `utils/races.ts`, `utils/spells.ts`, `utils/feats.ts`, `utils/monsters.ts`, `utils/srdItems.ts` and accessible through the `utils/index.ts` barrel.
+
+The `data/constants.ts` file is re-exported via the top-level `constants.ts`, which also defines `SYSTEM_INSTRUCTION`, `PROGRESSION_SYSTEM_PROMPT`, and `INITIAL_CHARACTER` (a frozen default character template — used in tests and as a fallback).
+
+### System prompts
+
+`constants.ts:5-79` — two large prompt strings:
+
+- **`SYSTEM_INSTRUCTION`** — base GM persona: "world-class Game Master", 14 numbered RULES (use tools for deterministic actions, manage currency, narrate equipped weapons correctly, handle time/durations, English-only responses, etc.), style guidelines, and the architectural note explaining the Storyteller/Engine split.
+- **`PROGRESSION_SYSTEM_PROMPT`** — XP calibration: CR-to-XP tables, DC-to-XP tables, trap/exploration XP, party-wide split semantics, solo-adventurer +25% buff, mandatory concurrent `award_experience` rule.
+
+Combined with `TOOL_MODE_INSTRUCTION` from `prompts/toolModePrompt.ts`, these form the agent loop's system message.
+
+---
+
+## 15. Build, Test & CI
+
+### Vite config (`vite.config.ts`)
+
+- `appType: 'spa'`, dev/preview on port 3000, host `0.0.0.0`.
+- **Proxy** at `/api` → `VITE_LLM_PROXY_TARGET || VITE_LLM_API_BASE || 'https://opencode.ai/zen/go/v1'`, with path rewrite stripping `/api`. This is what makes `VITE_LLM_API_BASE=/api` work in production.
+- **Setup-mode middleware**: when `VITE_SETUP_MODE=true`, registers a `POST /__setup/save` handler that writes the `.env` file from the SetupWizard's JSON payload.
+- `define`: injects `process.env.GEMINI_API_KEY` (legacy compat) and `import.meta.env.VITE_SETUP_MODE`.
+- Path alias `@` → repo root.
+- Manual chunks: `vendor-react`, `vendor-supabase`, `vendor-vercel`, `vendor-ui`.
+
+### Test config (`vitest.config.ts`)
+
+- `globals: true`, `environment: 'jsdom'`, setup file `tests/setup.ts` (polyfills `matchMedia`, `speechSynthesis`, `AudioContext`, `navigator.clipboard`).
+- Coverage via V8. Includes `components/`, `hooks/`, `services/`, `utils/`. Thresholds: 55% statements / 43% branches / 50% functions / 60% lines.
+- Excludes `tests/live/*_live.test.ts` from the default run.
+
+### Test layout
+
+```
+tests/
+├── setup.ts                  # jsdom polyfills
+├── helpers/                  # Test factories
+│   ├── characters.ts         # Build test characters
+│   ├── combat.ts             # Build combat states
+│   ├── engineRunner.ts       # Spin up mcpServer + run tool sequences
+│   ├── mockLLM.ts            # Mock fetch responses
+│   ├── mockMCP.ts            # Mock MCP server
+│   ├── mocks.ts              # Generic mocks
+│   ├── state.ts              # Build game states
+│   └── tuningOutput.ts       # Test output formatting
+├── live/                     # Tier-3+ tests that hit a real LLM
+│   ├── run_all.ts            # Runs all live tests via tsx
+│   ├── helpers/liveRunner.ts
+│   ├── scenarios/            # Multi-turn play scenarios
+│   └── 0X_*_live.test.ts     # Feature-specific live tests
+├── components/               # Component tests (smoke test)
+├── hooks/                    # Hook tests (6 files)
+├── services/                 # Service tests (~30 files)
+├── services/llm/             # agentLoop + toolFilter
+└── utils/                    # Util tests (10 files)
+```
+
+### npm scripts (recap)
+
+| Script | Notes |
+|---|---|
+| `npm run dev` | Runs `scripts/preflight.js` which auto-installs deps, then either launches the SetupWizard or Vite. |
+| `npm run build` | `vite build` |
+| `npm test` | `vitest run --bail=1` — stops on first failure |
+| `npm run test:ci` | `vitest run --bail=1 --reporter=verbose` — used in GitHub Actions |
+| `npm run test:live` | Live tests against a real LLM |
+| `npm run test:live:tier3` | Scenario tests via `tsx tests/live/run_all.ts` |
+| `npm run test:all` | Unit + tier-3 |
+| `npm run lint` | `eslint . --ext .ts,.tsx` |
+| `npm run install-app` | Guided CLI installer (`inquirer` + `chalk`) |
+
+### CI (`.github/workflows/test.yml`)
+
+On push to `main` / `develop` or PR to `main`:
+
+1. Checkout, setup Node 20, cache npm.
+2. `npm ci`
+3. `npm run lint`
+4. `npm run test:ci` with `CI: true`
+
+### Husky / pre-commit
+
+`npm run prepare` installs Husky. The `.husky/` directory contains the pre-commit hook (you can inspect it locally).
+
+---
+
+## 16. Configuration Reference
+
+### `.env` variables
+
+| Var | Required | Default | Used by |
+|---|---|---|---|
+| `VITE_LLM_API_KEY` | ✅ | — | All LLM calls |
+| `VITE_LLM_API_BASE` | no | `https://openrouter.ai/api/v1` | LLM endpoint; set to `/api` in prod |
+| `VITE_LLM_MODEL` | no | `deepseek/deepseek-v4-flash` | Primary model |
+| `VITE_SUMMARIZATION_MODEL` | no | `xiaomi/mimo-v2.5` | Checkpoint compression |
+| `VITE_IMAGE_ROUTER_API_KEY` | no | — | Atmosphere art |
+| `VITE_IMAGE_MODEL` | no | `stabilityai/sdxl-turbo` | Atmosphere model |
+| `VITE_SUPABASE_URL` | no | — | Cloud DB / auth |
+| `VITE_SUPABASE_ANON_KEY` | no | — | Cloud DB / auth |
+| `VITE_CONTEXT_RAW_CAP` | no | `30000` | Tokens before raw history → checkpoint |
+| `VITE_CONTEXT_BUDGET` | no | `180000` | Hard token budget |
+| `VITE_LLM_DISABLE_THINKING` | no | — | `true` disables reasoning traces |
+| `VITE_LLM_PROXY_TARGET` | no | — | Vercel proxy override |
+
+### Vercel proxy (`api/chat/completions.ts`)
+
+Serverless function: handles CORS preflight, validates method, forwards the request body to `VITE_LLM_PROXY_TARGET || 'https://opencode.ai/zen/go/v1'` with the original `Authorization` header, and pipes back the JSON. Solves CORS for browser→LLM calls in production.
+
+### `vercel.json`
+
+```json
+{ "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }] }
+```
+
+Standard SPA fallback so client-side routes work on refresh.
+
+### `tsconfig.json` highlights
+
+- `strict`, `noImplicitAny`, `strictNullChecks`, `strictFunctionTypes` all on.
+- `target: ES2022`, `module: ESNext`, `moduleResolution: bundler`.
+- `jsx: react-jsx`, `allowImportingTsExtensions: true`, `noEmit: true` (Vite handles emit).
+- Path alias: `@/*` → `./*`.
+
+### ESLint (`.eslintrc.cjs`)
+
+- Extends `eslint:recommended` + `@typescript-eslint/recommended`.
+- Plugins: `@typescript-eslint`, `vitest`, `testing-library`.
+- Most issues are warnings; `ban-ts-comment` is error (bans `ts-ignore`, allows `ts-expect-error`).
+- Test override: `no-explicit-any` and `no-non-null-assertion` become errors; enables `vitest/expect-expect` and several `testing-library/*` rules.
+
+---
+
+## 17. Key Invariants & Conventions
+
+These are unwritten rules that hold across the codebase. Violate them at your peril.
+
+### State
+
+- **`mcpServer` is the only source of truth for `GameState`.** React state mirrors it via `syncState()` (`useGameState.ts:24`) which just calls `setGameState(mcpServer.getFullState())`. Never mutate `gameState` directly — always go through `mcpServer`.
+- **All tool execution flows through `mcpServer.executeToolCall`** (or its typed wrappers on `MockMCPServer`). Don't call `combatEngine`/`spellcastingEngine` directly from React.
+- **A campaign is "syncable" iff `campaignId != null && campaignId !== 'anonymous'`.** The literal string `'anonymous'` is the sentinel for local-only play.
+- **`isProcessing` is a multiplayer lock.** Always set it before a turn and clear it in a `finally`.
+
+### Tools
+
+- **`narrate_turn` is the only way game time advances** (except `long_rest`/`short_rest`/`move_to` with narration/route, which advance time inline). The agent loop enforces a no-op `narrate_turn(timePassed=0)` at the end if nothing else advanced time, so conditions/DoTs always tick.
+- **Never call `inflict_damage` after `player_attack` or `cast_spell`** — those tools handle damage atomically. This is repeated loudly in `TOOL_MODE_INSTRUCTION`.
+- **Spells never use `roll_dice`.** Spell attack rolls and damage are inside `cast_spell`.
+- **Critical tools** (`cast_spell`, `inflict_damage`, `roll_dice`, `player_attack`) failing sets `criticalToolFailed`, which suppresses inline narration and forces a separate narration pass.
+
+### LLM
+
+- **English-only output.** Hardcoded in `SYSTEM_INSTRUCTION`. The narration layer re-asserts it.
+- **Never write `[System:tool_name]` in narration** — those are an internal protocol between engine and LLM. ChatLog strips them from `SYSTEM` messages but renders them raw in narration.
+- **Tool calls per iteration are batched and parallel** (`Promise.all` in `executeToolBatch`), but the agent loop respects tool ordering by `tool_call_id` for assistant/tool message pairing.
+
+### Context
+
+- **Generation bumping on rewind.** `handleRewind` always sets `ctx.generation = (old + 1)` so any in-flight compression promise rejects its result.
+- **Compression is async and non-blocking.** The player's turn never waits on a compression call; it just runs in the background and the next turn picks up the new checkpoint.
+- **Checkpoints are append-only** until budget eviction. Oldest dropped first.
+
+### Dice
+
+- **`cryptoRoll` is the only dice function.** Uses `globalThis.crypto.getRandomValues` with rejection sampling for uniform distribution; falls back to `Math.random` only if crypto fails. Never use `Math.random` directly for game mechanics.
+- **All die results are ≥ 1.** `cryptoRoll(sides)` returns `1..sides`.
+
+### Naming
+
+- Class and race IDs are always lowercased on entry to the engine (`stateService.ensureCharacterFields` and `partyService.joinParty` both `.toLowerCase()` them).
+- Subclass IDs follow `<class>-<path>` conventions (e.g. `life-domain`, `draconic-bloodline`, `champion`).
+- Spell IDs are kebab-case (`fireball`, `mage-armor`, `eldritch-blast`).
+- Item types are `'weapon' | 'armor' | 'potion' | 'shield' | 'gear' | 'other'`.
+
+### Files
+
+- **No comments.** Codebase convention is to write self-documenting code. (Inline `// ───` section banners appear in some services but are rare.)
+- **No barrel exports for components.** Components are imported by direct path (`./components/chat/MessageBubble`). Services and utils do have barrels (`services/index.ts`, `utils/index.ts`).
+- **Hook names start with `use`.** Context hooks are `useXContext` (e.g. `useGameContext`); raw hooks are `useX` (e.g. `useGameState`).
+- **All React components are default exports.** All engine functions are named exports.
+
+---
+
+## Appendix: Where to Start Reading
+
+If you're new to the codebase, read in this order:
+
+1. **`App.tsx`** — see the stage machine and provider stack.
+2. **`types/index.ts` + `types/game.ts` + `types/character.ts`** — learn the shapes.
+3. **`services/mcpService.ts`** — read the constructor and `executeToolCall`. This is the engine's public surface.
+4. **`services/mcp/stateService.ts`** + **`partyService.ts`** — see how state is held and initialized.
+5. **`hooks/useGameActions.ts`** — the turn lifecycle.
+6. **`services/llm/agentLoop.ts`** — the LLM driver.
+7. **`services/llm/contextManager.ts`** — memory management.
+8. **`services/llm/tools/*`** + **`prompts/toolModePrompt.ts`** — what the LLM can actually do.
+9. **`components/layouts/DesktopLayout.tsx`** — how everything is wired into the UI.
+10. **`tests/services/mcpService.test.ts`** + **`tests/helpers/engineRunner.ts`** — concrete examples of driving the engine.
+
+Welcome to the dungeon. 🐉

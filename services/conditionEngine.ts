@@ -1,0 +1,224 @@
+import { Character, Enemy, ActiveCondition, SaveStat } from '../types';
+import { cryptoRoll } from '../utils/random';
+import { getMod } from './classEngine';
+
+type Target = Character | Enemy;
+
+export function parseExhaustionLevel(target: Target): number {
+  const levels = (target.conditions ?? [])
+    .filter(c => c.id.startsWith('exhaustion-'))
+    .map(c => parseInt(c.id.split('-')[1]))
+    .filter(n => !isNaN(n));
+  return levels.length > 0 ? Math.max(...levels) : 0;
+}
+
+export function getExhaustionPenalty(target: Target): number {
+  return parseExhaustionLevel(target);
+}
+
+export function applyCondition(target: Target, condition: ActiveCondition): boolean {
+  if ('conditionsImmunities' in target) {
+    const immunities = (target as Enemy).conditionsImmunities ?? [];
+    const lowerId = condition.id.toLowerCase();
+    if (immunities.some(i => lowerId === i.toLowerCase() || lowerId.startsWith(i.toLowerCase() + '-'))) {
+      return false;
+    }
+  }
+  if (!target.conditions) target.conditions = [];
+  const existing = target.conditions.find(c => c.id === condition.id && c.source === condition.source);
+  if (existing) {
+    existing.duration = condition.duration;
+    return true;
+  }
+  target.conditions.push(condition);
+  return true;
+}
+
+export function removeCondition(target: Target, conditionId: string, source?: string): boolean {
+  if (!target.conditions) return false;
+  const before = target.conditions.length;
+  for (const c of target.conditions) {
+    if (c.id === conditionId && (source === undefined || c.source === source)) {
+      if (c.onRemove) {
+        if (typeof c.onRemove === 'function') {
+          c.onRemove(target);
+        } else if (c.onRemove.kind === 'acBonus') {
+          target.acBonus = Math.max(0, (target.acBonus || 0) - c.onRemove.value);
+        }
+      }
+    }
+  }
+  target.conditions = target.conditions.filter(c =>
+    c.id !== conditionId || (source !== undefined && c.source !== source)
+  );
+  return target.conditions.length < before;
+}
+
+export function tickConditions(target: Target): string[] {
+  if (!target.conditions) return [];
+  const expired: string[] = [];
+  const remaining: ActiveCondition[] = [];
+  for (const cond of target.conditions) {
+    if (cond.durationUnit === 'permanent') {
+      remaining.push(cond);
+      continue;
+    }
+    if (cond.durationUnit === 'minute') {
+      remaining.push(cond);
+      continue;
+    }
+    if (cond.duration != null) {
+      cond.duration--;
+      if (cond.duration <= 0) {
+        expired.push(cond.id);
+        if (cond.onRemove) {
+          if (typeof cond.onRemove === 'function') {
+            cond.onRemove(target);
+          } else if (cond.onRemove.kind === 'acBonus') {
+            target.acBonus = Math.max(0, (target.acBonus || 0) - cond.onRemove.value);
+          }
+        }
+        continue;
+      }
+    }
+    remaining.push(cond);
+  }
+  target.conditions = remaining;
+  return expired;
+}
+
+export function tickConditionsByTime(target: Target, minutes: number): string[] {
+  if (!target.conditions) return [];
+  const expired: string[] = [];
+  const remaining: ActiveCondition[] = [];
+  for (const cond of target.conditions) {
+    if (cond.durationUnit === 'permanent') {
+      remaining.push(cond);
+      continue;
+    }
+    if (cond.duration != null && cond.durationUnit === 'minute') {
+      cond.duration -= minutes;
+      if (cond.duration <= 0) {
+        expired.push(cond.id);
+        if (cond.onRemove) {
+          if (typeof cond.onRemove === 'function') cond.onRemove(target);
+          else if (cond.onRemove.kind === 'acBonus')
+            target.acBonus = Math.max(0, (target.acBonus || 0) - cond.onRemove.value);
+        }
+        continue;
+      }
+    }
+    remaining.push(cond);
+  }
+  target.conditions = remaining;
+  return expired;
+}
+
+
+
+
+
+
+export function tickConditionsByRounds(target: Target, rounds: number): string[] {
+  if (!target.conditions || rounds <= 0) return [];
+  const expired: string[] = [];
+  const remaining: ActiveCondition[] = [];
+  for (const cond of target.conditions) {
+    if (cond.durationUnit === 'permanent') {
+      remaining.push(cond);
+      continue;
+    }
+    if (cond.durationUnit !== 'minute' && cond.duration != null) {
+      cond.duration -= rounds;
+      if (cond.duration <= 0) {
+        expired.push(cond.id);
+        if (cond.onRemove) {
+          if (typeof cond.onRemove === 'function') cond.onRemove(target);
+          else if (cond.onRemove.kind === 'acBonus')
+            target.acBonus = Math.max(0, (target.acBonus || 0) - cond.onRemove.value);
+        }
+        continue;
+      }
+    }
+    remaining.push(cond);
+  }
+  target.conditions = remaining;
+  return expired;
+}
+
+export function hasCondition(target: Target, conditionId: string): boolean {
+  if (!target.conditions) return false;
+  return target.conditions.some(c => c.id === conditionId);
+}
+
+export function getConditionEffects(target: Target): {
+  advantageOnAttacks: boolean;
+  disadvantageOnAttacks: boolean;
+  attacksAgainstHaveAdvantage: boolean;
+  speedModifier: number;
+  acModifier: number;
+  isBlinded: boolean;
+  isCharmed: boolean;
+  isFrightened: boolean;
+  isParalyzed: boolean;
+  isProne: boolean;
+  isRestrained: boolean;
+  isStunned: boolean;
+  isIncapacitated: boolean;
+  isPoisoned: boolean;
+  isDeafened: boolean;
+  isUnconscious: boolean;
+  attacksAgainstHaveDisadvantage: boolean;
+  d20Modifier: number;
+  speedPenaltyFt: number;
+} {
+  const ids = new Set((target.conditions ?? []).map(c => c.id));
+  const exhaustionLevel = parseExhaustionLevel(target);
+
+  return {
+    isBlinded: ids.has('blinded'),
+    isCharmed: ids.has('charmed'),
+    isFrightened: ids.has('frightened'),
+    isParalyzed: ids.has('paralyzed'),
+    isProne: ids.has('prone'),
+    isRestrained: ids.has('restrained'),
+    isStunned: ids.has('stunned'),
+    isIncapacitated: ids.has('incapacitated'),
+    isPoisoned: ids.has('poisoned'),
+    isDeafened: ids.has('deafened'),
+    isUnconscious: ids.has('unconscious'),
+    disadvantageOnAttacks: ids.has('blinded') || ids.has('prone') || ids.has('poisoned') || ids.has('restrained') || ids.has('frightened') || ids.has('unconscious'),
+    attacksAgainstHaveAdvantage: ids.has('blinded') || ids.has('prone') || ids.has('paralyzed') || ids.has('restrained') || ids.has('stunned') || ids.has('unconscious'),
+    advantageOnAttacks: ids.has('frightened') ? false : (ids.has('paralyzed') || ids.has('stunned') || ids.has('unconscious')),
+    speedModifier: (ids.has('restrained') || ids.has('unconscious')) ? 0 : 1,
+    acModifier: 0,
+    attacksAgainstHaveDisadvantage: false,
+    d20Modifier: -exhaustionLevel,
+    speedPenaltyFt: -(exhaustionLevel * 5),
+  };
+}
+
+export function rollSaveAgainstCondition(
+  target: Target,
+  condition: ActiveCondition,
+  spellSaveDC: number
+): { succeeded: boolean; roll: number; total: number } {
+  if (!condition.saveEnd) {
+    return { succeeded: false, roll: 0, total: 0 };
+  }
+  const statVal = (target as any).stats?.[condition.saveEnd] || 10;
+  const mod = getMod(statVal);
+  const roll = cryptoRoll(20);
+  const total = roll + mod - getExhaustionPenalty(target);
+  return { succeeded: total >= spellSaveDC, roll, total };
+}
+
+export function isIncapacitated(target: Target): boolean {
+  return hasCondition(target, 'incapacitated') || hasCondition(target, 'paralyzed') || hasCondition(target, 'stunned');
+}
+
+export const isIncapsulated = isIncapacitated;
+
+export function isUnconscious(target: Target): boolean {
+  return hasCondition(target, 'unconscious');
+}
