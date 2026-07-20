@@ -85,6 +85,7 @@ const buildDebugLog = (messages: Message[] | undefined, gameState: GameState | u
   return L.join('\n');
 };
 
+/** Settings modal with voice selection, atmosphere toggle, debug mode, password update, and debug log export. */
 const SettingsModal: React.FC<SettingsModalProps> = ({ settings, userId, messages, gameState, onSave, onClose }) => {
   const [local, setLocal] = useState<AppSettings>(settings);
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);

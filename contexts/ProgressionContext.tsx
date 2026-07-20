@@ -21,6 +21,7 @@ interface ProgressionContextValue {
 
 const ProgressionContext = createContext<ProgressionContextValue | null>(null);
 
+/** Provides character progression context (level-up, stat allocation, feats) to the component tree. */
 export function ProgressionProvider({ children }: { children: ReactNode }) {
   const { currentCampaignId, syncState } = useGameContext();
   const progression = useProgression(currentCampaignId, syncState);
@@ -44,6 +45,7 @@ export function ProgressionProvider({ children }: { children: ReactNode }) {
   return <ProgressionContext.Provider value={value}>{children}</ProgressionContext.Provider>;
 }
 
+/** Returns the progression context value. Must be used within a ProgressionProvider. */
 export function useProgressionContext() {
   const ctx = useContext(ProgressionContext);
   if (!ctx) throw new Error('useProgressionContext must be used within ProgressionProvider');

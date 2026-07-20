@@ -1,3 +1,4 @@
+/** Tool definitions for rest and experience: awarding XP, and taking long/short rests. */
 export const tools = [
     {
         type: "function",

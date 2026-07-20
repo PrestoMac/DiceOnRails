@@ -3,6 +3,7 @@ import React, { Component, ReactNode } from 'react';
 interface Props { children: ReactNode; fallback?: ReactNode; }
 interface State { hasError: boolean; error: Error | null; }
 
+/** React error boundary that catches render errors and displays a fallback UI with a reload button. */
 class ErrorBoundary extends Component<Props, State> {
   state: State = { hasError: false, error: null };
 

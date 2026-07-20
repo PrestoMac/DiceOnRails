@@ -83,6 +83,7 @@ const FeatureList: React.FC<{ title: string; icon: string; features?: Array<{ id
   </div>;
 };
 
+/** Full character sheet displaying stats, HP, XP, AC, saving throws, skills, inventory, currency, spells, conditions, feats, and resources. */
 const CharacterSheet: React.FC<CharacterSheetProps> = ({ character, onUpdateInventory, onUpdateCurrency, onLevelUp, onSendMessage, onTriggerDiceRoll }) => {
   const [isAdding, setIsAdding] = useState(false);
   const [newItemName, setNewItemName] = useState('');

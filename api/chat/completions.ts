@@ -1,5 +1,10 @@
 import type { IncomingMessage, ServerResponse } from 'http';
 
+/**
+ * Vercel serverless proxy for chat-completion API requests. Handles CORS preflight, forwards POST bodies to the configured LLM endpoint, and returns the response.
+ * @param request - The incoming HTTP request.
+ * @param response - The outgoing HTTP response.
+ */
 export default async function handler(
   request: IncomingMessage,
   response: ServerResponse,

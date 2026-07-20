@@ -1,6 +1,12 @@
 import { isDebugMode } from './debug';
 
 
+/**
+ * Generates a cryptographically secure random integer in [1, sides].
+ * Falls back to Math.random() if crypto is unavailable.
+ * @param sides - The number of sides on the die (must be >= 2).
+ * @returns A random integer between 1 and sides inclusive.
+ */
 export function cryptoRoll(sides: number): number {
   if (sides < 2) return 1;
 

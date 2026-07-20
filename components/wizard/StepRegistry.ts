@@ -1,5 +1,6 @@
 import { WizardStep } from './WizardStep';
 
+/** Registry that manages a collection of WizardSteps with ordered registration and visibility filtering. */
 export class StepRegistry<TState> {
   private registry = new Map<string, WizardStep<TState>>();
   private order: string[] = [];

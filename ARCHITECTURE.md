@@ -92,7 +92,6 @@ DiceOnRails/
 ├── utils/                    # Pure helpers (random, dice, time, env, catalogs)
 ├── .env.example              # Documented env-var template
 ├── .eslintrc.cjs
-├── .github/workflows/test.yml
 ├── vite.config.ts            # Dev server, setup-wizard middleware, proxy, build chunks
 ├── vitest.config.ts
 ├── tsconfig.json
@@ -107,7 +106,7 @@ DiceOnRails/
 
 `index.html` → `/index.tsx` → `App.tsx` (default export).
 
-`App.tsx:38-62` — the root `App` component decides what to render:
+`App.tsx:39-63` — the root `App` component decides what to render:
 
 1. If `import.meta.env.VITE_SETUP_MODE === 'true'` → render `<SetupWizard />` (first-run installer that writes `.env`). The flag is injected by `vite.config.ts:80-85` based on whether `.env` contains `VITE_SUPABASE_URL`.
 2. `initAudio()` on mount (primes `speechSynthesis` voices).
@@ -128,7 +127,7 @@ The order matters: each provider consumes the contexts above it.
 
 ### Stage machine
 
-`AppStage` enum (`types/common.ts:8`) drives the entire UX:
+`AppStage` enum (`types/common.ts:10`) drives the entire UX:
 
 | Stage | Rendered by `AppContent.getContent()` | When |
 |---|---|---|
@@ -162,8 +161,8 @@ Every context throws if `useXContext` is called outside its provider (`Error: us
 
 ### Two singletons
 
-- **`mcpServer`** — proxy around `MockMCPServer`, defined in `services/mcpService.ts:328`. Lazy-instantiated, accessed globally.
-- **`supabase`** — proxy around the Supabase client, defined in `services/supabaseClient.ts:25`. Lazy-instantiated, falls back to placeholder URLs if env is missing.
+- **`mcpServer`** — proxy around `MockMCPServer`, defined in `services/mcpService.ts:333` (singleton getter `getMcpServer` at `:328`). Lazy-instantiated, accessed globally.
+- **`supabase`** — proxy around the Supabase client, defined in `services/supabaseClient.ts:27`. Lazy-instantiated, falls back to placeholder URLs if env is missing.
 
 Both are `Proxy` objects that bind method calls to a lazily-created underlying instance, so importing them never crashes even when misconfigured.
 
@@ -215,11 +214,11 @@ GameState = {
 | `content` | `contentService.ts` | quests, lore, reputation |
 | `travel` | `travelService.ts` | movement, routes, narration/time, rests, dice, skill checks |
 
-Sub-services are factory functions (`createXService(state, deps?)`) that close over the shared `state` and a small dependency object. The wiring lives in `mcpService.ts:43-72`. This is a lightweight **dependency injection** pattern — combat needs `inflict_damage` from inventory, travel needs `update_inventory`/`adjust_currency` from inventory + `log_lore`/`upsert_quest` from content, etc.
+Sub-services are factory functions (`createXService(state, deps?)`) that close over the shared `state` and a small dependency object. The wiring lives in `mcpService.ts:45-73`. This is a lightweight **dependency injection** pattern — combat needs `inflict_damage` from inventory, travel needs `update_inventory`/`adjust_currency` from inventory + `log_lore`/`upsert_quest` from content, etc.
 
 ### Tool dispatcher
 
-`MockMCPServer.executeToolCall(name, args)` (`mcpService.ts:232-321`) is the **canonical entry point for all mutations**. It's a switch over ~30 tool names. Every branch:
+`MockMCPServer.executeToolCall(name, args)` (`mcpService.ts:235-323`, switch at `:241-311`) is the **canonical entry point for all mutations**. It's a switch over ~30 tool names. Every branch:
 
 1. Coerces args to the correct types (LLMs send strings; engine needs numbers).
 2. Delegates to the relevant sub-service method.
@@ -256,22 +255,22 @@ services/llm/
 └── tools/                # OpenAI function-calling schemas (one file per domain)
     ├── index.ts          # Aggregates all tool defs into `tools[]`
     ├── shared.ts         # Shared JSON-schema fragments
-    ├── combat.ts         # add_enemy, start_combat, next_turn, end_combat, player_attack, …
-    ├── spells.ts         # cast_spell, spell_effect, manage_spellbook, use_resource, cast_ritual
-    ├── character.ts      # roll_dice, check_skill, make_save, roll_death_save, inflict_damage
+    ├── combat.ts         # add_enemy, start_combat, next_turn, end_combat, player_attack, inflict_damage
+    ├── spells.ts         # cast_spell, spell_effect, cast_ritual, manage_spellbook, summon_creature, teleport_creature, polymorph_creature
+    ├── character.ts      # roll_dice, check_skill, make_save, roll_death_save, level_up, use_resource
     ├── inventory.ts      # update_inventory, adjust_currency
     ├── movement.ts       # move_to, narrate_turn
     ├── journal.ts        # upsert_quest, log_lore
-    └── rest.ts           # award_experience, long_rest, short_rest, level_up
+    └── rest.ts           # award_experience, long_rest, short_rest
 ```
 
 ### `tools[]`
 
-A flat array of OpenAI-style `{ type: "function", function: { name, description, parameters } }` definitions. Aggregated in `tools/index.ts:9`. The `description` of each tool is **the most important cue the LLM gets** for picking the right one — they're written in a punchy, instruction-heavy style ("COMBAT. Adds an enemy combatant. Call this BEFORE start_combat.").
+A flat array of OpenAI-style `{ type: "function", function: { name, description, parameters } }` definitions. Aggregated in `tools/index.ts:10`. The `description` of each tool is **the most important cue the LLM gets** for picking the right one — they're written in a punchy, instruction-heavy style ("COMBAT. Adds an enemy combatant. Call this BEFORE start_combat.").
 
 ### `TOOL_MODE_INSTRUCTION`
 
-`prompts/toolModePrompt.ts` — a ~90-line supplement appended to the system prompt during the agent loop. It contains:
+`services/llm/prompts/toolModePrompt.ts` — a ~93-line supplement appended to the system prompt during the agent loop. It contains:
 - The strict combat sequence (`start_combat` → `player_attack` → `next_turn` → `narrate_turn`)
 - A "QUICK REFERENCE" table mapping natural-language verbs to tools
 - Class-feature narration guidance (Rage, Sneak Attack, Fighting Style, …)
@@ -299,7 +298,7 @@ A flat array of OpenAI-style `{ type: "function", function: { name, description,
 
 ## 7. The Turn Lifecycle (end-to-end)
 
-The single most important flow to understand. Entry point: `useGameActions.handleSendMessage` in `hooks/useGameActions.ts:126`.
+The single most important flow to understand. Entry point: `useGameActions.handleSendMessage` in `hooks/useGameActions.ts:128`.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -350,7 +349,7 @@ The single most important flow to understand. Entry point: `useGameActions.handl
 
 ### Inside `runAgentLoop`
 
-`services/llm/agentLoop.ts:55`. A bounded loop (default `MAX_ITERS = 20`) that drives the LLM:
+`services/llm/agentLoop.ts:66` (JSDoc starts at `:55`). A bounded loop (default `MAX_ITERS = 20`) that drives the LLM:
 
 1. **Build the message array:**
    - system: `SYSTEM_INSTRUCTION + PROGRESSION_SYSTEM_PROMPT + TOOL_MODE_INSTRUCTION`
@@ -366,19 +365,19 @@ The single most important flow to understand. Entry point: `useGameActions.handl
      - Iteration 0 → push "you MUST call at least one tool" and continue.
      - Active combat, current actor is enemy, <5 iters → push "call next_turn".
      - Otherwise break.
-   - **End-of-turn detection:** if any tool call is `narrate_turn`, or a rest/move with narration/route → execute pre-end calls first, then `narrate_turn`, then break. The narration returned by `narrate_turn` is captured as `inlineNarration` (passed up to `handleSendMessage`).
+    - **End-of-turn detection:** if any tool call is `narrate_turn`, or a rest/move with narration/autoAdvanceTime/route → execute pre-end calls first, then `narrate_turn`, then break. The narration returned by `narrate_turn` is captured as `inlineNarration` (passed up to `handleSendMessage`).
    - Otherwise batch-execute all tool calls in parallel via `executeToolBatch`, append `{role: assistant, tool_calls}` + per-tool `{role: tool, tool_call_id}` messages, loop.
    - **Critical-tool tracking:** `cast_spell`, `inflict_damage`, `roll_dice`, `player_attack` — if any fails, set `criticalToolFailed` so we don't trust inline narration.
    - **Budget guard:** if estimated payload exceeds 95% of `CONTEXT_BUDGET`, break early.
    - **Combat shortcut:** if `next_turn` succeeded, break (turn is over).
 
-3. **Post-loop enforcement:** if no `narrate_turn` / rest / move-with-route fired, synthesize a `narrate_turn(narration='', timePassed=0)` so conditions/DoTs/concentration still tick consistently.
+3. **Post-loop enforcement:** if no `narrate_turn` / rest / move-with-route fired, synthesize a `narrate_turn(narration='', timePassed=0)` so conditions/DoTs/concentration still tick consistently. The check is gated by `if (!timeAdvancedThisTurn)` at `agentLoop.ts:335-343` — it is conditional, not unconditional.
 
 4. **Return:** `{ toolMessages, iterationCount, promptTokens, completionTokens, cachedTokens, inlineNarration }`.
 
 ### Batched party turns (`handleExecuteBatch`)
 
-`useGameActions.ts:210`. When multiplayer action queue is flushed:
+`useGameActions.ts:212`. When multiplayer action queue is flushed:
 
 - Builds a `[Collaborative Turn]` user message containing every queued entry tagged with player name.
 - Same agent-loop flow but with a `batchContext` that emphasizes "process ALL actions".
@@ -387,7 +386,7 @@ The single most important flow to understand. Entry point: `useGameActions.handl
 
 ### Rewind flow (`handleRewind`)
 
-`useGameActions.ts:305`:
+`useGameActions.ts:307`:
 
 1. If currently processing → bail.
 2. Load the rewind point (state + messages from before the user's last message).
@@ -406,19 +405,19 @@ A custom episodic-memory system so the LLM can remember hours of play without ov
 |---|---|
 | **Active window** | The last `ACTIVE_MSG_WINDOW = 20` messages, sent verbatim. |
 | **Frozen raw history** | Messages that aged out of the active window, concatenated into one string with `[Player]/[GM]/[System]` prefixes. Capped at `RAW_CAP` (30K tokens, 80K chars). |
-| **Episode checkpoints** | Compressed summaries of frozen raw history. Each ~4K tokens, written by a fast non-thinking model (`VITE_SUMMARIZATION_MODEL`, default `xiaomi/mimo-v2.5`). |
+| **Episode checkpoints** | Compressed summaries of frozen raw history. Each ~1.5K tokens (~1000 words), written by a fast non-thinking model (`VITE_SUMMARIZATION_MODEL`, default `xiaomi/mimo-v2.5`). |
 | **Generation** | Monotonic counter; bumped on rewind. Stale in-flight compression results are discarded by comparing generations. |
 | **CONTEXT_BUDGET** | Hard cap (default 180K tokens). When the payload exceeds it, oldest checkpoints are evicted, then raw history is trimmed. |
 
 ### Flow
 
-Per turn (`runContextPipeline` in `contextManager.ts:145`):
+Per turn (`runContextPipeline` in `contextManager.ts:173`):
 
 1. Increment `turnCounter`.
 2. Every `FREEZE_INTERVAL = 5` turns → `freezeMessages`: slide messages older than the active window into `frozenRawHistory`, update `frozenMessageCount`.
 3. `compressToCheckpointIfNeeded`: if raw tokens exceed `RAW_CAP` **or** no checkpoints exist yet and raw > 1K → kick off **async** compression (sets `isCompressing`, stores `compressPromise`). On success, the raw history is cleared and the checkpoint pushed onto `episodeCheckpoints`. Failures are logged and swallowed.
 
-Before each turn (`prepareContext` in `contextManager.ts:151`):
+Before each turn (`prepareContext` in `contextManager.ts:186`):
 
 1. Rebuild "frozen messages" array from `episodeCheckpoints` (as `[RECENT SESSION]`) and `frozenRawHistory` (as `[EARLIER EVENTS]`).
 2. `enforceTokenBudget`: while payload > budget, drop oldest checkpoint, then drop raw, then trim the active window from the front.
@@ -426,11 +425,11 @@ Before each turn (`prepareContext` in `contextManager.ts:151`):
 
 ### Checkpoint compression prompt
 
-`atmosphere.ts:151-169`. A dense ~1000-word archival prompt instructing the summarizer to preserve every NPC, quest, item, transaction, combat, skill check, XP award, lore entry, player decision, and character-development event in `[T#] Type: description.` format. These are the **only** record of those turns after compression — the model is told to be exhaustive.
+`atmosphere.ts:174-192`. A dense ~1000-word archival prompt instructing the summarizer to preserve every NPC, quest, item, transaction, combat, skill check, XP award, lore entry, player decision, and character-development event in `[T#] Type: description.` format. These are the **only** record of those turns after compression — the model is told to be exhaustive.
 
 ### Persistence
 
-The `ContextState` is serialized into `GameState.ctx` (`ContextMetadata` in `types/game.ts:31`) on every `syncFinishedState` call. On load, `useGameActions`'s `useEffect` at line 71 hydrates `ctxRef.current` from `gameState.ctx`. This means checkpoints survive page reloads and sync to other multiplayer clients.
+The `ContextState` is serialized into `GameState.ctx` (`ContextMetadata` in `types/game.ts:36`) on every `syncFinishedState` call. On load, `useGameActions`'s `useEffect` at line 73 hydrates `ctxRef.current` from `gameState.ctx`. This means checkpoints survive page reloads and sync to other multiplayer clients.
 
 ---
 
@@ -516,7 +515,7 @@ The persistence facade. Behavior switches on whether `userId` and a real `campai
 Key methods:
 
 - `subscribeToCampaign(campaignId, onUpdate)` — Supabase Realtime channel on the `campaigns` table; used by `useGameState` to sync multiplayer state.
-- `syncCampaignState(campaignId, gameState, messages?)` — **batched** update. Multiple calls within a microtask are coalesced into a single Supabase UPDATE via `enqueueSync`/`drain` (lines 206-236). This prevents one player's turn from generating 20 separate DB writes.
+- `syncCampaignState(campaignId, gameState, messages?)` — **batched** update. Multiple calls within a microtask are coalesced into a single Supabase UPDATE via `enqueueSync` (`storageService.ts:223`)/`drain` (`:231`) using a per-campaign merge Map (`pendingPayloads` at `:218`). This prevents one player's turn from generating 20 separate DB writes.
 - `createCampaign`, `loadCampaigns`, `loadGame`, `saveGame`, `deleteCampaign`, `renameCampaign`, `clearLocalSave`.
 
 `loadCampaigns` queries both the modern `campaigns` table **and** the legacy `game_saves` table (tagged `[LEGACY]`), preserving saves from older versions of the app.
@@ -532,7 +531,7 @@ The runtime uses static TS catalogs (`data/srdItems.ts`, `data/monsters.ts`) —
 
 ### Multiplayer lock
 
-Before any turn, `handleSendMessage` sets `isProcessing: true` and `processingUser: <name>` and writes that to Supabase. Other clients in `useGameState`'s subscription handler (lines 116-146) check `isProcessingRef`: if the local client thinks it's processing and the remote cleared the flag, that's the "unlock" signal; otherwise incoming remote state is applied.
+Before any turn, `handleSendMessage` sets `isProcessing: true` and `processingUser: <name>` and writes that to Supabase. Other clients in `useGameState`'s subscription handler (lines 118-159) check `isProcessingRef`: if the local client thinks it's processing and the remote cleared the flag, that's the "unlock" signal; otherwise incoming remote state is applied.
 
 ---
 
@@ -578,7 +577,7 @@ components/wizard/
 
 ### `onComplete` → `handleCharacterCreated`
 
-`useGameActions.ts:275`:
+`useGameActions.ts:277`:
 
 1. Tag character with `ownerId = userId`.
 2. Set `myCharacterId`, `viewingCharacterId`.
@@ -710,10 +709,10 @@ The `data/constants.ts` file is re-exported via the top-level `constants.ts`, wh
 
 ### System prompts
 
-`constants.ts:5-79` — two large prompt strings:
+`constants.ts:8-83` — two large prompt strings:
 
-- **`SYSTEM_INSTRUCTION`** — base GM persona: "world-class Game Master", 14 numbered RULES (use tools for deterministic actions, manage currency, narrate equipped weapons correctly, handle time/durations, English-only responses, etc.), style guidelines, and the architectural note explaining the Storyteller/Engine split.
-- **`PROGRESSION_SYSTEM_PROMPT`** — XP calibration: CR-to-XP tables, DC-to-XP tables, trap/exploration XP, party-wide split semantics, solo-adventurer +25% buff, mandatory concurrent `award_experience` rule.
+- **`SYSTEM_INSTRUCTION`** (`constants.ts:8-39`) — base GM persona: "world-class Game Master", 14 numbered RULES (use tools for deterministic actions, manage currency, narrate equipped weapons correctly, handle time/durations, English-only responses, etc.), style guidelines, and the architectural note explaining the Storyteller/Engine split.
+- **`PROGRESSION_SYSTEM_PROMPT`** (`constants.ts:42-83`) — XP calibration: CR-to-XP tables, DC-to-XP tables, trap/exploration XP, party-wide split semantics, solo-adventurer +25% buff, mandatory concurrent `award_experience` rule.
 
 Combined with `TOOL_MODE_INSTRUCTION` from `prompts/toolModePrompt.ts`, these form the agent loop's system message.
 
@@ -726,7 +725,7 @@ Combined with `TOOL_MODE_INSTRUCTION` from `prompts/toolModePrompt.ts`, these fo
 - `appType: 'spa'`, dev/preview on port 3000, host `0.0.0.0`.
 - **Proxy** at `/api` → `VITE_LLM_PROXY_TARGET || VITE_LLM_API_BASE || 'https://opencode.ai/zen/go/v1'`, with path rewrite stripping `/api`. This is what makes `VITE_LLM_API_BASE=/api` work in production.
 - **Setup-mode middleware**: when `VITE_SETUP_MODE=true`, registers a `POST /__setup/save` handler that writes the `.env` file from the SetupWizard's JSON payload.
-- `define`: injects `process.env.GEMINI_API_KEY` (legacy compat) and `import.meta.env.VITE_SETUP_MODE`.
+- `define`: injects `process.env.API_KEY` and `process.env.GEMINI_API_KEY` (legacy compat, both sourced from `env.GEMINI_API_KEY`) and `import.meta.env.VITE_SETUP_MODE`.
 - Path alias `@` → repo root.
 - Manual chunks: `vendor-react`, `vendor-supabase`, `vendor-vercel`, `vendor-ui`.
 
@@ -734,7 +733,7 @@ Combined with `TOOL_MODE_INSTRUCTION` from `prompts/toolModePrompt.ts`, these fo
 
 - `globals: true`, `environment: 'jsdom'`, setup file `tests/setup.ts` (polyfills `matchMedia`, `speechSynthesis`, `AudioContext`, `navigator.clipboard`).
 - Coverage via V8. Includes `components/`, `hooks/`, `services/`, `utils/`. Thresholds: 55% statements / 43% branches / 50% functions / 60% lines.
-- Excludes `tests/live/*_live.test.ts` from the default run.
+- Excludes only direct children `tests/live/*_live.test.ts` from the default run. The `tests/live/scenarios/*.test.ts` subfolder **is** picked up by `npm test` (it matches the `tests/**/*.test.{ts,tsx}` include pattern) — those scenario files use full vitest (`describe`/`it`/`expect`/`vi`) and `vi.mock('../../../utils/random', ...)` to stub `cryptoRoll`.
 
 ### Test layout
 
@@ -768,26 +767,28 @@ tests/
 |---|---|
 | `npm run dev` | Runs `scripts/preflight.js` which auto-installs deps, then either launches the SetupWizard or Vite. |
 | `npm run build` | `vite build` |
+| `npm run preview` | `vite preview` — local preview of the production build |
 | `npm test` | `vitest run --bail=1` — stops on first failure |
-| `npm run test:ci` | `vitest run --bail=1 --reporter=verbose` — used in GitHub Actions |
-| `npm run test:live` | Live tests against a real LLM |
+| `npm run test:watch` | `vitest` in watch mode |
+| `npm run test:coverage` | `vitest run --coverage` — V8 coverage report |
+| `npm run test:ci` | `vitest run --bail=1 --reporter=verbose` — verbose CI-style run (run locally; no CI is configured) |
+| `npm run test:live` | Live tests against a real LLM (`vitest run tests/live/`) |
 | `npm run test:live:tier3` | Scenario tests via `tsx tests/live/run_all.ts` |
 | `npm run test:all` | Unit + tier-3 |
 | `npm run lint` | `eslint . --ext .ts,.tsx` |
+| `npm run lint:fix` | `eslint . --ext .ts,.tsx --fix` |
 | `npm run install-app` | Guided CLI installer (`inquirer` + `chalk`) |
+| `npm run prepare` | `husky` — installs Git pre-commit + commit-msg hooks |
 
 ### CI (`.github/workflows/test.yml`)
 
-On push to `main` / `develop` or PR to `main`:
-
-1. Checkout, setup Node 20, cache npm.
-2. `npm ci`
-3. `npm run lint`
-4. `npm run test:ci` with `CI: true`
+> **Not currently configured.** No `.github/workflows/` directory exists in the repo — the script `npm run test:ci` is the equivalent of the historical CI run and should be invoked locally before pushing. The intended pipeline (when restored) would be: on push to `main` / `develop` or PR to `main`, checkout → setup Node 20 → cache npm → `npm ci` → `npm run lint` → `npm run test:ci` with `CI: true`.
 
 ### Husky / pre-commit
 
-`npm run prepare` installs Husky. The `.husky/` directory contains the pre-commit hook (you can inspect it locally).
+`npm run prepare` installs Husky. The `.husky/` directory contains:
+- **`pre-commit`** — runs `npm run lint` then `npm test` on separate lines (not `&&`-chained; a lint failure does NOT block the commit if tests pass).
+- **`commit-msg`** — if a commit stages both test files (`*.test.*`) and source files (`*.ts`/`.tsx`), the message must start with `[RED]` or `[GREEN]`. Use `git commit --no-verify` to bypass.
 
 ---
 
@@ -844,7 +845,7 @@ These are unwritten rules that hold across the codebase. Violate them at your pe
 
 ### State
 
-- **`mcpServer` is the only source of truth for `GameState`.** React state mirrors it via `syncState()` (`useGameState.ts:24`) which just calls `setGameState(mcpServer.getFullState())`. Never mutate `gameState` directly — always go through `mcpServer`.
+- **`mcpServer` is the only source of truth for `GameState`.** React state mirrors it via `syncState()` (`useGameState.ts:26`) which just calls `setGameState(mcpServer.getFullState())`. Never mutate `gameState` directly — always go through `mcpServer`.
 - **All tool execution flows through `mcpServer.executeToolCall`** (or its typed wrappers on `MockMCPServer`). Don't call `combatEngine`/`spellcastingEngine` directly from React.
 - **A campaign is "syncable" iff `campaignId != null && campaignId !== 'anonymous'`.** The literal string `'anonymous'` is the sentinel for local-only play.
 - **`isProcessing` is a multiplayer lock.** Always set it before a turn and clear it in a `finally`.

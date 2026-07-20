@@ -10,6 +10,12 @@ function skillRollData(d: any, dc: any, label?: string, extra?: Partial<RollData
     return { type: 'skill', dieFace: 'd20', dieRoll: d.roll ?? 0, modifier: d.modifier ?? 0, total: d.total ?? 0, dc, success: d.success, label, dieCount: 1, results: [d.roll ?? 0], ...extra };
 }
 
+/**
+ * Extracts structured RollData from a tool execution result for UI display.
+ * @param toolName - The name of the executed tool.
+ * @param result - The MCP response from the tool execution.
+ * @returns A RollData object if the tool produces roll data, otherwise undefined.
+ */
 export function extractRollData(toolName: string, result: MCPResponse): RollData | undefined {
   const d = result.data || {};
   if (toolName === 'roll_dice') {
@@ -43,6 +49,12 @@ export function extractRollData(toolName: string, result: MCPResponse): RollData
   return undefined;
 }
 
+/**
+ * Formats a tool result into a compact JSON string for LLM context.
+ * @param toolName - The name of the executed tool.
+ * @param result - The MCP response from the tool execution.
+ * @returns A JSON string summarizing the tool result.
+ */
 export function formatToolResult(toolName: string, result: MCPResponse): string {
   const d = result.data || {};
   try {
@@ -70,6 +82,14 @@ export function formatToolResult(toolName: string, result: MCPResponse): string 
   } catch { return result.message.substring(0, 80); }
 }
 
+/**
+ * Generates a narration text for the given history and context via the LLM.
+ * @param history - The conversation history messages.
+ * @param context - A string describing the current game state context.
+ * @param frozenMessages - Optional frozen/pinned messages to include.
+ * @param providerConfig - Optional LLM provider configuration override.
+ * @returns An object containing the narration text.
+ */
 export const generateNarration = async (history: Message[], context: string, frozenMessages?: { role: 'user' | 'system'; content: string }[], providerConfig?: { provider: LLMProvider; apiKey: string; apiBase?: string }): Promise<{ text: string }> => {
     const { apiKey: finalApiKey, model, apiUrl, apiHeaders } = resolveLLMConfig(providerConfig);
     if (!finalApiKey) {
@@ -99,17 +119,28 @@ export const generateNarration = async (history: Message[], context: string, fro
     } catch (error) { clearTimeout(fetchTimer); console.error("LLM Error:", error); console.error('[Narration] generateNarration failed', { elapsed: Date.now() - narrationStart, error }); return { text: "The Narrator is silenced by an unknown force. (Check your API key or model settings.)" }; }
 };
 
+/** Callbacks for streaming narration events. */
 export interface NarrationStreamCallbacks {
   onDelta: (chunk: string, fullSoFar: string) => void;
   onDone: (fullText: string, usage: { prompt: number; completion: number; cached: number }) => void;
   onError: (err: Error) => void;
 }
 
+/** Result of starting a streaming narration, including a promise and a cancel function. */
 export interface NarrationStreamResult {
   promise: Promise<string>;
   cancel: () => void;
 }
 
+/**
+ * Creates a streaming narration that delivers delta chunks via callbacks and returns a cancel handle.
+ * @param history - The conversation history messages.
+ * @param context - A string describing the current game state context.
+ * @param frozenMessages - Optional frozen/pinned messages to include.
+ * @param callbacks - Callback object for delta, done, and error events.
+ * @param providerConfig - Optional LLM provider configuration override.
+ * @returns A NarrationStreamResult with a promise and cancel function.
+ */
 export function generateNarrationStream(history: Message[], context: string, frozenMessages: { role: 'user' | 'system'; content: string }[] | undefined, callbacks: NarrationStreamCallbacks, providerConfig?: { provider: LLMProvider; apiKey: string; apiBase?: string }): NarrationStreamResult {
     const { apiKey: finalApiKey, model, apiUrl, apiHeaders } = resolveLLMConfig(providerConfig);
     if (isDebugMode) console.log('[NarrationStream] generateNarrationStream starting', { model, apiUrl, historyLen: history.length, contextLen: context.length, hasApiKey: !!finalApiKey });
@@ -150,9 +181,20 @@ export function generateNarrationStream(history: Message[], context: string, fro
     return { promise, cancel: () => { if (isDebugMode) console.log('[NarrationStream] Cancelled by caller'); controller.abort(); } };
 }
 
+/** System prompt for generating a single-action tight narration (2-3 vivid sentences). */
 export const TIGHT_NARRATION_PROMPT = `You are a fantasy narrator for a 5e-style RPG. The player has just taken a mechanical action (resolved by game tools). In 2-3 vivid sentences, narrate the outcome from the player's perspective. Focus on action, immediate consequence, and sensory detail. Respond in English. Do not call any tools.`;
+/** System prompt for generating a batch-action tight narration (weaving multiple actions into 2-4 sentences). */
 export const TIGHT_NARRATION_BATCH_PROMPT = `You are a fantasy narrator for a 5e-style RPG. The party has just taken a batch of mechanical actions (resolved by game tools). Weave the actions into a single 2-4 sentence narration. Focus on action, immediate consequence, and sensory detail. Respond in English. Do not call any tools.`;
 
+/**
+ * Generates a short, tight narration (2-4 sentences) based on the last user action and tool results.
+ * Falls back to a default string on failure.
+ * @param lastUserText - The last user input text.
+ * @param toolMessages - Array of tool name and message pairs from recent tool executions.
+ * @param isBatch - Whether to use the batch narration prompt.
+ * @param providerConfig - Optional LLM provider configuration override.
+ * @returns A narration string.
+ */
 export async function generateTightNarration(lastUserText: string, toolMessages: { toolName: string; message: string }[], isBatch: boolean, providerConfig?: { provider: LLMProvider; apiKey: string; apiBase?: string }): Promise<string> {
     const { apiKey: finalApiKey, model, apiUrl, apiHeaders } = resolveLLMConfig(providerConfig);
     if (!finalApiKey) {

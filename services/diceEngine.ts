@@ -7,12 +7,14 @@ import type { Character } from '../types';
 
 type StatKey = 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
 
+/** Rolls a number of dice with the given sides and returns the sum total. */
 export function rollDice(count: number, sides: number): number {
   let total = 0;
   for (let i = 0; i < count; i++) total += cryptoRoll(sides);
   return total;
 }
 
+/** Rolls dice with advantage if the flag is set, returning the higher of two separate rolls. */
 export function rollDiceWithAdvantage(
   count: number,
   sides: number,
@@ -24,10 +26,12 @@ export function rollDiceWithAdvantage(
   return Math.max(first, second);
 }
 
+/** Returns the ability modifier for a given stat value (delegates to classEngine.getMod). */
 export function calculateModifier(statValue: number): number {
   return getMod(statValue);
 }
 
+/** Rolls an attack roll for a weapon attack, calculating the total versus target AC and determining hit/critical/fumble. */
 export function rollAttackRoll(params: {
   attackerLevel: number;
   attackerStats: { str: number; dex: number };
@@ -62,6 +66,7 @@ export function rollAttackRoll(params: {
   return { type: 'attack', dieFace: 'd20', dieRoll: roll, modifier: abilityMod + profBonus, total, isCritical, isFumble, hit };
 }
 
+/** Rolls damage dice for a weapon, including critical doubling, Great Weapon Fighting rerolls, and off-hand modifier handling. */
 export function rollDamage(params: {
   weaponDamageDice: string;
   weaponDamageType: string;
@@ -104,6 +109,7 @@ export function rollDamage(params: {
   return { type: 'damage', dieFace: `d${dieSides}`, dieRoll: results[0] ?? 0, modifier, total, isCritical, results, dieCount: diceCount };
 }
 
+/** Result of a skill check including the raw roll, total, DC, and success flag. */
 export interface SkillCheckResult {
   roll: number;
   total: number;
@@ -117,6 +123,7 @@ for (const skill of SKILLS_LIST) {
   STAT_MAP[skill.name] = skill.stat;
 }
 
+/** Rolls a skill check for a character, determining the relevant stat modifier and applying proficiency, Resilient, and Shield Master bonuses. */
 export function rollSkillCheck(params: {
   characterStats: { str: number; dex: number; con: number; int: number; wis: number; cha: number };
   characterLevel: number;
@@ -165,6 +172,7 @@ export function rollSkillCheck(params: {
   return { type: 'skill', dieFace: 'd20', dieRoll: roll, modifier: statMod + profBonus + shieldBonus, total, dc: difficulty, success: total >= difficulty, label: skillName, skillRank: skillProficiency };
 }
 
+/** Rolls a saving throw for a character, including proficiency bonus if the stat is proficient or the Resilient feat applies. */
 export function rollSavingThrow(params: {
   characterStats: Record<string, number>;
   characterLevel: number;
@@ -205,6 +213,7 @@ export function rollSavingThrow(params: {
   return { type: 'save', dieFace: 'd20', dieRoll: roll, modifier: totalMod, total, dc, success: total >= dc, stat: mappedStat.toUpperCase(), label: mappedStat.toUpperCase() };
 }
 
+/** Rolls a death save: natural 20 is a critical success, >=10 is a success, <10 is a failure (natural 1 is critical failure). */
 export function rollDeathSave(): RollData {
   const roll = cryptoRoll(20);
 
@@ -219,6 +228,7 @@ export function rollDeathSave(): RollData {
 
 const VALID_STATS: StatKey[] = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
 
+/** Resolves a raw stat input string to one of the six standard stat keys. */
 function resolveStat(raw: string): StatKey {
   const lower = raw.toLowerCase().trim();
   return VALID_STATS.find(s => lower.includes(s) || s.includes(lower)) || 'dex';

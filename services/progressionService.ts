@@ -2,6 +2,7 @@ import { Character, LevelUpSummary } from '../types';
 import { XP_TABLE, STAT_POINTS_PER_LEVEL, MAX_STAT_VALUE, ASI_LEVELS } from '../constants';
 import { calculateMaxHp as classEngineCalculateMaxHp, getClassDef, getSubclassDef, recalculateResourcePools } from './classEngine';
 
+/** Returns the XP required to reach a given character level from the XP table. */
 export function getXpForLevel(level: number): number {
   const entry = XP_TABLE.find(e => e.level === level);
   if (entry) return entry.xpRequired;
@@ -9,21 +10,25 @@ export function getXpForLevel(level: number): number {
   return 0;
 }
 
+/** Calculates the XP needed to go from the current level to the next level. */
 export function calculateXPToNextLevel(currentLevel: number): number {
   if (currentLevel >= 20) return 0;
   return getXpForLevel(currentLevel + 1) - getXpForLevel(currentLevel);
 }
 
+/** Calculates the maximum hit points for a character, delegating to the class engine. */
 export function calculateMaxHp(character: Character): number {
   return classEngineCalculateMaxHp(character);
 }
 
+/** Calculates the HP gain a character would receive upon leveling up by comparing current and next-level max HP. */
 export function calculateHPGainForLevelUp(character: Character): number {
   const oldMax = character.hp.max;
   const newMax = calculateMaxHp({ ...character, level: character.level + 1 });
   return newMax - oldMax;
 }
 
+/** Awards XP to a character, handling multi-level advancement, stat/skill point accrual, and HP recalculation. */
 export function awardExperience(
   character: Character,
   amount: number
@@ -99,6 +104,7 @@ export function awardExperience(
   return { character: updated, leveledUp: false };
 }
 
+/** Applies stat/skill point allocations to a character, recalculates HP and resources, and returns errors for invalid allocations. */
 export function applyStatAllocation(
   character: Character,
   allocations: Partial<Record<keyof Character['stats'], number>>,
@@ -162,6 +168,7 @@ export function applyStatAllocation(
   return { character: updated, hpGained, errors: [] };
 }
 
+/** Builds a human-readable progression context string including level, XP percentage, unspent points, and feats. */
 export function getProgressionContext(character: Character): string {
   const currentLevelXp = getXpForLevel(character.level);
   const nextLevelXp = character.experienceToNextLevel;
@@ -174,10 +181,12 @@ export function getProgressionContext(character: Character): string {
   return base + feats;
 }
 
+/** Sums all positive numeric values from an array of key-value entries. */
 function sumPositiveEntries(entries: [string, unknown][]): number {
   return entries.reduce((sum, [, val]) => sum + (typeof val === 'number' && val > 0 ? val : 0), 0);
 }
 
+/** Clamps current HP to the new maximum, ensuring it never exceeds max. */
 function updateHp(current: number, max: number): { current: number; max: number } {
   return { current: Math.min(max, current), max };
 }

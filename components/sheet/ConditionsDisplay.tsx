@@ -1,10 +1,12 @@
 import React from 'react';
 import { CharacterCondition } from '../../types';
 
+/** Props for the ConditionsDisplay component. */
 interface ConditionsDisplayProps {
   conditions: CharacterCondition[];
 }
 
+/** Lookup table mapping condition IDs to their display icon and summary text. */
 const CONDITION_INFO: Record<string, { icon: string; summary: string }> = {
   blinded:       { icon: 'fa-eye-slash',        summary: 'Auto-fail sight checks; attacks have disadvantage; attacks against you have advantage.' },
   charmed:       { icon: 'fa-heart',             summary: "Can't attack charmer; charmer has advantage on social checks against you." },
@@ -24,6 +26,7 @@ const CONDITION_INFO: Record<string, { icon: string; summary: string }> = {
   bless:         { icon: 'fa-plus-circle',        summary: 'Roll 1d4 and add to attack rolls and saving throws.' },
 };
 
+/** Renders a list of active conditions on a character with icons, summaries, save DCs, and remaining durations. */
 const ConditionsDisplay: React.FC<ConditionsDisplayProps> = ({ conditions }) => {
   if (!conditions.length) return null;
 

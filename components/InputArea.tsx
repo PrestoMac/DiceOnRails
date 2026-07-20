@@ -39,6 +39,7 @@ const CATEGORY_STYLES: Record<string, string> = {
 const QUICK_BTN = 'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium whitespace-nowrap transition-all shrink-0';
 const DISABLED_STYLE = 'bg-stone-800/50 text-stone-600 cursor-not-allowed';
 
+/** Chat input area with quick-action buttons (spells, weapons, features, rests), speech-to-text, and queue/submit controls. */
 const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onQueueAction, onResolveEnemyTurn, isLoading, combat, character, onScrollToBottom, showScrollButton }) => {
   const [input, setInput] = useState('');
   const [isListening, setIsListening] = useState(false);

@@ -1,5 +1,12 @@
 import { GameState } from '../../types';
 
+/**
+ * Filters the available tool definitions based on the current game state.
+ * Certain tools are hidden unless specific conditions are met (e.g. combat-active, party not at full HP, has caster).
+ * @param tools - The full array of tool definitions.
+ * @param state - The current game state.
+ * @returns A filtered array of tool definitions visible to the LLM.
+ */
 export function filterTools(tools: any[], state: GameState): any[] {
   const inCombat = state.combat?.isActive === true;
   const hasEnemies = (state.combat?.enemies?.length ?? 0) > 0;

@@ -18,11 +18,13 @@ import { SPELLS_BY_ID, parseDuration } from '../../utils/spells';
 import { breakConcentration as engineBreakConcentration } from '../spellcastingEngine';
 import { getTimePeriod, formatGameTime, AMBIENT_LINES } from '../../utils/timeUtils';
 
+/** Dependencies required by the CombatService. */
 export interface CombatDeps {
   getTarget: (id?: string) => Character | undefined;
   inflict_damage: (amount: number, targetId?: string, damageType?: string) => Promise<MCPResponse>;
 }
 
+/** Service interface for managing combat encounters, initiative, attacks, and saves. */
 export interface CombatService {
   add_enemy(name: string, ac?: number, hp?: number, attacks?: EnemyAttack[], cr?: number, xp?: number, size?: string, type?: string, damageResistances?: string[], damageImmunities?: string[], damageVulnerabilities?: string[]): Promise<MCPResponse>;
   start_combat(targetId?: string, enemies?: Array<{ name: string; ac?: number; hp?: number; cr?: number; xp?: number; size?: string; type?: string; }>): Promise<MCPResponse>;
@@ -43,6 +45,7 @@ export interface CombatService {
   initializeDeathSaves(character: Character): void;
 }
 
+/** Creates a new CombatService instance operating on the given GameState. */
 export function createCombatService(state: GameState, deps: CombatDeps): CombatService {
   function buildEnemyFromTemplate(name: string, overrides: {
     ac?: number; hp?: number; attacks?: EnemyAttack[]; cr?: number; xp?: number;

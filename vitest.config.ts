@@ -1,5 +1,6 @@
 import { defineConfig } from 'vitest/config';
 
+/** Vitest configuration: jsdom environment, v8 coverage provider with thresholds (55% stmts / 43% branches / 50% funcs / 60% lines), and test file patterns scoped to tests/. */
 export default defineConfig({
   test: {
     globals: true,

@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { WizardStep, WizardStepContext } from './WizardStep';
 
+/** Props for the StepWizard component. */
 interface StepWizardProps<TState> {
   steps: WizardStep<TState>[];
   state: TState;
@@ -11,6 +12,7 @@ interface StepWizardProps<TState> {
   extraProps?: Record<string, any>;
 }
 
+/** Generic multi-step wizard that renders visible steps sequentially with navigation (back/forward/jump-to-step). */
 function StepWizard<TState>({
   steps, state, updateState, renderProgress, renderHeader, className, extraProps,
 }: StepWizardProps<TState>) {

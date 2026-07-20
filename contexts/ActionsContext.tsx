@@ -17,6 +17,7 @@ interface ActionsContextValue {
 
 const ActionsContext = createContext<ActionsContextValue | null>(null);
 
+/** Provides actions context to the component tree, wiring together game actions with UI, auth, and progression state. */
 export function ActionsProvider({ children }: { children: ReactNode }) {
   const { userId } = useAuthContext();
   const { settings, handleTriggerDiceRoll } = useUIContext();
@@ -84,6 +85,7 @@ export function ActionsProvider({ children }: { children: ReactNode }) {
   return <ActionsContext.Provider value={value}>{children}</ActionsContext.Provider>;
 }
 
+/** Returns the actions context value. Must be used within an ActionsProvider. */
 export function useActionsContext() {
   const ctx = useContext(ActionsContext);
   if (!ctx) throw new Error('useActionsContext must be used within ActionsProvider');

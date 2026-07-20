@@ -2,6 +2,7 @@ import React from 'react';
 import AdjBtn from '../../shared/AdjBtn';
 import AddBtn from '../../shared/AddBtn';
 
+/** Props for the SkillRow component. */
 interface SkillRowProps {
   label: string;
   statKey: string;
@@ -14,6 +15,7 @@ interface SkillRowProps {
   description?: string;
 }
 
+/** Single skill row with label, stat key badge, rank adjusters (+/-), total modifier display, and optional recommendation badge. */
 const SkillRow: React.FC<SkillRowProps> = ({
   label, statKey, rank, totalRank, totalMod, remainingPoints,
   onAllocate, recommended, description,

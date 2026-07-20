@@ -1,3 +1,4 @@
+/** Tool definitions for journal management: upserting quests and logging lore entries. */
 export const tools = [
     {
         type: "function",

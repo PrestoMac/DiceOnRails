@@ -1,5 +1,6 @@
 import { isDebugMode } from '../utils/debug';
 
+/** A chunk yielded by the SSE stream, representing content deltas, reasoning, tool calls, usage stats, or stream end/error signals. */
 export type StreamChunk =
   | { type: 'content'; delta: string }
   | { type: 'reasoning'; delta: string }
@@ -8,6 +9,7 @@ export type StreamChunk =
   | { type: 'done' }
   | { type: 'error'; error: Error };
 
+/** Options for the streaming chat completion request, including an abort signal and an optional per-chunk callback. */
 export interface StreamOptions {
   signal?: AbortSignal;
   onChunk?: (chunk: StreamChunk) => void;
@@ -15,6 +17,7 @@ export interface StreamOptions {
 
 const STREAM_TIMEOUT_MS = 60_000;
 
+/** Creates an async generator that streams a chat completion response from a server-sent events (SSE) endpoint, yielding typed StreamChunks. */
 export async function* streamChatCompletion(
   url: string,
   body: unknown,

@@ -1,8 +1,10 @@
 import React, { useRef, useEffect } from 'react';
 import { MessageRole } from '../../types';
 
+/** Filter categories for the chat message search. */
 export type FilterType = 'all' | 'narration' | 'player' | 'system';
 
+/** Pre-defined filter option definitions mapping display labels and icons to matching message roles. */
 export const FILTER_OPTIONS: { key: FilterType; label: string; icon: string; match: MessageRole[] }[] = [
   { key: 'all', label: 'All', icon: 'fa-layer-group', match: [MessageRole.MODEL, MessageRole.USER, MessageRole.SYSTEM, MessageRole.TOOL] },
   { key: 'narration', label: 'Narration', icon: 'fa-feather-pointed', match: [MessageRole.MODEL] },
@@ -21,6 +23,7 @@ interface SearchBarProps {
   onToggle: () => void;
 }
 
+/** Collapsible search bar with text input and category filter buttons for the chat log. */
 const SearchBar: React.FC<SearchBarProps> = ({ searchQuery, onSearchChange, activeFilter, onFilterChange, filteredCount, totalCount, show, onToggle }) => {
   const searchInputRef = useRef<HTMLInputElement>(null);
 

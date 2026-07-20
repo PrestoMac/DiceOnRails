@@ -24,6 +24,7 @@ const DashboardBtn: React.FC<{ onClick: () => void; icon: string; children: Reac
   </button>
 );
 
+/** Dashboard listing saved campaigns with rename, delete, resume, and join actions. */
 const CampaignDashboard: React.FC<CampaignDashboardProps> = ({ campaigns, onSelectCampaign, onCreateNew, onDeleteCampaign, onRenameCampaign, onJoinCampaign, loading = false }) => {
   const [renamingId, setRenamingId] = useState<string|null>(null);
   const [renameName, setRenameName] = useState('');

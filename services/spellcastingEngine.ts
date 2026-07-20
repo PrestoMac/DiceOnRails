@@ -34,15 +34,18 @@ function parseDice(dice: string): { count: number; sides: number; flatBonus: num
   return { count: parsed.count, sides: parsed.sides, flatBonus: parsed.bonus, addAbilityMod };
 }
 
+/** Finds an available spell slot resource for the given level, returning undefined if none remain. */
 export function getSpellSlot(character: Character, level: 1|2|3|4|5|6|7|8|9): ResourcePool | undefined {
   const r = findSpellSlot(character, level);
   return r && r.current > 0 ? r : undefined;
 }
 
+/** Checks whether a character has at least one spell slot of the given level remaining. */
 export function hasSpellSlot(character: Character, level: 1|2|3|4|5|6|7|8|9): boolean {
   return (findSpellSlot(character, level)?.current ?? 0) > 0;
 }
 
+/** Consumes one spell slot of the given level from the character's resources, returning success status. */
 export function consumeSpellSlot(character: Character, level: 1|2|3|4|5|6|7|8|9): boolean {
   const r = findSpellSlot(character, level);
   if (!r || r.current <= 0) return false;
@@ -50,6 +53,7 @@ export function consumeSpellSlot(character: Character, level: 1|2|3|4|5|6|7|8|9)
   return true;
 }
 
+/** Returns the number of cantrips a character of the given class and level can know. */
 export function getCantripsKnown(character: Character, level: number): number {
   const classDef = getClassDef(character.class);
   if (!classDef?.spellcasting) return 0;
@@ -57,6 +61,7 @@ export function getCantripsKnown(character: Character, level: number): number {
   return arr[Math.min(level - 1, arr.length - 1)] || 0;
 }
 
+/** Returns the number of spells a known-style caster can know at the given level. */
 export function getSpellsKnown(character: Character, level: number): number {
   const classDef = getClassDef(character.class);
   if (!classDef?.spellcasting || !classDef.spellcasting.spellsKnown) return 0;
@@ -64,12 +69,14 @@ export function getSpellsKnown(character: Character, level: number): number {
   return arr[Math.min(level - 1, arr.length - 1)] || 0;
 }
 
+/** Returns the maximum number of spells a prepared-style caster can prepare at the given level. */
 export function getMaxPrepared(character: Character, level: number): number {
   const classDef = getClassDef(character.class);
   if (!classDef?.spellcasting || classDef.spellcasting.prepMode !== 'prepared') return 0;
   return Math.max(1, level + getAbilityMod(character, classDef.spellcasting.ability));
 }
 
+/** Validates whether a character can learn a specific spell (correct class, level-appropriate cantrip/spell count). */
 export function canLearnSpell(character: Character, spellId: string): { ok: boolean; reason?: string } {
   const spell = SPELLS_BY_ID[spellId.toLowerCase()];
   if (!spell) return { ok: false, reason: 'Unknown spell.' };
@@ -96,6 +103,7 @@ export function canLearnSpell(character: Character, spellId: string): { ok: bool
   return { ok: true };
 }
 
+/** Adds a spell to a character's known spell list if valid, returning success status. */
 export function learnSpell(character: Character, spellId: string): boolean {
   const check = canLearnSpell(character, spellId);
   if (!check.ok) return false;
@@ -105,6 +113,7 @@ export function learnSpell(character: Character, spellId: string): boolean {
   return true;
 }
 
+/** Prepares a spell for a prepared-style caster, respecting the preparation cap, and returns success with optional reason. */
 export function prepareSpell(character: Character, spellId: string): { ok: boolean; reason?: string } {
   const classDef = getClassDef(character.class);
   if (!classDef?.spellcasting || classDef.spellcasting.prepMode !== 'prepared') {
@@ -127,6 +136,7 @@ export function prepareSpell(character: Character, spellId: string): { ok: boole
   return { ok: true };
 }
 
+/** Removes a spell from a character's prepared list, returning success status. */
 export function unprepareSpell(character: Character, spellId: string): boolean {
   const idx = character.preparedSpells.indexOf(spellId);
   if (idx === -1) return false;
@@ -134,6 +144,7 @@ export function unprepareSpell(character: Character, spellId: string): boolean {
   return true;
 }
 
+/** Detailed result of a cast spell operation, including attack rolls, saves, damage, healing, concentration changes, and narration hints. */
 export interface CastResult {
   success: boolean;
   reason?: string;
@@ -156,6 +167,7 @@ export interface CastResult {
   hasEffect?: boolean;  
 }
 
+/** Executes a full spell cast: validates known/prepared state, consumes spell slot, handles concentration, rolls attack/save/damage/healing, and applies scaling. */
 export function castSpell(
   character: Character,
   spellId: string,
@@ -435,6 +447,7 @@ export function castSpell(
   return result;
 }
 
+/** Result of a concentration break attempt, including whether concentration was broken and the associated CON save details. */
 export interface ConcentrationBreakResult {
   broken: boolean;
   roll?: number;
@@ -444,6 +457,7 @@ export interface ConcentrationBreakResult {
   success?: boolean;
 }
 
+/** Attempts to break a character's concentration, handling damaged (CON save), voluntary, and incapacitated reasons, and cleaning up tied conditions. */
 export function breakConcentration(character: Character, reason: 'damaged' | 'voluntary' | 'incapacitated', damage = 0): ConcentrationBreakResult {
   if (!character.concentrationSpellId) return { broken: false };
   const spellId = character.concentrationSpellId;

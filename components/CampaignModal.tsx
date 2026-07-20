@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 
+/** Mode options for the campaign creation, joining, or renaming modal. */
 export type CampaignModalMode = 'create' | 'join' | 'rename';
 
 interface CampaignModalProps {
@@ -44,6 +45,7 @@ const CornerBorder: React.FC<{ className: string }> = ({ className }) => (
   <div className={`absolute ${className} w-4 h-4 border-amber-800/50`} />
 );
 
+/** Modal dialog for creating, renaming, or joining a campaign. */
 const CampaignModal: React.FC<CampaignModalProps> = ({ mode, isOpen, currentName, onConfirm, onCancel }) => {
   const [value, setValue] = useState(mode === 'rename' ? (currentName ?? '') : '');
 

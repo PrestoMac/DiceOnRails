@@ -1,11 +1,14 @@
 import type { DamageType, SaveStat } from './character';
 
+/** The eight schools of magic in D&D 5e. */
 export type SpellSchool =
   | 'abjuration' | 'conjuration' | 'divination' | 'enchantment'
   | 'evocation' | 'illusion' | 'necromancy' | 'transmutation';
 
+/** The spellcasting progression archetype for a class. */
 export type SpellTradition = 'full' | 'half' | 'pact' | 'third' | 'none';
 
+/** Describes how a spell changes when cast at a higher level. */
 export interface SpellScaling {
   atSlotLevel: number;
   damageDice?: string;
@@ -13,6 +16,7 @@ export interface SpellScaling {
   notes?: string;
 }
 
+/** A complete spell definition including casting parameters, damage, and scaling. */
 export interface SpellDefinition {
   id: string;
   name: string;
@@ -57,6 +61,7 @@ export interface SpellDefinition {
   }>;
 }
 
+/** A profile defining how a class handles spellcasting (tradition, ability, slots, pact magic). */
 export interface SpellcastingProfile {
   tradition: SpellTradition;
   ability: 'int' | 'wis' | 'cha';

@@ -4,30 +4,37 @@ import { RACES_CATALOG, RaceDefinition } from '../utils/races';
 import { SubclassSummary } from '../types';
 import { getExhaustionPenalty } from './conditionEngine';
 
+/** Calculates the ability modifier for a given score. */
 function abilityMod(score: number): number {
   return Math.floor((score - 10) / 2);
 }
 
+/** Returns the ability modifier for a given stat value. */
 export const getMod = abilityMod;
 
+/** Returns the spellcasting ability modifier value for the character's class, or null if not a spellcaster. */
 function spellAbilityValue(character: Character): number | null {
   const classDef = getClassDef(character.class);
   return classDef?.spellcasting ? abilityMod(character.stats[classDef.spellcasting.ability]) : null;
 }
 
+/** Looks up a class definition by its lowercase ID from the classes catalog. */
 export function getClassDef(classId: string): ClassDefinition | undefined {
   if (!classId) return undefined;
   return CLASSES_CATALOG.find(c => c.id === classId.toLowerCase());
 }
 
+/** Looks up a race definition by its lowercase ID from the races catalog. */
 export function getRaceDef(raceId: string): RaceDefinition | undefined {
   return RACES_CATALOG.find(r => r.id === raceId.toLowerCase());
 }
 
+/** Looks up a subclass definition by class ID and subclass ID. */
 export function getSubclassDef(classId: string, subclassId: string): SubclassSummary | undefined {
   return getClassDef(classId)?.subclasses.find(s => s.id === subclassId.toLowerCase());
 }
 
+/** Calculates the maximum HP for a character accounting for class, CON, feats (Tough), Draconic Bloodline, and bonuses. */
 export function calculateMaxHp(character: Character): number {
   const classDef = getClassDef(character.class);
   if (!classDef) return character.hp?.max ?? 10;
@@ -39,6 +46,7 @@ export function calculateMaxHp(character: Character): number {
   return Math.max(1, total);
 }
 
+/** Checks whether a character can equip a given armor type based on class proficiencies and domain features. */
 export function canEquipArmor(character: Character, armorType: 'light' | 'medium' | 'heavy' | 'shield'): boolean {
   const classDef = getClassDef(character.class);
   if (!classDef) return armorType === 'light';
@@ -46,6 +54,7 @@ export function canEquipArmor(character: Character, armorType: 'light' | 'medium
   return classDef.id === 'cleric' && character.divineDomain === 'life-domain' && armorType === 'heavy';
 }
 
+/** Determines the armor type category (light/medium/heavy/shield) from an inventory item's stats and name. */
 export function getArmorTypeFromItem(item: any): 'light' | 'medium' | 'heavy' | 'shield' {
   if (item.type === 'shield') return 'shield';
   const formula = item.stats?.acFormula || '';
@@ -57,10 +66,12 @@ export function getArmorTypeFromItem(item: any): 'light' | 'medium' | 'heavy' | 
   return 'light';
 }
 
+/** Checks whether the character has Draconic Resilience from the Draconic Bloodline sorcerer subclass. */
 function hasDraconicResilience(character: Character): boolean {
   return character.class === 'sorcerer' && character.sorcerousOrigin === 'draconic-bloodline';
 }
 
+/** Evaluates whether a character meets a named condition (e.g. 'no-heavy-armor', 'no-armor'). */
 function meetsCondition(character: Character, condition: string | undefined): boolean {
   if (!condition) return true;
   if (condition === 'no-heavy-armor') {
@@ -73,12 +84,14 @@ function meetsCondition(character: Character, condition: string | undefined): bo
   return true;
 }
 
+/** Parses an armor AC formula (e.g. '12 + DEX', '14 max 2') and returns the calculated AC value. */
 function parseArmorFormula(formula: string, dexMod: number): number {
   if (formula.includes('max 2')) return parseInt(formula) + Math.min(2, dexMod);
   if (formula.includes('+ DEX')) return parseInt(formula) + dexMod;
   return parseInt(formula);
 }
 
+/** Adds +1 AC from the Dual Wielder feat if the character has two weapons equipped. */
 function addDualWielderBonus(character: Character, ac: number): number {
   if (character.feats?.includes('dual-wielder')) {
     const equippedWeapons = character.inventory.filter(i => i.equipped && i.type === 'weapon');
@@ -87,6 +100,7 @@ function addDualWielderBonus(character: Character, ac: number): number {
   return ac;
 }
 
+/** Calculates a character's full Armor Class considering armor, shield, class features (Barbarian/Monk/Draconic), feats, and bonuses. */
 export function calculateAc(character: Character, equippedArmor: InventoryItem | null): number {
   const dexMod = abilityMod(character.stats.dex);
   const conMod = abilityMod(character.stats.con);
@@ -119,6 +133,7 @@ export function calculateAc(character: Character, equippedArmor: InventoryItem |
   return ac;
 }
 
+/** Computes the total saving throw bonus for a given stat, including proficiency, feats (Resilient, Shield Master), and Rogue's Slippery Mind. */
 export function getSavingThrowBonus(character: Character, stat: 'str'|'dex'|'con'|'int'|'wis'|'cha'): number {
   const ability = abilityMod(character.stats[stat]);
   const classDef = getClassDef(character.class);
@@ -141,20 +156,24 @@ export function getSavingThrowBonus(character: Character, stat: 'str'|'dex'|'con
   return bonus;
 }
 
+/** Returns the proficiency bonus for a character based on level: 2 + floor((level-1)/4). */
 export function getProficiencyBonus(character: Character): number {
   return Math.floor((character.level - 1) / 4) + 2;
 }
 
+/** Returns the spell save DC for a character, or 0 if the class does not have spellcasting. */
 export function getSpellSaveDc(character: Character): number {
   const ability = spellAbilityValue(character);
   return ability !== null ? 8 + getProficiencyBonus(character) + ability : 0;
 }
 
+/** Returns the spell attack bonus for a character, or 0 if the class does not have spellcasting. */
 export function getSpellAttackBonus(character: Character): number {
   const ability = spellAbilityValue(character);
   return ability !== null ? getProficiencyBonus(character) + ability : 0;
 }
 
+/** Calculates a character's speed in feet, accounting for race, feats (Mobile, Athlete), bonuses, and exhaustion penalties. */
 export function calculateSpeed(character: Character): number {
   const race = getRaceDef(character.race);
   if (!race) return 30;
@@ -170,14 +189,17 @@ export function calculateSpeed(character: Character): number {
   return Math.max(0, speed);
 }
 
+/** Returns the darkvision range in feet for the character's race, or 0 if none. */
 export function getDarkvisionRange(character: Character): number {
   return getRaceDef(character.race)?.darkvision ?? 0;
 }
 
+/** Finds a character's resource pool by its string ID (e.g. 'spell-slot-1', 'ki'). */
 export function getResource(character: Character, id: string): ResourcePool | undefined {
   return (character.resources || []).find(r => r.id === id);
 }
 
+/** Attempts to spend `amount` from a character resource pool; returns false if insufficient. */
 export function spendResource(character: Character, id: string, amount = 1): boolean {
   const r = getResource(character, id);
   if (!r || r.current < amount) return false;
@@ -185,6 +207,7 @@ export function spendResource(character: Character, id: string, amount = 1): boo
   return true;
 }
 
+/** Restores resources that reset on the given rest type (short/long/turn); for long rests also recovers half hit dice. */
 export function recoverResources(character: Character, restType: 'short' | 'long' | 'turn'): void {
   for (const r of (character.resources || [])) {
     if (r.resetOn === restType) r.current = r.max;
@@ -197,6 +220,7 @@ export function recoverResources(character: Character, restType: 'short' | 'long
   }
 }
 
+/** Collects all damage resistance types for a character from racial traits only (no class/feat sources). */
 export function getDamageResistances(character: Character): string[] {
   const result: string[] = [];
   const race = getRaceDef(character.race);
@@ -213,6 +237,7 @@ export function getDamageResistances(character: Character): string[] {
   return result;
 }
 
+/** Collects all condition immunities for a character from racial traits. */
 export function getConditionsImmunities(character: Character): string[] {
   const result: string[] = [];
   const race = getRaceDef(character.race);
@@ -225,6 +250,7 @@ export function getConditionsImmunities(character: Character): string[] {
   return result;
 }
 
+/** Rebuilds the character's full resource pool list (class features, spell slots, racial traits), preserving existing current values within max bounds. */
 export function recalculateResourcePools(character: Character): ResourcePool[] {
   const resources: ResourcePool[] = [];
   const level = character.level || 1;

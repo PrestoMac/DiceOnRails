@@ -1,7 +1,10 @@
 import { Character } from './types';
+/** Skill definitions, XP progression thresholds, per-level stat-point allocation, max stat value, ASI milestone levels, and a fallback starting location. */
 export { SKILLS_LIST, XP_TABLE, STAT_POINTS_PER_LEVEL, MAX_STAT_VALUE, ASI_LEVELS, FALLBACK_STARTING_LOCATION } from './data/constants';
+/** Describes a single skill with its name, key ability, and optional description. */
 export type { SkillDefinition } from './data/constants';
 
+/** Core system prompt instructing the LLM how to act as a game master: mandatory tool usage, game-mechanics rules, style guidelines, and architectural notes. */
 export const SYSTEM_INSTRUCTION = `You are a world-class Game Master for a text-based RPG. Your goal is to run a fluid, fun, and fast-paced game.
 
 RULES:
@@ -35,6 +38,7 @@ STYLE GUIDELINES:
   LANGUAGE: You MUST respond in English at all times. Never switch to any other language. All narration, dialogue, descriptions, and system messages must be in English only.
 ` as const;
 
+/** Secondary system prompt covering 5e XP awards, combat CR calibration, skill DC rewards, rest mechanics, party splitting, solo-play scaling, and the mandatory concurrent tool-call rule. */
 export const PROGRESSION_SYSTEM_PROMPT = `
 CHARACTER PROGRESSION (5e SRD rules):
 You MUST award Experience Points (XP) immediately throughout gameplay for player actions. Do NOT wait until the end of a quest. Whenever the player overcomes a challenge, you MUST concurrently invoke the 'award_experience' tool in the same turn.
@@ -86,6 +90,7 @@ function deepFreeze<T>(obj: T): T {
   return obj;
 }
 
+/** A frozen default Character instance used as the starting hero (Valerius, a level-1 human paladin) for quick-start games. */
 export const INITIAL_CHARACTER: Character = deepFreeze({
   id: 'player-1',
   name: 'Valerius',

@@ -35,6 +35,7 @@ const QueueNotification: React.FC<{ message: string }> = ({ message }) => (
   </div>
 );
 
+/** Root application component. Shows setup wizard when VITE_SETUP_MODE is true, otherwise orchestrates the splash screen, auth, dashboard, character creation, and the main game layout with all context providers. */
 const App: React.FC = () => {
   if (import.meta.env.VITE_SETUP_MODE === 'true') return <SetupWizard />;
 

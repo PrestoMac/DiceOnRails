@@ -35,6 +35,7 @@ interface UIContextValue {
 
 const UIContext = createContext<UIContextValue | null>(null);
 
+/** Provides UI context (settings, mobile detection, dice roll overlay) to the component tree. */
 export function UIProvider({ children }: { children: ReactNode }) {
   const { settings, settingsOpen, setSettingsOpen, saveSettings } = useSettings();
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -64,6 +65,7 @@ export function UIProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/** Returns the UI context value. Must be used within a UIProvider. */
 export function useUIContext() {
   const ctx = useContext(UIContext);
   if (!ctx) throw new Error('useUIContext must be used within UIProvider');

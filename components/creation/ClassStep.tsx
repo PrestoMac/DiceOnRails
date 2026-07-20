@@ -5,6 +5,7 @@ import { StepH, NavBtn, SubclassList, DragonColorPicker } from './SharedComponen
 
 const CLASSES = CLASSES_CATALOG;
 
+/** Class selection step of the character creation wizard. Displays available classes with their features, starting equipment, and handles subclass routing for classes with subclass at level 1. */
 const ClassStep: React.FC<StepProps> = ({ wizardState, updateWizard, onNext, goToStep }) => {
   const { selectedClass, selectedSubclassId, draconicAncestry, level } = wizardState;
   const stepCls = "space-y-6 animate-in fade-in duration-500";

@@ -1,5 +1,6 @@
 import React from 'react';
 
+/** SVG polygon coordinates and decorative inner elements for each standard die face (d4–d20). Note: the d6 entry uses an empty `points` string and renders its shape via an `<rect>` inside `inner` rather than a polygon. */
 export const DIE_POLYGONS: Record<string, { points: string; inner?: React.ReactNode }> = {
   d4: {
     points: '50,15 90,85 10,85',
@@ -74,6 +75,7 @@ export const DIE_POLYGONS: Record<string, { points: string; inner?: React.ReactN
   },
 };
 
+/** Parses a die face string (e.g. "d20") and returns the number of sides. Defaults to 20. */
 export function getDieSides(face: string): number {
   const match = face.match(/d(\d+)/);
   return match ? parseInt(match[1]) : 20;
@@ -89,6 +91,7 @@ const makeAudio = () => {
   return { ctx, osc, gain };
 };
 
+/** Plays a short audio tick sound (randomized sine tone) to simulate a die tumbling. */
 export function playDiceTick() {
   try {
     const { ctx, osc, gain } = makeAudio();
@@ -100,6 +103,7 @@ export function playDiceTick() {
   } catch {}
 }
 
+/** Plays an audio tone to indicate the roll outcome: ascending high tone for success (523→659 Hz), low sustained tone for failure (120 Hz, NOT a descending sweep), or ascending low tone when success is undefined (440→554 Hz). */
 export function playDiceResult(success?: boolean) {
   try {
     const { ctx, osc, gain } = makeAudio();

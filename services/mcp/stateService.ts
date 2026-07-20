@@ -6,6 +6,7 @@ import { fail } from './_shared';
 
 
 
+/** Ensures that required GameState fields (gameTime, lastLongRestTime, factionReputations) have valid defaults. */
 export function ensureGameStateFields(state: GameState): void {
   if (state.gameTime == null || typeof state.gameTime !== 'number' || isNaN(state.gameTime) || state.gameTime < 0) {
     state.gameTime = 0;
@@ -18,6 +19,7 @@ export function ensureGameStateFields(state: GameState): void {
   }
 }
 
+/** Service interface for managing game state lifecycle, transactions, snapshots, and rewinds. */
 export interface StateService {
   loadState(savedState: GameState): void;
   reset(): void;
@@ -37,6 +39,7 @@ export interface StateService {
   ensureGameStateFields(): void;
 }
 
+/** Creates a new StateService instance operating on the given GameState. */
 export function createStateService(state: GameState): StateService {
   let _snapshot: GameState | undefined;
   let rewindPoint: { gameState: GameState; messages: Message[] } | null = null;

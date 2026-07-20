@@ -2,6 +2,11 @@ export { SPELLS_CATALOG } from '../data/spells';
 import { SPELLS_CATALOG } from '../data/spells';
 import { SpellDefinition } from '../types';
 
+/**
+ * Parses a duration string (e.g. "1 minute", "Up to 1 hour") into a structured value.
+ * @param duration - The raw duration string from a spell definition.
+ * @returns An object with value and unit, or undefined for instantaneous durations AND any other unrecognized format (e.g. "Concentration, up to 10 minutes" without the "Up to" prefix, "Special; see text"). Callers cannot rely on undefined meaning strictly "instantaneous".
+ */
 export function parseDuration(duration: string): { value: number; unit: 'round' | 'minute' | 'permanent' } | undefined {
   const d = duration.toLowerCase().trim();
 
@@ -24,9 +29,15 @@ export function parseDuration(duration: string): { value: number; unit: 'round' 
   return undefined;
 }
 
+/** Lookup map of spell ID to spell definition, built from the spells catalog. */
 export const SPELLS_BY_ID: Record<string, SpellDefinition> =
   Object.fromEntries(SPELLS_CATALOG.map(s => [s.id, s]));
 
+/**
+ * Returns all spells available to a given class.
+ * @param classId - The class ID to filter by.
+ * @returns An array of spell definitions.
+ */
 export function getSpellsForClass(classId: string): SpellDefinition[] {
   return SPELLS_CATALOG.filter(s => s.classes.includes(classId));
 }

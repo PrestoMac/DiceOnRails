@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { authService } from '../services/authService';
 
+/** Manages authentication state: loads session on mount and provides login/logout helpers. */
 export const useAuth = () => {
     const [userId, setUserId] = useState<string | undefined>(undefined);
 

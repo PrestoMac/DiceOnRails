@@ -5,6 +5,7 @@ import { getMod } from '../../services/classEngine';
 import { CLASS_RECOMMENDED_SKILLS } from './constants';
 import { StepH, AdjBtn } from './SharedComponents';
 
+/** Skill training step. Allocates skill points derived from class choices and level, with class-recommended skills highlighted. */
 const SkillsStep: React.FC<StepProps> = ({ wizardState, updateWizard, onNext }) => {
   const { selectedClass, selectedRace, stats, allocatedSkills, level } = wizardState;
   const stepCls = "space-y-6 animate-in fade-in duration-500";

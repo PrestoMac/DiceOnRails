@@ -24,6 +24,11 @@ function toEnemy(entry: typeof SRD_MONSTERS[number]): Enemy {
   };
 }
 
+/**
+ * Looks up a monster by name, with alias and fuzzy matching fallbacks.
+ * @param name - The monster name or alias.
+ * @returns An Enemy object, or undefined if not found.
+ */
 export function lookupMonster(name: string): Enemy | undefined {
   const clean = name.trim().toLowerCase();
   let found = SRD_MONSTERS.find(m => m.name.toLowerCase() === clean);
@@ -63,14 +68,30 @@ export function lookupMonster(name: string): Enemy | undefined {
   return undefined;
 }
 
+/**
+ * Returns all monsters with a CR at or below the given value.
+ * @param maxCR - The maximum challenge rating.
+ * @returns An array of matching Enemy objects.
+ */
 export function getMonstersByCR(maxCR: number): Enemy[] {
   return SRD_MONSTERS.filter(m => m.cr <= maxCR).map(toEnemy);
 }
 
+/**
+ * Returns all monsters matching the given creature type.
+ * @param type - The creature type (e.g. "humanoid", "beast").
+ * @returns An array of matching Enemy objects.
+ */
 export function getMonstersByType(type: string): Enemy[] {
   return SRD_MONSTERS.filter(m => m.type === type).map(toEnemy);
 }
 
+/**
+ * Returns all monsters within the given CR range (inclusive).
+ * @param minCR - The minimum challenge rating.
+ * @param maxCR - The maximum challenge rating.
+ * @returns An array of matching Enemy objects.
+ */
 export function getMonstersByCRRange(minCR: number, maxCR: number): Enemy[] {
   return SRD_MONSTERS.filter(m => m.cr >= minCR && m.cr <= maxCR).map(toEnemy);
 }

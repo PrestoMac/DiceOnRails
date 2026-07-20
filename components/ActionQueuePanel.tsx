@@ -21,6 +21,7 @@ const EmptyState = () => (
   </div>
 );
 
+/** Displays a queue of pending player actions (dialogue/action) with drag-to-reorder, inline editing, and a bulk execute button. */
 const ActionQueuePanel: React.FC<ActionQueuePanelProps> = ({
   queue, userId, onRemove, onUpdate, onReorder, onExecute, isProcessing, isCollapsed = false, onToggleCollapse
 }) => {

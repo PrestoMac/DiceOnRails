@@ -25,6 +25,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   flavor: 'Roleplay'
 };
 
+/** Modal displaying full feat details: icon, category, description, mechanical effect, and prerequisites. */
 const FeatDetailModal: React.FC<FeatDetailModalProps> = ({ feat, onClose, headerSlot }) => {
   if (!feat) return null;
   const cat = CATEGORY_COLORS[feat.category] || CATEGORY_COLORS.general;

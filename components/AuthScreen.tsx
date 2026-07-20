@@ -9,6 +9,7 @@ const inputCls = "w-full bg-stone-950 border border-stone-800 rounded p-3 text-s
 const linkCls = "hover:text-amber-500 transition-colors uppercase tracking-wider";
 const labelCls = "block text-stone-400 text-xs uppercase font-bold tracking-wider mb-1";
 
+/** Login/signup form with email/password authentication and anonymous play option. */
 const AuthScreen: React.FC<AuthScreenProps> = ({ onComplete }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [isResetMode, setIsResetMode] = useState(false);

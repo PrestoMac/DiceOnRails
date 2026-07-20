@@ -4,6 +4,7 @@ import { ClassDefinition } from '../../utils/classes';
 import { RaceDefinition } from '../../utils/races';
 import { SpellDefinition } from '../../types';
 
+/** Complete state of the character creation wizard, tracking all selections across every step. */
 export interface WizardState {
   name: string;
   level: number;
@@ -27,6 +28,7 @@ export interface WizardState {
   isRerolling: boolean;
 }
 
+/** Base props shared by all wizard step components. */
 export interface StepProps {
   wizardState: WizardState;
   updateWizard: (updates: Partial<WizardState>) => void;
@@ -35,6 +37,7 @@ export interface StepProps {
   goToStep: (step: number) => void;
 }
 
+/** An item available for purchase in the gear shop. */
 export interface ShopItem {
   name: string;
   category: 'Weapon' | 'Armor' | 'Gear' | 'Consumable';
@@ -42,6 +45,7 @@ export interface ShopItem {
   description: string;
 }
 
+/** Props for the SubclassList component. */
 export interface SubclassListProps {
   subclasses: ClassDefinition['subclasses'];
   selectedSubclassId: string | null;
@@ -49,6 +53,7 @@ export interface SubclassListProps {
   level: number;
 }
 
+/** Props for the SpellCard component. */
 export interface SpellCardProps {
   spell: SpellDefinition;
   isSelected: boolean;

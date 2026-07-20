@@ -15,6 +15,8 @@ import { createTravelService, TravelService } from './mcp/travelService';
 
 export { generateId };
 
+/** Central server-class that owns the game state and wires together all sub-services (party, inventory, combat, spells, progression, travel, content, state).
+ *  Acts as the single canonical source of truth; all game state mutations must go through this class. */
 export class MockMCPServer {
   private state: GameState;
 
@@ -229,6 +231,7 @@ export class MockMCPServer {
   }
 
   
+  /** Routes an LLM tool call by name to the appropriate sub-service, dispatching across 29 cases (28 tools + unknown default). */
   public async executeToolCall(name: string, args: Record<string, unknown>): Promise<MCPResponse> {
     if (isDebugMode) {
       console.log(`[executeToolCall] Executing: ${name} with args:`, args);
@@ -321,10 +324,12 @@ export class MockMCPServer {
 }
 
 let _mcpServer: MockMCPServer | undefined;
+/** Returns the singleton MockMCPServer instance, creating it on first call. */
 export function getMcpServer(): MockMCPServer {
   if (!_mcpServer) _mcpServer = new MockMCPServer();
   return _mcpServer;
 }
+/** Proxy that lazily initialises the MCP server on first property access and binds method calls to the instance. */
 export const mcpServer = new Proxy({} as MockMCPServer, {
   get(_, prop) {
     if (typeof prop === 'string' && (prop === 'then' || prop === 'catch' || prop === 'finally')) return undefined;

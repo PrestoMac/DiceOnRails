@@ -11,6 +11,11 @@ import {
 import { estimateTokens } from './tokenEstimation';
 import { fetchWithTimeout } from './llmApiClient';
 
+/**
+ * Generates an atmosphere image URL based on a textual description using the ImageRouter API.
+ * @param description - A text description of the scene to visualize.
+ * @returns A URL string of the generated image, or undefined on failure.
+ */
 export async function generateAtmosphere(
     description: string
 ): Promise<string | undefined> {
@@ -72,6 +77,7 @@ export async function generateAtmosphere(
     }
 }
 
+/** System prompt used to generate fantasy starting locations (taverns/inns/waypoints). */
 export const STARTING_LOCATIONS_PROMPT = `You are a fantasy world-building assistant for a 5e-style RPG. Generate exactly 4 unique, safe starting locations (taverns, inns, or roadside waypoints) for a new adventurer. Each must be a welcoming place where a hero begins their journey.
 
 Return a valid JSON array with exactly 4 objects. Each object must have:
@@ -81,6 +87,14 @@ Return a valid JSON array with exactly 4 objects. Each object must have:
 
 Make each location feel distinct in architecture, atmosphere, and implied region. Vary the names tonally (some warm and rustic, some mysterious, some bustling). The introHook should feel like the opening of a story, drawing the player in with vivid sensory detail.`;
 
+/**
+ * Generates up to 4 unique starting locations for a new character via the LLM.
+ * @param character - The character descriptor (name, race, class).
+ * @param apiKey - The LLM API key.
+ * @param provider - Optional LLM provider type.
+ * @param apiBase - Optional custom API base URL.
+ * @returns An array of up to 4 StartingLocation objects.
+ */
 export async function generateStartingLocations(
   character: { name: string; race: string; class: string },
   apiKey: string,
@@ -141,6 +155,15 @@ export async function generateStartingLocations(
   }
 }
 
+/**
+ * Compresses raw session text into a dense episode checkpoint summary via the LLM.
+ * @param rawText - The raw session history text to compress.
+ * @param apiKey - The LLM API key.
+ * @param model - The model name to use for compression.
+ * @param provider - Optional LLM provider type.
+ * @param apiBase - Optional custom API base URL.
+ * @returns The compressed checkpoint string, or an empty string on failure.
+ */
 export async function compressRawToCheckpoint(
     rawText: string,
     apiKey: string,

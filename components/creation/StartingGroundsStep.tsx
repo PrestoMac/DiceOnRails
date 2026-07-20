@@ -3,6 +3,7 @@ import { StartingLocation } from '../../types';
 import { WizardState } from './types';
 import { StepH } from './SharedComponents';
 
+/** Props for the starting grounds selection step on new campaigns. */
 interface StartingGroundsStepProps {
   wizardState: WizardState;
   updateWizard: (updates: Partial<WizardState>) => void;
@@ -10,6 +11,7 @@ interface StartingGroundsStepProps {
   onReroll: () => void;
 }
 
+/** Starting grounds selection step. Displays AI-generated location options with images, descriptions, and an intro hook. */
 const StartingGroundsStep: React.FC<StartingGroundsStepProps> = ({
   wizardState, updateWizard, onFinalize, onReroll,
 }) => {

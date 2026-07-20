@@ -5,6 +5,7 @@ import SkillRow from './SkillRow';
 import RemainingPointsBanner from './RemainingPointsBanner';
 import { Character } from '../../../types';
 
+/** Props for the SkillListWithPoints component. */
 interface SkillListWithPointsProps {
   allocatedSkills: Record<string, number>;
   stats: Character['stats'];
@@ -14,6 +15,7 @@ interface SkillListWithPointsProps {
   recommendedSkills?: string[];
 }
 
+/** Full skill list with point allocation controls, sorted by recommendation status when recommendedSkills is provided. */
 const SkillListWithPoints: React.FC<SkillListWithPointsProps> = ({
   allocatedSkills, stats, selectedAllocations = {},
   remainingPoints, onAllocate, recommendedSkills,

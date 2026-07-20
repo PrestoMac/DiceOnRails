@@ -2,6 +2,7 @@
 import { AppSettings } from "../types";
 import { isDebugMode } from '../utils/debug';
 
+/** Resolves the list of available speech synthesis voices, waiting for the voiceschanged event if necessary. */
 export const getVoices = (): Promise<SpeechSynthesisVoice[]> => {
   return new Promise((resolve) => {
     let v = window.speechSynthesis.getVoices();
@@ -21,12 +22,14 @@ export const getVoices = (): Promise<SpeechSynthesisVoice[]> => {
   });
 };
 
+/** Splits text into sentence-length chunks for sequential TTS playback. */
 const chunkText = (text: string): string[] => {
   if (!text.trim()) return [];
   const chunks = text.match(/[^.!?]+[.!?]*/g) || [text];
   return chunks.map(c => c.trim()).filter(c => c.length > 0);
 };
 
+/** Speaks the given text using the Web Speech API with the provided voice and rate/pitch settings. */
 export async function speakText(text: string, settings: AppSettings): Promise<boolean> {
   if (!text.trim()) return true;
 
@@ -96,14 +99,17 @@ export async function speakText(text: string, settings: AppSettings): Promise<bo
   });
 }
 
+/** Stops any currently playing speech synthesis. */
 export function stopSpeaking() {
   window.speechSynthesis.cancel();
 }
 
+/** Initializes the audio system by pre-loading available voices. */
 export function initAudio() {
   getVoices();
 }
 
+/** Stores the most recent utterance reference for external cancellation tracking. */
 const setLastUtterance = (utterance: SpeechSynthesisUtterance | null) => {
   (window as any)._lastUtterance = utterance;
 };

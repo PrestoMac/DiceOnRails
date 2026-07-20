@@ -4,6 +4,7 @@ import { getEnv } from '../../utils/envHelper';
 import { estimateTokens, computePayloadTokens, CONTEXT_BUDGET, STATIC_OVERHEAD, OVERHEAD_CONTEXT, PER_MSG_OVERHEAD, COMPLETION_RESERVE, RAW_CAP } from './tokenEstimation';
 import { compressRawToCheckpoint } from './atmosphere';
 
+/** Tracks the state of the context compression pipeline, including checkpoints, frozen history, and compression status. */
 export type ContextState = {
     episodeCheckpoints: string[];
     frozenRawHistory: string;
@@ -15,6 +16,11 @@ export type ContextState = {
     generation: number;
 };
 
+/**
+ * Enforces the token budget by evicting checkpoints, raw history, or trimming active messages as needed.
+ * @param params - Object containing activeMessages, frozenMessages, ctx, and optional contextString.
+ * @returns Eviction results including trimmed frozen messages and counts of dropped items.
+ */
 export function enforceTokenBudget(params: {
     activeMessages: { text?: string }[]
     frozenMessages: { role?: string; content?: string }[]
@@ -93,6 +99,11 @@ export function enforceTokenBudget(params: {
     return { trimmedFrozen: frozen, droppedRaw, droppedCheckpoints, tiersTriggered: droppedCheckpoints > 0 ? [1] : [], trimActiveCount, rawHistoryUpdate };
 }
 
+/**
+ * Builds the frozen messages array from checkpoints and raw history stored in the context state.
+ * @param ctx - The current context state.
+ * @returns An array of frozen messages with role and content.
+ */
 export function buildFrozenMessages(ctx: ContextState): { role: 'user' | 'system'; content: string }[] {
     const msgs: { role: 'user' | 'system'; content: string }[] = [];
     for (const chk of ctx.episodeCheckpoints) msgs.push({ role: 'system', content: `[RECENT SESSION]\n${chk}` });
@@ -100,6 +111,12 @@ export function buildFrozenMessages(ctx: ContextState): { role: 'user' | 'system
     return msgs;
 }
 
+/**
+ * Freezes messages outside the active window into the raw history, truncating oldest content if the character cap is exceeded.
+ * @param ctx - The current context state (mutated in place).
+ * @param allMessages - The full list of messages.
+ * @param aw - The active window size (number of messages to keep unfrozen).
+ */
 export function freezeMessages(ctx: ContextState, allMessages: Message[], aw: number): void {
     const fe = Math.max(0, allMessages.length - aw);
     if (fe <= ctx.frozenMessageCount) return;
@@ -122,6 +139,10 @@ export function freezeMessages(ctx: ContextState, allMessages: Message[], aw: nu
     console.log(`[Context Freeze] ${tf.length} msgs \u2192 ${estimateTokens(ft)} tokens. Frozen total: ${ctx.frozenRawTokens}/${RAW_CAP}`);
 }
 
+/**
+ * Triggers checkpoint compression if the frozen raw history exceeds the token cap and no compression is already in progress.
+ * @param ctx - The current context state (mutated in place).
+ */
 export function compressToCheckpointIfNeeded(ctx: ContextState): void {
     if (ctx.isCompressing || (ctx.frozenRawTokens < RAW_CAP && ctx.episodeCheckpoints.length > 0) || !ctx.frozenRawHistory) return;
     if (ctx.frozenRawTokens < 1000 && ctx.episodeCheckpoints.length === 0) return;
@@ -142,12 +163,26 @@ export function compressToCheckpointIfNeeded(ctx: ContextState): void {
     })();
 }
 
+/**
+ * Runs one step of the context pipeline: increments turn counter, freezes messages if threshold is met, and triggers compression.
+ * @param ctx - The current context state (mutated in place).
+ * @param fi - Freeze interval (number of turns between freeze operations).
+ * @param am - The full list of active messages.
+ * @param aw - The active window size.
+ */
 export function runContextPipeline(ctx: ContextState, fi: number, am: Message[], aw: number): void {
     ctx.turnCounter++;
     if (ctx.turnCounter >= fi) freezeMessages(ctx, am, aw);
     compressToCheckpointIfNeeded(ctx);
 }
 
+/**
+ * Prepares the context for an LLM call by building frozen messages, enforcing the token budget, and slicing active messages.
+ * @param ctx - The current context state (may be mutated if eviction occurs).
+ * @param am - The full list of active messages.
+ * @param contextString - Optional context string to include in budget calculation.
+ * @returns An object with frozen messages and a trimmed active messages array.
+ */
 export function prepareContext(ctx: ContextState, am: Message[], contextString?: string): { frozen: { role: 'user' | 'system'; content: string }[]; activeMessages: Message[] } {
     const frozen = buildFrozenMessages(ctx);
     const result = enforceTokenBudget({ activeMessages: am, frozenMessages: frozen, ctx, contextString });
@@ -158,6 +193,17 @@ export function prepareContext(ctx: ContextState, am: Message[], contextString?:
     return { frozen: result.trimmedFrozen, activeMessages: activeSlice };
 }
 
+/**
+ * Syncs finished state by attaching context metadata, deep-cloning the game state, and persisting it.
+ * @param ctx - The current context state.
+ * @param mts - (Unused) messages parameter.
+ * @param ms - The MCP server instance.
+ * @param sg - State setter function (e.g. React setState).
+ * @param cci - (Unused) campaign ID parameter.
+ * @param cn - (Unused) campaign name parameter.
+ * @param extras - Optional additional GameState fields to merge.
+ * @returns The finalized game state object.
+ */
 export function syncFinishedState(ctx: ContextState, mts: Message[], ms: typeof mcpServer, sg: (s: GameState) => void, cci: string | undefined, cn: string | undefined, extras?: Partial<GameState>) {
     const ctxMeta: Record<string, unknown> = {};
     if (ctx.episodeCheckpoints.length > 0) ctxMeta.episodeCheckpoints = ctx.episodeCheckpoints;

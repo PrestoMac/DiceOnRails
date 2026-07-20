@@ -41,6 +41,7 @@ interface GameContextValue {
 
 const GameContext = createContext<GameContextValue | null>(null);
 
+/** Provides the core game state context (state, messages, queue, loading, sync) to the component tree. */
 export function GameProvider({ children }: { children: ReactNode }) {
   const { userId } = useAuthContext();
   const gameState = useGameState(userId);
@@ -60,6 +61,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;
 }
 
+/** Returns the game context value. Must be used within a GameProvider. */
 export function useGameContext() {
   const ctx = useContext(GameContext);
   if (!ctx) throw new Error('useGameContext must be used within GameProvider');

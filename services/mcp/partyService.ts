@@ -2,6 +2,7 @@ import { Character, GameState, MCPResponse } from '../../types';
 import { formatGameTime } from '../../utils/timeUtils';
 import { ensureGameStateFields } from './stateService';
 
+/** Service interface for managing party members and resource lookups. */
 export interface PartyService {
   setCharacter(character: Character): void;
   joinParty(character: Character): void;
@@ -9,6 +10,7 @@ export interface PartyService {
   getResource(uri: string): any;
 }
 
+/** Creates a new PartyService instance operating on the given GameState. */
 export function createPartyService(state: GameState): PartyService {
   return {
     setCharacter(character: Character) {

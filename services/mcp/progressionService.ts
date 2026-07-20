@@ -2,6 +2,7 @@ import { Character, GameState, MCPResponse, LevelUpSummary } from '../../types';
 import { fail } from './_shared';
 import { awardExperience as progAward, applyStatAllocation, getProgressionContext } from '../progressionService';
 
+/** Service interface for managing character experience, levels, and stat allocations. */
 export interface ProgressionService {
   awardExperience(amount: number, targetId?: string): { success: boolean; data: any; message: string; leveledUp: boolean; levelUpSummary?: LevelUpSummary; levelUpSummaries?: LevelUpSummary[] };
   level_up(targetId: string, statAllocations?: Record<string, number>, subclassSelection?: string, chosenFeats?: string[]): Promise<MCPResponse>;
@@ -9,6 +10,7 @@ export interface ProgressionService {
   getCharacterProgression(targetId?: string): string;
 }
 
+/** Creates a new ProgressionService instance operating on the given GameState. */
 export function createProgressionService(state: GameState): ProgressionService {
   function getTarget(id?: string): Character | undefined {
     if (!id) return state.party[0];

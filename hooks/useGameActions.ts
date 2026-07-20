@@ -47,6 +47,7 @@ import { syncFinishedState as syncStateHelper, prepareContext as prepContext,
 const FREEZE_INTERVAL = 5;
 const ACTIVE_MSG_WINDOW = 20;
 
+/** Core game interaction hook: handles sending messages, batch execution, character creation, and rewind/retry. */
 export const useGameActions = (
     gameState: GameState, setGameState: (state: GameState) => void,
     messages: Message[], setMessages: React.Dispatch<React.SetStateAction<Message[]>>,

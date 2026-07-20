@@ -3,6 +3,11 @@ import { getEnv } from '../../utils/envHelper';
 import { isDebugMode } from '../../utils/debug';
 import { buildChatCompletionUrl, buildChatCompletionHeaders, resolveProvider, normalizeModelName } from '../llmClient';
 
+/**
+ * Resolves the LLM configuration from an optional provider config or environment variables.
+ * @param providerConfig - Optional provider configuration override.
+ * @returns An object containing apiKey, model, apiUrl, and apiHeaders.
+ */
 export function resolveLLMConfig(providerConfig?: { provider: LLMProvider; apiKey: string; apiBase?: string }) {
     const apiKey = providerConfig?.apiKey || getEnv("VITE_LLM_API_KEY");
     const apiBase = providerConfig?.apiBase;
@@ -18,6 +23,11 @@ export function resolveLLMConfig(providerConfig?: { provider: LLMProvider; apiKe
     return { apiKey, model, apiUrl, apiHeaders };
 }
 
+/**
+ * Maps internal Message objects to LLM API message format (role/content/tool_call_id).
+ * @param history - The array of internal Message objects.
+ * @returns An array of API-compatible message objects.
+ */
 export function mapHistoryToMessages(history: Message[]) {
     return history.map(msg => ({
         role: (msg.role === MessageRole.MODEL ? "assistant"
@@ -31,6 +41,13 @@ export function mapHistoryToMessages(history: Message[]) {
     }));
 }
 
+/**
+ * Wraps fetch with an abort timeout.
+ * @param url - The URL to fetch.
+ * @param init - The fetch init options.
+ * @param timeoutMs - Timeout in milliseconds (default 30000).
+ * @returns A promise resolving to the Response.
+ */
 export function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = 30000): Promise<Response> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);

@@ -6,6 +6,7 @@ import { applyAsiChoice, applyFeatChoice } from '../services/featsService';
 import { getSubclassDef } from '../services/classEngine';
 import { storageService } from '../services/storageService';
 
+/** Options passed when confirming a feat choice during level-up, including optional ASI bonuses and skill selections. */
 export interface FeatChoiceOptions {
   featId: string;
   asiBonuses?: Partial<Record<keyof Character['stats'], number>>;
@@ -16,6 +17,7 @@ export interface FeatChoiceOptions {
 const sumNumericValues = (obj: Record<string, number>): number =>
   Object.values(obj).reduce((sum, v) => sum + (typeof v === 'number' ? v : 0), 0);
 
+/** Manages character level-up progression: opening/closing modal, stat/skill allocation, ASI, feats, and subclass acknowledgment. */
 export const useProgression = (
   currentCampaignId: string | undefined,
   syncState: () => void

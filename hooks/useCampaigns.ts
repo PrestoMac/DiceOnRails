@@ -4,6 +4,7 @@ import { storageService } from '../services/storageService';
 import { isDebugMode } from '../utils/debug';
 import { mcpServer } from '../services/mcpService';
 
+/** Manages campaign CRUD operations (create, join, rename, delete) and loading the campaign list. */
 export const useCampaigns = (
     userId: string | undefined,
     setStage: (stage: AppStage) => void,

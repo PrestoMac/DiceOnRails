@@ -60,6 +60,7 @@ function buildCreature(template: CreatureTemplate, casterId: string, id: string)
   };
 }
 
+/** Creates a summoned creature from a named template (e.g. zombie, skeleton, dire-wolf), returning null for unknown templates. */
 export function createSummonedCreature(
   template: string,
   casterId: string,
@@ -69,9 +70,11 @@ export function createSummonedCreature(
   return t ? buildCreature(t, casterId, `summon-${Math.random().toString(36).substr(2, 9)}`) : null;
 }
 
+/** Filters out summoned creatures whose duration has expired or have 0 HP, decrementing duration for survivors. */
 export const tickSummonedCreatures = (creatures: Enemy[]): Enemy[] =>
   creatures.filter(c => { if (c.summonFields) c.summonFields.duration--; return c.summonFields && c.summonFields.duration > 0 && c.hp.current > 0; });
 
+/** Returns all non-dead summoned creatures owned by the given caster. */
 export const getSummonedCreaturesForCaster = (
   creatures: Enemy[],
   casterId: string

@@ -37,6 +37,7 @@ const ConditionsList: React.FC<{ conditions: string[] | undefined; className?: s
 const modifierText = (m: number | null | undefined) =>
   m != null && m !== 0 ? `${m > 0 ? '+' : ''}${m}` : '';
 
+/** Single initiative tracker row showing combatant name, initiative value, HP bar, and expandable details. */
 const CombatInitiativeRow: React.FC<CombatInitiativeRowProps> = ({ entry, isCurrent, isDead, isExpanded, enemyMap, party, hp, isMobile, onToggle }) => {
   const icon = entry.type === 'player' ? '👤' : '👾';
   const enemy = entry.type === 'enemy' ? enemyMap.get(entry.id) : null;

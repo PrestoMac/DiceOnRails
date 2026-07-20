@@ -1,3 +1,4 @@
+/** Tool definitions for spellcasting actions: casting spells, counterspelling/dispelling, ritual casting, managing spellbooks, and summoning/teleporting/polymorphing creatures. */
 export const tools = [
     {
         type: "function",

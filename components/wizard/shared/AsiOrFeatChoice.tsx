@@ -1,10 +1,12 @@
 import React from 'react';
 
+/** Props for the AsiOrFeatChoice component. */
 interface AsiOrFeatChoiceProps {
   onChooseAsi: () => void;
   onChooseFeat: () => void;
 }
 
+/** Binary choice card: Ability Score Improvement vs taking a Feat on an ASI level. */
 const AsiOrFeatChoice: React.FC<AsiOrFeatChoiceProps> = ({ onChooseAsi, onChooseFeat }) => (
   <div className="bg-stone-950/60 border border-amber-900/30 rounded-xl p-3 text-center mb-3">
     <p className="text-xs text-stone-400">

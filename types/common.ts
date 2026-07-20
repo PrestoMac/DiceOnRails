@@ -1,3 +1,4 @@
+/** Roles that a chat message can have in the conversation. */
 export enum MessageRole {
   USER = 'user',
   MODEL = 'model',
@@ -5,6 +6,7 @@ export enum MessageRole {
   TOOL = 'tool'
 }
 
+/** The high-level stage of the application lifecycle. */
 export enum AppStage {
   CREATION = 'creation',
   PLAY = 'play',
@@ -12,6 +14,7 @@ export enum AppStage {
   DASHBOARD = 'dashboard'
 }
 
+/** A saved campaign with metadata for listing and resuming. */
 export interface Campaign {
   id: string;
   name: string;
@@ -21,8 +24,10 @@ export interface Campaign {
   stage: AppStage;
 }
 
+/** Supported LLM API providers. */
 export type LLMProvider = 'openai' | 'openrouter';
 
+/** Application-wide user settings for voice, atmosphere, and debug mode. */
 export interface AppSettings {
   voiceName: string;
   rate: number;
@@ -33,6 +38,7 @@ export interface AppSettings {
   debugMode: boolean;
 }
 
+/** Structured data about a dice roll, used for UI rendering and result display. */
 export interface RollData {
   type: 'attack' | 'skill' | 'damage' | 'cast_spell' | 'save' | 'death_save';
   dieFace: string;
@@ -52,6 +58,7 @@ export interface RollData {
   stat?: string;
 }
 
+/** A single message in the chat log. */
 export interface Message {
   id: string;
   role: MessageRole;
@@ -63,6 +70,7 @@ export interface Message {
   rollData?: RollData;
 }
 
+/** An action queued by a player, pending execution. */
 export interface QueuedAction {
   id: string;
   playerId: string;
@@ -73,6 +81,7 @@ export interface QueuedAction {
   timestamp: number;
 }
 
+/** A full snapshot of game state for save/load operations. */
 export interface SavedGameData {
   version: string;
   campaignId: string;
@@ -83,6 +92,7 @@ export interface SavedGameData {
   timestamp: number;
 }
 
+/** Standard response envelope from the MCP engine. */
 export interface MCPResponse {
   success: boolean;
   data: any;

@@ -4,6 +4,7 @@ import { getMod } from './classEngine';
 
 type Target = Character | Enemy;
 
+/** Parses the highest exhaustion level from a target's active conditions matching 'exhaustion-N'. */
 export function parseExhaustionLevel(target: Target): number {
   const levels = (target.conditions ?? [])
     .filter(c => c.id.startsWith('exhaustion-'))
@@ -12,10 +13,12 @@ export function parseExhaustionLevel(target: Target): number {
   return levels.length > 0 ? Math.max(...levels) : 0;
 }
 
+/** Returns the exhaustion penalty (equal to the exhaustion level) applied to all d20 rolls. */
 export function getExhaustionPenalty(target: Target): number {
   return parseExhaustionLevel(target);
 }
 
+/** Applies a condition to a target respecting immunities; if the condition already exists from the same source, refreshes its duration. */
 export function applyCondition(target: Target, condition: ActiveCondition): boolean {
   if ('conditionsImmunities' in target) {
     const immunities = (target as Enemy).conditionsImmunities ?? [];
@@ -34,6 +37,7 @@ export function applyCondition(target: Target, condition: ActiveCondition): bool
   return true;
 }
 
+/** Removes a condition from a target by ID and optional source, executing any onRemove callback. */
 export function removeCondition(target: Target, conditionId: string, source?: string): boolean {
   if (!target.conditions) return false;
   const before = target.conditions.length;
@@ -54,6 +58,7 @@ export function removeCondition(target: Target, conditionId: string, source?: st
   return target.conditions.length < before;
 }
 
+/** Ticks all round-based conditions on a target, decrementing durations and removing expired ones. */
 export function tickConditions(target: Target): string[] {
   if (!target.conditions) return [];
   const expired: string[] = [];
@@ -87,6 +92,7 @@ export function tickConditions(target: Target): string[] {
   return expired;
 }
 
+/** Ticks minute-duration conditions on a target by a given number of minutes, removing expired ones. */
 export function tickConditionsByTime(target: Target, minutes: number): string[] {
   if (!target.conditions) return [];
   const expired: string[] = [];
@@ -116,9 +122,7 @@ export function tickConditionsByTime(target: Target, minutes: number): string[] 
 
 
 
-
-
-
+/** Ticks conditions by a given number of rounds, removing expired ones; skips permanent and minute-duration conditions. */
 export function tickConditionsByRounds(target: Target, rounds: number): string[] {
   if (!target.conditions || rounds <= 0) return [];
   const expired: string[] = [];
@@ -146,11 +150,13 @@ export function tickConditionsByRounds(target: Target, rounds: number): string[]
   return expired;
 }
 
+/** Checks whether a target has a specific condition by ID. */
 export function hasCondition(target: Target, conditionId: string): boolean {
   if (!target.conditions) return false;
   return target.conditions.some(c => c.id === conditionId);
 }
 
+/** Aggregates all gameplay-relevant effects from active conditions into a single snapshot object, including exhaustion penalties. */
 export function getConditionEffects(target: Target): {
   advantageOnAttacks: boolean;
   disadvantageOnAttacks: boolean;
@@ -198,6 +204,7 @@ export function getConditionEffects(target: Target): {
   };
 }
 
+/** Rolls a saving throw for a target against a condition's save DC, returning whether the save succeeded along with roll details. */
 export function rollSaveAgainstCondition(
   target: Target,
   condition: ActiveCondition,
@@ -213,12 +220,15 @@ export function rollSaveAgainstCondition(
   return { succeeded: total >= spellSaveDC, roll, total };
 }
 
+/** Checks whether a target is incapacitated (has the incapacitated, paralyzed, or stunned condition). */
 export function isIncapacitated(target: Target): boolean {
   return hasCondition(target, 'incapacitated') || hasCondition(target, 'paralyzed') || hasCondition(target, 'stunned');
 }
 
+/** Alias for isIncapacitated, kept for backward compatibility with serialized game states. */
 export const isIncapsulated = isIncapacitated;
 
+/** Checks whether a target is unconscious. */
 export function isUnconscious(target: Target): boolean {
   return hasCondition(target, 'unconscious');
 }

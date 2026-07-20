@@ -8,6 +8,7 @@ import { rollDice } from '../diceEngine';
 import { parseDiceFormula } from '../../utils/dice';
 import { applyCondition, getConditionEffects, getExhaustionPenalty } from '../conditionEngine';
 
+/** Dependencies required by the SpellcastingService. */
 export interface SpellcastingDeps {
   getTarget: (id?: string) => Character | undefined;
   inflict_damage: (amount: number, targetId?: string, damageType?: string) => Promise<MCPResponse>;
@@ -15,6 +16,7 @@ export interface SpellcastingDeps {
   syncInitiativeConditions: () => void;
 }
 
+/** Service interface for spell casting, ritual casting, spellbook management, and resource usage. */
 export interface SpellcastingService {
   cast_spell(characterId: string, spellId: string, slotLevel?: number, targets?: string[], targetSaveResults?: Record<string, boolean>, reaction?: boolean): Promise<MCPResponse>;
   resolve_dot_damage(spellId: string, targetId: string, casterId?: string): Promise<MCPResponse>;
@@ -31,6 +33,7 @@ export interface SpellcastingService {
   applyWeaponBuff(target: Character, source: string, duration: number, durationUnit?: 'round' | 'minute'): void;
 }
 
+/** Creates a new SpellcastingService instance operating on the given GameState. */
 export function createSpellcastingService(state: GameState, deps: SpellcastingDeps): SpellcastingService {
   function getDotDamageFormula(spellId: string, slotLevel: number): string {
     const baseFormulas: Record<string, string> = {

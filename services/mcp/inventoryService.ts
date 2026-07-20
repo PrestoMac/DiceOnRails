@@ -35,12 +35,14 @@ const RECIPES: Record<string, { result: string; resultType: 'weapon' | 'armor' |
 
 function getRecipe(name: string): any { return RECIPES[name.toLowerCase()]; }
 
+/** Dependencies required by the InventoryService. */
 export interface InventoryDeps {
   getTarget: (id?: string) => Character | undefined;
   supabase: any;
   lookupSRDItem: (name: string) => any;
 }
 
+/** Service interface for managing inventory, currency, and damage. */
 export interface InventoryService {
   updateInventoryDirectly(newInventory: InventoryItem[], targetId?: string): void;
   updateCurrencyDirectly(newCurrency: Currency, targetId?: string): void;
@@ -54,6 +56,7 @@ export interface InventoryService {
   getLastCurrencyAdjustment(): { targetId: string; amount: number; timestamp: number } | null;
 }
 
+/** Creates a new InventoryService instance operating on the given GameState. */
 export function createInventoryService(state: GameState, deps: InventoryDeps): InventoryService {
   let lastCurrencyAdjustment: { targetId: string; amount: number; timestamp: number } | null = null;
 

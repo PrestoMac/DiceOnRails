@@ -1,11 +1,13 @@
 import { GameState, LoreEntry, MCPResponse } from '../../types';
 import { generateId, ok } from './_shared';
 
+/** Service interface for managing quests and lore entries. */
 export interface ContentService {
   upsert_quest(title: string, description: string, status: 'active' | 'completed' | 'failed', reputationChanges?: Array<{ faction: string; delta: number }>): Promise<MCPResponse>;
   log_lore(title: string, content: string, category: LoreEntry['category']): Promise<MCPResponse>;
 }
 
+/** Creates a new ContentService instance operating on the given GameState. */
 export function createContentService(state: GameState): ContentService {
   return {
     async upsert_quest(title, description, status, reputationChanges) {

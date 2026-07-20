@@ -30,6 +30,7 @@ const StatCell: React.FC<{ label: string; value: React.ReactNode }> = ({ label, 
 
 const Sep = ({ children }: { children: React.ReactNode }) => <span className="text-stone-600 font-sans">{children}</span>;
 
+/** Full-screen modal overlay displaying an animated dice roll with detailed breakdown and auto-dismiss. */
 const DiceRollModal: React.FC<DiceRollModalProps> = ({ characterName, rollType, label, rollResult, modifier, skillRank=0, difficulty, success, xpGained, sides=20, isCritical, isFumble, onClose, count = 1, results = [] }) => {
   const [rolling, setRolling] = useState(true);
   const diceCount = count || results.length || 1;

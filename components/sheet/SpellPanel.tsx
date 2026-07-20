@@ -3,10 +3,12 @@ import { Character } from '../../types';
 import { SPELLS_BY_ID } from '../../utils/spells';
 import { getClassDef, getSpellSaveDc, getSpellAttackBonus } from '../../services/classEngine';
 
+/** Props for the SpellPanel component. */
 interface SpellPanelProps {
   character: Character;
 }
 
+/** Displays a character's spellcasting information: spell slot resources and known/prepared spells list. */
 const SpellPanel: React.FC<SpellPanelProps> = ({ character }) => {
   const classDef = getClassDef(character.class);
   if (!classDef?.spellcasting) return null;

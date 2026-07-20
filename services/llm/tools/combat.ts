@@ -1,5 +1,6 @@
 import { ENEMY_PROPERTIES } from './shared';
 
+/** Tool definitions for combat actions: adding enemies, starting/ending combat, advancing turns, making attacks, and inflicting damage. */
 export const tools = [
     {
         type: "function",

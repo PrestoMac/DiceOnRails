@@ -4,6 +4,7 @@ import { RACES_CATALOG } from '../utils/races';
 import { SPELLS_BY_ID } from '../utils/spells';
 import { getClassDef, canEquipArmor, getArmorTypeFromItem } from './classEngine';
 
+/** Result of a single audit rule check against the game state. */
 export interface AuditResult {
   rule: string;
   passed: boolean;
@@ -11,24 +12,29 @@ export interface AuditResult {
   autoFixed: boolean;
 }
 
+/** Internal structure defining a named audit rule with check and repair functions. */
 interface AuditRule {
   name: string;
   check: (state: GameState) => AuditResult;
   repair: (state: GameState) => GameState;
 }
 
+/** Creates a passing AuditResult. */
 function ok(rule: string): AuditResult {
   return { rule, passed: true, details: 'OK', autoFixed: false };
 }
 
+/** Creates a failing AuditResult with optional auto-fix flag. */
 function fail(rule: string, details: string, autoFixed = false): AuditResult {
   return { rule, passed: false, details, autoFixed };
 }
 
+/** Applies a transformation function to every character in the party and returns the new state. */
 function mapParty(state: GameState, fn: (c: any) => any): GameState {
   return { ...state, party: state.party.map(fn) };
 }
 
+/** Iterates over all party characters, returning the first non-null AuditResult from the predicate. */
 function checkEachChar(state: GameState, rule: string, predicate: (char: any) => AuditResult | null): AuditResult {
   for (const char of state.party) {
     const result = predicate(char);
@@ -375,6 +381,7 @@ const AUDIT_RULES: AuditRule[] = [
   },
 ];
 
+/** Runs all audit rules against the provided game state, returning an array of results with attempted auto-repairs. */
 export function auditState(state: GameState): AuditResult[] {
   const results: AuditResult[] = [];
   let current = { ...state };
@@ -395,6 +402,7 @@ export function auditState(state: GameState): AuditResult[] {
   return results;
 }
 
+/** Applies all audit rule repairs to the game state and returns the corrected copy. */
 export function repairState(state: GameState): GameState {
   let current = { ...state };
 

@@ -7,6 +7,7 @@ import { StepH, SpellCard } from './SharedComponents';
 
 const SPELL_FILTERS = ['all', 'damage', 'healing', 'utility', 'control'];
 
+/** Spell selection step. Displays cantrips and leveled spells for the selected class with filtering, and shows a detail modal on view. */
 const SpellsStep: React.FC<StepProps & { onBackToSubclass: () => void; onBackToFeats: () => void; onGoToGear: () => void }> = ({
   wizardState, updateWizard, onBackToSubclass, onBackToFeats, onGoToGear,
 }) => {

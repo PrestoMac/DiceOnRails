@@ -1,5 +1,6 @@
 import { Character } from '../types';
 
+/** Result of a teleportation attempt, including success status and a descriptive message. */
 export interface TeleportResult {
   success: boolean;
   message: string;
@@ -7,6 +8,7 @@ export interface TeleportResult {
   outOfRange?: boolean;
 }
 
+/** Teleports a character to a named destination within the given range, returning a success result. */
 export function teleportCharacter(
   character: Character,
   range: number,
@@ -18,6 +20,7 @@ export function teleportCharacter(
   };
 }
 
+/** Teleports a character up to 500 feet via the Dimension Door spell. */
 export function dimensionDoor(
   character: Character,
   range: number = 500
@@ -28,6 +31,7 @@ export function dimensionDoor(
   };
 }
 
+/** Teleports a character up to 30 feet via Misty Step. */
 export function mistyStep(
   character: Character,
   range: number = 30
@@ -38,6 +42,7 @@ export function mistyStep(
   };
 }
 
+/** Teleports a character with the Teleport spell, applying mishap chance based on destination familiarity. */
 export function teleport(
   character: Character,
   range: number = 10,

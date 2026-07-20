@@ -10,6 +10,7 @@ const FeatureCard: React.FC<{ icon: string; title: string; children: React.React
   </div>
 );
 
+/** Animated splash/landing screen with feature cards and an "Enter the Realm" button. */
 const SplashScreen: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
   const [isVisible, setIsVisible] = useState(true);
 

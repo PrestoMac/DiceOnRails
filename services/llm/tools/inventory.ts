@@ -1,3 +1,4 @@
+/** Tool definitions for inventory and currency management: updating items and adjusting GP/SP/CP. */
 export const tools = [
     {
         type: "function",

@@ -1,6 +1,7 @@
 import React from 'react';
 import { getMod } from '../../services/classEngine';
 
+/** Props for the HpRollPanel component. */
 interface HpRollPanelProps {
   hitDie: number;
   averageRoll: number;
@@ -14,6 +15,7 @@ interface HpRollPanelProps {
   onTakeAverage: () => void;
 }
 
+/** Panel for rolling hit dice during level-up. Shows a dice animation, roll/avg buttons, and HP gain summary. */
 const HpRollPanel: React.FC<HpRollPanelProps> = ({ hitDie, averageRoll, hpRoll, rolling, tempRoll, conMod, previewHp, characterMaxHp, onRoll, onTakeAverage }) => {
   const hpGain = hpRoll !== null ? Math.max(1, hpRoll + conMod) : 0;
   const finalPreviewHp = previewHp;

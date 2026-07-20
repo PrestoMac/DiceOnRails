@@ -41,6 +41,7 @@ const ROUTES: Record<string, Route> = {
 
 function getRoute(id: string): Route | undefined { return ROUTES[id.toLowerCase()]; }
 
+/** Dependencies required by the TravelService. */
 export interface TravelDeps {
   getTarget: (id?: string) => Character | undefined;
   adjust_currency: (gp?: number, sp?: number, cp?: number, targetId?: string) => Promise<MCPResponse>;
@@ -49,6 +50,7 @@ export interface TravelDeps {
   upsert_quest: (title: string, description: string, status: 'active' | 'completed' | 'failed', reputationChanges?: Array<{ faction: string; delta: number }>) => Promise<MCPResponse>;
 }
 
+/** Service interface for movement, narration, rests, dice rolling, and skill checks. */
 export interface TravelService {
   move_to(location_name: string, description?: string, targetId?: string, skillCheck?: any, route?: string, pace?: string): Promise<MCPResponse>;
   narrate_turn(narration: string, timePassed?: number): Promise<MCPResponse>;
@@ -62,6 +64,7 @@ export interface TravelService {
   short_rest(targetId?: string, narration?: string, autoAdvanceTime?: boolean): Promise<MCPResponse>;
 }
 
+/** Creates a new TravelService instance operating on the given GameState. */
 export function createTravelService(state: GameState, deps: TravelDeps): TravelService {
   function ensureCharacterFields(): void {
     for (const char of state.party) {

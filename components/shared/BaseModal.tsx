@@ -1,5 +1,6 @@
 import React from 'react';
 
+/** Props for the BaseModal component. */
 interface BaseModalProps {
   isOpen: boolean;
   onClose?: () => void;
@@ -8,6 +9,7 @@ interface BaseModalProps {
   className?: string;
 }
 
+/** Reusable modal dialog with backdrop blur, optional title, and custom class. */
 const BaseModal: React.FC<BaseModalProps> = ({ isOpen, onClose, title, children, className = '' }) => {
   if (!isOpen) return null;
   return (

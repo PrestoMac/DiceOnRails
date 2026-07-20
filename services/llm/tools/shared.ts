@@ -1,3 +1,4 @@
+/** Shared JSON Schema properties for on-success chaining (awardCurrency, logLore, upsertQuest, updateInventory). */
 export const ON_SUCCESS_PROPERTIES = {
     awardCurrency: {
         type: 'object',
@@ -33,6 +34,7 @@ export const ON_SUCCESS_PROPERTIES = {
     }
 };
 
+/** Shared JSON Schema properties for defining an enemy (name, AC, HP, CR, XP, size, type). */
 export const ENEMY_PROPERTIES = {
     name: { type: 'string', description: 'Enemy name (e.g. "Goblin", "Orc", "Dragon"). Auto-looks up 5E SRD stats.' },
     ac: { type: 'integer', description: 'Optional: Override Armor Class' },

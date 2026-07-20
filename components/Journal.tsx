@@ -25,6 +25,7 @@ const CATEGORY_MAP: Record<string, LoreEntry['category']> = {
 
 const TAB_ROWS = [TABS.slice(0, 3), TABS.slice(3)];
 
+/** Journal panel with tabbed views for quests, NPCs, locations, history, and item lore entries. */
 const Journal: React.FC<JournalProps> = ({ quests, lore }) => {
   const [activeTab, setActiveTab] = useState<string>('quests');
   const filteredLore = activeTab === 'quests' ? [] : lore.filter(e => e.category === CATEGORY_MAP[activeTab]);

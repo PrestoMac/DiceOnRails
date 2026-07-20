@@ -20,6 +20,7 @@ const calculateAC = (inv: InventoryItem[], dexScore: number): number => {
   return 10 + dexMod + shieldBonus;
 };
 
+/** Gear purchasing step. Displays starting gold, a shop with filtered items, and the character's current inventory with buy/sell functionality. */
 const GearStep: React.FC<StepProps & { onBackToSpells: () => void; onBackToFeats: () => void; onBackToSubclass: () => void; needsSpellsStep: boolean; needsSubclassStep: boolean }> = ({
   wizardState, updateWizard, onNext, onBackToSpells, onBackToFeats, onBackToSubclass, needsSpellsStep, needsSubclassStep,
 }) => {

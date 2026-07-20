@@ -9,7 +9,7 @@ The implemented fixes cover: duration literals, `applyAcBuff` recast stacking, e
 ## CRITICAL — Break core gameplay right now
 
 ### C1. `spell_effect` (Dispel Magic / Counterspell) is a no-op stub
-**File:** `services/mcp/spellcastingService.ts:559-584`
+**File:** `services/mcp/spellcastingService.ts:572-597`
 
 The function rolls an ability check and returns a "you dispelled it!" message, but **never actually removes any condition, breaks any concentration, or clears any DoT**. The `targetId` parameter is accepted by the schema but completely ignored.
 
@@ -20,7 +20,7 @@ The function rolls an ability check and returns a "you dispelled it!" message, b
 ---
 
 ### C2. Fresh concentration spells break the first time any time passes
-**Files:** `services/spellcastingEngine.ts:195-204` + `services/mcp/spellcastingService.ts:168-178`
+**Files:** `services/spellcastingEngine.ts:207-216` + `services/mcp/spellcastingService.ts:184-194`
 
 When a caster first casts a concentration spell (not replacing an existing one), `concentrationStarted` stays `false`, so `runtime.concentrationStartTime` is never set. The next `narrate_turn` with `timePassed > 0` reads `startTime = 0`, computes `elapsed = gameTime - 0 = hundreds of minutes`, and instantly ends the spell.
 
@@ -31,7 +31,7 @@ When a caster first casts a concentration spell (not replacing an existing one),
 ---
 
 ### C3. Prior tool results are orphaned in LLM history every turn
-**Files:** `services/llm/llmApiClient.ts:21-32` + `types/common.ts:55-64`
+**Files:** `services/llm/llmApiClient.ts:31-42` + `types/common.ts:62-71`
 
 OpenAI's API requires every `role: "tool"` message to be paired with the assistant `tool_calls` that produced it. The persisted `Message` type has no field to store assistant `tool_calls`, so `mapHistoryToMessages` produces orphan tool messages whose `tool_call_id` doesn't match any stored assistant message.
 
@@ -42,7 +42,7 @@ OpenAI's API requires every `role: "tool"` message to be paired with the assista
 ---
 
 ### C4. Long Rest wipes ALL exhaustion instead of 1 level
-**File:** `services/mcp/travelService.ts:643-645`
+**File:** `services/mcp/travelService.ts:646-648`
 
 Per 5e RAW, a long rest removes one exhaustion level. The code strips every `exhaustion-N` condition for the entire party at once.
 
@@ -53,7 +53,7 @@ Per 5e RAW, a long rest removes one exhaustion level. The code strips every `exh
 ---
 
 ### C5. Long Rest clears exhaustion for characters at 0 HP
-**File:** `services/mcp/travelService.ts:643-645` vs HP check at `:661-665`
+**File:** `services/mcp/travelService.ts:646-648` vs HP check at `:664-668`
 
 The exhaustion-clear loop runs *before* the "is this character conscious enough to rest?" check. A dying character has all exhaustion removed even though the function itself prints "X is unconscious and cannot benefit from the rest."
 
@@ -62,7 +62,7 @@ The exhaustion-clear loop runs *before* the "is this character conscious enough 
 ---
 
 ### C6. `end_combat` leaves Stunned/Paralyzed/Prone etc. on every combatant forever
-**File:** `services/mcp/combatService.ts:476-488`
+**File:** `services/mcp/combatService.ts:479-491`
 
 When combat ends, the engine just sets `state.combat = undefined`. It does not clean up conditions applied during the fight. Many combat conditions have `duration: null` so they never tick down.
 
@@ -73,7 +73,7 @@ When combat ends, the engine just sets `state.combat = undefined`. It does not c
 ---
 
 ### C7. Concentration is never broken when caster falls unconscious or gets Paralyzed/Stunned
-**File:** `services/spellcastingEngine.ts:447`
+**File:** `services/spellcastingEngine.ts:461`
 
 `breakConcentration(character, reason)` accepts `'incapacitated'` as a reason, but no caller ever passes it. Grep confirms only `'damaged'` and `'voluntary'` are ever used.
 
@@ -84,7 +84,7 @@ When combat ends, the engine just sets `state.combat = undefined`. It does not c
 ---
 
 ### C8. `handleExecuteBatch` calls `rollbackTransaction()` without ever calling `beginTransaction()`
-**File:** `hooks/useGameActions.ts:210-273`
+**File:** `hooks/useGameActions.ts:212-275`
 
 Multiplayer batched turns have a try/catch that tries to roll back on failure, but the rollback is a no-op because no transaction was started.
 
@@ -95,7 +95,7 @@ Multiplayer batched turns have a try/catch that tries to roll back on failure, b
 ---
 
 ### C9. `isEndOfTurn` / `timeAdvancedThisTurn` look at LLM input args, not actual success
-**Files:** `services/llm/agentLoop.ts:240-274, 314-324`
+**Files:** `services/llm/agentLoop.ts:252-257, 335-343`
 
 When the LLM calls `long_rest(narration="X")` and the rest **fails** (e.g., on cooldown), the loop still thinks "time advanced" because it inspects the args, not the result, so it skips the enforcement `narrate_turn`.
 
@@ -108,7 +108,7 @@ When the LLM calls `long_rest(narration="X")` and the rest **fails** (e.g., on c
 ## HIGH — Visible misbehavior or state corruption
 
 ### H1. `handleUpdateInventory` / `handleUpdateCurrency` silently route to character #1
-**File:** `hooks/useGameState.ts:148-158`
+**File:** `hooks/useGameState.ts:161-171`
 
 TypeScript types claim `handleUpdateInventory(charId, items)` but the implementation drops `charId` and always targets `party[0]`.
 
@@ -119,7 +119,7 @@ TypeScript types claim `handleUpdateInventory(charId, items)` but the implementa
 ---
 
 ### H2. Combat-end (`state.combat = undefined`) doesn't propagate to remote multiplayer clients
-**File:** `services/mcp/stateService.ts:72-73` + `services/mcp/combatService.ts:481-482`
+**File:** `services/mcp/stateService.ts:75-76` + `services/mcp/combatService.ts:485`
 
 `JSON.stringify` omits undefined fields. When combat ends locally and `combat` becomes undefined, the sync payload has no `combat` key. Remote clients run `Object.assign(state, remoteState)` which doesn't delete `state.combat`.
 
@@ -135,7 +135,7 @@ if (!('combat' in savedState) || savedState.combat == null) {
 ---
 
 ### H3. Concentration duration isn't checked during combat
-**File:** `services/mcp/combatService.ts:367-380`
+**File:** `services/mcp/combatService.ts:367-383`
 
 The `runtime.concentrationEffectiveDuration` check lives only in `travelService.narrate_turn`. Combat never advances `gameTime` and never calls that check.
 
@@ -146,7 +146,7 @@ The `runtime.concentrationEffectiveDuration` check lives only in `travelService.
 ---
 
 ### H4. `applyCondition` / `breakConcentration` mutate arrays in place
-**Files:** `services/conditionEngine.ts:19-35`, `services/spellcastingEngine.ts:459-473`
+**Files:** `services/conditionEngine.ts:22-38`, `services/spellcastingEngine.ts:461-482`
 
 They `push` and `splice` the conditions array rather than creating a new one. The array reference doesn't change, so any future `React.memo` or `useMemo([conditions])` will silently fail to recompute.
 
@@ -157,7 +157,7 @@ They `push` and `splice` the conditions array rather than creating a new one. Th
 ---
 
 ### H5. `applyCondition` refresh branch only updates `duration` — ignores saveDC, saveEnd, onRemove, durationUnit
-**File:** `services/conditionEngine.ts:28-32`
+**File:** `services/conditionEngine.ts:32-34`
 
 Re-casting Hold Person on a held target refreshes the timer but keeps the **old save DC** even after the caster levels up.
 
@@ -179,7 +179,7 @@ Functions can't survive JSON. Any condition set up with a function callback lose
 ---
 
 ### H7. Tool filter hides `long_rest` / `short_rest` whenever HP and hit dice are full
-**File:** `services/llm/toolFilter.ts:9-11, 45`
+**File:** `services/llm/toolFilter.ts:16-18, 52`
 
 A party at full HP but with exhaustion, depleted spell slots, or used Rage/Ki cannot call long_rest because the tool is filtered out.
 
@@ -201,7 +201,7 @@ The "current state" context message is missing: Moonbeam/Flaming Sphere/Spirit G
 ---
 
 ### H9. Malformed JSON in any tool-call arg aborts the loop without rolling back
-**File:** `services/llm/agentLoop.ts:236-238`
+**File:** `services/llm/agentLoop.ts:249`
 
 No try/catch around `JSON.parse(tc.function.arguments)`. If a weaker LLM emits one bad JSON arg, the whole loop throws.
 
@@ -212,7 +212,7 @@ No try/catch around `JSON.parse(tc.function.arguments)`. If a weaker LLM emits o
 ---
 
 ### H10. `inlineNarration` from long_rest/short_rest/move_to is discarded — extra LLM call wasted
-**File:** `services/llm/agentLoop.ts:257-273`
+**File:** `services/llm/agentLoop.ts:259-298`
 
 When long_rest produces narration internally, the agent loop doesn't capture it as `inlineNarration` because there was no top-level `narrate_turn` call. `useGameActions` then makes a *second* LLM call to generate narration that was already produced.
 
@@ -223,7 +223,7 @@ When long_rest produces narration internally, the agent loop doesn't capture it 
 ## MEDIUM — Cosmetic / edge cases
 
 ### M1. Elf Trance (4h rest) still uses 8h exhaustion offset
-**File:** `services/mcp/travelService.ts:504-506`
+**File:** `services/mcp/travelService.ts:508-509`
 
 Elves gain exhaustion as if they needed 8 hours of sleep, defeating the purpose of Trance.
 
@@ -241,7 +241,7 @@ Also, temp HP granted only once at cast, not refreshed each turn per the spell t
 ---
 
 ### M3. Loading-state race: realtime subscription can overwrite fresher local state
-**File:** `hooks/useGameState.ts:36-76 + 116-146`
+**File:** `hooks/useGameState.ts:36-76 + 118-159`
 
 If the SELECT returns newer data than the subscription's first delivery (during Supabase replication lag), the older subscription payload overwrites the newer SELECT result.
 
@@ -250,7 +250,7 @@ If the SELECT returns newer data than the subscription's first delivery (during 
 ---
 
 ### M4. `_tiredWarningFired` only resets on long_rest
-**File:** `services/mcp/travelService.ts:499-502, 659`
+**File:** `services/mcp/travelService.ts:502-504, 662`
 
 The fatigue warning fires only once per long-rest cycle. Pushing past 18h / 20h thresholds produces no further warnings.
 
@@ -259,7 +259,7 @@ The fatigue warning fires only once per long-rest cycle. Pushing past 18h / 20h 
 ---
 
 ### M5. `cast_spell` lookup `spellId.toLowerCase()` doesn't normalize spaces
-**File:** `services/mcp/spellcastingService.ts:145`
+**File:** `services/mcp/spellcastingService.ts:154`
 
 If the LLM passes `"Mage Armor"` (which the schema description literally suggests), the lookup fails and the spell silently does nothing.
 
@@ -268,7 +268,7 @@ If the LLM passes `"Mage Armor"` (which the schema description literally suggest
 ---
 
 ### M6. TOOL_MODE_INSTRUCTION says Rage ends if you don't attack/take damage; engine doesn't enforce this
-**File:** `services/llm/prompts/toolModePrompt.ts:56` vs `services/mcp/travelService.ts:582-588`
+**File:** `services/llm/prompts/toolModePrompt.ts:56` vs `services/mcp/travelService.ts:585-588`
 
 The LLM is instructed to narrate a rule the engine does not enforce.
 
@@ -277,7 +277,7 @@ The LLM is instructed to narrate a rule the engine does not enforce.
 ---
 
 ### M7. `combatEngine.advanceToNextTurn` skips minute-tick
-**File:** `services/combatEngine.ts:93-97`
+**File:** `services/combatEngine.ts:93-99`
 
 Only `tickConditions` is called (round-unit only). Minute-based conditions are not decremented at the round boundary.
 
@@ -286,7 +286,7 @@ Only `tickConditions` is called (round-unit only). Minute-based conditions are n
 ---
 
 ### M8. Long_rest clears `concentrationSpellId` only for resting chars — unconscious casters stay "concentrating"
-**File:** `services/mcp/travelService.ts:661-669`
+**File:** `services/mcp/travelService.ts:664-674`
 
 An unconscious caster (who per 5e cannot concentrate) retains their `concentrationSpellId` through a long rest.
 
@@ -297,7 +297,7 @@ An unconscious caster (who per 5e cannot concentrate) retains their `concentrati
 ## LOW — Minor / code quality
 
 ### L1. LLM context message emits raw IDs with no readable names or durations
-**File:** `services/llm/agentLoop.ts:128-130`
+**File:** `services/llm/agentLoop.ts:139-141`
 
 LLM sees `exhaustion-2`, `mage-armor-ac`, etc. with no duration/save info. Brittle.
 
@@ -306,7 +306,7 @@ LLM sees `exhaustion-2`, `mage-armor-ac`, etc. with no duration/save info. Britt
 ---
 
 ### L2. Spell slot level parsed via `slice(-1)` — breaks at slot 10+
-**File:** `components/CharacterSheet.tsx:251`
+**File:** `components/CharacterSheet.tsx:281`
 
 **Fix direction:** `parseInt(slot.id.replace('spell-slot-', ''), 10)`.
 
@@ -320,7 +320,7 @@ LLM sees `exhaustion-2`, `mage-armor-ac`, etc. with no duration/save info. Britt
 ---
 
 ### L4. `move_to` without a route doesn't advance time at all
-**File:** `services/mcp/travelService.ts:447-473`
+**File:** `services/mcp/travelService.ts:450-475`
 
 In-town exploration never advances the clock.
 
@@ -329,21 +329,21 @@ In-town exploration never advances the clock.
 ---
 
 ### L5. `lastLongRestTime = -960` initialization is dead weight
-**File:** `services/mcp/stateService.ts:13-15` vs `services/mcp/travelService.ts:492`
+**File:** `services/mcp/stateService.ts:14-15` vs `services/mcp/travelService.ts:498`
 
 **Fix direction:** Either accept `lastLongRestTime < 0` as valid (drop the `>= 0` guard) or initialize to `0`.
 
 ---
 
 ### L6. Exhaustion level-10 message says "dead" but character is at 0 HP + unconscious (revivable)
-**File:** `services/mcp/travelService.ts:521-528`
+**File:** `services/mcp/travelService.ts:524-530`
 
 **Fix direction:** Change copy to "collapses from exhaustion" or actually apply a death effect.
 
 ---
 
 ### L7. Default model `deepseek/deepseek-v4-flash` likely doesn't exist on OpenRouter
-**File:** `services/llm/llmApiClient.ts:10`
+**File:** `services/llm/llmApiClient.ts:15`
 
 Would cause 100% of unconfigured turns to fail.
 
@@ -351,15 +351,15 @@ Would cause 100% of unconfigured turns to fail.
 
 ---
 
-### L8. Variable shadow: `const state = mcpServer.getFullState()` at `agentLoop.ts:218` shadows the outer `state` from line 88
-**File:** `services/llm/agentLoop.ts:88, 218`
+### L8. Variable shadow: `const state = mcpServer.getFullState()` at `agentLoop.ts:230` shadows the outer `state` from line 99
+**File:** `services/llm/agentLoop.ts:99, 230`
 
 **Fix direction:** Rename the inner binding to `currentState`.
 
 ---
 
 ### L9. `stateService.loadState` uses shallow `Object.assign` — nested arrays share references with caller
-**File:** `services/mcp/stateService.ts:72-73`
+**File:** `services/mcp/stateService.ts:75-76`
 
 If the caller still holds `savedState` (for diffing, snapshots, etc.), those references are polluted.
 

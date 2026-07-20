@@ -16,6 +16,7 @@ interface PrewarmState {
   lastFiredAt: Map<string, number>;
 }
 
+/** Pre-emptively generates atmosphere images for nearby/common locations in the background while idle. */
 export function useAtmospherePrewarm(
   gameState: GameState,
   settings: AppSettings,

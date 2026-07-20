@@ -1,6 +1,7 @@
 import React from 'react';
 import { FeatDefinition } from '../../../utils/feats';
 
+/** Props for the FeatCard component. */
 interface FeatCardProps {
   feat: FeatDefinition;
   isSelected: boolean;
@@ -10,6 +11,7 @@ interface FeatCardProps {
   onViewDetail: () => void;
 }
 
+/** Clickable card displaying a feat's name, icon, short description, and prerequisite status. */
 const FeatCard: React.FC<FeatCardProps> = ({
   feat, isSelected, meetsPrereqs, validationReason,
   onSelect, onViewDetail,

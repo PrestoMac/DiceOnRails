@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { GameState, Message } from '../types';
 
+/** Tracks recent activity for display (processing user, new messages, queue changes) and returns the activity log. */
 export function useActivityTracking(gameState: GameState, messages: Message[], userId?: string) {
   const [recentActivity, setRecentActivity] = useState<string[]>([]);
   const prevProcessingUserRef = useRef<string | undefined>(undefined);

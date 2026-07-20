@@ -7,6 +7,7 @@ import { AppSettings } from '../types';
 import { isDebugMode } from '../utils/debug';
 import { getRewindGeneration } from '../services/rewindGeneration';
 
+/** Central state management hook for the game: stage, gameState, messages, campaign metadata, sync, and atmosphere updates. */
 export const useGameState = (userId: string | undefined) => {
     const [stage, setStage] = useState<AppStage>(AppStage.AUTH);
     const [gameState, setGameState] = useState<GameState>(mcpServer.getFullState());

@@ -1,10 +1,12 @@
 import React from 'react';
 
+/** Props for the AtmosphereOverlay component. */
 interface AtmosphereOverlayProps {
   url?: string | null;
   enabled: boolean;
 }
 
+/** Full-bleed background image overlay for atmosphere. Renders a dimmed, pointer-events-none image. */
 const AtmosphereOverlay: React.FC<AtmosphereOverlayProps> = ({ url, enabled }) => {
   if (!enabled || !url) return null;
   return (

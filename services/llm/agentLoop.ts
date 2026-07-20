@@ -52,6 +52,17 @@ async function executeToolBatch(
     return { results, criticalFailed };
 }
 
+/**
+ * Runs the main LLM agent loop, iteratively calling the LLM with tool definitions
+ * until an end-of-turn condition is met or the iteration budget is exhausted.
+ * @param history - The conversation history messages.
+ * @param context - A string describing the current game state context.
+ * @param frozenMessages - Optional frozen/pinned messages (checkpoints, raw history) to include.
+ * @param onToolResult - Optional callback invoked after each tool execution.
+ * @param providerConfig - Optional LLM provider configuration override.
+ * @param options - Optional settings: requestEndNarration, maxIters, AbortSignal.
+ * @returns An object containing tool messages, iteration count, token usage, and optional inline narration.
+ */
 export async function runAgentLoop(
   history: Message[],
   context: string,

@@ -20,6 +20,7 @@ const ATTACK_ROLL_RE = /\((\d+)d(\d+)\s+Roll:\s*(\d+)\s*\+\s*Mod:\s*([+-]?\d+)\)
 const SKILL_ROLL_RE = /\[Roll:\s*(\d+),\s*Stat Mod:\s*([+-]?\d+),\s*Skill Rank:\s*\+(\d+)\]/;
 const SKILL_RESULT_RE = /(.+?):\s*(SUCCESS|FAILURE)\s*\(Total\s*(\d+)\s*vs\s*DC\s*(\d+)\)/;
 
+/** Extracts structured attack and skill roll results from raw message text using regex patterns. */
 export function parseRolls(text: string): ParsedRoll[] {
   const rolls: ParsedRoll[] = [];
 
@@ -122,6 +123,7 @@ const RollCard: React.FC<{ roll: ParsedRoll }> = ({ roll }) => {
   );
 };
 
+/** Props for the MessageBubble component. */
 export interface MessageBubbleProps {
   msg: Message;
   playingMessageId: string | null;
@@ -138,6 +140,7 @@ const MSG_STYLES: Record<MessageRole, string> = {
   [MessageRole.MODEL]: 'text-stone-300 fantasy-font text-lg leading-relaxed bg-stone-900/20 hover:bg-stone-900/30 shadow-inner shadow-stone-950/20',
 };
 
+/** Renders a single chat message with role-based styling, roll cards, speech playback, and rewind button. */
 const MessageBubble: React.FC<MessageBubbleProps> = ({ msg, playingMessageId, isProcessing, onRewind, onSpeech, messages }) => {
   const rolls = parseRolls(msg.text);
   const cleanedText = rolls.reduce((t, r) => t.replace(r.raw, '').replace(/\s+/g, ' ').trim(), msg.text)

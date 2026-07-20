@@ -1,8 +1,10 @@
 import { getEnv } from "../utils/envHelper";
 import { isDebugMode } from "../utils/debug";
 
+/** Supported LLM provider identifiers. */
 export type LLMProvider = 'openai' | 'openrouter';
 
+/** Builds the full /chat/completions URL for a given provider, using a custom base URL or falling back to defaults. */
 export function buildChatCompletionUrl(provider: LLMProvider, customBase?: string): string {
     const base = customBase || getEnv("VITE_LLM_API_BASE") || (provider === 'openai' ? 'https://api.openai.com/v1' : 'https://openrouter.ai/api/v1');
     const url = `${base.replace(/\/+$/, '')}/chat/completions`;
@@ -10,6 +12,7 @@ export function buildChatCompletionUrl(provider: LLMProvider, customBase?: strin
     return url;
 }
 
+/** Builds the HTTP headers for a chat completion request, including Authorization and OpenRouter-specific headers. */
 export function buildChatCompletionHeaders(provider: LLMProvider, apiKey: string, origin?: string): Record<string, string> {
     const headers: Record<string, string> = {
         "Content-Type": "application/json",
@@ -26,12 +29,14 @@ export function buildChatCompletionHeaders(provider: LLMProvider, apiKey: string
     return headers;
 }
 
+/** Resolves the API key from a settings value or the VITE_LLM_API_KEY environment variable. */
 export function resolveApiKey(settingsKey?: string): string | undefined {
     const key = settingsKey || getEnv("VITE_LLM_API_KEY");
     if (isDebugMode) console.log('[LLM Client] resolveApiKey', { fromSettings: !!settingsKey, fromEnv: !!getEnv("VITE_LLM_API_KEY"), found: !!key });
     return key;
 }
 
+/** Resolves the LLM provider based on the API base URL or explicit provider argument. */
 export function resolveProvider(provider?: LLMProvider, apiBase?: string): LLMProvider {
     const base = apiBase || getEnv("VITE_LLM_API_BASE");
     const envVar = getEnv("VITE_LLM_API_BASE");
@@ -45,6 +50,7 @@ export function resolveProvider(provider?: LLMProvider, apiBase?: string): LLMPr
     return result;
 }
 
+/** Strips the provider prefix from a model name when using a non-OpenRouter base URL. */
 export function normalizeModelName(model: string, apiBase?: string): string {
     const base = apiBase || getEnv("VITE_LLM_API_BASE");
     const envVar = getEnv("VITE_LLM_API_BASE");
@@ -58,6 +64,7 @@ export function normalizeModelName(model: string, apiBase?: string): string {
     return result;
 }
 
+/** Resolves the final model name to send in the request, stripping the 'opencode/' prefix for opencode proxy. */
 export function resolveRequestModel(model: string, apiBase?: string): string {
     const base = apiBase || getEnv("VITE_LLM_API_BASE") || '';
     let result: string;

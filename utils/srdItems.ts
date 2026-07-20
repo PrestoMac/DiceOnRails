@@ -3,6 +3,11 @@ export * from '../data/srdItems';
 import { SRD_ITEMS } from '../data/srdItems';
 import { InventoryItem } from '../types';
 
+/**
+ * Looks up an SRD item by name with fuzzy matching and common aliases.
+ * @param name - The item name or alias.
+ * @returns The matching item (without quantity), or undefined if not found.
+ */
 export function lookupSRDItem(name: string): Omit<InventoryItem, 'quantity'> | undefined {
   const cleanName = name.trim().toLowerCase();
 

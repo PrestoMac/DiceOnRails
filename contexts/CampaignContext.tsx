@@ -18,6 +18,7 @@ interface CampaignContextValue {
 
 const CampaignContext = createContext<CampaignContextValue | null>(null);
 
+/** Provides campaign management context (create, join, rename, delete) to the component tree. */
 export function CampaignProvider({ children }: { children: ReactNode }) {
   const { userId } = useAuthContext();
   const {
@@ -36,6 +37,7 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
   return <CampaignContext.Provider value={campaigns}>{children}</CampaignContext.Provider>;
 }
 
+/** Returns the campaign context value. Must be used within a CampaignProvider. */
 export function useCampaignContext() {
   const ctx = useContext(CampaignContext);
   if (!ctx) throw new Error('useCampaignContext must be used within CampaignProvider');

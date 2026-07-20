@@ -3,6 +3,7 @@ import { Character } from '../../../types';
 
 const STAT_LABELS: Record<string, string> = { str: 'STR', dex: 'DEX', con: 'CON', int: 'INT', wis: 'WIS', cha: 'CHA' };
 
+/** Props for the AsiSlotAllocator component. */
 interface AsiSlotAllocatorProps {
   stats: Character['stats'];
   allocations: Partial<Record<keyof Character['stats'], number>>;
@@ -13,6 +14,7 @@ interface AsiSlotAllocatorProps {
   onAllocate: (stat: keyof Character['stats'], delta: number) => void;
 }
 
+/** Grid of stat allocation controls for distributing ASI points across the six ability scores. */
 const AsiSlotAllocator: React.FC<AsiSlotAllocatorProps> = ({
   stats, allocations, totalAllocated, targetTotal, maxPerStat, maxValue, onAllocate,
 }) => (

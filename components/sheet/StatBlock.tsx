@@ -2,13 +2,16 @@ import React from 'react';
 import { Character } from '../../types';
 import { getMod } from '../../services/classEngine';
 
+/** Props for the StatBlock component. */
 interface StatBlockProps {
   stats: Character['stats'];
   className?: string;
 }
 
+/** Maps internal stat keys to their display labels. */
 const STAT_LABELS: Record<string, string> = { str:'STR', dex:'DEX', con:'CON', int:'INT', wis:'WIS', cha:'CHA' };
 
+/** Renders a 3-column grid of ability scores with their modifier values. */
 const StatBlock: React.FC<StatBlockProps> = ({ stats, className = '' }) => (
   <div className={`grid grid-cols-3 gap-3 ${className}`}>
     {(Object.entries(stats) as [string, number][]).map(([stat, val]) => (

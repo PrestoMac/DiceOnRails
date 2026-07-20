@@ -5,6 +5,7 @@ import { getMod } from '../../services/classEngine';
 import AdjBtn from '../shared/AdjBtn';
 import AddBtn from '../shared/AddBtn';
 
+/** Props for the SkillsPanel component. */
 interface SkillsPanelProps {
   skills: Character['skills'];
   selectedAllocations: Partial<Record<keyof Character['stats'], number>>;
@@ -14,6 +15,7 @@ interface SkillsPanelProps {
   onAllocate: (skillName: string, delta: number) => void;
 }
 
+/** Panel for allocating skill points during level-up. Displays each skill with +/- buttons and current rank. */
 const SkillsPanel: React.FC<SkillsPanelProps> = ({ skills, selectedAllocations, stats, localSkills, remainingSkillPoints, onAllocate }) => (
   <div className="space-y-3 py-2 animate-in fade-in duration-350">
     <div className="flex justify-between items-center bg-stone-950/60 p-3 rounded-lg border border-stone-850 mb-2">

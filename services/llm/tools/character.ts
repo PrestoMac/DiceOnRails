@@ -1,5 +1,6 @@
 import { ON_SUCCESS_PROPERTIES } from './shared';
 
+/** Tool definitions for character-related actions: rolling dice, skill checks, saving throws, death saves, leveling up, and using class resources. */
 export const tools = [
     {
         type: "function",

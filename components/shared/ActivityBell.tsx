@@ -1,9 +1,11 @@
 import React from 'react';
 
+/** Props for the ActivityBell component. */
 interface ActivityBellProps {
   activities: string[];
 }
 
+/** Bell icon with a badge count and a hover tooltip listing recent party activities. */
 const ActivityBell: React.FC<ActivityBellProps> = ({ activities }) => {
   if (!activities.length) return null;
   return (

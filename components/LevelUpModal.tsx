@@ -49,6 +49,7 @@ interface LevelUpModalProps {
 
 type Tab = 'hp' | 'stats' | 'skills' | 'choice' | 'asi' | 'feat' | 'subclass' | 'resources' | 'spells';
 
+/** Level-up modal with tabs for HP roll, stat allocation, skill points, ASI/feat selection, resources, and spells. */
 const LevelUpModal: React.FC<LevelUpModalProps> = ({ character, selectedAllocations, remainingPoints, previewHp, error, onAllocate, onConfirm, onCancel, onConfirmAsi, onConfirmFeat, onAcknowledgeSubclass }) => {
   const isAsi = character.pendingFeatChoice && ASI_LEVELS.includes(character.level);
   const hasSubclassFeature = character.pendingSubclassFeature && character.subclassId;

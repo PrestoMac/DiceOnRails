@@ -48,6 +48,7 @@ const BEAST_TEMPLATES: Record<string, Omit<Enemy, 'id' | 'isDead' | 'hp'> & { hp
   }
 };
 
+/** Lookup table of beast form definitions (Wolf, Brown Bear, Giant Eagle, etc.) keyed by lowercase name, used for polymorph and wild shape. */
 export const BEAST_FORMS: Record<string, Enemy> = {};
 for (const [key, tpl] of Object.entries(BEAST_TEMPLATES)) {
   BEAST_FORMS[key] = {
@@ -64,12 +65,14 @@ for (const [key, tpl] of Object.entries(BEAST_TEMPLATES)) {
   };
 }
 
+/** Selects a random beast form whose CR is at or below the given target CR, or null if none are eligible. */
 export function getBeastForPolymorph(targetCR: number): Enemy | null {
   const eligible = Object.values(BEAST_FORMS).filter(b => b.cr != null && b.cr <= targetCR);
   if (eligible.length === 0) return null;
   return eligible[Math.floor(Math.random() * eligible.length)];
 }
 
+/** Applies the Polymorph transformation to a character, storing the original form and beast stats in a TransformationState. */
 export function applyPolymorph(
   character: Character,
   beastForm: Enemy,
@@ -78,6 +81,7 @@ export function applyPolymorph(
   return createTransformationState(character, beastForm, duration, 'polymorph');
 }
 
+/** Applies the Wild Shape transformation to a character, storing the original form and beast stats in a TransformationState. */
 export function applyWildShape(
   character: Character,
   beastForm: Enemy,
@@ -86,6 +90,7 @@ export function applyWildShape(
   return createTransformationState(character, beastForm, duration, 'wild-shape');
 }
 
+/** Checks whether a transformation has expired (duration <= 0), indicating reversion should occur. */
 export function revertTransformation(state: TransformationState): boolean {
   return state.duration <= 0;
 }

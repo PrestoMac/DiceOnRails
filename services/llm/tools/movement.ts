@@ -1,5 +1,6 @@
 import { ON_SUCCESS_PROPERTIES } from './shared';
 
+/** Tool definitions for movement and narration: moving to locations and ending turns with narration. */
 export const tools = [
     {
         type: "function",

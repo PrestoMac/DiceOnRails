@@ -1,5 +1,6 @@
 import type { Enemy } from './combat';
 
+/** Represents an item in a character's inventory, including equipment and consumables. */
 export interface InventoryItem {
   name: string;
   quantity: number;
@@ -22,18 +23,21 @@ export interface InventoryItem {
   };
 }
 
+/** Represents a character's currency holdings in gold, silver, and copper pieces. */
 export interface Currency {
   gp: number;
   sp: number;
   cp: number;
 }
 
+/** Tracks death saving throw progress (successes/failures) and stability state. */
 export interface DeathSaveStatus {
   successes: number;
   failures: number;
   isStable: boolean;
 }
 
+/** Records a feat or ASI (Ability Score Improvement) choice made at a given level. */
 export interface FeatSelection {
   level: number;
   type: 'asi' | 'feat';
@@ -43,8 +47,10 @@ export interface FeatSelection {
   skillChoices?: string[];
 }
 
+/** The recharge cadence for a resource pool (short rest, long rest, turn, or level-up). */
 export type ResourceReset = 'short' | 'long' | 'turn' | 'level';
 
+/** A tracked resource (e.g. ki points, rage, spell slots) with a current/max and reset trigger. */
 export interface ResourcePool {
   id: string;
   name: string;
@@ -56,6 +62,7 @@ export interface ResourcePool {
   icon?: string;
 }
 
+/** Categorizes the activation mechanism of a class feature. */
 export type ClassFeatureKind =
   | 'passive'
   | 'resource'
@@ -66,6 +73,7 @@ export type ClassFeatureKind =
   | 'proficiency'
   | 'spell-like';
 
+/** A feature granted by a character class at a specific level. */
 export interface ClassFeature {
   id: string;
   name: string;
@@ -82,6 +90,7 @@ export interface ClassFeature {
   };
 }
 
+/** A feature granted by a character subclass at a specific level. */
 export interface SubclassFeature {
   id: string;
   name: string;
@@ -93,6 +102,7 @@ export interface SubclassFeature {
   choice?: ClassFeature['choice'];
 }
 
+/** Summary of a subclass including its parent class and features. */
 export interface SubclassSummary {
   id: string;
   parentClass: string;
@@ -101,6 +111,7 @@ export interface SubclassSummary {
   features: SubclassFeature[];
 }
 
+/** A trait granted by a character's race. */
 export interface RacialTrait {
   id: string;
   name: string;
@@ -110,16 +121,19 @@ export interface RacialTrait {
   grantsResource?: string;
 }
 
+/** The 13 damage types available in D&D 5e. */
 export type DamageType =
   | 'acid' | 'bludgeoning' | 'cold' | 'fire' | 'force'
   | 'lightning' | 'necrotic' | 'piercing' | 'poison'
   | 'psychic' | 'radiant' | 'slashing' | 'thunder';
 
+/** Describes a numeric effect to be removed (e.g. an AC bonus). */
 export interface RemoveEffect {
   kind: 'acBonus';
   value: number;
 }
 
+/** A condition or ongoing effect applied to a character or enemy. */
 export interface ActiveCondition {
   id: string;
   source: string;
@@ -131,8 +145,10 @@ export interface ActiveCondition {
   onRemove?: ((target: Character | Enemy) => void) | RemoveEffect;
 }
 
+/** An ability score used for saving throws. */
 export type SaveStat = 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
 
+/** Tracks a polymorphed or wild-shaped character's original form and transformation details. */
 export interface TransformationState {
   originalForm: {
     stats: Character['stats'];
@@ -146,12 +162,14 @@ export interface TransformationState {
   casterId: string;
 }
 
+/** Runtime-only metadata attached to a character (e.g. concentration timers, transformation state). */
 export interface RuntimeMetadata {
   concentrationStartTime?: number;
   concentrationEffectiveDuration?: number;
   transformationState?: TransformationState;
 }
 
+/** Summary of changes applied when a character levels up. */
 export interface LevelUpSummary {
   characterId: string;
   characterName: string;
@@ -162,6 +180,7 @@ export interface LevelUpSummary {
   statPointsGained: number;
 }
 
+/** A full player character with stats, inventory, class, race, and all game-relevant fields. */
 export interface Character {
   id: string;
   ownerId?: string;

@@ -1,11 +1,14 @@
 import { ShopItem } from './types';
+/** Re-exported shop items catalog used by the GearStep for buying/selling equipment. */
 export { SHOP_ITEMS } from '../../data/shopItems';
 
+/** Ordered labels for each step in the character creation wizard. */
 export const STEP_LABELS = [
   'Name', 'Race', 'Class', 'Stats', 'Skills', 'Feats',
   'Path', 'Spells', 'Gear', 'Review', 'Start'
 ];
 
+/** Maps stat keys to their human-readable names. */
 export const STAT_LABELS: Record<string, string> = {
   str: 'Strength',
   dex: 'Dexterity',
@@ -15,10 +18,12 @@ export const STAT_LABELS: Record<string, string> = {
   cha: 'Charisma',
 };
 
+/** Point buy cost table: maps final ability score to its cost in points (max 27 total). */
 export const POINT_BUY_COSTS: Record<number, number> = {
   8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9,
 };
 
+/** Recommended skills for each class, shown with a badge in the skills step. */
 export const CLASS_RECOMMENDED_SKILLS: Record<string, string[]> = {
   'Fighter':   ['Athletics', 'Perception', 'Intimidation'],
   'Wizard':    ['Arcana', 'History', 'Investigation'],
@@ -35,12 +40,14 @@ export const CLASS_RECOMMENDED_SKILLS: Record<string, string[]> = {
 };
 
 
+/** Available stat generation modes for the stats step. */
 export const GEN_MODES = [
   { key: 'buy' as const, label: 'Point Buy' },
   { key: 'array' as const, label: 'Standard Array' },
   { key: 'roll' as const, label: 'Roll Stats' },
 ];
 
+/** Dragon ancestry/color options for Dragonborn race and Draconic Bloodline subclass. */
 export const DRAGON_ANCESTRIES: { id: string; label: string; damageType: string }[] = [
   { id: 'black',   label: 'Black',   damageType: 'acid' },
   { id: 'blue',    label: 'Blue',    damageType: 'lightning' },

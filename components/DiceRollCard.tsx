@@ -19,6 +19,7 @@ interface DiceRollCardProps {
   rerolledIndices?: number[];
 }
 
+/** Animated dice roll result card with SVG die faces, roll animation, and success/failure display. */
 const DiceRollCard: React.FC<DiceRollCardProps> = ({
   type,
   dieFace,

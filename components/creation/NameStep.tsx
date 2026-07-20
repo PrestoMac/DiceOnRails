@@ -3,6 +3,7 @@ import { StepProps } from './types';
 import { StepH, NavBtn } from './SharedComponents';
 import { ASI_LEVELS } from '../../constants';
 
+/** Name and starting level step. Captures the character name, backstory, and starting level with ASI slot preview. */
 const NameStep: React.FC<StepProps> = ({ wizardState, updateWizard, onNext }) => {
   const { name, level, backstory } = wizardState;
   const stepCls = "space-y-6 animate-in fade-in duration-500";

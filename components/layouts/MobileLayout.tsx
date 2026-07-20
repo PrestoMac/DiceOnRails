@@ -18,6 +18,7 @@ import { useActivityTracking } from '../../hooks/useActivityTracking';
 import { calculateAc } from '../../services/classEngine';
 import { formatGameTime } from '../../utils/timeUtils';
 
+/** Compact HP/AC status bar displayed below the chat area on mobile. */
 const HpStatusBar: React.FC<{ character: any }> = ({ character }) => (
   <div className="px-3 py-1.5 bg-stone-900/90 border-t border-stone-800 flex items-center justify-between text-[10px] backdrop-blur-md">
     <div className="flex items-center gap-2">
@@ -33,6 +34,7 @@ const HpStatusBar: React.FC<{ character: any }> = ({ character }) => (
   </div>
 );
 
+/** Primary mobile layout with 3-tab navigation (adventure/character/journal), queue drawer, and bottom nav bar. */
 const MobileLayout: React.FC = () => {
   const {
     stage, currentCampaignId, campaignName, gameState, messages,

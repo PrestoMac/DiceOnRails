@@ -12,6 +12,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     debugMode: false,
 };
 
+/** Manages app settings (voice, atmosphere, debug mode) persisted to localStorage. */
 export const useSettings = () => {
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [settings, setSettings] = useState<AppSettings>(() => {

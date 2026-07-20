@@ -39,6 +39,7 @@ const ConditionsList: React.FC<{
     <span className="text-stone-600 italic">No active conditions</span>
   );
 
+/** Combat initiative tracker panel showing turn order, HP bars, and expandable combatant details. */
 const CombatTracker: React.FC<CombatTrackerProps> = ({ combat, party, isMobile }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);

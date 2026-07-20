@@ -17,6 +17,7 @@ import AtmosphereOverlay from '../shared/AtmosphereOverlay';
 import { useActivityTracking } from '../../hooks/useActivityTracking';
 import { formatGameTime } from '../../utils/timeUtils';
 
+/** Primary desktop layout with resizable sidebar, chat log, input area, and full header controls. */
 const DesktopLayout: React.FC = () => {
   const {
     stage, currentCampaignId, campaignName, gameState, messages,

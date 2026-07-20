@@ -10,6 +10,7 @@ interface ExportMenuProps {
 const EXPORT_BTN_CLASS = 'w-full flex items-center gap-3 px-4 py-2.5 text-sm text-stone-300 hover:bg-stone-800/80 hover:text-amber-400 transition-colors text-left';
 const EXPORT_ICON_CLASS = 'text-xs w-5 text-center text-stone-500';
 
+/** Dropdown menu for exporting the chat log (copy to clipboard or download as .txt). */
 const ExportMenu: React.FC<ExportMenuProps> = ({ show, onClose, onCopy, onDownload }) => {
   const menuRef = useRef<HTMLDivElement>(null);
 

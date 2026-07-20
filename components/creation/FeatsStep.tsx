@@ -9,6 +9,7 @@ import { STAT_LABELS } from './constants';
 import { StepH } from './SharedComponents';
 import FeatDetailModal from '../FeatDetailModal';
 
+/** Feats and Ability Score Improvements step. Manages ASI/feat selection per slot, including point allocation for ASI and feat browsing/filtering. */
 const FeatsStep: React.FC<StepProps & { onGoToSpells: () => void; onGoToGear: () => void; onGoToSubclass: () => void; needsSpellsStep: boolean; needsSubclassStep: boolean }> = ({
   wizardState, updateWizard, onBack, onGoToSpells, onGoToGear, onGoToSubclass, needsSpellsStep, needsSubclassStep,
 }) => {

@@ -48,7 +48,7 @@ DiceOnRails pairs a **large language model** (for narration, roleplay, and inten
 
 ### Prerequisites
 
-- **Node.js 20+** (the CI pipeline uses Node 20)
+- **Node.js 20+** (the test suite targets Node 20)
 - An **LLM API key** — get one free at <https://openrouter.ai/keys>
 - *(Optional)* An **ImageRouter API key** for atmosphere art — <https://imagerouter.io>
 - *(Optional)* A **Supabase project** for cloud saves & multiplayer — <https://supabase.com>
@@ -202,7 +202,7 @@ Upload `dist/` to any static host (Netlify, Cloudflare Pages, GitHub Pages, S3, 
 | `npm test` | Run unit/component tests (Vitest, bails on first failure) |
 | `npm run test:watch` | Watch mode |
 | `npm run test:coverage` | Run tests with V8 coverage report |
-| `npm run test:ci` | CI-friendly verbose test run |
+| `npm run test:ci` | Verbose test run (run locally before pushing — no CI is currently configured) |
 | `npm run test:live` | Run live LLM integration tests in `tests/live/` |
 | `npm run test:live:tier3` | Run scenario-based live tests via `tsx` |
 | `npm run test:all` | Unit tests + tier-3 live scenarios |
@@ -261,7 +261,7 @@ Click the **rewind arrow** next to your last action — it restores the snapshot
 This is a personal project but issues and PRs are welcome. Before submitting:
 
 1. `npm run lint` — must pass
-2. `npm test` — must pass (CI runs `npm run test:ci`)
-3. Live tests (`npm run test:live`) require a real LLM key and shouldn't be run in CI
+2. `npm test` — must pass (run `npm run test:ci` locally for verbose output before pushing)
+3. Live tests (`npm run test:live`) require a real LLM key and shouldn't be run in a CI runner
 
 For the full developer reference — file structure, services, the agent loop, context pipeline, and how everything ties together — see **[ARCHITECTURE.md](./ARCHITECTURE.md)**.

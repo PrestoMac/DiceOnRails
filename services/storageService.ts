@@ -6,6 +6,7 @@ import { getRewindGeneration } from './rewindGeneration';
 const LS_KEY = 'diceonrails_game_data';
 const CAMPAIGNS_TABLE = 'campaigns';
 
+/** Builds a SavedGameData structure from campaign fields. */
 function buildSaveData(id: string, name: string, gameState: GameState, messages: Message[], timestamp: number): SavedGameData {
     return {
         version: '2.0',
@@ -18,7 +19,9 @@ function buildSaveData(id: string, name: string, gameState: GameState, messages:
     };
 }
 
+/** Storage service managing campaign persistence to Supabase (for named campaigns) and localStorage (for anonymous play). */
 export const storageService = {
+    /** Subscribes to real-time updates on a Supabase campaign row, returning an unsubscribe function. */
     subscribeToCampaign(campaignId: string, onUpdate: (data: any) => void) {
         const channel = supabase
             .channel(`campaign-${campaignId}`)
@@ -31,6 +34,7 @@ export const storageService = {
         return () => { supabase.removeChannel(channel); };
     },
 
+    /** Queues a sync of the game state and messages to Supabase for the given campaign (coalesced via microtask). */
     syncCampaignState(campaignId: string, gameState: GameState, messages?: Message[]): Promise<void> {
         const payload: any = { game_state: { ...gameState, _rewindGeneration: getRewindGeneration() } };
         if (messages) payload.messages = messages;
@@ -38,6 +42,7 @@ export const storageService = {
         return Promise.resolve();
     },
 
+    /** Creates a new campaign record in Supabase, returning the campaign ID or an error. */
     async createCampaign(userId: string, name: string, gameState: GameState, specificId?: string): Promise<{ campaignId?: string; error?: string }> {
         try {
             const payload: any = { host_id: userId, name, game_state: gameState, messages: [] };
@@ -50,6 +55,7 @@ export const storageService = {
         }
     },
 
+    /** Loads all campaigns for a user from Supabase (new + legacy format), sorted by last played time. */
     async loadCampaigns(userId?: string): Promise<{ campaigns?: Campaign[]; error?: string }> {
         if (!userId) return { campaigns: [] };
 
@@ -100,6 +106,7 @@ export const storageService = {
         }
     },
 
+    /** Loads a game from Supabase (by campaign ID) or falls back to localStorage for anonymous/local saves. */
     async loadGame(userId?: string, campaignId?: string): Promise<{ data?: SavedGameData; error?: string }> {
         if (userId && campaignId && campaignId !== 'anonymous') {
             try {
@@ -158,6 +165,7 @@ export const storageService = {
         }
     },
 
+    /** Saves game data to Supabase (for named campaigns) or localStorage (for anonymous). */
     async saveGame(data: SavedGameData, userId?: string, campaignId?: string): Promise<{ error?: string }> {
         if (userId && campaignId && campaignId !== 'anonymous') {
             try {
@@ -171,6 +179,7 @@ export const storageService = {
         return {};
     },
 
+    /** Deletes a campaign from Supabase by ID (host-only) or clears the local save. */
     async deleteCampaign(userId?: string, campaignId?: string): Promise<{ error?: string }> {
         if (!userId || !campaignId) {
             localStorage.removeItem(LS_KEY);
@@ -185,6 +194,7 @@ export const storageService = {
         return {};
     },
 
+    /** Renames a campaign in Supabase, verifying host ownership. */
     async renameCampaign(userId: string, campaignId: string, newName: string): Promise<{ error?: string }> {
         try {
             const { error } = await supabase
@@ -199,6 +209,7 @@ export const storageService = {
         }
     },
 
+    /** Clears the local-storage save data. */
     async clearLocalSave() {
         localStorage.removeItem(LS_KEY);
     },
@@ -208,6 +219,7 @@ const pendingPayloads = new Map<string, any>();
 let flushScheduled = false;
 let inflight = false;
 
+/** Queues a campaign sync payload, coalescing multiple updates within the same microtask into a single Supabase UPDATE. */
 function enqueueSync(campaignId: string, payload: any) {
     pendingPayloads.set(campaignId, { ...(pendingPayloads.get(campaignId) || {}), ...payload });
     if (flushScheduled) return;
@@ -215,6 +227,7 @@ function enqueueSync(campaignId: string, payload: any) {
     queueMicrotask(drain);
 }
 
+/** Drains all queued sync payloads, sending batched Supabase UPDATE queries. */
 async function drain() {
     flushScheduled = false;
     if (inflight || pendingPayloads.size === 0) return;

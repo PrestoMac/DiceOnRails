@@ -2,24 +2,29 @@ import React from 'react';
 import { SubclassListProps, SpellCardProps } from './types';
 import { DRAGON_ANCESTRIES } from './constants';
 
+/** Step heading component. Renders an amber-colored fantasy-font heading centered in uppercase. */
 export const StepH: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <h2 className="fantasy-font text-4xl font-bold text-amber-500 text-center uppercase tracking-widest">{children}</h2>
 );
 
+/** Navigation button. Full-width amber button for proceeding to the next wizard step. */
 export const NavBtn: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement>> = (props) => (
   <button {...props} className={`w-full py-4 bg-amber-700 hover:bg-amber-600 rounded-lg font-bold text-white transition-all uppercase tracking-widest text-xs ${props.className || ''}`} />
 );
 
+/** Tab button for mode selection (e.g. point buy / standard array / roll stats). Highlights when active. */
 export const TabBtn: React.FC<{ active: boolean; onClick: () => void; children: React.ReactNode }> = ({ active, onClick, children }) => (
   <button onClick={onClick} className={`flex-1 py-2 font-bold rounded transition-all uppercase tracking-wider ${active ? 'bg-amber-900/40 text-amber-400 border border-amber-800/30' : 'text-stone-500 hover:text-stone-300'}`}>{children}</button>
 );
 
+/** Increment/decrement button for adjusting numeric values (skill ranks, stat points). */
 export const AdjBtn: React.FC<{ onClick: () => void; disabled?: boolean; icon: string; hoverColor: string }> = ({ onClick, disabled, icon, hoverColor }) => (
   <button onClick={onClick} disabled={disabled} aria-label={icon === 'plus' ? 'Add' : 'Remove'} className={`w-7 h-7 flex items-center justify-center rounded bg-stone-800 ${hoverColor} disabled:opacity-20 disabled:cursor-not-allowed transition-colors text-stone-400 border border-stone-750 text-xs`}>
     <i className={`fas fa-${icon} text-[9px]`}></i>
   </button>
 );
 
+/** Error banner. Displays a red-tinted warning message with an icon. */
 export const ErrorBanner: React.FC<{ message: string }> = ({ message }) => (
   <div className="flex items-start gap-3 bg-red-950/30 border border-red-800/40 rounded-lg p-3 text-xs text-red-300">
     <i className="fas fa-exclamation-triangle text-red-500 mt-0.5 shrink-0"></i>
@@ -27,6 +32,7 @@ export const ErrorBanner: React.FC<{ message: string }> = ({ message }) => (
   </div>
 );
 
+/** Subclass selection list. Renders each subclass with expandable features, dimming features above the character's level. */
 export const SubclassList: React.FC<SubclassListProps> = ({ subclasses, selectedSubclassId, onSelect, level }) => (
   <div className="space-y-3 max-h-[50vh] overflow-y-auto custom-scrollbar pr-1">
     {subclasses.map(sc => (
@@ -48,6 +54,7 @@ export const SubclassList: React.FC<SubclassListProps> = ({ subclasses, selected
   </div>
 );
 
+/** Spell card for the spell selection step. Shows the spell name, level badge, and provides toggle/view actions. */
 export const SpellCard: React.FC<SpellCardProps> = ({ spell, isSelected, onToggle, onView, showLevel }) => (
   <div className={`text-left p-2 rounded border text-xs flex items-center justify-between gap-1 ${isSelected ? 'border-amber-600 bg-amber-900/10' : 'border-stone-800 bg-stone-900/40'}`}>
     <button className="flex-1 text-left font-bold" onClick={onToggle}>
@@ -59,6 +66,7 @@ export const SpellCard: React.FC<SpellCardProps> = ({ spell, isSelected, onToggl
   </div>
 );
 
+/** Dragon color/ancestry picker. Used both for Dragonborn race and Draconic Bloodline sorcerer subclass selection. */
 export const DragonColorPicker: React.FC<{
   selected: string | null;
   onSelect: (id: string) => void;

@@ -167,6 +167,7 @@ const MSG_STYLES: Record<MessageRole, string> = {
 const EXPORT_BTN_CLASS = 'w-full flex items-center gap-3 px-4 py-2.5 text-sm text-stone-300 hover:bg-stone-800/80 hover:text-amber-400 transition-colors text-left';
 const EXPORT_ICON_CLASS = 'text-xs w-5 text-center text-stone-500';
 
+/** Renders the scrollable message history with search, filter, export, speech playback, rewind, and roll-highlighting cards. */
 const ChatLog: React.FC<ChatLogProps> = ({ messages, settings, onRewind, isProcessing, onExpandAtmosphere, atmosphereUrl, scrollRef: externalScrollRef, onScrollChange, disableInternalScroll }) => {
   const internalScrollRef = useRef<HTMLDivElement>(null);
   const scrollRef = externalScrollRef || internalScrollRef;

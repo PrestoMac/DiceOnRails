@@ -5,6 +5,7 @@ import { StepH, NavBtn, DragonColorPicker } from './SharedComponents';
 
 const RACES = RACES_CATALOG;
 
+/** Race/lineage selection step. Displays available races with ASI bonuses, racial traits, and draconic ancestry picker for Dragonborn. */
 const RaceStep: React.FC<StepProps> = ({ wizardState, updateWizard, onNext }) => {
   const { selectedRace, draconicAncestry } = wizardState;
   const stepCls = "space-y-6 animate-in fade-in duration-500";

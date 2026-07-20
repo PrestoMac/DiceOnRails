@@ -1,6 +1,7 @@
 import React from 'react';
 import { FEAT_CATEGORIES } from '../../../utils/feats';
 
+/** Props for the FeatSearchBar component. */
 interface FeatSearchBarProps {
   search: string;
   category: string;
@@ -8,6 +9,7 @@ interface FeatSearchBarProps {
   onCategoryChange: (category: string) => void;
 }
 
+/** Search input and category filter buttons for filtering the feat list. */
 const FeatSearchBar: React.FC<FeatSearchBarProps> = ({ search, category, onSearchChange, onCategoryChange }) => (
   <div className="space-y-2">
     <input

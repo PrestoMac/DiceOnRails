@@ -3,6 +3,7 @@ import { GameState, QueuedAction } from '../types';
 import { mcpServer } from '../services/mcpService';
 import { storageService } from '../services/storageService';
 
+/** Manages the action queue: enqueue, remove, update, reorder items, and provides the sender name helper. */
 export const useQueue = (
     gameState: GameState,
     setGameState: (state: GameState) => void,

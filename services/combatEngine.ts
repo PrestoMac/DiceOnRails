@@ -6,6 +6,7 @@ import { calculateAc, getMod } from './classEngine';
 import { getAlertInitiativeBonus, getResilientSaveBonus, getShieldMasterSaveBonus } from './featsService';
 function ensureDeathSaves(c: Character) { if (!c.deathSaves) c.deathSaves = { successes: 0, failures: 0, isStable: false }; }
 
+/** Adds a new enemy to the combat state, optionally auto-filling stats from the SRD monster lookup, and rolls initiative if combat is active. */
 export function addEnemyToCombat(args: {
   name: string; ac?: number; hp?: number; attacks?: EnemyAttack[];
   cr?: number; xp?: number; size?: string; type?: string;
@@ -40,6 +41,7 @@ export function addEnemyToCombat(args: {
   return { enemy, sourceInfo };
 }
 
+/** Initializes a new combat encounter: rolls initiative for all party members (except stable) and all enemies, sorts by initiative descending. */
 export function initializeCombat(party: Character[], enemies: Enemy[]): { combatState: CombatState; initiativeOrder: InitiativeEntry[] } {
   const init: InitiativeEntry[] = [];
   for (const ch of party) {
@@ -56,6 +58,7 @@ export function initializeCombat(party: Character[], enemies: Enemy[]): { combat
   return { combatState: { isActive: true, round: 1, turnIndex: 0, initiative: init, enemies }, initiativeOrder: init };
 }
 
+/** Advances combat to the next turn in initiative order, processing save-vs-condition rolls and condition expiry ticks at round boundaries. */
 export function advanceToNextTurn(cs: CombatState, party: Character[], enemies: Enemy[]): {
   nextEntry: InitiativeEntry | null; roundChanged: boolean; saveMessages: string[]; expiryMessages: string[];
 } {
@@ -100,12 +103,14 @@ export function advanceToNextTurn(cs: CombatState, party: Character[], enemies: 
   return { nextEntry: cs.initiative[nextIdx] ?? null, roundChanged, saveMessages: saveMsgs, expiryMessages: expiryMsgs };
 }
 
+/** Selects the best (lowest HP ratio) living, non-stable character as a target. */
 export function selectBestTarget(party: Character[]): Character | undefined {
   const alive = party.filter(c => c.hp.current > 0 && !(c.deathSaves?.isStable));
   if (!alive.length) return undefined;
   return alive.reduce((b, c) => (c.hp.current / c.hp.max) < (b.hp.current / b.hp.max) ? c : b);
 }
 
+/** Resolves a single enemy attack against a target character, including advantage/disadvantage, crit/fumble, and death save triggers. */
 export function resolveEnemySingleAttack(enemy: Enemy, atkIdx: number, target: Character): {
   message: string; isHit: boolean; isCrit: boolean; damage: number; fumble: boolean;
 } {
@@ -137,6 +142,7 @@ export function resolveEnemySingleAttack(enemy: Enemy, atkIdx: number, target: C
   return { message: `${enemy.name} attacks ${target.name} with ${atk.name}: **HIT${crit ? ' **CRITICAL HIT!**' : ''}** (${aRoll} vs AC ${tAc}) dealing **${dmg}** ${atk.damageType}! ${target.name}: ${target.hp.current}/${target.hp.max} HP.`, isHit: true, isCrit: crit, damage: dmg, fumble: false };
 }
 
+/** Resolves a single enemy's full turn (all attacks) against the best available target. */
 export function resolveEnemySingleTurn(enemy: Enemy, party: Character[]): { messages: string[] } {
   const t = selectBestTarget(party);
   if (!t) return { messages: [`${enemy.name} has no valid targets.`] };
@@ -145,6 +151,7 @@ export function resolveEnemySingleTurn(enemy: Enemy, party: Character[]): { mess
   return { messages: msgs };
 }
 
+/** Resolves all pending enemy turns in the initiative order until no enemies remain or combat ends. */
 export function resolveAllEnemyTurns(party: Character[], cs: CombatState): {
   messages: string[]; combatEnded: boolean; victory?: boolean;
 } {
@@ -164,6 +171,7 @@ export function resolveAllEnemyTurns(party: Character[], cs: CombatState): {
   return { messages: msgs, combatEnded: !cs.isActive };
 }
 
+/** Checks whether the combat has ended due to all enemies slain (victory) or all party members dead (TPK). */
 export function checkVictoryConditions(cs: CombatState, party: Character[]): { ended: boolean; reason?: string; victory?: boolean } {
   if (!cs.isActive) return { ended: false };
   if (cs.enemies.length > 0 && cs.enemies.every(e => e.isDead)) return { ended: true, reason: 'victory', victory: true };
@@ -171,24 +179,28 @@ export function checkVictoryConditions(cs: CombatState, party: Character[]): { e
   return { ended: false };
 }
 
+/** Marks a character's reaction as spent if available, returning success status. */
 export function useCharacterReaction(ch: Character): { success: boolean; message: string } {
   if (!ch.reactionAvailable || ch.reactionUsedThisTurn) return { success: false, message: `${ch.name} has already used their reaction this round.` };
   ch.reactionAvailable = false; ch.reactionUsedThisTurn = true;
   return { success: true, message: `${ch.name}'s reaction spent.` };
 }
 
+/** Updates the death status of a combatant in initiative order. When marking dead (isDead=true), also flags the matching enemies-list entry; the enemies-list flag is NOT cleared when reviving (isDead=false) — only the initiative entry is. */
 export function updateCombatantDeathStatus(cs: CombatState, id: string, isDead: boolean): CombatState {
   const e = cs.initiative.find(x => x.id === id); if (e) e.isDead = isDead;
   if (isDead) { const en = cs.enemies.find(x => x.id === id); if (en) en.isDead = true; }
   return cs;
 }
 
+/** Returns the name, type, and ID of the actor whose turn it currently is in combat, or null if combat is inactive. */
 export function getCurrentCombatActor(cs: CombatState): { name: string; type: 'player' | 'enemy'; id: string } | null {
   if (!cs.isActive) return null;
   const e = cs.initiative[cs.turnIndex];
   return e ? { name: e.name, type: e.type, id: e.id } : null;
 }
 
+/** Performs a death save for a character: natural 20 revives with 1 HP, >=10 success, <10 failure; 3 failures marks them as dead. */
 export function rollDeathSave(ch: Character, cs: CombatState): {
   message: string; roll: number; total: number; successes: number; failures: number; isStable: boolean; revived: boolean; died: boolean;
 } {
@@ -203,6 +215,7 @@ export function rollDeathSave(ch: Character, cs: CombatState): {
   return { message: `${ch.name} rolls DEATH SAVE: **${rawRoll}** — ${dead ? `3 failures! **${ch.name} has died.**` : `Failure (${s.failures}/3)`}`, roll: rawRoll, total, successes: s.successes, failures: s.failures, isStable: false, revived: false, died: dead };
 }
 
+/** Makes a saving throw for a target against a given DC, accounting for Resilient and Shield Master feat bonuses. */
 export function makeSavingThrow(target: Character, stat: string, dc: number): {
   success: boolean; roll: number; total: number; modifier: number; nat20: boolean; nat1: boolean; message: string;
 } {

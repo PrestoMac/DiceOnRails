@@ -3,6 +3,7 @@ import { canEquipArmor, getArmorTypeFromItem } from './classEngine';
 import { supabase } from './supabaseClient';
 import { getHeavyArmorMasterReduction } from './featsService';
 
+/** Normalizes a total copper-piece amount into GP/SP/CP currency values, ensuring non-negative. */
 export function normalizeCurrency(totalCp: number): Currency {
   const safeTotal = Math.max(0, totalCp);
   const gp = Math.floor(safeTotal / 100);
@@ -12,6 +13,7 @@ export function normalizeCurrency(totalCp: number): Currency {
   return { gp, sp, cp };
 }
 
+/** Adjusts a character's currency by adding or subtracting GP/SP/CP, returning the new balance or an insufficent-funds error. */
 export function adjustCharacterCurrency(
   character: Character, gp: number, sp: number, cp: number
 ): { character: Character; totalCp: number; message: string } {
@@ -31,6 +33,7 @@ export function adjustCharacterCurrency(
   };
 }
 
+/** Applies equip/unequip effects to a character's inventory, auto-unequipping other armor/shield items on equip. */
 export function applyEquipmentEffects(
   character: Character, item: InventoryItem, action: 'equip' | 'unequip'
 ): Character {
@@ -50,10 +53,12 @@ export function applyEquipmentEffects(
   return { ...character, inventory: updatedInventory };
 }
 
+/** Cleans an item name by splitting on conjunctions and truncating to 60 characters. */
 function cleanItemName(itemName: string): string {
   return itemName?.split(/\s+(?:and|or|then|while|to|into)\s+/)[0]?.trim()?.slice(0, 60) || 'unknown item';
 }
 
+/** Adds an item (or increases its quantity) in a character's inventory, merging with existing stacks of the same name. */
 export function addInventoryItem(
   character: Character, itemName: string, quantity: number,
   itemMeta?: { type?: string; rarity?: string; description?: string; stats?: Record<string, any>; equipped?: boolean }
@@ -91,6 +96,7 @@ export function addInventoryItem(
   };
 }
 
+/** Removes a specified quantity of an item from a character's inventory, deleting the entire stack if the requested quantity is greater than or equal to the stack size. */
 export function removeInventoryItem(
   character: Character, itemName: string, quantity: number
 ): { character: Character; message: string; removedItem?: InventoryItem } {
@@ -113,6 +119,7 @@ export function removeInventoryItem(
   return { character: { ...character, inventory: updatedInventory }, message: `Removed ${quantity}x ${cleanName} from ${character.name}'s inventory.` };
 }
 
+/** Edits the properties of an inventory item by name, removing the stack if quantity becomes zero or negative. */
 export function editInventoryItem(
   character: Character, itemName: string, updates: Partial<InventoryItem>
 ): { character: Character; message: string } {
@@ -131,6 +138,7 @@ export function editInventoryItem(
   return { character: { ...character, inventory: updatedInventory }, message: `Modified ${itemName} in ${character.name}'s inventory.` };
 }
 
+/** Inflicts damage on a target (character or enemy), accounting for immunities, resistances, vulnerabilities, temp HP, and Heavy Armor Master. */
 export function inflictDamageOnTarget(
   target: Character | Enemy, amount: number, damageType?: string
 ): { target: Character | Enemy; actualDamage: number; message: string } {
@@ -171,6 +179,7 @@ export function inflictDamageOnTarget(
   return { target: updatedTarget, actualDamage: dmg, message };
 }
 
+/** Heals a character by a given amount, capping at their maximum HP. */
 export function healCharacter(
   character: Character, amount: number
 ): { character: Character; actualHealing: number; message: string } {
@@ -186,6 +195,7 @@ export function healCharacter(
   };
 }
 
+/** Looks up an SRD item by name from the Supabase srd_items table. */
 export async function lookupItemByName(
   cleanName: string
 ): Promise<{ data: any; error: any }> {
@@ -194,6 +204,7 @@ export async function lookupItemByName(
 
 const GARBAGE_NAMES = /^(?:shop|man|woman|person|halfling|dwarf|elf|goblin|me|myself|yourself|out|in|up|down|some|any|of|the|a|an|it|them|this|that|those|these|there|here|someone|anyone|everyone|nobody)$/i;
 
+/** Processes a full inventory action (add/remove/edit) against the party, returning an MCP response with success status and message. */
 export function processInventoryAction(
   party: Character[],
   args: {

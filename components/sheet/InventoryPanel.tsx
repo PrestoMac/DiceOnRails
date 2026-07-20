@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Character, InventoryItem, Currency } from '../../types';
 import { cryptoRoll } from '../../utils/random';
 
+/** Props for the InventoryPanel component. */
 interface InventoryPanelProps {
   character: Character;
   onUpdateInventory: (inv: InventoryItem[]) => void;
@@ -11,6 +12,7 @@ interface InventoryPanelProps {
   onSendMessage?: (text: string) => void;
 }
 
+/** Returns a Tailwind class string for styling an item's border/text based on its rarity tier. */
 const rarityStyle = (rarity?: string) =>
   rarity === 'uncommon' ? 'text-blue-400 border-l-blue-500' :
   rarity === 'rare' ? 'text-purple-400 border-l-purple-500' :
@@ -18,6 +20,7 @@ const rarityStyle = (rarity?: string) =>
   rarity === 'legendary' ? 'text-amber-500 border-l-amber-500' :
   'text-stone-400 border-l-stone-500';
 
+/** A single editable row displaying a currency type (GP, SP, or CP) with inline editing. */
 const CurrencyRow: React.FC<{
   label: string; iconColor: string; field: keyof Currency; value: number;
   isEditing: boolean; input: string; onStartEdit: ()=>void; onChange: (v:string)=>void; onSave: ()=>void; inputClass: string;
@@ -32,6 +35,7 @@ const CurrencyRow: React.FC<{
   </div>
 );
 
+/** Full inventory management panel including item listing, equip/use actions, currency editing, and item tooltips. */
 const InventoryPanel: React.FC<InventoryPanelProps> = ({ character, onUpdateInventory, onUpdateCurrency, onTriggerDiceRoll, onSendMessage }) => {
   const [isAdding, setIsAdding] = useState(false);
   const [newItemName, setNewItemName] = useState('');

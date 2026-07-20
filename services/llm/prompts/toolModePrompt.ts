@@ -1,3 +1,4 @@
+/** System prompt instructing the LLM on how to use game tools in tool mode (combat, spells, feats, class features, race traits, etc.). */
 export const TOOL_MODE_INSTRUCTION = `You are the Game Engine. Translate player intent into Game Mechanics (Tools).
 
 COMBAT — FOLLOW THIS SEQUENCE STRICTLY:

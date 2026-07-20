@@ -21,6 +21,7 @@ import GearStep from './GearStep';
 import ReviewStep from './ReviewStep';
 import StartingGroundsStep from './StartingGroundsStep';
 
+/** Props for the main character creation wizard shell. */
 interface WizardShellProps {
   onComplete: (character: Character) => void;
   isNewCampaign?: boolean;
@@ -32,6 +33,7 @@ interface WizardShellProps {
 const RACES = RACES_CATALOG;
 const CLASSES = CLASSES_CATALOG;
 
+/** Main character creation wizard. Orchestrates all steps (name, race, class, stats, skills, feats, spells, gear, review, starting grounds) into a multi-step form with progress tracking. */
 const WizardShell: React.FC<WizardShellProps> = ({
   onComplete, isNewCampaign, campaignStartingLocation, onGenerateStartingLocations, onSetStartingLocation,
 }) => {

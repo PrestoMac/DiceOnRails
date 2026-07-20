@@ -7,6 +7,7 @@ import { FEATS_CATALOG } from '../utils/feats';
 import { DRAGON_ANCESTRIES } from '../components/creation/constants';
 import { SKILLS_LIST } from '../constants';
 
+/** Builds a fully-formed Character object from wizard creation state, validating name, location, stats, feats, and subclass choices. */
 export function buildCharacterFromWizard(
   wizard: WizardState,
   options: { isNewCampaign: boolean; campaignStartingLocation?: StartingLocation; remainingSkillPoints?: number; onSetStartingLocation?: (location: StartingLocation) => void }

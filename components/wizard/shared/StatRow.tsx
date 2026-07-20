@@ -5,6 +5,7 @@ import AddBtn from '../../shared/AddBtn';
 const STAT_LABELS: Record<string, string> = { str: 'STR', dex: 'DEX', con: 'CON', int: 'INT', wis: 'WIS', cha: 'CHA' };
 const STAT_LABELS_FULL: Record<string, string> = { str: 'Strength', dex: 'Dexterity', con: 'Constitution', int: 'Intelligence', wis: 'Wisdom', cha: 'Charisma' };
 
+/** Props for the StatRow component. */
 interface StatRowProps {
   stat: string;
   currentValue: number;
@@ -17,6 +18,7 @@ interface StatRowProps {
   showMod?: boolean;
 }
 
+/** Single ability score row with label, +/- controls, current value, and optional modifier display. */
 const StatRow: React.FC<StatRowProps> = ({
   stat, currentValue: cv, allocation: al, newValue: nv, modifier: nm,
   disableAdd, onAllocate, hover, showMod = true,

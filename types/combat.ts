@@ -1,5 +1,6 @@
 import type { ActiveCondition } from './character';
 
+/** An attack available to an enemy creature. */
 export interface EnemyAttack {
   name: string;
   toHit: number;
@@ -8,6 +9,7 @@ export interface EnemyAttack {
   description?: string;
 }
 
+/** An enemy creature in combat, with stats, attacks, and damage affinities. */
 export interface Enemy {
   id: string;
   name: string;
@@ -33,6 +35,7 @@ export interface Enemy {
   beastFields?: { speed: number };
 }
 
+/** An entry in the combat initiative order for a participant. */
 export interface InitiativeEntry {
   id: string;
   name: string;
@@ -46,6 +49,7 @@ export interface InitiativeEntry {
   conditionsResolvedThisTurn?: boolean;
 }
 
+/** The full state of an active combat encounter. */
 export interface CombatState {
   isActive: boolean;
   round: number;

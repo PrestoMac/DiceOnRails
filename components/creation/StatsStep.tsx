@@ -11,6 +11,7 @@ const CLASS_RECOMMENDED_STATS: Record<string, Record<string, number>> =
 const CLASS_STATS_PRIORITY: Record<string, string[]> =
   Object.fromEntries(CLASSES_CATALOG.map(c => [c.name, c.statPriority]));
 
+/** Stats generation step. Supports point buy, standard array, and 4d6-drop-lowest rolling modes with Half-Elf flexible ASI handling. */
 const StatsStep: React.FC<StepProps> = ({ wizardState, updateWizard, onNext }) => {
   const { selectedClass, selectedRace, stats, level } = wizardState;
   const stepCls = "space-y-6 animate-in fade-in duration-500";

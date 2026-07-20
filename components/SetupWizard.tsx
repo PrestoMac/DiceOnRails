@@ -61,6 +61,7 @@ const FormField = ({ label, name, value, onChange, type, placeholder }: {
   </div>
 );
 
+/** Multi-step initial setup wizard for API keys and Supabase database configuration. */
 const SetupWizard: React.FC = () => {
   const [step, setStep] = useState(1);
   const [config, setConfig] = useState({

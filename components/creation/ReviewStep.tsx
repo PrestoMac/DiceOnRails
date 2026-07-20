@@ -7,6 +7,7 @@ import { FEATS_CATALOG } from '../../utils/feats';
 import { STAT_LABELS } from './constants';
 import { StepH, ErrorBanner } from './SharedComponents';
 
+/** Props for the review/final summary step of character creation. */
 interface ReviewStepProps {
   wizardState: WizardState;
   finalizeError: string | null;
@@ -17,6 +18,7 @@ interface ReviewStepProps {
   onGoToStart: () => void;
 }
 
+/** Final review step. Displays a full summary of the character (name, race, class, stats, skills, feats, spells, gear, starting location) before finalization. */
 const ReviewStep: React.FC<ReviewStepProps> = ({
   wizardState, finalizeError, isNewCampaign, campaignStartingLocation, needsSpellsStep, onFinalize, onGoToStart,
 }) => {

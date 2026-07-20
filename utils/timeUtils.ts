@@ -1,3 +1,8 @@
+/**
+ * Returns the time-of-day period for a given number of minutes since midnight.
+ * @param totalMinutes - The total minutes (mod 1440 determines the period).
+ * @returns The period name: "dawn", "morning", "afternoon", "dusk", or "night".
+ */
 export function getTimePeriod(totalMinutes: number): string {
   const tod = ((totalMinutes % 1440) + 1440) % 1440;
   if (tod < 360) return 'night';
@@ -8,6 +13,11 @@ export function getTimePeriod(totalMinutes: number): string {
   return 'night';
 }
 
+/**
+ * Formats a total minutes value into a human-readable game time (day, time, period).
+ * @param totalMinutes - The total elapsed minutes (non-negative).
+ * @returns An object with day number, formatted time string, and period name.
+ */
 export function formatGameTime(totalMinutes: number): { day: number; time: string; period: string } {
   const safeMinutes = (typeof totalMinutes === 'number' && !isNaN(totalMinutes)) ? Math.max(0, totalMinutes) : 0;
   const day = Math.floor(safeMinutes / 1440) + 1;
@@ -23,6 +33,7 @@ export function formatGameTime(totalMinutes: number): { day: number; time: strin
   };
 }
 
+/** Ambient narration lines keyed by time period for atmospheric description. */
 export const AMBIENT_LINES: Record<string, string> = {
   dawn: '[The first light of dawn crests the horizon, painting the sky amber and rose.]',
   dusk: '[The sun sinks low, casting long shadows as twilight settles in.]',

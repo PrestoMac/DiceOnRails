@@ -1,5 +1,6 @@
 import React from 'react';
 
+/** Props for the RemainingPointsBanner component. */
 interface RemainingPointsBannerProps {
   label: string;
   remaining: number;
@@ -8,6 +9,7 @@ interface RemainingPointsBannerProps {
   completeColor?: string;
 }
 
+/** Banner showing remaining/unspent points for a resource (skill points, stat points, etc.) with pulse animation when > 0. */
 const RemainingPointsBanner: React.FC<RemainingPointsBannerProps> = ({
   label, remaining, total, pulseColor = 'text-amber-500', completeColor = 'text-green-500',
 }) => (
