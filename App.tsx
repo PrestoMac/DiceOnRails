@@ -98,6 +98,7 @@ const AppContent: React.FC = () => {
 
   useEffect(() => {
     if (userId && stage === AppStage.AUTH) setStage(AppStage.DASHBOARD);
+    else if (!userId && stage !== AppStage.AUTH) setStage(AppStage.AUTH);
   }, [userId, stage, setStage]);
 
   useEffect(() => {
