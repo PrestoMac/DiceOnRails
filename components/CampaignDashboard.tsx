@@ -9,6 +9,8 @@ interface CampaignDashboardProps {
   onDeleteCampaign: (id: string) => void;
   onRenameCampaign: (id: string, newName: string) => Promise<void>;
   onJoinCampaign?: (id: string) => void;
+  onOpenSettings?: () => void;
+  onLogout?: () => void;
   loading?: boolean;
 }
 
@@ -25,7 +27,7 @@ const DashboardBtn: React.FC<{ onClick: () => void; icon: string; children: Reac
 );
 
 /** Dashboard listing saved campaigns with rename, delete, resume, and join actions. */
-const CampaignDashboard: React.FC<CampaignDashboardProps> = ({ campaigns, onSelectCampaign, onCreateNew, onDeleteCampaign, onRenameCampaign, onJoinCampaign, loading = false }) => {
+const CampaignDashboard: React.FC<CampaignDashboardProps> = ({ campaigns, onSelectCampaign, onCreateNew, onDeleteCampaign, onRenameCampaign, onJoinCampaign, onOpenSettings, onLogout, loading = false }) => {
   const [renamingId, setRenamingId] = useState<string|null>(null);
   const [renameName, setRenameName] = useState('');
   const [showJoinModal, setShowJoinModal] = useState(false);
@@ -35,6 +37,10 @@ const CampaignDashboard: React.FC<CampaignDashboardProps> = ({ campaigns, onSele
   return (
     <div className="h-full w-full bg-stone-950 overflow-y-auto relative custom-scrollbar">
       <div className="fixed inset-0 opacity-10 pointer-events-none" style={{backgroundImage:'radial-gradient(circle at 50% 30%, #78350f 0%, transparent 70%)', backgroundSize:'100% 100%'}}></div>
+      <div className="absolute top-0 right-0 z-20 p-4 flex items-center gap-2">
+        {onOpenSettings && <button onClick={onOpenSettings} className="p-2 hover:bg-stone-900 rounded-lg text-stone-400 transition-colors group" title="Settings"><i className="fas fa-cog text-xl group-hover:rotate-90 transition-transform duration-500" /></button>}
+        {onLogout && <button onClick={onLogout} className="p-2 hover:bg-stone-900 rounded-lg text-stone-400 transition-colors" title="Logout"><i className="fas fa-sign-out-alt text-xl" /></button>}
+      </div>
       <div className="min-h-full flex flex-col items-center p-6 md:p-12 pt-20 md:pt-32 relative z-10">
         <div className="w-full max-w-4xl flex flex-col items-center">
           <h1 className="fantasy-font text-4xl md:text-6xl text-amber-600 mb-2 drop-shadow-lg tracking-wider text-center">Your Chronicles</h1>

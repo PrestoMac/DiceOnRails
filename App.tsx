@@ -63,7 +63,7 @@ const App: React.FC = () => {
 };
 
 const AppContent: React.FC = () => {
-  const { userId, setUserId } = useAuthContext();
+  const { userId, setUserId, handleLogout } = useAuthContext();
   const {
     stage, gameState, messages, isLoading,
     isNewCampaign, setStage,
@@ -129,7 +129,7 @@ const AppContent: React.FC = () => {
 
   const getContent = () => {
     if (stage === AppStage.DASHBOARD) {
-      return <CampaignDashboard campaigns={campaigns} onSelectCampaign={id => handleJoinCampaign(id, loadGameData)} onCreateNew={handleCreateNewCampaign} onDeleteCampaign={handleDeleteCampaign} onRenameCampaign={handleRenameCampaign} onJoinCampaign={id => handleJoinCampaign(id, loadGameData)} loading={isLoading} />;
+      return <CampaignDashboard campaigns={campaigns} onSelectCampaign={id => handleJoinCampaign(id, loadGameData)} onCreateNew={handleCreateNewCampaign} onDeleteCampaign={handleDeleteCampaign} onRenameCampaign={handleRenameCampaign} onJoinCampaign={id => handleJoinCampaign(id, loadGameData)} onOpenSettings={() => setSettingsOpen(true)} onLogout={handleLogout} loading={isLoading} />;
     }
     if (stage === AppStage.CREATION) {
       return <WizardShell onComplete={handleCharacterCreated} isNewCampaign={isNewCampaign} campaignStartingLocation={gameState.startingLocation} onGenerateStartingLocations={isNewCampaign ? handleGenerateStartingLocations : undefined} onSetStartingLocation={handleSetStartingLocation} />;
