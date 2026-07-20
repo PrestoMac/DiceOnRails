@@ -41,7 +41,7 @@ const GearStep: React.FC<StepProps & { onBackToSpells: () => void; onBackToFeats
       const srd = lookupSRDItem(item.name);
       newInventory = [...inventory, {
         name: item.name, quantity: 1,
-        type: srd?.type || item.category.toLowerCase() as any,
+        type: (srd?.type || item.category.toLowerCase()) as InventoryItem['type'],
         rarity: srd?.rarity || 'common',
         description: srd?.description || item.description || 'No description available.',
         weight: srd?.weight || 0,
@@ -62,7 +62,7 @@ const GearStep: React.FC<StepProps & { onBackToSpells: () => void; onBackToFeats
     });
   };
 
-  const dexBonus = typeof selectedRace.asi === 'object' ? (selectedRace.asi as any).dex || 0 : 0;
+  const dexBonus = typeof selectedRace.asi === 'object' ? (selectedRace.asi as Record<string, number>).dex || 0 : 0;
   const estimatedAC = calculateAC(inventory, stats.dex + dexBonus);
 
   return (

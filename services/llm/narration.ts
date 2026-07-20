@@ -1,12 +1,12 @@
-import { Message, MessageRole, LLMProvider, MCPResponse, RollData } from '../../types';
+import { Message, LLMProvider, MCPResponse, RollData } from '../../types';
 import { SYSTEM_INSTRUCTION, PROGRESSION_SYSTEM_PROMPT } from '../../constants';
-import { getEnv, getThinkingDisabledBody } from '../../utils/envHelper';
+import { getThinkingDisabledBody } from '../../utils/envHelper';
 import { isDebugMode } from '../../utils/debug';
 import { safeParseJson } from '../../utils/safeJson';
 import { streamChatCompletion } from '../streamingClient';
 import { resolveLLMConfig, mapHistoryToMessages } from './llmApiClient';
 
-function skillRollData(d: any, dc: any, label?: string, extra?: Partial<RollData>): RollData {
+function skillRollData(d: Record<string, unknown>, dc: number, label?: string, extra?: Partial<RollData>): RollData {
     return { type: 'skill', dieFace: 'd20', dieRoll: d.roll ?? 0, modifier: d.modifier ?? 0, total: d.total ?? 0, dc, success: d.success, label, dieCount: 1, results: [d.roll ?? 0], ...extra };
 }
 
@@ -28,7 +28,7 @@ export function extractRollData(toolName: string, result: MCPResponse): RollData
   } else if (toolName === 'cast_spell') {
     const atkRoll = d.attackRoll;
     if (atkRoll) {
-      const spellLabel = d.damage ? 'Spell Attack → ' + d.damage.total + ' ' + (d.damage.type || '') + ' damage' : d.perBeam && d.perBeam.length > 1 ? d.perBeam.map((b: any, i: number) => `Ray ${i+1}: ${b.attackRoll.total} to hit, ${b.isHit ? `${b.damage} ${d.damage?.type || ''} damage` : 'miss'}`).join(', ') : undefined;
+      const spellLabel = d.damage ? 'Spell Attack → ' + d.damage.total + ' ' + (d.damage.type || '') + ' damage' : d.perBeam && d.perBeam.length > 1 ? d.perBeam.map((b: { attackRoll: { total: number }; isHit: boolean; damage: number }, i: number) => `Ray ${i+1}: ${b.attackRoll.total} to hit, ${b.isHit ? `${b.damage} ${d.damage?.type || ''} damage` : 'miss'}`).join(', ') : undefined;
       return { type: 'cast_spell', dieFace: 'd20', dieRoll: atkRoll.d20, modifier: atkRoll.total - atkRoll.d20, total: atkRoll.total, isCritical: atkRoll.isCrit, isFumble: atkRoll.isFumble, label: spellLabel, dieCount: 1, results: [atkRoll.d20] };
     }
     if (d.damage) { return { type: 'cast_spell', dieFace: 'dmg', dieRoll: d.damage.total, modifier: 0, total: d.damage.total, dieCount: 1, results: [d.damage.total] }; }
@@ -73,7 +73,7 @@ export function formatToolResult(toolName: string, result: MCPResponse): string 
       case 'make_save': return JSON.stringify({tool:'make_save', toolSuccess:result.success, message:result.message, character:d.character, stat:d.stat, roll:d.roll, total:d.total, dc:d.dc, saveSuccess:d.success});
       case 'roll_death_save': return JSON.stringify({tool:'roll_death_save', success:result.success, message:result.message, roll:d.roll, successes:d.deathSaves?.successes, failures:d.deathSaves?.failures, stable:d.deathSaves?.isStable});
       case 'long_rest': case 'short_rest': case 'upsert_quest': case 'log_lore': return JSON.stringify({tool:toolName, success:result.success, message:result.message});
-      case 'cast_spell': return JSON.stringify({tool:'cast_spell', success:result.success, message:result.message, damage:d.damage, healing:d.healing, concentration:d.concentrationStarted, saveRoll:d.saveRoll, attackRoll:d.attackRoll, perTarget:d.damage?.perTarget, perBeam:d.perBeam, casterName:d.casterName, appliedConditions:(d as any).appliedConditions, affectedTargets:d.affectedTargets, narrationHint:d.narrationHint});
+      case 'cast_spell': return JSON.stringify({tool:'cast_spell', success:result.success, message:result.message, damage:d.damage, healing:d.healing, concentration:d.concentrationStarted, saveRoll:d.saveRoll, attackRoll:d.attackRoll, perTarget:d.damage?.perTarget, perBeam:d.perBeam, casterName:d.casterName, appliedConditions:(d as unknown as { appliedConditions?: unknown[] }).appliedConditions, affectedTargets:d.affectedTargets, narrationHint:d.narrationHint});
       case 'use_resource': return JSON.stringify({tool:'use_resource', success:result.success, message:result.message, healed:d.healed, raging:d.raging});
       case 'manage_spellbook': return JSON.stringify({tool:'manage_spellbook', success:result.success, message:result.message, spell:d.spell});
       case 'award_experience': return JSON.stringify({tool:'award_experience', success:result.success, message:result.message, amount:d.character?.xp, leveledUp:d.leveledUp});
@@ -148,7 +148,7 @@ export function generateNarrationStream(history: Message[], context: string, fro
     const systemMessage = { role: "system" as const, content: `${SYSTEM_INSTRUCTION}\n\n${PROGRESSION_SYSTEM_PROMPT}\n\n=== NARRATION MODE ===\n${narrationInstruction}` };
     const contextMessage = { role: "user" as const, content: `[Dungeon State Context: ${context}]` };
     const messages = [systemMessage, ...(frozenMessages || []), ...mapHistoryToMessages(history), contextMessage];
-    const body: any = { model, messages, temperature: 0.7, stream: true, stream_options: { include_usage: true }, ...(getThinkingDisabledBody() || {}) };
+    const body: Record<string, unknown> = { model, messages, temperature: 0.7, stream: true, stream_options: { include_usage: true }, ...(getThinkingDisabledBody() || {}) };
     if (isDebugMode) console.log('[NarrationStream] Request body', { model, messageCount: messages.length, hasStream: body.stream, hasUsage: !!body.stream_options });
     const controller = new AbortController();
     let fullText = '';
@@ -159,7 +159,7 @@ export function generateNarrationStream(history: Message[], context: string, fro
         try {
             for await (const chunk of streamChatCompletion(apiUrl, body, apiHeaders, { signal: controller.signal })) {
                 chunkCount++;
-                if (chunk.type === 'content') { fullText += chunk.delta; try { callbacks.onDelta(chunk.delta, fullText); } catch { } }
+                if (chunk.type === 'content') { fullText += chunk.delta; try { callbacks.onDelta(chunk.delta, fullText); } catch { /* callback may throw */ } }
                 else if (chunk.type === 'usage') { usage = { prompt: chunk.prompt, completion: chunk.completion, cached: chunk.cached }; if (isDebugMode) console.log('[NarrationStream] Usage update', usage); }
                 else if (chunk.type === 'error') { if (isDebugMode) console.error('[NarrationStream] Error in stream', chunk.error); callbacks.onError(chunk.error); throw chunk.error; }
             }
@@ -203,7 +203,7 @@ export async function generateTightNarration(lastUserText: string, toolMessages:
     }
     const toolSummary = toolMessages.slice(-5).map(t => `[${t.toolName}] ${t.message}`).join('\n');
     const userContent = toolSummary ? `Player action: ${lastUserText}\n\nGame events:\n${toolSummary}\n\nNow narrate the outcome.` : `Player action: ${lastUserText}\n\nNow narrate the outcome.`;
-    const body: any = { model, messages: [{ role: 'system', content: isBatch ? TIGHT_NARRATION_BATCH_PROMPT : TIGHT_NARRATION_PROMPT }, { role: 'user', content: userContent }], temperature: 0.7, max_tokens: 500, ...(getThinkingDisabledBody() || {}) };
+    const body: Record<string, unknown> = { model, messages: [{ role: 'system', content: isBatch ? TIGHT_NARRATION_BATCH_PROMPT : TIGHT_NARRATION_PROMPT }, { role: 'user', content: userContent }], temperature: 0.7, max_tokens: 500, ...(getThinkingDisabledBody() || {}) };
     if (isDebugMode) console.log('[TightNarration] Request', { model, isBatch, toolCount: toolMessages.length, userTextLen: lastUserText.length, url: apiUrl });
     const fetchController = new AbortController();
     const fetchTimer = setTimeout(() => fetchController.abort(), 15_000);

@@ -1,5 +1,5 @@
 import { createContext, useContext, ReactNode } from 'react';
-import { GameState, Message, AppStage, Character, Currency, InventoryItem, QueuedAction } from '../types';
+import { GameState, Message, AppStage, Currency, InventoryItem, QueuedAction } from '../types';
 import { useGameState } from '../hooks/useGameState';
 import { useQueue } from '../hooks/useQueue';
 import { useAuthContext } from './AuthContext';

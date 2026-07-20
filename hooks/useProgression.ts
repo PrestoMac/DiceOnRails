@@ -130,7 +130,7 @@ export const useProgression = (
       const existing = char.unlockedSubclassFeatures || [];
       const subclassDef = char.subclassId ? getSubclassDef(char.class, char.subclassId) : undefined;
       const newLevels = subclassDef
-        ? subclassDef.features.filter((f: any) => f.level === char.level).map((f: any) => f.level)
+        ? subclassDef.features.filter((f: { level: number }) => f.level === char.level).map((f: { level: number }) => f.level)
         : [];
       mcpServer.getFullState().party[idx] = {
         ...char,

@@ -26,7 +26,7 @@ export async function* streamChatCompletion(
 ): AsyncGenerator<StreamChunk> {
   if (isDebugMode) {
     const maskedHeaders = { ...headers, Authorization: headers.Authorization ? `Bearer ${headers.Authorization.slice(0, 20)}...` : undefined };
-    console.log('[SSE streamChatCompletion] Starting stream', { url, body: typeof body === 'object' ? { ...(body as any), model: (body as any)?.model } : body, headers: maskedHeaders });
+    console.log('[SSE streamChatCompletion] Starting stream', { url, body: typeof body === 'object' ? { ...(body as Record<string, unknown>), model: (body as Record<string, unknown>)?.model } : body, headers: maskedHeaders });
   }
   const controller = new AbortController();
   const signal = opts.signal ?? controller.signal;
@@ -60,7 +60,7 @@ export async function* streamChatCompletion(
     try {
       const txt = await response.text();
       if (txt) detail += ` — ${txt.slice(0, 300)}`;
-    } catch { }
+    } catch { /* response.text() may throw */ }
     if (isDebugMode) console.error('[SSE streamChatCompletion] Response not OK', { status: response.status, detail });
     yield { type: 'error', error: new Error(detail) };
     return;
@@ -131,7 +131,7 @@ export async function* streamChatCompletion(
             yield c;
           }
           if (Array.isArray(delta.tool_calls)) {
-            if (isDebugMode) console.log(`[SSE streamChatCompletion] Tool calls at ${Date.now() - startTime}ms`, delta.tool_calls.map((tc: any) => ({ index: tc.index, name: tc.function?.name })));
+            if (isDebugMode) console.log(`[SSE streamChatCompletion] Tool calls at ${Date.now() - startTime}ms`, delta.tool_calls.map((tc: { index?: number; function?: { name?: string } }) => ({ index: tc.index, name: tc.function?.name })));
             for (const tc of delta.tool_calls) {
               const c = {
                 type: 'tool_calls' as const,
@@ -163,7 +163,7 @@ export async function* streamChatCompletion(
     return;
   } finally {
     clearTimer(timeoutId);
-    try { reader.releaseLock(); } catch { }
+    try { reader.releaseLock(); } catch { /* reader may already be closed */ }
   }
 
   if (isDebugMode) console.log(`[SSE streamChatCompletion] Stream ended normally after ${readCount} reads, ${contentChars} chars in ${Date.now() - startTime}ms`);
@@ -183,7 +183,7 @@ function isNonEmptyString(v: unknown): v is string {
   return typeof v === 'string' && v.length > 0;
 }
 
-function emitUsage(u: any, emit: (chunk: StreamChunk) => void, includeReasoning: boolean): StreamChunk {
+function emitUsage(u: { prompt_tokens?: number; completion_tokens?: number; prompt_tokens_details?: { cached_tokens?: number }; completion_tokens_details?: { reasoning_tokens?: number } }, emit: (chunk: StreamChunk) => void, includeReasoning: boolean): StreamChunk {
   const c: StreamChunk = {
     type: 'usage',
     prompt: u.prompt_tokens ?? 0,

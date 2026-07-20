@@ -1,4 +1,4 @@
-import { Character, SpellDefinition, ResourcePool, SaveStat, DamageType } from '../types';
+import { Character, ResourcePool, SaveStat } from '../types';
 import { getClassDef, getMod, getProficiencyBonus, getSpellSaveDc, getSpellAttackBonus } from './classEngine';
 import { rollDice } from './diceEngine';
 import { parseDiceFormula } from '../utils/dice';
@@ -109,7 +109,7 @@ export function learnSpell(character: Character, spellId: string): boolean {
   if (!check.ok) return false;
   const spell = SPELLS_BY_ID[spellId.toLowerCase()];
   character.knownSpells ??= [];
-  if (!character.knownSpells.includes(spell!.id)) character.knownSpells.push(spell!.id);
+  if (spell && !character.knownSpells.includes(spell.id)) character.knownSpells.push(spell.id);
   return true;
 }
 
@@ -233,16 +233,14 @@ export function castSpell(
 
     const casterFx = getConditionEffects(character);
     
-    const primaryTargetId = targets[0]?.id;
-
     for (let beam = 0; beam < beamCount; beam++) {
       
-      let roll1 = cryptoRoll(20);
-      let roll2 = cryptoRoll(20);
+      const roll1 = cryptoRoll(20);
+      const roll2 = cryptoRoll(20);
 
       const casterHasDisadv = casterFx.disadvantageOnAttacks || casterFx.isBlinded;
       
-      const targetGrantsAdvantage = (targets[0] as any)?._attacksAgainstHaveAdvantage === true;
+      const targetGrantsAdvantage = (targets[0] as unknown as { _attacksAgainstHaveAdvantage?: boolean })?._attacksAgainstHaveAdvantage === true;
 
       let d20: number;
       if (casterHasDisadv && !targetGrantsAdvantage) {

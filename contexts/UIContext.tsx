@@ -28,7 +28,7 @@ interface UIContextValue {
   setSettingsOpen: (open: boolean) => void;
   saveSettings: (s: AppSettings) => void;
   isMobile: boolean;
-  handleTriggerDiceRoll: (data: any) => Promise<void>;
+  handleTriggerDiceRoll: (data: Record<string, unknown>) => Promise<void>;
   diceRollData: DiceRollData | null;
   clearDiceRoll: () => void;
 }
@@ -47,7 +47,7 @@ export function UIProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('resize', h);
   }, []);
 
-  const handleTriggerDiceRoll = useCallback((rollData: any) =>
+  const handleTriggerDiceRoll = useCallback((rollData: Record<string, unknown>) =>
     new Promise<void>(resolve => setDiceRollData({ isOpen: true, ...rollData, resolver: resolve })), []);
 
   const clearDiceRoll = useCallback(() => {

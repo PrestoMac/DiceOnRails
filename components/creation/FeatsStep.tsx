@@ -21,7 +21,7 @@ const FeatsStep: React.FC<StepProps & { onGoToSpells: () => void; onGoToGear: ()
   const [viewingFeat, setViewingFeat] = useState<FeatDefinition | null>(null);
 
   const collectedFeatsSoFar = (uptoIdx: number) =>
-    asiFeatSlots.slice(0, uptoIdx).filter(s => s.type === 'feat' && s.featId).map(s => s.featId!);
+    asiFeatSlots.slice(0, uptoIdx).filter(s => s.type === 'feat' && s.featId).map(s => s.featId as string);
 
   const isSlotComplete = (slot: FeatSelection) => {
     if (slot.type === 'feat') return !!slot.featId;
@@ -54,7 +54,7 @@ const FeatsStep: React.FC<StepProps & { onGoToSpells: () => void; onGoToGear: ()
 
   const handleAsiAlloc = (idx: number, stat: string, delta: number) => {
     const next = [...asiFeatSlots];
-    const sa = { ...(next[idx].statAllocations || {}) } as any;
+    const sa = { ...(next[idx].statAllocations || {}) } as Record<string, number>;
     sa[stat] = Math.max(0, (sa[stat] || 0) + delta);
     next[idx] = { ...next[idx], statAllocations: sa };
     updateWizard({ asiFeatSlots: next });
@@ -144,8 +144,8 @@ const FeatsStep: React.FC<StepProps & { onGoToSpells: () => void; onGoToGear: ()
                 </div>
                 <div className="grid grid-cols-3 gap-1.5">
                   {(Object.keys(stats) as (keyof Character['stats'])[]).map(stat => {
-                    const al = (slot.statAllocations as any)?.[stat] || 0;
-                    const racialBonus = typeof selectedRace.asi === 'object' ? ((selectedRace.asi as any)[stat] || 0) : (stat === 'cha' ? 2 : 0);
+                    const al = (slot.statAllocations as Record<string, number>)?.[stat] || 0;
+                    const racialBonus = typeof selectedRace.asi === 'object' ? ((selectedRace.asi as Record<string, number>)[stat] || 0) : (stat === 'cha' ? 2 : 0);
                     const currentFinal = stats[stat] + racialBonus;
                     const proposed = currentFinal + al;
                     const disableAdd = al >= 2 || Object.values(slot.statAllocations || {}).reduce((s: number, v) => s + (typeof v === 'number' ? v : 0), 0) >= 2 || proposed > 20;
@@ -203,7 +203,7 @@ const FeatsStep: React.FC<StepProps & { onGoToSpells: () => void; onGoToGear: ()
                     id: 'tmp', name: wizardState.name, class: selectedClass.name, race: selectedRace.name, level,
                     hp: { current: 0, max: 0 },
                     stats: (() => {
-                      const out: any = { ...stats };
+                      const out: Record<string, number> = { ...stats };
                       if (typeof selectedRace.asi === 'object') for (const [k, v] of Object.entries(selectedRace.asi)) out[k] = (out[k] || 0) + (v as number);
                       return out;
                     })(),

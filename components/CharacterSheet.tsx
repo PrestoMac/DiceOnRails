@@ -5,7 +5,7 @@ import { SKILLS_LIST } from '../constants';
 import { cryptoRoll } from '../utils/random';
 import { getAllFeats } from '../services/featsService';
 import { FeatDefinition } from '../utils/feats';
-import { getClassDef, getSubclassDef, calculateAc, getProficiencyBonus, calculateSpeed, getDarkvisionRange, getSavingThrowBonus, getSpellSaveDc, getSpellAttackBonus, getDamageResistances, canEquipArmor, getMod } from '../services/classEngine';
+import { getClassDef, getSubclassDef, calculateAc, getProficiencyBonus, calculateSpeed, getDarkvisionRange, getSavingThrowBonus, getSpellSaveDc, getSpellAttackBonus, getDamageResistances, getMod } from '../services/classEngine';
 import { parseExhaustionLevel } from '../services/conditionEngine';
 import { SPELLS_BY_ID } from '../utils/spells';
 import FeatDetailModal from './FeatDetailModal';
@@ -44,7 +44,7 @@ interface CharacterSheetProps {
   onUpdateCurrency: (c: Currency) => void;
   onLevelUp?: (characterId: string) => void;
   onSendMessage?: (text: string) => void;
-  onTriggerDiceRoll?: (rollData: any) => Promise<void>;
+  onTriggerDiceRoll?: (rollData: Record<string, unknown>) => Promise<void>;
 }
 
 const rarityStyle = (rarity?: string) =>
@@ -54,7 +54,7 @@ const rarityStyle = (rarity?: string) =>
   rarity === 'legendary' ? 'text-amber-500 border-l-amber-500' :
   'text-stone-400 border-l-stone-500';
 
-const CurrencyRow: React.FC<{ label: string; iconColor: string; field: keyof Currency; value: number; isEditing: boolean; input: string; onStartEdit: ()=>void; onChange: (v:string)=>void; onSave: ()=>void; inputClass: string }> = ({ label, iconColor, field, value, isEditing, input, onStartEdit, onChange, onSave, inputClass }) => (
+const CurrencyRow: React.FC<{ label: string; iconColor: string; field: keyof Currency; value: number; isEditing: boolean; input: string; onStartEdit: ()=>void; onChange: (v:string)=>void; onSave: ()=>void; inputClass: string }> = ({ label, iconColor, value, isEditing, input, onStartEdit, onChange, onSave, inputClass }) => (
   <div className="flex items-center gap-2 font-medium text-xs">
     <i className={`fas fa-coins ${iconColor}`}></i>
     {isEditing ? (
@@ -446,7 +446,7 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ character, onUpdateInve
                     <span onClick={()=>{setEditingIdx(idx);setEditingName(item.name);setEditingQty(item.quantity.toString());}} className="cursor-pointer hover:text-stone-200 transition-colors flex-1">{item.name}{item.equipped&&<span className="ml-2 text-[8px] uppercase font-bold px-1.5 py-0.5 bg-amber-950/40 text-amber-400 border border-amber-800/30 rounded">Equipped</span>}</span>
                     <div className="flex items-center gap-1.5 ml-2">
                       {(item.type==='weapon'||item.type==='armor'||item.type==='shield')&&<button onClick={e=>{e.stopPropagation();handleToggleEquip(idx);}} className={`px-2 py-0.5 rounded text-[9px] font-bold border transition-all flex items-center gap-1 shrink-0 ${item.equipped?'bg-amber-900/30 border-amber-800/50 text-amber-400 hover:bg-amber-900/50':'bg-stone-850 border-stone-800 hover:bg-stone-800 text-stone-400 hover:text-stone-300'}`}><i className={`fas ${item.type==='weapon'?'fa-crosshairs':(item.equipped?'fa-shield-halved':'fa-shield')} text-[8px]`}></i>{item.equipped?'Equipped':'Equip'}</button>}
-                      {item.type==='potion'&&<button onClick={e=>{e.stopPropagation();const hf=item.stats?.healing||'2d4+2',roll=rollDiceFormula(hf),ah=roll.total;if(onTriggerDiceRoll)onTriggerDiceRoll({characterName:character.name,rollType:'damage',label:`${item.name} Healing`,rollResult:roll.results.reduce((a,b)=>a+b,0),modifier:+(hf.match(/(\d+)$/)||[0,0])[1],sides:+(hf.match(/d(\d+)/)||[0,4])[1]});const nhp=Math.min(character.hp.max,character.hp.current+ah);character.hp.current=nhp;const ni=[...character.inventory];ni[idx].quantity>1?ni[idx]={...ni[idx],quantity:ni[idx].quantity-1}:ni.splice(idx,1);onUpdateInventory(ni);onSendMessage&&onSendMessage(`[Use Potion] ${character.name} drinks ${item.name}!\\n• Healing: **+${ah}** HP restored (${hf})\\n• Vitality: **${nhp} / ${character.hp.max}** HP.`);}} className="px-2 py-0.5 bg-stone-850 hover:bg-stone-800 text-green-500 rounded text-[9px] font-bold border border-stone-800 hover:border-green-900/50 transition-all flex items-center gap-1 shrink-0"><i className="fas fa-flask text-[8px]"></i> Drink</button>}
+                      {item.type==='potion'&&<button onClick={e=>{e.stopPropagation();const hf=item.stats?.healing||'2d4+2',roll=rollDiceFormula(hf),ah=roll.total;if(onTriggerDiceRoll)onTriggerDiceRoll({characterName:character.name,rollType:'damage',label:`${item.name} Healing`,rollResult:roll.results.reduce((a,b)=>a+b,0),modifier:+(hf.match(/(\d+)$/)||[0,0])[1],sides:+(hf.match(/d(\d+)/)||[0,4])[1]});const nhp=Math.min(character.hp.max,character.hp.current+ah);character.hp.current=nhp;const ni=[...character.inventory];if (ni[idx].quantity > 1) { ni[idx] = { ...ni[idx], quantity: ni[idx].quantity - 1 }; } else { ni.splice(idx, 1); } onUpdateInventory(ni); if (onSendMessage) onSendMessage(`[Use Potion] ${character.name} drinks ${item.name}!\\n• Healing: **+${ah}** HP restored (${hf})\\n• Vitality: **${nhp} / ${character.hp.max}** HP.`);}} className="px-2 py-0.5 bg-stone-850 hover:bg-stone-800 text-green-500 rounded text-[9px] font-bold border border-stone-800 hover:border-green-900/50 transition-all flex items-center gap-1 shrink-0"><i className="fas fa-flask text-[8px]"></i> Drink</button>}
                       <span className="text-stone-500 text-[10px] font-mono px-1.5 py-0.5 bg-stone-900/60 rounded border border-stone-850 shrink-0">x{item.quantity}</span>
                     </div>
                   </div>}

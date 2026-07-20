@@ -214,6 +214,7 @@ export interface Character {
   feats?: string[];
   pendingFeatChoice?: boolean;
   featSelections?: FeatSelection[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   featChoices?: Record<string, Record<string, any>>;
   subclassId?: string;
   resources?: ResourcePool[];

@@ -7,9 +7,8 @@ import { GameState } from '../../types';
  * @param state - The current game state.
  * @returns A filtered array of tool definitions visible to the LLM.
  */
-export function filterTools(tools: any[], state: GameState): any[] {
+export function filterTools(tools: Array<{ function: { name: string } }>, state: GameState): Array<{ function: { name: string } }> {
   const inCombat = state.combat?.isActive === true;
-  const hasEnemies = (state.combat?.enemies?.length ?? 0) > 0;
   const hasUnspentPoints = state.party.some(c =>
     (c.unusedStatPoints ?? 0) > 0 || (c.unusedSkillPoints ?? 0) > 0
   );

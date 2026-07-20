@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
 
@@ -68,7 +68,7 @@ import ActionQueuePanel from '../../components/ActionQueuePanel';
 import SettingsModal from '../../components/SettingsModal';
 import LevelUpModal from '../../components/LevelUpModal';
 import CharacterSheet from '../../components/CharacterSheet';
-import { AppSettings, Character, GameState, MessageRole, AppStage } from '../../types';
+import { AppSettings, Character, MessageRole, AppStage } from '../../types';
 
 const defaultSettings: AppSettings = {
   voiceName: '',

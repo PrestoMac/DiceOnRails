@@ -63,11 +63,11 @@ const App: React.FC = () => {
 };
 
 const AppContent: React.FC = () => {
-  const { userId, setUserId, handleLogout: authLogout } = useAuthContext();
+  const { userId, setUserId } = useAuthContext();
   const {
-    stage, gameState, messages, isLoading, currentCampaignId,
-    campaignName, isNewCampaign, myCharacterId, setStage,
-    setMessages, setCurrentCampaignId, loadGameData, syncState,
+    stage, gameState, messages, isLoading,
+    isNewCampaign, setStage,
+    setCurrentCampaignId, loadGameData, syncState,
     queueNotification
   } = useGameContext();
   const { settings, settingsOpen, setSettingsOpen, saveSettings, isMobile, diceRollData, clearDiceRoll } = useUIContext();
@@ -93,11 +93,7 @@ const AppContent: React.FC = () => {
 
   const handleAuthComplete = (uid?: string) => {
     setUserId(uid);
-    uid ? setStage(AppStage.DASHBOARD) : (setCurrentCampaignId('anonymous'), loadGameData(undefined, 'anonymous'));
-  };
-
-  const handleLogout = async () => {
-    if (await authLogout()) { setStage(AppStage.AUTH); setMessages([]); }
+    if (uid) { setStage(AppStage.DASHBOARD); } else { setCurrentCampaignId('anonymous'); loadGameData(undefined, 'anonymous'); }
   };
 
   useEffect(() => {

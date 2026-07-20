@@ -71,7 +71,7 @@ export async function speakText(text: string, settings: AppSettings): Promise<bo
         speakNextChunk();
       };
 
-      utterance.onerror = (event: any) => {
+      utterance.onerror = (event: SpeechSynthesisErrorEvent) => {
         setLastUtterance(null);
         const errorType = event.error || 'unknown';
 
@@ -111,5 +111,5 @@ export function initAudio() {
 
 /** Stores the most recent utterance reference for external cancellation tracking. */
 const setLastUtterance = (utterance: SpeechSynthesisUtterance | null) => {
-  (window as any)._lastUtterance = utterance;
+  (window as unknown as { _lastUtterance: SpeechSynthesisUtterance | null })._lastUtterance = utterance;
 };

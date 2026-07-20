@@ -4,7 +4,7 @@ import { awardExperience as progAward, applyStatAllocation, getProgressionContex
 
 /** Service interface for managing character experience, levels, and stat allocations. */
 export interface ProgressionService {
-  awardExperience(amount: number, targetId?: string): { success: boolean; data: any; message: string; leveledUp: boolean; levelUpSummary?: LevelUpSummary; levelUpSummaries?: LevelUpSummary[] };
+  awardExperience(amount: number, targetId?: string): { success: boolean; data: Record<string, unknown>; message: string; leveledUp: boolean; levelUpSummary?: LevelUpSummary; levelUpSummaries?: LevelUpSummary[] };
   level_up(targetId: string, statAllocations?: Record<string, number>, subclassSelection?: string, chosenFeats?: string[]): Promise<MCPResponse>;
   allocateStatPoints(allocations: Partial<Record<keyof Character['stats'], number>>, targetId?: string, skillAllocations?: Record<string, number>, hpDeviation?: number): MCPResponse;
   getCharacterProgression(targetId?: string): string;

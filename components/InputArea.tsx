@@ -40,10 +40,10 @@ const QUICK_BTN = 'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] 
 const DISABLED_STYLE = 'bg-stone-800/50 text-stone-600 cursor-not-allowed';
 
 /** Chat input area with quick-action buttons (spells, weapons, features, rests), speech-to-text, and queue/submit controls. */
-const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onQueueAction, onResolveEnemyTurn, isLoading, combat, character, onScrollToBottom, showScrollButton }) => {
+const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onQueueAction, onResolveEnemyTurn, isLoading, combat, character }) => {
   const [input, setInput] = useState('');
   const [isListening, setIsListening] = useState(false);
-  const [recognition, setRecognition] = useState<any>(null);
+  const [recognition, setRecognition] = useState<{ continuous: boolean; interimResults: boolean; lang: string; onresult: (e: unknown) => void; onerror: (e: unknown) => void; onend: () => void; start: () => void; abort: () => void } | null>(null);
   const isEnemyTurn = combat?.isActive && (combat.initiative[combat.turnIndex]?.type === 'enemy');
   const effectivelyLocked = isLoading || isEnemyTurn;
 
@@ -98,12 +98,12 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onQueueAction, onR
   }, [character]);
 
   useEffect(() => {
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const SR = (window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown }).SpeechRecognition || (window as unknown as { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition;
     if (SR) {
       const rec = new SR();
       rec.continuous = false; rec.interimResults = false; rec.lang = 'en-US';
-      rec.onresult = (e: any) => { setInput(p => p ? `${p} ${e.results[0][0].transcript}` : e.results[0][0].transcript); setIsListening(false); };
-      rec.onerror = (e: any) => { if (isDebugMode) console.error("Speech recognition error", e.error); setIsListening(false); };
+      rec.onresult = (e: { results: Array<Array<{ transcript: string }>> }) => { setInput(p => p ? `${p} ${e.results[0][0].transcript}` : e.results[0][0].transcript); setIsListening(false); };
+      rec.onerror = (e: { error: string }) => { if (isDebugMode) console.error("Speech recognition error", e.error); setIsListening(false); };
       rec.onend = () => setIsListening(false);
       setRecognition(rec);
     }
@@ -111,7 +111,7 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onQueueAction, onR
 
   const toggleListening = useCallback(() => {
     if (!recognition) { alert("Speech recognition is not supported in this browser."); return; }
-    isListening ? recognition.stop() : (setIsListening(true), recognition.start());
+    if (isListening) { recognition.stop(); } else { setIsListening(true); recognition.start(); }
   }, [recognition, isListening]);
 
   const handleSubmit = (e: React.FormEvent) => {

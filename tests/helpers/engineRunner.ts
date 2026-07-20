@@ -12,7 +12,7 @@ export interface TestRunner {
   assertState: (checkFn: (server: MockMCPServer) => boolean, message?: string) => void;
 }
 
-export function createTestRunner(suiteName: string): TestRunner {
+export function createTestRunner(_suiteName: string): TestRunner {
   const server = new MockMCPServer();
 
   beforeEach(() => {
@@ -22,7 +22,7 @@ export function createTestRunner(suiteName: string): TestRunner {
   return {
     server,
 
-    assert(condition: boolean, message?: string) {
+    assert(condition: boolean, _message?: string) {
       expect(condition).toBe(true);
     },
 
@@ -32,7 +32,7 @@ export function createTestRunner(suiteName: string): TestRunner {
       }
     },
 
-    assertState(checkFn: (server: MockMCPServer) => boolean, message?: string) {
+    assertState(checkFn: (server: MockMCPServer) => boolean, _message?: string) {
       expect(checkFn(server)).toBe(true);
     },
   };

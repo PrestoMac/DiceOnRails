@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, act, waitFor } from '@testing-library/react';
+import { renderHook, act } from '@testing-library/react';
 import { AppStage, CombatState, GameState, MessageRole } from '../../types';
 
 vi.mock('../../utils/random', () => ({
@@ -49,7 +49,7 @@ vi.mock('../../services/llm', () => ({
   runAgentLoop: (...args: unknown[]) => mockRunAgentLoop(...args),
   estimateTokens: vi.fn(() => 10),
   compressRawToCheckpoint: vi.fn().mockResolvedValue(''),
-  enforceTokenBudget: vi.fn().mockImplementation(({ activeMessages, frozenMessages }: { activeMessages: unknown[]; frozenMessages: unknown[] }) => ({
+  enforceTokenBudget: vi.fn().mockImplementation(({ activeMessages: _activeMessages, frozenMessages }: { activeMessages: unknown[]; frozenMessages: unknown[] }) => ({
     trimmedFrozen: frozenMessages || [],
     droppedRaw: false,
     droppedCheckpoints: 0,

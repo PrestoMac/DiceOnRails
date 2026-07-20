@@ -3,7 +3,7 @@ import { MCPResponse } from '../../types';
 /** Returns a failure response. */
 export const fail = (message: string): MCPResponse => ({ success: false, data: {}, message });
 /** Returns a success response. */
-export const ok = (data: any, message: string): MCPResponse => ({ success: true, data, message });
+export const ok = (data: unknown, message: string): MCPResponse => ({ success: true, data, message });
 
 /** Generates a random alphanumeric ID of the specified length. */
 export function generateId(length = 9): string {

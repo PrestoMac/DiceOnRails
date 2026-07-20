@@ -33,9 +33,7 @@ export function cryptoRoll(sides: number): number {
         }
         return result;
       }
-    } catch {
-      
-    }
+    } catch { /* crypto.getRandomValues may throw if unavailable */ }
   }
 
   const fallback = Math.floor(Math.random() * sides) + 1;

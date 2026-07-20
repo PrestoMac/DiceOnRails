@@ -4,7 +4,7 @@ import { useActionsContext } from '../../contexts/ActionsContext';
 import { useProgressionContext } from '../../contexts/ProgressionContext';
 import { useUIContext } from '../../contexts/UIContext';
 import { useAuthContext } from '../../contexts/AuthContext';
-import { AppStage } from '../../types';
+import { AppStage, Character, InventoryItem } from '../../types';
 import ChatLog from '../ChatLog';
 import ActionQueuePanel from '../ActionQueuePanel';
 import InputArea from '../InputArea';
@@ -19,7 +19,7 @@ import { calculateAc } from '../../services/classEngine';
 import { formatGameTime } from '../../utils/timeUtils';
 
 /** Compact HP/AC status bar displayed below the chat area on mobile. */
-const HpStatusBar: React.FC<{ character: any }> = ({ character }) => (
+const HpStatusBar: React.FC<{ character: Character }> = ({ character }) => (
   <div className="px-3 py-1.5 bg-stone-900/90 border-t border-stone-800 flex items-center justify-between text-[10px] backdrop-blur-md">
     <div className="flex items-center gap-2">
       <span className="text-stone-500">HP:</span>
@@ -29,7 +29,7 @@ const HpStatusBar: React.FC<{ character: any }> = ({ character }) => (
     <div className="flex items-center gap-1 bg-stone-950 px-1.5 py-0.5 rounded border border-stone-800">
       <i className="fas fa-shield-halved text-stone-500 text-[8px]"></i>
       <span className="text-stone-400">AC:</span>
-      <span className="font-mono font-bold text-amber-500">{calculateAc(character, character.inventory?.find((i: any) => i.equipped && i.type === 'armor') || null)}</span>
+      <span className="font-mono font-bold text-amber-500">{calculateAc(character, character.inventory?.find((i: InventoryItem) => i.equipped && i.type === 'armor') || null)}</span>
     </div>
   </div>
 );
@@ -37,7 +37,7 @@ const HpStatusBar: React.FC<{ character: any }> = ({ character }) => (
 /** Primary mobile layout with 3-tab navigation (adventure/character/journal), queue drawer, and bottom nav bar. */
 const MobileLayout: React.FC = () => {
   const {
-    stage, currentCampaignId, campaignName, gameState, messages,
+    stage, currentCampaignId, gameState, messages,
     isLoading, myCharacterId, viewingCharacterId, setViewingCharacterId,
     setStage, resetGame, handleUpdateInventory, handleUpdateCurrency,
     handleEnqueueAction, handleRemoveQueueItem, handleUpdateQueueItem,
@@ -71,7 +71,7 @@ const MobileLayout: React.FC = () => {
     if (el) setIsScrolledUp(el.scrollHeight - el.scrollTop - el.clientHeight > 200);
   }, []);
 
-  const charToShow = gameState.party.find((c: any) => c.id === viewingCharacterId) || gameState.party[0];
+  const charToShow = gameState.party.find((c: Character) => c.id === viewingCharacterId) || gameState.party[0];
   const handleBackOrReset = () => userId ? confirm('Return to dashboard?') && setStage(AppStage.DASHBOARD) : confirm('Are you sure you want to reset the game? All progress will be lost.') && resetGame();
   const queueLen = gameState.actionQueue?.length || 0;
 
@@ -116,7 +116,7 @@ const MobileLayout: React.FC = () => {
           {!showQueue&&<InputArea onSendMessage={handleSendMessage} onQueueAction={(t: string, ty: 'action'|'dialogue') => handleEnqueueAction(t, ty)} onResolveEnemyTurn={handleResolveEnemyTurn} isLoading={isLoading||gameState.isProcessing===true} combat={gameState.combat} character={charToShow}/>}
         </>}
         {mobileTab==='character'&&<div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-          <div className="flex gap-2 overflow-x-auto pb-2 mb-2">{gameState.party.map((char: any) => <button key={char.id} onClick={() => setViewingCharacterId(char.id)} className={`p-2 rounded text-xs whitespace-nowrap ${viewingCharacterId===char.id?'bg-amber-700 text-white':'bg-stone-800 text-stone-400'}`}>{char.name}{char.id===myCharacterId?' (You)':''}</button>)}</div>
+          <div className="flex gap-2 overflow-x-auto pb-2 mb-2">{gameState.party.map((char: Character) => <button key={char.id} onClick={() => setViewingCharacterId(char.id)} className={`p-2 rounded text-xs whitespace-nowrap ${viewingCharacterId===char.id?'bg-amber-700 text-white':'bg-stone-800 text-stone-400'}`}>{char.name}{char.id===myCharacterId?' (You)':''}</button>)}</div>
           {charToShow?<CharacterSheet character={charToShow} onUpdateInventory={handleUpdateInventory} onUpdateCurrency={handleUpdateCurrency} onLevelUp={handleOpenLevelUp} onSendMessage={handleSendMessage} onTriggerDiceRoll={handleTriggerDiceRoll}/>:<div className="text-stone-500 text-center mt-10">No characters in party.</div>}
         </div>}
         {mobileTab==='journal'&&<div className="flex-1 overflow-y-auto p-4 custom-scrollbar"><Journal quests={gameState.quests} lore={gameState.lore}/></div>}
@@ -124,7 +124,7 @@ const MobileLayout: React.FC = () => {
       <nav className="fixed bottom-0 left-0 right-0 h-16 bg-stone-950 border-t border-stone-800 flex justify-around items-center z-30 pb-safe">
         {[{key:'adventure' as const,icon:'fa-scroll',label:'Adventure'},{key:'character' as const,icon:'fa-user-shield',label:'Hero'},{key:'journal' as const,icon:'fa-book-skull',label:'Journal'}].map(({key,icon,label})=>(
           <button key={key} onClick={()=>setMobileTab(key)} className={`flex flex-col items-center gap-1 p-2 transition-colors ${mobileTab===key?'text-amber-500':'text-stone-600'} relative`}>
-            <div className="relative"><i className={`fas ${icon} text-lg`}></i>{key==='journal'&&gameState.quests.some((q: any)=>q.status==='active')&&<span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-amber-600 border border-stone-950 animate-pulse"></span>}</div>
+            <div className="relative"><i className={`fas ${icon} text-lg`}></i>{key==='journal'&&gameState.quests.some((q: { status: string })=>q.status==='active')&&<span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-amber-600 border border-stone-950 animate-pulse"></span>}</div>
             <span className="text-[10px] uppercase font-bold tracking-wider">{label}</span>
           </button>
         ))}

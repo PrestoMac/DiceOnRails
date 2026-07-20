@@ -2,15 +2,12 @@ import React, { useState, useMemo } from 'react';
 import { Character } from '../types';
 import { SKILLS_LIST, ASI_LEVELS } from '../constants';
 import { cryptoRoll } from '../utils/random';
-import { FeatDefinition, FEATS_CATALOG, FEAT_CATEGORIES } from '../utils/feats';
+import { FeatDefinition, FEATS_CATALOG } from '../utils/feats';
 import { filterAvailableFeats, validateFeatPrereqs } from '../services/featsService';
 import { getClassDef, getSubclassDef, getSpellSaveDc, getSpellAttackBonus, getMod } from '../services/classEngine';
 import { SPELLS_BY_ID } from '../utils/spells';
 import FeatDetailModal from './FeatDetailModal';
 import TabButton from './shared/TabButton';
-import CategoryButton from './shared/CategoryButton';
-import AdjBtn from './shared/AdjBtn';
-import AddBtn from './shared/AddBtn';
 import StatRow from './wizard/shared/StatRow';
 import SkillRow from './wizard/shared/SkillRow';
 import FeatCard from './wizard/shared/FeatCard';
@@ -20,7 +17,6 @@ import AsiOrFeatChoice from './wizard/shared/AsiOrFeatChoice';
 import RemainingPointsBanner from './wizard/shared/RemainingPointsBanner';
 
 const STAT_LABELS: Record<string, string> = { str:'STR', dex:'DEX', con:'CON', int:'INT', wis:'WIS', cha:'CHA' };
-const STAT_LABELS_FULL: Record<string, string> = { str:'Strength', dex:'Dexterity', con:'Constitution', int:'Intelligence', wis:'Wisdom', cha:'Charisma' };
 const STAT_KEYS = ['str','dex','con','int','wis','cha'] as const;
 
 const ASI_FEAT_IDS = new Set([
@@ -75,7 +71,7 @@ const LevelUpModal: React.FC<LevelUpModalProps> = ({ character, selectedAllocati
   const [featCategory, setFeatCategory] = useState<string>('all');
   const [viewingFeat, setViewingFeat] = useState<FeatDefinition | null>(null);
   const [saveStatChoice, setSaveStatChoice] = useState<'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha'>(
-    (character.featChoices?.['resilient']?.saveStat as any) || 'con'
+    (character.featChoices?.['resilient']?.saveStat as string) || 'con'
   );
   const [asiBonusesForFeat, setAsiBonusesForFeat] = useState<Partial<Record<keyof Character['stats'], number>>>({});
   const [skilledChoices, setSkilledChoices] = useState<string[]>([]);
@@ -141,7 +137,7 @@ const LevelUpModal: React.FC<LevelUpModalProps> = ({ character, selectedAllocati
             const cv = character.stats[stat], al = selectedAllocations[stat] || 0, nv = cv + al, nm = getMod(nv);
             return (
               <StatRow key={stat} stat={stat} currentValue={cv} allocation={al} newValue={nv} modifier={nm}
-                disableAdd={remainingPoints <= 0 || nv >= 20 || al >= 2} onAllocate={(s,d) => onAllocate(stat as any, d)} />
+                disableAdd={remainingPoints <= 0 || nv >= 20 || al >= 2} onAllocate={(s,d) => onAllocate(stat as keyof Character['stats'], d)} />
             );
           })}
           <button onClick={() => setChoiceType(null)} className="w-full py-2 text-[10px] uppercase text-stone-500 hover:text-stone-300">← Back to ASI/Feat choice</button>
@@ -170,7 +166,7 @@ const LevelUpModal: React.FC<LevelUpModalProps> = ({ character, selectedAllocati
           {featNeedsAsi && selectedFeat && (
             <AsiSlotAllocator
               stats={character.stats}
-              allocations={asiBonusesForFeat as any}
+              allocations={asiBonusesForFeat as Partial<Record<keyof Character['stats'], number>>}
               totalAllocated={asiTotalForFeat}
               targetTotal={1}
               maxPerStat={1}

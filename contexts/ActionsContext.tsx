@@ -1,5 +1,5 @@
 import { createContext, useContext, ReactNode, useCallback } from 'react';
-import { Character, MessageRole } from '../types';
+import { Character, Message, MessageRole } from '../types';
 import { useGameActions } from '../hooks/useGameActions';
 import { useGameContext } from './GameContext';
 import { useAuthContext } from './AuthContext';
@@ -67,7 +67,7 @@ export function ActionsProvider({ children }: { children: ReactNode }) {
           text: `[System:enemy_turn] ${msg}`,
           timestamp: Date.now()
         }));
-        setMessages((prev: any[]) => [...prev, ...systemMessages]);
+        setMessages((prev: Message[]) => [...prev, ...systemMessages]);
       }
       syncState();
     } catch (e) {

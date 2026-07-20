@@ -1,9 +1,8 @@
-import { Character, Message, GameState, MessageRole } from '../types';
+import { Character, Message } from '../types';
 import { mcpServer } from '../services/mcpService';
 import { getAllFeats } from '../services/featsService';
 import { getClassDef, getSubclassDef, getMod, getProficiencyBonus } from '../services/classEngine';
 import { SPELLS_BY_ID } from '../utils/spells';
-import { buildFrozenMessages, freezeMessages, compressToCheckpointIfNeeded, runContextPipeline, prepareContext, syncFinishedState, ContextState } from '../services/llm/contextManager';
 /**
  * Function signature for triggering a dice roll animation/overlay in the UI.
  * @param data - The roll data including character name, roll type, result, modifier, and outcome details.
@@ -37,7 +36,7 @@ export function getWeaponInfo(c: Character) {
         const dm = eq.stats?.damage?.match(/(\d+)d(\d+)/);
         if (dm) { count = parseInt(dm[1], 10); sides = parseInt(dm[2], 10); }
     }
-    return { equippedWeapon: eq, weaponName: wn, strMod: sM, dexMod: dM, weaponMod: mod, weaponSides: sides, weaponCount: count, profBonus: getProficiencyBonus(c as any) };
+    return { equippedWeapon: eq, weaponName: wn, strMod: sM, dexMod: dM, weaponMod: mod, weaponSides: sides, weaponCount: count, profBonus: getProficiencyBonus(c as unknown as Character) };
 }
 /** Extracts the last 5 tool messages into a summary of tool name and truncated message. */
 export function buildToolSummary(toolMessages: Message[]) {
@@ -101,7 +100,7 @@ function parseDamageRollDetails(details?: string): { sides: number; count: numbe
 }
 
 /** Dispatches dice roll animations for the UI based on tool execution results (roll_dice, player_attack, check_skill, etc.). */
-export async function dispatchToolRolls(toolName: string, args: Record<string, unknown>, toolResult: { success: boolean; data: any }, onTriggerDiceRoll: DiceRollFn | undefined, currentState: ReturnType<typeof mcpServer.getFullState>, myCharacterId: string | null) {
+export async function dispatchToolRolls(toolName: string, args: Record<string, unknown>, toolResult: { success: boolean; data: Record<string, unknown> }, onTriggerDiceRoll: DiceRollFn | undefined, currentState: ReturnType<typeof mcpServer.getFullState>, myCharacterId: string | null) {
     if (!onTriggerDiceRoll || !toolResult.success || !toolResult.data) return;
     const d = toolResult.data;
     if (toolName === 'roll_dice') {
@@ -119,7 +118,7 @@ export async function dispatchToolRolls(toolName: string, args: Record<string, u
     } else if (toolName === 'cast_spell') {
         if (d.attackRoll) await onTriggerDiceRoll({ characterName: d.casterName || 'Unknown', rollType: 'attack', label: 'Spell Attack', rollResult: d.attackRoll.d20, modifier: d.attackRoll.total - d.attackRoll.d20, difficulty: d.saveRoll?.dc, success: d.attackRoll.total >= (d.saveRoll?.dc || 0), sides: 20, isCritical: d.attackRoll.isCrit, isFumble: d.attackRoll.isFumble });
         if (d.damage?.total > 0) {
-            const lbl = d.perBeam?.length > 1 ? d.perBeam.map((b: any, i: number) => `Ray ${i+1}: ${b.isHit ? `${b.damage} dmg` : 'miss'}`).join(', ') : 'Spell Damage';
+            const lbl = d.perBeam?.length > 1 ? (d.perBeam as Array<{ isHit: boolean; damage: number }>).map((b: { isHit: boolean; damage: number }, i: number) => `Ray ${i+1}: ${b.isHit ? `${b.damage} dmg` : 'miss'}`).join(', ') : 'Spell Damage';
             const parsed = parseDamageRollDetails(d.damageRollDetails);
             const sides = parsed ? parsed.sides : 20;
             const rollResult = parsed ? parsed.results.reduce((a, b) => a + b, 0) : d.damage.total;
@@ -131,7 +130,7 @@ export async function dispatchToolRolls(toolName: string, args: Record<string, u
     } else if (toolName === 'inflict_damage') {
         if (d.concentrationSave) setTimeout(() => onTriggerDiceRoll({ characterName: d.character || 'Character', rollType: 'save', label: 'CON Save (Concentration)', rollResult: d.concentrationSave.d20Roll, modifier: d.concentrationSave.modifier, sides: 20, difficulty: d.concentrationSave.dc, success: d.concentrationSave.success }), 0);
     } else if (toolName === 'start_combat') {
-        for (const e of d.combat.initiative.filter((e: any) => e.type === 'player')) await onTriggerDiceRoll({ characterName: e.name, rollType: 'initiative', label: 'Initiative', rollResult: e.rawRoll, modifier: e.modifier, difficulty: undefined, success: true, sides: 20, isCritical: e.rawRoll === 20, isFumble: e.rawRoll === 1 });
+        for (const e of (d.combat as Record<string, unknown>).initiative.filter((e: { type: string }) => e.type === 'player')) await onTriggerDiceRoll({ characterName: e.name, rollType: 'initiative', label: 'Initiative', rollResult: e.rawRoll, modifier: e.modifier, difficulty: undefined, success: true, sides: 20, isCritical: e.rawRoll === 20, isFumble: e.rawRoll === 1 });
     }
 }
 

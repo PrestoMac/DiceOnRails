@@ -24,7 +24,7 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
   const {
     setStage, setGameState, setMessages, setCurrentCampaignId,
     setCampaignName, setIsNewCampaign, setMyCharacterId,
-    setViewingCharacterId, setIsLoading, loadGameData
+    setViewingCharacterId, setIsLoading
   } = useGameContext();
 
   const campaigns = useCampaigns(

@@ -1,5 +1,4 @@
 import React from 'react';
-import { getMod } from '../../services/classEngine';
 
 /** Props for the HpRollPanel component. */
 interface HpRollPanelProps {

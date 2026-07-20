@@ -42,14 +42,14 @@ const DiceRollCard: React.FC<DiceRollCardProps> = ({
   const count = isMultiDie ? dieCount : 1;
   const effectiveResults = isMultiDie ? results : [dieRoll];
   const [phase, setPhase] = useState<'rolling' | 'result'>(animate ? 'rolling' : 'result');
-  const [displayVals, setDisplayVals] = useState<number[]>(isMultiDie ? results!.slice() : [dieRoll]);
+  const [displayVals, setDisplayVals] = useState<number[]>(isMultiDie ? results.slice() : [dieRoll]);
   const [glowClass, setGlowClass] = useState('');
   const timerRefs = useRef<(ReturnType<typeof setInterval> | null)[]>([]);
 
   useEffect(() => {
     if (!animate) {
       setPhase('result');
-      setDisplayVals(isMultiDie ? results!.slice() : [dieRoll]);
+      setDisplayVals(isMultiDie ? results.slice() : [dieRoll]);
       return;
     }
 
@@ -69,12 +69,12 @@ const DiceRollCard: React.FC<DiceRollCardProps> = ({
           if (tickCounts[i] === 0) playDiceTick();
           tickCounts[i]++;
           if (tickCounts[i] > 14) {
-            if (timerRefs.current[i]) clearInterval(timerRefs.current[i]!);
+            if (timerRefs.current[i]) clearInterval(timerRefs.current[i]);
             settled.add(i);
             if (isMultiDie) {
               setDisplayVals(prev => {
                 const next = [...prev];
-                next[i] = results![i];
+                next[i] = results[i];
                 return next;
               });
             } else {
@@ -86,11 +86,11 @@ const DiceRollCard: React.FC<DiceRollCardProps> = ({
             }
           }
         }, 85);
-      }, delay) as any;
+      }, delay) as unknown as ReturnType<typeof setTimeout>;
     }
 
     return () => {
-      timerRefs.current.forEach(t => { if (t) { clearTimeout(t as any); clearInterval(t as any); } });
+      timerRefs.current.forEach(t => { if (t) { clearTimeout(t as unknown as ReturnType<typeof setTimeout>); clearInterval(t as unknown as ReturnType<typeof setInterval>); } });
     };
   }, [animate, dieRoll, sides, success, count, isMultiDie, results]);
 

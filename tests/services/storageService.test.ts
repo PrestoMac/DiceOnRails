@@ -31,7 +31,7 @@ function createChain() {
   chainData = {};
   chainError = undefined;
   
-  const chain: any = {
+  const chain: MockChain = {
     then(resolve: (value: unknown) => void, reject?: (reason: unknown) => void) {
       if (chainError instanceof Error) {
         if (reject) reject(chainError);
@@ -103,7 +103,7 @@ describe('storageService', () => {
     localStorage.clear();
     chain = createChain();
     
-    vi.mocked(supabase.from).mockReturnValue(chain as any);
+    vi.mocked(supabase.from).mockReturnValue(chain as unknown as ReturnType<typeof supabase.from>);
     vi.mocked(supabase.from).mockClear();
   });
 

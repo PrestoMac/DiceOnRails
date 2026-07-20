@@ -20,6 +20,7 @@ export interface FeatDefinition {
   description: string;
   mechanicalEffect: string;
   effectType: FeatEffectType;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   effectPayload?: Record<string, any>;
   prerequisites?: FeatPrerequisites;
 }

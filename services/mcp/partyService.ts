@@ -1,4 +1,4 @@
-import { Character, GameState, MCPResponse } from '../../types';
+import { Character, GameState } from '../../types';
 import { formatGameTime } from '../../utils/timeUtils';
 import { ensureGameStateFields } from './stateService';
 
@@ -7,7 +7,7 @@ export interface PartyService {
   setCharacter(character: Character): void;
   joinParty(character: Character): void;
   getTarget(id?: string): Character | undefined;
-  getResource(uri: string): any;
+  getResource(uri: string): unknown;
 }
 
 /** Creates a new PartyService instance operating on the given GameState. */
@@ -47,7 +47,7 @@ export function createPartyService(state: GameState): PartyService {
       return state.party.find(c => c.id === id || c.name.toLowerCase() === id.toLowerCase());
     },
 
-    getResource(uri: string): any {
+    getResource(uri: string): unknown {
       if (uri.startsWith('campaign://character/')) {
         return state.party;
       }
@@ -65,7 +65,7 @@ export function createPartyService(state: GameState): PartyService {
         ensureGameStateFields(state);
         const info = formatGameTime(state.gameTime ?? 0);
         const sinceRest = state.lastLongRestTime != null
-          ? Math.max(0, Math.floor((state.gameTime! - state.lastLongRestTime) / 60))
+          ? Math.max(0, Math.floor(((state.gameTime as number) - state.lastLongRestTime) / 60))
           : 0;
         return { ...info, gameTime: state.gameTime, hoursSinceLastRest: sinceRest };
       }

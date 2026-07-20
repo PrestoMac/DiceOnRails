@@ -1816,7 +1816,7 @@ describe('MockMCPServer', () => {
         },
       });
       
-      (server as any).syncInitiativeConditions();
+      server.combat.syncInitiativeConditions();
       const gs = server.getFullState();
       expect(gs.combat).toBeDefined();
       const combat = gs.combat;
@@ -1831,18 +1831,18 @@ describe('MockMCPServer', () => {
 
     it('is cleared after restoreSnapshot', () => {
       
-      (server as any).lastCurrencyAdjustment = { targetId: 'hero-1', amount: 50, timestamp: Date.now() };
+      server.lastCurrencyAdjustment = { targetId: 'hero-1', amount: 50, timestamp: Date.now() };
       server.restoreSnapshot(makeServerState());
       
-      expect((server as any).lastCurrencyAdjustment).toBeNull();
+      expect(server.lastCurrencyAdjustment).toBeNull();
     });
 
     it('is cleared on reset', () => {
       
-      (server as any).lastCurrencyAdjustment = { targetId: 'hero-1', amount: 50, timestamp: Date.now() };
+      server.lastCurrencyAdjustment = { targetId: 'hero-1', amount: 50, timestamp: Date.now() };
       server.reset();
       
-      expect((server as any).lastCurrencyAdjustment).toBeNull();
+      expect(server.lastCurrencyAdjustment).toBeNull();
     });
   });
 
@@ -1887,7 +1887,7 @@ describe('MockMCPServer', () => {
       expect(condition.onRemove).not.toBeUndefined();
 
       
-      const effect = condition.onRemove as any;
+      const effect = condition.onRemove as unknown as { kind: string; value: number };
       expect(effect.kind).toBe('acBonus');
       expect(effect.value).toBe(5);
     });

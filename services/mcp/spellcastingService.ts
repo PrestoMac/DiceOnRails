@@ -1,7 +1,7 @@
-import { Character, Enemy, GameState, MCPResponse } from '../../types';
+import { Character, GameState, MCPResponse } from '../../types';
 import { cryptoRoll } from '../../utils/random';
 import { fail, fuzzyMatchEntity, generateId } from './_shared';
-import { getMod, getProficiencyBonus, getClassDef, getSpellSaveDc, getSpellAttackBonus, calculateAc, spendResource as classEngineSpendResource } from '../classEngine';
+import { getMod, getProficiencyBonus, getClassDef, getSpellSaveDc, spendResource as classEngineSpendResource } from '../classEngine';
 import { castSpell as engineCastSpell, learnSpell as engineLearnSpell, prepareSpell as enginePrepareSpell, unprepareSpell as engineUnprepareSpell, canLearnSpell, breakConcentration as engineBreakConcentration } from '../spellcastingEngine';
 import { SPELLS_BY_ID, parseDuration } from '../../utils/spells';
 import { rollDice } from '../diceEngine';
@@ -43,7 +43,7 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
       'cloudkill': '5d8',
       'wall-of-fire': '5d8',
     };
-    let formula = baseFormulas[spellId] || '1d6';
+    const formula = baseFormulas[spellId] || '1d6';
     const match = formula.match(/^(\d+)d(\d+)/);
     if (match) {
       let baseCount = parseInt(match[1]);
@@ -114,7 +114,7 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
     if (!classDef?.spellcasting) return null;
     const ability = classDef.spellcasting.ability;
     const abilityMod = getMod(caster.stats[ability]);
-    const profBonus = getProficiencyBonus(caster as any);
+    const profBonus = getProficiencyBonus(caster as unknown as Character);
     const roll = cryptoRoll(20);
     const total = roll + abilityMod + profBonus - getExhaustionPenalty(caster);
     const dc = 10 + targetSpellLevel;
@@ -172,7 +172,7 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
         const condFx = entity ? getConditionEffects(entity) : null;
         return {
           id,
-          ac: (entity as any)?.ac ?? 0,
+          ac: (entity as unknown as { ac?: number })?.ac ?? 0,
           _attacksAgainstHaveAdvantage: condFx?.attacksAgainstHaveAdvantage ?? false,
         };
       });
@@ -242,19 +242,19 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
             const cleanId = t.targetId.toLowerCase().trim();
             return rt === t.targetId || rt.toLowerCase() === cleanId;
           }) || t.targetId;
-          const dmgResult = await deps.inflict_damage(dmg, resolvedTargetId, result.damage!.type);
+          const dmgResult = await deps.inflict_damage(dmg, resolvedTargetId, result.damage.type);
           if (!dmgResult.success) {
             state.sessionLogs.push(`Damage to ${t.targetId} failed: ${dmgResult.message}`);
           }
         }
       } else if (result.damage?.perTarget) {
         for (const t of result.damage.perTarget) {
-          let dmg = t.damage;
+          const dmg = t.damage;
           const resolvedTargetId = resolvedTargets.find(rt => {
             const cleanId = t.targetId.toLowerCase().trim();
             return rt === t.targetId || rt.toLowerCase() === cleanId;
           }) || t.targetId;
-          const dmgResult = await deps.inflict_damage(dmg, resolvedTargetId, result.damage!.type);
+          const dmgResult = await deps.inflict_damage(dmg, resolvedTargetId, result.damage.type);
           if (!dmgResult.success) {
             state.sessionLogs.push(`Damage to ${t.targetId} failed: ${dmgResult.message}`);
           }
@@ -345,7 +345,8 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
           const targetObj = targetChar || enemy;
           if (!targetObj) continue;
 
-          const condDef = spellDef.condition!;
+          if (!spellDef.condition) continue;
+          const condDef = spellDef.condition;
           const resolvedSaveDC = result.saveRoll?.dc ?? getSpellSaveDc(char);
           const condParsed = spellDef.parsedDuration ?? parseDuration(spellDef.duration);
           const condDurationUnit: 'round' | 'minute' | 'permanent' | undefined =
@@ -373,7 +374,7 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
         }
 
         if (appliedConditions.length > 0) {
-          (result as any).appliedConditions = appliedConditions;
+          (result as unknown as { appliedConditions: unknown[] }).appliedConditions = appliedConditions;
         }
       }
       deps.syncInitiativeConditions();
@@ -445,7 +446,7 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
 
       let dmgSummary = '';
       if (result.perBeam && result.perBeam.length > 1) {
-        dmgSummary = ' ' + result.perBeam.map((b: any, i: number) =>
+        dmgSummary = ' ' + result.perBeam.map((b: { attackRoll: { total: number }; isHit: boolean; damage: unknown }, i: number) =>
           `Ray ${i+1}: ${b.attackRoll.total} to hit, ${b.isHit ? `${b.damage} ${result.damage?.type || ''} damage` : 'miss'}`
         ).join('. ') + '.';
       } else if (result.narrationHint) {
@@ -456,9 +457,9 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
       const healSummary = result.healing ? ` ${result.healing} HP healed.` : '';
 
       let condSummary = '';
-      const appliedConditions = (result as any).appliedConditions;
+      const appliedConditions = (result as unknown as { appliedConditions?: unknown[] }).appliedConditions;
       if (appliedConditions && appliedConditions.length > 0) {
-        condSummary = ' ' + appliedConditions.map((c: any) =>
+        condSummary = ' ' + appliedConditions.map((c: { targetName: string; conditionId: string }) =>
           `${c.targetName} is now ${c.conditionId}.`
         ).join(' ');
       }
@@ -569,7 +570,7 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
       };
     },
 
-    async spell_effect(mode, casterId, targetSpellLevel, targetId) {
+    async spell_effect(mode, casterId, targetSpellLevel, _targetId) {
       const caster = deps.getTarget(casterId);
       if (!caster) return fail('Caster not found.');
       if (!getClassDef(caster.class)?.spellcasting) return fail(`${caster.name} cannot cast spells.`);
@@ -583,7 +584,7 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
         };
       }
 
-      const check = abilityCheckForSpell(caster, targetSpellLevel)!;
+      const check = abilityCheckForSpell(caster, targetSpellLevel) as { roll: number; total: number; dc: number; success: boolean };
       const pastVerb = mode === 'counter' ? 'counters' : 'dispels';
       const baseVerb = mode === 'counter' ? 'counter' : 'dispel';
 
@@ -651,14 +652,14 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
       }
       if (resourceId === 'breath-weapon') {
         const conMod = getMod(char.stats.con);
-        const profBonus = getProficiencyBonus(char as any);
+        const profBonus = getProficiencyBonus(char as unknown as Character);
         const dc = 8 + conMod + profBonus;
         const dmgDice = char.level >= 16 ? '5d6' : char.level >= 11 ? '4d6' : char.level >= 6 ? '3d6' : '2d6';
         const parsed = parseDiceFormula(dmgDice);
         const damage = rollDice(parsed.count, parsed.sides);
         const ancestryDmgTypes: Record<string, string> = { black: 'acid', blue: 'lightning', brass: 'fire', bronze: 'lightning', copper: 'acid', gold: 'fire', green: 'poison', red: 'fire', silver: 'cold', white: 'cold' };
         const dmgType = ancestryDmgTypes[char.draconicAncestry || 'red'] || 'fire';
-        char.draconicDamageType = dmgType as any;
+        char.draconicDamageType = dmgType;
         return { success: true, data: { saveDC: dc, damage: { total: damage, type: dmgType } }, message: `Breath weapon used. DEX save DC ${dc}, ${dmgDice} ${dmgType} damage on fail, half on success.` };
       }
       return { success: true, data: {}, message: `Used ${resourceId}.` };

@@ -4,7 +4,7 @@ import { CLASSES_CATALOG } from '../../utils/classes';
 import { getMod } from '../../services/classEngine';
 import { cryptoRoll } from '../../utils/random';
 import { STAT_LABELS, POINT_BUY_COSTS, GEN_MODES } from './constants';
-import { StepH, TabBtn, AdjBtn, ErrorBanner } from './SharedComponents';
+import { TabBtn, AdjBtn, ErrorBanner } from './SharedComponents';
 
 const CLASS_RECOMMENDED_STATS: Record<string, Record<string, number>> =
   Object.fromEntries(CLASSES_CATALOG.map(c => [c.name, c.recommendedStats]));
@@ -34,14 +34,14 @@ const StatsStep: React.FC<StepProps> = ({ wizardState, updateWizard, onNext }) =
 
   useEffect(() => {
     if (genMode === 'buy') setLocalStats({ str: 8, dex: 8, con: 8, int: 8, wis: 8, cha: 8 });
-    else if (genMode === 'array') setLocalStats({ ...CLASS_RECOMMENDED_STATS[selectedClass.name] } as any);
+    else if (genMode === 'array') setLocalStats({ ...CLASS_RECOMMENDED_STATS[selectedClass.name] } as Record<string, number>);
     else if (genMode === 'roll' && rolledValues.length > 0) {
       setLocalStats(buildStatMap(rolledValues));
     }
   }, [genMode, selectedClass.name, rolledValues, buildStatMap]);
 
   const handlePointBuyUpdate = (stat: string, delta: number) => {
-    const nv = (localStats as any)[stat] + delta;
+    const nv = (localStats as Record<string, number>)[stat] + delta;
     if (nv < 8 || nv > 15) return;
     if (Object.values({ ...localStats, [stat]: nv }).reduce((s, v) => s + (POINT_BUY_COSTS[v as number] || 0), 0) <= 27) {
       setLocalStats(s => ({ ...s, [stat]: nv }));
@@ -52,7 +52,7 @@ const StatsStep: React.FC<StepProps> = ({ wizardState, updateWizard, onNext }) =
     setLocalStats(p => {
       const e = Object.entries(p);
       const tk = e.find(([, v]) => v === tv)?.[0];
-      return Object.fromEntries(e.map(([k, v]) => [k, k === stat ? tv : k === tk ? (p as any)[stat] : v])) as typeof stats;
+      return Object.fromEntries(e.map(([k, v]) => [k, k === stat ? tv : k === tk ? (p as Record<string, number>)[stat] : v])) as typeof stats;
     });
   };
 
@@ -177,7 +177,7 @@ const StatsStep: React.FC<StepProps> = ({ wizardState, updateWizard, onNext }) =
         onClick={() => {
           if (genMode === 'roll' && !hasRolled) { setFinalizeError("Please roll stats first."); return; }
           setFinalizeError(null);
-          setLocalStats(genMode === 'roll' ? buildStatMap(rolledValues) : { ...CLASS_RECOMMENDED_STATS[selectedClass.name] } as any);
+          setLocalStats(genMode === 'roll' ? buildStatMap(rolledValues) : { ...CLASS_RECOMMENDED_STATS[selectedClass.name] } as Record<string, number>);
         }}
         className="w-full py-2 border border-amber-800/40 bg-amber-950/20 hover:bg-amber-900/30 rounded-lg text-amber-400 text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2"
       >

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MockMCPServer } from '../../services/mcpService';
-import { makeCharacter, makeWizard, makeCleric, makeBarbarian } from '../helpers/characters';
+import { makeCharacter, makeWizard, makeBarbarian } from '../helpers/characters';
 
 vi.mock('../../utils/random', () => ({
   cryptoRoll: vi.fn(),
@@ -29,7 +29,7 @@ function mockRoll(value: number) {
 }
 
 function mockRollSequence(...values: number[]) {
-  values.forEach((v, i) => {
+  values.forEach((v) => {
     vi.mocked(cryptoRoll).mockReturnValueOnce(v);
   });
 }

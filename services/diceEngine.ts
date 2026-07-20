@@ -1,9 +1,8 @@
 import { cryptoRoll } from '../utils/random';
-import { SKILLS_LIST, type SkillDefinition } from '../constants';
-import type { RollData } from '../types';
+import { SKILLS_LIST } from '../constants';
+import type { RollData, Character } from '../types';
 import { getMod, getProficiencyBonus } from './classEngine';
 import { parseDiceFormula } from '../utils/dice';
-import type { Character } from '../types';
 
 type StatKey = 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
 
@@ -41,11 +40,11 @@ export function rollAttackRoll(params: {
   isOffHand: boolean;
   hasAlertFeat?: boolean;
 }): RollData {
-  const { attackerLevel, attackerStats, weaponProperties, targetAc, isOffHand } = params;
+  const { attackerLevel, attackerStats, weaponProperties, targetAc } = params;
 
   const strMod = calculateModifier(attackerStats.str);
   const dexMod = calculateModifier(attackerStats.dex);
-  const profBonus = getProficiencyBonus({ level: attackerLevel } as any);
+  const profBonus = getProficiencyBonus({ level: attackerLevel } as unknown as Character);
 
   const isRanged = weaponProperties.includes('ranged')
     || params.weaponName.toLowerCase().includes('bow')
@@ -59,7 +58,7 @@ export function rollAttackRoll(params: {
   const isCritical = roll === 20;
   const isFumble = roll === 1;
 
-  let total = roll + abilityMod + profBonus;
+  const total = roll + abilityMod + profBonus;
 
   const hit = isCritical || (!isFumble && total >= targetAc);
 
@@ -79,7 +78,7 @@ export function rollDamage(params: {
 }): RollData {
   const {
     weaponDamageDice, modifier, isCritical, isOffHand,
-    hasGreatWeaponFighting, hasTwoWeaponFighting, hasDualWielder,
+    hasGreatWeaponFighting, hasTwoWeaponFighting,
   } = params;
 
   const match = weaponDamageDice.match(/^(\d+)d(\d+)/);
@@ -158,9 +157,9 @@ export function rollSkillCheck(params: {
 
   const statValue = characterStats[statKey] || 10;
   const statMod = calculateModifier(statValue);
-  let profBonus = skillProficiency > 0 ? getProficiencyBonus({ level: characterLevel } as any) : 0;
+  let profBonus = skillProficiency > 0 ? getProficiencyBonus({ level: characterLevel } as unknown as Character) : 0;
   if (hasResilient && resilientStat === statKey) {
-    profBonus += getProficiencyBonus({ level: characterLevel } as any);
+    profBonus += getProficiencyBonus({ level: characterLevel } as unknown as Character);
   }
   let shieldBonus = 0;
   if (hasShieldMaster && shieldEquipped && statKey === 'dex') {
@@ -193,7 +192,7 @@ export function rollSavingThrow(params: {
   const statValue = characterStats[mappedStat] || 10;
   const baseMod = calculateModifier(statValue);
 
-  const profLevel = { level: characterLevel } as any;
+  const profLevel = { level: characterLevel } as unknown as Character;
   let profBonus = 0;
   if (proficientInStat) {
     profBonus = getProficiencyBonus(profLevel);

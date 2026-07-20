@@ -56,7 +56,7 @@ export async function generateAtmosphere(
                     const text = await response.text();
                     errorMessage = `Non-JSON Response (${response.status}): ${text.substring(0, 100)}`;
                 }
-            } catch (parseErr) {
+            } catch {
                 errorMessage = `Failed to parse error response: ${response.status}`;
             }
             throw new Error(errorMessage);
@@ -144,7 +144,7 @@ export async function generateStartingLocations(
     const parsed = JSON.parse(cleaned);
     const locations = parsed.locations || parsed.starting_locations || (Array.isArray(parsed) ? parsed : [parsed]);
 
-    return locations.slice(0, 4).map((l: any, i: number) => ({
+    return locations.slice(0, 4).map((l: { name: string; imageUrl?: string }, i: number) => ({
       name: l.name || `Unnamed Location ${i + 1}`,
       description: l.description || "",
       introHook: l.introHook || l.hook || "",

@@ -1,4 +1,3 @@
-import { ShopItem } from './types';
 /** Re-exported shop items catalog used by the GearStep for buying/selling equipment. */
 export { SHOP_ITEMS } from '../../data/shopItems';
 

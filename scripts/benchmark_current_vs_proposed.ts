@@ -1,12 +1,27 @@
 import 'dotenv/config';
 
-(globalThis as any).import = { meta: { env: process.env } };
+(globalThis as { import: { meta: { env: typeof process.env } } }).import = { meta: { env: process.env } };
 
 import { MockMCPServer } from '../services/mcpService';
 import { Character, MCPResponse } from '../types';
 import { tools as CURRENT_TOOLS, TOOL_MODE_INSTRUCTION } from '../services/llm/toolDefinitions';
 import { SYSTEM_INSTRUCTION, PROGRESSION_SYSTEM_PROMPT } from '../constants';
 
+type InternalMockMCP = MockMCPServer & { state: GameState };
+
+interface ToolCallInfo {
+  id: string;
+  name: string;
+  args: Record<string, unknown>;
+}
+
+interface LLMResult {
+  content: string | null;
+  toolCalls: ToolCallInfo[] | null;
+  rawToolCalls: Array<{ id: string; function: { name: string; arguments: string } }>;
+  promptTokens: number;
+  completionTokens: number;
+}
 
 const API_KEY = process.env.API_KEY || process.env.VITE_LLM_API_KEY || '';
 const API_BASE = (process.env.API_BASE || process.env.VITE_LLM_API_BASE || 'https://opencode.ai/zen/go/v1').replace(/\/+$/, '');
@@ -90,12 +105,12 @@ const SCENARIOS: Scenario[] = [
     input: 'I draw my sword and attack the goblin!',
     setup: (s) => {
       s.setCharacter(makeCharacter());
-      (s as any).state.worldDescription = 'A dark cave. A goblin (AC 15, 7 HP) stands ready, scimitar drawn.';
+      (s as unknown as InternalMockMCP).state.worldDescription = 'A dark cave. A goblin (AC 15, 7 HP) stands ready, scimitar drawn.';
     },
     expected: ['player_attack'],
     optional: ['start_combat', 'add_enemy', 'next_turn', 'narrate_turn'],
     validate: (s) => {
-      const c = (s as any).state.combat;
+      const c = (s as unknown as InternalMockMCP).state.combat;
       return { pass: true, detail: c ? `${c.enemies.length} enemies` : 'no combat' };
     },
   },
@@ -107,22 +122,22 @@ const SCENARIOS: Scenario[] = [
       s.add_enemy('Goblin', 15, 7);
       s.add_enemy('Goblin', 15, 7);
       s.add_enemy('Hobgoblin', 18, 18);
-      (s as any).state.worldDescription = 'A cave opening. Three goblinoids stand together.';
+      (s as unknown as InternalMockMCP).state.worldDescription = 'A cave opening. Three goblinoids stand together.';
     },
     expected: ['cast_spell'],
     optional: ['start_combat', 'next_turn', 'narrate_turn'],
-    validate: (s) => ({ pass: true, detail: '' }),
+    validate: () => ({ pass: true, detail: '' }),
   },
   {
     name: '3. Search bodies',
     input: 'I search the fallen goblins for anything useful.',
     setup: (s) => {
       s.setCharacter(makeCharacter());
-      (s as any).state.worldDescription = 'Cave floor littered with goblin corpses.';
+      (s as unknown as InternalMockMCP).state.worldDescription = 'Cave floor littered with goblin corpses.';
     },
     expected: ['check_skill'],
     optional: ['update_inventory', 'narrate_turn'],
-    validate: (s) => ({ pass: true, detail: '' }),
+    validate: () => ({ pass: true, detail: '' }),
   },
   {
     name: '4. End combat + loot',
@@ -130,7 +145,7 @@ const SCENARIOS: Scenario[] = [
     setup: (s) => {
       s.setCharacter(makeCharacter());
       s.add_enemy('Goblin', 15, 7);
-      (s as any).state.combat = {
+      (s as unknown as InternalMockMCP).state.combat = {
         isActive: true, enemies: [{ name: 'Goblin', hp: { current: 0, max: 7 }, ac: 15, isDead: true }],
         initiative: [{ name: 'Valerius', type: 'player', initiative: 18 }, { name: 'Goblin', type: 'enemy', initiative: 10 }],
         turnIndex: 0, round: 1,
@@ -139,7 +154,7 @@ const SCENARIOS: Scenario[] = [
     expected: ['end_combat'],
     optional: ['award_experience', 'update_inventory', 'narrate_turn', 'adjust_currency', 'roll_dice', 'check_skill'],
     validate: (s) => {
-      const combat = (s as any).state.combat;
+      const combat = (s as unknown as InternalMockMCP).state.combat;
       return { pass: !combat?.isActive, detail: combat?.isActive ? 'combat still active' : 'combat ended' };
     },
   },
@@ -148,23 +163,23 @@ const SCENARIOS: Scenario[] = [
     input: 'I go to the ancient library to the north.',
     setup: (s) => {
       s.setCharacter(makeCharacter());
-      (s as any).state.worldDescription = "Entrance of a vast complex. 'Archives — Library' to the north.";
+      (s as unknown as InternalMockMCP).state.worldDescription = "Entrance of a vast complex. 'Archives — Library' to the north.";
     },
     expected: ['move_to'],
     optional: ['narrate_turn'],
-    validate: (s) => ({ pass: true, detail: '' }),
+    validate: () => ({ pass: true, detail: '' }),
   },
   {
     name: '6. Move + search',
     input: 'I carefully enter the library and look around for traps.',
     setup: (s) => {
       s.setCharacter(makeCharacter());
-      (s as any).state.worldDescription = "Entrance of a vast complex. 'Archives — Library' to the north.";
+      (s as unknown as InternalMockMCP).state.worldDescription = "Entrance of a vast complex. 'Archives — Library' to the north.";
     },
     expected: ['move_to', 'check_skill'],
     optional: ['narrate_turn', 'award_experience', 'log_lore'],
     validate: (s) => {
-      const c = s.getTarget('player-1')!;
+      const c = s.getTarget('player-1') as Character;
       return { pass: !!c.location && c.location.toLowerCase().includes('library'), detail: c.location };
     },
   },
@@ -173,23 +188,23 @@ const SCENARIOS: Scenario[] = [
     input: 'I try to persuade the city guard to let me pass into the restricted district.',
     setup: (s) => {
       s.setCharacter(makeCharacter());
-      (s as any).state.worldDescription = "City gate. A stern guard blocks the entrance to the upper district.";
+      (s as unknown as InternalMockMCP).state.worldDescription = "City gate. A stern guard blocks the entrance to the upper district.";
     },
     expected: ['check_skill'],
     optional: ['narrate_turn'],
-    validate: (s) => ({ pass: true, detail: '' }),
+    validate: () => ({ pass: true, detail: '' }),
   },
   {
     name: '8. Buy potion',
     input: 'I buy a healing potion for 5 gold pieces.',
     setup: (s) => {
       s.setCharacter(makeCharacter());
-      (s as any).state.worldDescription = "A potion shop. '5 gold each,' says the shopkeeper.";
+      (s as unknown as InternalMockMCP).state.worldDescription = "A potion shop. '5 gold each,' says the shopkeeper.";
     },
     expected: ['update_inventory'],
     optional: ['adjust_currency', 'narrate_turn'],
     validate: (s) => {
-      const c = s.getTarget('player-1')!;
+      const c = s.getTarget('player-1') as Character;
       const has = c.inventory.some(i => i.name.toLowerCase().includes('potion'));
       return { pass: has, detail: `potion:${has} gp:${c.currency.gp}` };
     },
@@ -204,26 +219,24 @@ const SCENARIOS: Scenario[] = [
           { name: 'Shortsword', quantity: 1, type: 'weapon', stats: { damage: '1d6', damageType: 'piercing' } },
         ],
       }));
-      (s as any).state.worldDescription = 'A bustling blacksmith shop. Anvils ring with hammer strikes.';
+      (s as unknown as InternalMockMCP).state.worldDescription = 'A bustling blacksmith shop. Anvils ring with hammer strikes.';
     },
     expected: ['update_inventory'],
     optional: ['adjust_currency', 'narrate_turn'],
-    validate: (s) => ({ pass: true, detail: '' }),
+    validate: () => ({ pass: true, detail: '' }),
   },
   {
     name: '10. Loot gold',
     input: 'I take the gold coins from the trapped chest.',
     setup: (s) => {
       s.setCharacter(makeCharacter());
-      (s as any).state.worldDescription = 'A dusty chamber. An ornate chest sits against the far wall.';
+      (s as unknown as InternalMockMCP).state.worldDescription = 'A dusty chamber. An ornate chest sits against the far wall.';
     },
     expected: ['update_inventory'],
     optional: ['adjust_currency', 'check_skill', 'narrate_turn', 'inflict_damage', 'make_save', 'roll_dice'],
     validate: (s) => {
-      
-      const c = s.getTarget('player-1')!;
-      const hasLongsword = c.inventory.some(i => i.name.toLowerCase().includes('longsword'));
-      return { pass: true, detail: `inv:${c.inventory.length} items` };
+      const c = s.getTarget('player-1');
+      return { pass: true, detail: `inv:${c ? c.inventory.length : 0} items` };
     },
   },
   {
@@ -231,34 +244,34 @@ const SCENARIOS: Scenario[] = [
     input: 'I accept the quest to clear out the ruins of Thornwall Keep.',
     setup: (s) => {
       s.setCharacter(makeCharacter());
-      (s as any).state.worldDescription = "The village elder's cottage. A map of the region is spread on the table.";
+      (s as unknown as InternalMockMCP).state.worldDescription = "The village elder's cottage. A map of the region is spread on the table.";
     },
     expected: ['upsert_quest'],
     optional: ['narrate_turn'],
-    validate: (s) => ({ pass: true, detail: '' }),
+    validate: () => ({ pass: true, detail: '' }),
   },
   {
     name: '12. Recall lore',
     input: 'I try to recall what I know about the ancient dragon cult.',
     setup: (s) => {
       s.setCharacter(makeCharacter());
-      (s as any).state.worldDescription = 'A library filled with ancient tomes and scrolls.';
+      (s as unknown as InternalMockMCP).state.worldDescription = 'A library filled with ancient tomes and scrolls.';
     },
     expected: ['check_skill'],
     optional: ['log_lore', 'narrate_turn'],
-    validate: (s) => ({ pass: true, detail: '' }),
+    validate: () => ({ pass: true, detail: '' }),
   },
   {
     name: '13. Short rest',
     input: 'I take a short rest to catch my breath and recover.',
     setup: (s) => {
       s.setCharacter(makeInjuredCharacter());
-      (s as any).state.worldDescription = 'A safe alcove within the dungeon.';
+      (s as unknown as InternalMockMCP).state.worldDescription = 'A safe alcove within the dungeon.';
     },
     expected: ['short_rest'],
     optional: ['take_rest', 'long_rest', 'narrate_turn'],
     validate: (s) => {
-      const c = s.getTarget('player-1')!;
+      const c = s.getTarget('player-1') as Character;
       return { pass: true, detail: c.hp.current > 4 ? `healed to ${c.hp.current}` : `no heal (${c.hp.current}/25)` };
     },
   },
@@ -267,12 +280,12 @@ const SCENARIOS: Scenario[] = [
     input: 'I drink my healing potion to recover from my wounds.',
     setup: (s) => {
       s.setCharacter(makeInjuredCharacter());
-      (s as any).state.worldDescription = 'Blood drips from your wounds after battle.';
+      (s as unknown as InternalMockMCP).state.worldDescription = 'Blood drips from your wounds after battle.';
     },
     expected: ['update_inventory'],
     optional: ['narrate_turn', 'roll_dice'],
     validate: (s) => {
-      const c = s.getTarget('player-1')!;
+      const c = s.getTarget('player-1') as Character;
       const still = c.inventory.some(i => i.name.toLowerCase().includes('potion'));
       return { pass: !still, detail: still ? `potion still present (${c.hp.current}/25)` : `potion consumed (${c.hp.current}/25)` };
     },
@@ -290,12 +303,12 @@ const SCENARIOS: Scenario[] = [
       char.knownSpells = ['bless', 'cure-wounds'];
       char.preparedSpells = ['bless'];
       s.setCharacter(char);
-      (s as any).state.worldDescription = 'After the battle, a moment of peace.';
+      (s as unknown as InternalMockMCP).state.worldDescription = 'After the battle, a moment of peace.';
     },
     expected: ['level_up'],
     optional: ['manage_spellbook', 'narrate_turn', 'award_experience'],
     validate: (s) => {
-      const c = s.getTarget('player-1')!;
+      const c = s.getTarget('player-1') as Character;
       return { pass: c.unusedStatPoints === 0, detail: c.unusedStatPoints > 0 ? `stats unspent:${c.unusedStatPoints}` : 'levelled up' };
     },
   },
@@ -304,11 +317,11 @@ const SCENARIOS: Scenario[] = [
     input: 'I cast Detect Magic as a ritual to check the entire room for enchantments.',
     setup: (s) => {
       s.setCharacter(makeWizard());
-      (s as any).state.worldDescription = 'A chamber filled with mysterious artifacts.';
+      (s as unknown as InternalMockMCP).state.worldDescription = 'A chamber filled with mysterious artifacts.';
     },
     expected: [],
     optional: ['cast_spell', 'cast_ritual', 'narrate_turn'],
-    validate: (s) => ({ pass: true, detail: '' }),
+    validate: () => ({ pass: true, detail: '' }),
   },
   {
     name: '17. Death save',
@@ -317,11 +330,11 @@ const SCENARIOS: Scenario[] = [
       const char = makeCharacter();
       char.hp.current = 0;
       s.setCharacter(char);
-      (s as any).state.worldDescription = 'Everything goes dark...';
+      (s as unknown as InternalMockMCP).state.worldDescription = 'Everything goes dark...';
     },
     expected: ['roll_death_save'],
     optional: ['make_save', 'narrate_turn'],
-    validate: (s) => ({ pass: true, detail: '' }),
+    validate: () => ({ pass: true, detail: '' }),
   },
   {
     name: '18. Counterspell',
@@ -329,17 +342,17 @@ const SCENARIOS: Scenario[] = [
     setup: (s) => {
       s.setCharacter(makeWizard());
       s.add_enemy('Evil Mage', 15, 40);
-      (s as any).state.combat = {
+      (s as unknown as InternalMockMCP).state.combat = {
         isActive: true,
         enemies: [{ name: 'Evil Mage', hp: { current: 40, max: 40 }, ac: 15, isDead: false }],
         initiative: [{ name: 'Evil Mage', type: 'enemy', initiative: 20 }, { name: 'Merlin', type: 'player', initiative: 12 }],
         turnIndex: 0, round: 1,
       };
-      (s as any).state.worldDescription = 'A magical duel in the heart of the ruined temple.';
+      (s as unknown as InternalMockMCP).state.worldDescription = 'A magical duel in the heart of the ruined temple.';
     },
     expected: ['cast_spell'],
     optional: ['spell_effect', 'next_turn', 'narrate_turn'],
-    validate: (s) => ({ pass: true, detail: '' }),
+    validate: () => ({ pass: true, detail: '' }),
   },
   {
     name: '19. Award XP',
@@ -348,12 +361,12 @@ const SCENARIOS: Scenario[] = [
       const char = makeCharacter();
       char.experience = 100;
       s.setCharacter(char);
-      (s as any).state.worldDescription = 'The hobgoblin chieftain lies dead at your feet.';
+      (s as unknown as InternalMockMCP).state.worldDescription = 'The hobgoblin chieftain lies dead at your feet.';
     },
     expected: ['award_experience'],
     optional: ['end_combat', 'narrate_turn', 'adjust_currency', 'update_inventory'],
     validate: (s) => {
-      const c = s.getTarget('player-1')!;
+      const c = s.getTarget('player-1') as Character;
       return { pass: c.experience > 100, detail: `XP: ${c.experience}` };
     },
   },
@@ -362,22 +375,22 @@ const SCENARIOS: Scenario[] = [
     input: 'Hello there, tavern keeper! How are you doing today?',
     setup: (s) => {
       s.setCharacter(makeCharacter());
-      (s as any).state.worldDescription = 'The Rusty Tankard tavern. Warm fire, good ale.';
+      (s as unknown as InternalMockMCP).state.worldDescription = 'The Rusty Tankard tavern. Warm fire, good ale.';
     },
     expected: [],
     optional: ['narrate_turn'],
-    validate: (s) => ({ pass: true, detail: '' }),
+    validate: () => ({ pass: true, detail: '' }),
   },
 ];
 
 
 const CURRENT_INSTRUCTION = `${SYSTEM_INSTRUCTION}\n\n${PROGRESSION_SYSTEM_PROMPT}\n\n=== TOOL MODE ===\n${TOOL_MODE_INSTRUCTION}`;
 
-function currentExecTool(s: MockMCPServer, name: string, args: Record<string, any>): Promise<MCPResponse> {
+function currentExecTool(s: MockMCPServer, name: string, args: Record<string, unknown>): Promise<MCPResponse> {
   switch (name) {
     case 'roll_dice': return s.roll_dice(Number(args.sides) || 20, Number(args.count) || 1, Number(args.modifier) || 0, args.target_ac !== undefined ? Number(args.target_ac) : undefined, args.target_name as string, args.roll_label as string, args.isDamageRoll as boolean, args.isOffHand as boolean, args.weaponName as string, args.attackerId as string);
     case 'add_enemy': return s.add_enemy(String(args.name || ''), args.ac !== undefined ? Number(args.ac) : undefined, args.hp !== undefined ? Number(args.hp) : undefined, undefined, args.cr !== undefined ? Number(args.cr) : undefined, args.xp !== undefined ? Number(args.xp) : undefined);
-    case 'start_combat': return s.start_combat(args.targetId as string, args.enemies as any);
+    case 'start_combat': return s.start_combat(args.targetId as string, args.enemies as Array<{ name: string; ac?: number; hp?: number; cr?: number; xp?: number; size?: string; type?: string; }>);
     case 'next_turn': return s.next_turn();
     case 'end_combat': return s.end_combat();
     case 'player_attack': return s.player_attack(String(args.attackerId || ''), String(args.weaponName || ''), String(args.targetId || ''), args.isOffHand as boolean, args.isSneakAttack as boolean, args.sharpshooter as boolean, args.greatWeaponMaster as boolean);
@@ -390,19 +403,19 @@ function currentExecTool(s: MockMCPServer, name: string, args: Record<string, an
     case 'spell_effect': return s.spell_effect(String(args.mode || 'counter') as 'counter' | 'dispel', String(args.casterId || ''), Number(args.targetSpellLevel || 3), args.targetId as string);
     case 'make_save': return s.make_save(String(args.targetId || ''), String(args.stat || 'dex'), Number(args.dc || 10));
     case 'roll_death_save': return s.roll_death_save(String(args.targetId || ''));
-    case 'check_skill': return s.check_skill(String(args.skill_name || ''), Number(args.difficulty || 10), args.targetId as string, args.onSuccess as any);
-    case 'update_inventory': return s.update_inventory(String(args.item_name || ''), String(args.action || 'add') as any, Number(args.quantity || 1), args.new_name as string, args.targetId as string, args.type as any, args.rarity as any, args.description as string, args.stats as any, args.equipped as boolean, args.cost_gp as number, args.cost_sp as number, args.cost_cp as number, args.autoDeductMarketPrice as boolean, args.craft as boolean);
+    case 'check_skill': return s.check_skill(String(args.skill_name || ''), Number(args.difficulty || 10), args.targetId as string, args.onSuccess as Record<string, unknown>);
+    case 'update_inventory': return s.update_inventory(String(args.item_name || ''), String(args.action || 'add') as 'add' | 'remove' | 'edit', Number(args.quantity || 1), args.new_name as string, args.targetId as string, args.type as import('../types').InventoryItem['type'], args.rarity as import('../types').InventoryItem['rarity'], args.description as string, args.stats as import('../types').InventoryItem['stats'], args.equipped as boolean, args.cost_gp as number, args.cost_sp as number, args.cost_cp as number, args.autoDeductMarketPrice as boolean, args.craft as boolean);
     case 'adjust_currency': return s.adjust_currency(Number(args.gp || 0), Number(args.sp || 0), Number(args.cp || 0), args.targetId as string);
     case 'inflict_damage': return s.inflict_damage(Number(args.amount || 0), (args.targetId || args.target_name) as string, args.damageType as string);
-    case 'move_to': return s.move_to(String(args.location_name || 'Unknown'), String(args.description || ''), args.targetId as string, args.skillCheck as any, args.route as string, args.pace as string);
-    case 'upsert_quest': return s.upsert_quest(String(args.title || ''), String(args.description || ''), String(args.status || 'active') as any, args.reputationChanges as Array<{ faction: string; delta: number }> | undefined);
-    case 'log_lore': return s.log_lore(String(args.title || ''), String(args.content || ''), String(args.category || 'History') as any);
+    case 'move_to': return s.move_to(String(args.location_name || 'Unknown'), String(args.description || ''), args.targetId as string, args.skillCheck as { skill_name?: string; difficulty?: number; onSuccess?: unknown } | undefined, args.route as string, args.pace as string);
+    case 'upsert_quest': return s.upsert_quest(String(args.title || ''), String(args.description || ''), String(args.status || 'active') as 'active' | 'completed' | 'failed', args.reputationChanges as Array<{ faction: string; delta: number }> | undefined);
+    case 'log_lore': return s.log_lore(String(args.title || ''), String(args.content || ''), String(args.category || 'History'));
     case 'award_experience': return s.awardExperience(Number(args.amount || 0), args.targetId as string);
     case 'short_rest': return s.short_rest(args.targetId as string, args.narration as string, args.autoAdvanceTime as boolean);
     case 'long_rest': return s.long_rest(args.narration as string, args.autoAdvanceTime as boolean);
-    case 'level_up': return Promise.resolve(s.allocateStatPoints((args.stats || {}) as any, args.targetId as string, (args.skills || {}) as Record<string, number>, Number(args.hpDeviation || 0)));
+    case 'level_up': return Promise.resolve(s.allocateStatPoints((args.stats || {}) as Partial<Record<string, number>>, args.targetId as string, (args.skills || {}) as Record<string, number>, Number(args.hpDeviation || 0)));
     case 'use_resource': return s.use_resource(String(args.characterId || args.targetId || ''), String(args.resourceId || ''), args.targetId as string, args.amount as number);
-    case 'manage_spellbook': return s.manage_spellbook(String(args.characterId || args.targetId || ''), String(args.action || 'learn') as any, String(args.spellId || ''));
+    case 'manage_spellbook': return s.manage_spellbook(String(args.characterId || args.targetId || ''), String(args.action || 'learn') as 'learn' | 'prepare' | 'unprepare' | 'forget', String(args.spellId || ''));
     case 'summon_creature': return s.summon_creature(String(args.casterId || ''), String(args.creatureName || args.template || ''), Number(args.count || 1));
     case 'teleport_creature': return s.teleport_creature(String(args.characterId || args.targetId || ''), String(args.destination || ''), Number(args.range || 30));
     case 'polymorph_creature': return s.polymorph_creature(String(args.characterId || args.targetId || ''), String(args.newForm || args.beastForm || 'wolf'), Number(args.duration || 60));
@@ -480,12 +493,12 @@ const PROPOSED_INSTRUCTION = `You are a Game Engine for a fantasy RPG. Translate
 
 ⚡ EACH TURN: Call the right tool(s) for the action. If a tool has a "narration" param, the narration ends your turn. If no narration, end with narrate_turn(narration="...", timePassed=N).`;
 
-function proposedExecTool(s: MockMCPServer, name: string, args: Record<string, any>): Promise<MCPResponse> {
+function proposedExecTool(s: MockMCPServer, name: string, args: Record<string, unknown>): Promise<MCPResponse> {
   switch (name) {
     case 'roll_dice':
       return s.roll_dice(Number(args.sides) || 20, Number(args.count) || 1, Number(args.modifier) || 0);
     case 'start_combat':
-      return s.start_combat(undefined, args.enemies as any);
+      return s.start_combat(undefined, args.enemies as Array<{ name: string; ac?: number; hp?: number; cr?: number; xp?: number; size?: string; type?: string; }>);
     case 'next_turn':
       return s.next_turn();
     case 'end_combat': {
@@ -513,7 +526,7 @@ function proposedExecTool(s: MockMCPServer, name: string, args: Record<string, a
         );
         let extra = '';
         
-        const stateAfter = s.getFullState() as any;
+        const stateAfter = s.getFullState();
         if (stateAfter.combat?.isActive && args.advanceTurn !== false) {
           const nt = await s.next_turn();
           extra += nt.message + ' ';
@@ -526,7 +539,7 @@ function proposedExecTool(s: MockMCPServer, name: string, args: Record<string, a
         if (args.onKill?.logLore && r1.data?.enemyDefeated) {
           await s.log_lore(
             String(args.onKill.logLore.title || ''), String(args.onKill.logLore.content || ''),
-            String(args.onKill.logLore.category || 'Item') as any,
+            String(args.onKill.logLore.category || 'Item'),
           );
         }
         return { success: r1.success, data: { ...r1.data, narration: args.narration || '' }, message: (r1.message + ' ' + extra).trim() };
@@ -553,15 +566,15 @@ function proposedExecTool(s: MockMCPServer, name: string, args: Record<string, a
       if (args.saveType === 'death') return s.roll_death_save(String(args.targetId || ''));
       return s.make_save(String(args.targetId || ''), String(args.stat || 'dex'), Number(args.dc || 10));
     case 'check_skill':
-      return s.check_skill(String(args.skill_name || ''), Number(args.difficulty || 10), args.targetId as string, args.onSuccess as any);
+      return s.check_skill(String(args.skill_name || ''), Number(args.difficulty || 10), args.targetId as string, args.onSuccess as Record<string, unknown>);
     case 'update_inventory':
-      return s.update_inventory(String(args.item_name || ''), String(args.action || 'add') as any, Number(args.quantity || 1), undefined, args.targetId as string, args.type as any, args.rarity as any, args.description as string, args.stats as any, args.equipped as boolean, args.cost_gp as number, args.cost_sp as number, args.cost_cp as number, false, false);
+      return s.update_inventory(String(args.item_name || ''), String(args.action || 'add') as 'add' | 'remove' | 'edit', Number(args.quantity || 1), undefined, args.targetId as string, args.type as import('../types').InventoryItem['type'], args.rarity as import('../types').InventoryItem['rarity'], args.description as string, args.stats as import('../types').InventoryItem['stats'], args.equipped as boolean, args.cost_gp as number, args.cost_sp as number, args.cost_cp as number, false, false);
     case 'adjust_currency':
       return s.adjust_currency(Number(args.gp || 0), Number(args.sp || 0), Number(args.cp || 0), String(args.targetId || ''));
     case 'inflict_damage':
       return s.inflict_damage(Number(args.amount || 0), String(args.targetId || ''), args.damageType as string);
     case 'move_to': {
-      const r = s.move_to(String(args.location_name || 'Unknown'), String(args.description || ''), args.targetId as string, args.skillCheck as any, args.route as string, args.pace as string);
+      const r = s.move_to(String(args.location_name || 'Unknown'), String(args.description || ''), args.targetId as string, args.skillCheck as { skill_name?: string; difficulty?: number; onSuccess?: unknown } | undefined, args.route as string, args.pace as string);
       return r.then(result => ({ ...result, data: { ...result.data, narration: args.narration || '' } }));
     }
     case 'take_rest': {
@@ -574,7 +587,7 @@ function proposedExecTool(s: MockMCPServer, name: string, args: Record<string, a
       if (!args.stats || Object.keys(args.stats).length === 0) {
         return Promise.resolve({ success: true, data: { warned: true }, message: `Level up called without stat increases. Specify stats like: stats={str:2,con:1}. Character: ${args.targetId}` });
       }
-      const r = s.allocateStatPoints((args.stats || {}) as any, args.targetId as string, (args.skills || {}) as Record<string, number>, Number(args.hpDeviation || 0));
+      const r = s.allocateStatPoints((args.stats || {}) as Partial<Record<string, number>>, args.targetId as string, (args.skills || {}) as Record<string, number>, Number(args.hpDeviation || 0));
       
       const results: string[] = [r.message];
       if (args.learnSpells && Array.isArray(args.learnSpells)) {
@@ -594,9 +607,9 @@ function proposedExecTool(s: MockMCPServer, name: string, args: Record<string, a
     case 'use_resource':
       return s.use_resource(String(args.targetId || ''), String(args.resourceId || ''), args.targetId as string, args.amount as number);
     case 'upsert_quest':
-      return s.upsert_quest(String(args.title || ''), String(args.description || ''), String(args.status || 'active') as any, args.reputationChanges as any);
+      return s.upsert_quest(String(args.title || ''), String(args.description || ''), String(args.status || 'active') as 'active' | 'completed' | 'failed', args.reputationChanges as Array<{ faction: string; delta: number }> | undefined);
     case 'log_lore':
-      return s.log_lore(String(args.title || ''), String(args.content || ''), String(args.category || 'History') as any);
+      return s.log_lore(String(args.title || ''), String(args.content || ''), String(args.category || 'History'));
     case 'award_experience':
       return s.awardExperience(Number(args.amount || 0), args.targetId as string);
     case 'summon_creature':
@@ -613,8 +626,8 @@ function proposedExecTool(s: MockMCPServer, name: string, args: Record<string, a
 }
 
 
-async function callLLM(messages: any[], tools: any[]): Promise<any> {
-  const body: any = { model: MODEL, messages, temperature: 0.7 };
+async function callLLM(messages: Array<Record<string, unknown>>, tools: Array<Record<string, unknown>>): Promise<LLMResult> {
+  const body: Record<string, unknown> = { model: MODEL, messages, temperature: 0.7 };
   if (tools?.length) { body.tools = tools; body.tool_choice = "auto"; }
   const r = await fetch(`${API_BASE}/chat/completions`, {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${API_KEY}` }, body: JSON.stringify(body),
@@ -624,7 +637,7 @@ async function callLLM(messages: any[], tools: any[]): Promise<any> {
   const m = d.choices[0].message;
   return {
     content: m.content,
-    toolCalls: m.tool_calls?.map((tc: any) => ({ id: tc.id, name: tc.function.name, args: safeParse(tc.function.arguments) })) || null,
+    toolCalls: m.tool_calls?.map((tc: Record<string, unknown>) => ({ id: tc.id as string, name: (tc.function as Record<string, unknown>).name as string, args: safeParse((tc.function as Record<string, unknown>).arguments as string) })) || null,
     rawToolCalls: m.tool_calls || [],
     promptTokens: d.usage?.prompt_tokens || 0,
     completionTokens: d.usage?.completion_tokens || 0,
@@ -633,7 +646,7 @@ async function callLLM(messages: any[], tools: any[]): Promise<any> {
 
 function safeParse(raw: string): Record<string, unknown> {
   try { return JSON.parse(raw); } catch {
-    let repaired = raw.replace(/'/g, '"').replace(/,\s*([}\]])/g, '$1').replace(/(['"])?([a-zA-Z_]\w*)(['"])?\s*:/g, '"$2":').replace(/\bTrue\b/g, 'true').replace(/\bFalse\b/g, 'false').replace(/\bNone\b/g, 'null');
+    const repaired = raw.replace(/'/g, '"').replace(/,\s*([}\]])/g, '$1').replace(/(['"])?([a-zA-Z_]\w*)(['"])?\s*:/g, '"$2":').replace(/\bTrue\b/g, 'true').replace(/\bFalse\b/g, 'false').replace(/\bNone\b/g, 'null');
     try { return JSON.parse(repaired); } catch { return {}; }
   }
 }
@@ -648,9 +661,9 @@ interface Metrics {
 
 async function runHarness(
   scenario: Scenario,
-  tools: any[],
+  tools: Array<Record<string, unknown>>,
   instruction: string,
-  execTool: (s: MockMCPServer, name: string, args: Record<string, any>) => Promise<MCPResponse>,
+  execTool: (s: MockMCPServer, name: string, args: Record<string, unknown>) => Promise<MCPResponse>,
   label: string,
   isProposed: boolean,
   opts: { maxIters: number; preInjectReminder?: boolean },
@@ -658,16 +671,16 @@ async function runHarness(
   const server = new MockMCPServer();
   scenario.setup(server);
   const char = server.getTarget('player-1');
-  const state = server.getFullState() as any;
+  const state = server.getFullState();
   const hasCombat = state.combat?.isActive === true;
-  const hasLevelUp = state.party?.some((c: any) => (c.unusedStatPoints ?? 0) > 0 || (c.unusedSkillPoints ?? 0) > 0);
+  const hasLevelUp = state.party?.some((c: Character) => (c.unusedStatPoints ?? 0) > 0 || (c.unusedSkillPoints ?? 0) > 0);
   
   const charSummary = char ? `${char.name} (L${char.level} ${char.class}, HP ${char.hp.current}/${char.hp.max}, location: ${char.location || 'unknown'})` : 'None';
-  const partySummary = (state.party || []).map((c: any) => `${c.name} (L${c.level} ${c.class}, HP ${c.hp.current}/${c.hp.max})`).join(', ');
-  let contextStr = `Context: Active player: ${charSummary}. Party: ${partySummary}. World: ${(state as any).worldDescription || ''}.`;
+  const partySummary = (state.party || []).map((c: Character) => `${c.name} (L${c.level} ${c.class}, HP ${c.hp.current}/${c.hp.max})`).join(', ');
+  let contextStr = `Context: Active player: ${charSummary}. Party: ${partySummary}. World: ${state.worldDescription || ''}.`;
   if (hasCombat) {
-    const alive = (state.combat.enemies || []).filter((e: any) => !e.isDead);
-    contextStr += ` COMBAT ACTIVE: Round ${state.combat.round}. Enemies: ${alive.map((e: any) => `${e.name} (HP ${e.hp?.current}/${e.hp?.max}, AC ${e.ac})`).join(', ')}. Initiative: ${(state.combat.initiative || []).map((e: any) => e.name).join(' > ')}.`;
+    const alive = (state.combat.enemies || []).filter((e: import('../types').Enemy) => !e.isDead);
+    contextStr += ` COMBAT ACTIVE: Round ${state.combat.round}. Enemies: ${alive.map((e: import('../types').Enemy) => `${e.name} (HP ${e.hp?.current}/${e.hp?.max}, AC ${e.ac})`).join(', ')}. Initiative: ${(state.combat.initiative || []).map((e: import('../types').InitiativeEntry) => e.name).join(' > ')}.`;
   }
   if (hasLevelUp) contextStr += ' LEVEL UP AVAILABLE: This character has unspent stat/skill points.';
 
@@ -675,11 +688,11 @@ async function runHarness(
   const ctxMsg = { role: 'user' as const, content: contextStr };
   const inputMsg = { role: 'user' as const, content: scenario.input };
 
-  const messages: any[] = [sysMsg, ctxMsg, inputMsg];
+  const messages: Record<string, unknown>[] = [sysMsg, ctxMsg, inputMsg];
   const maxIters = opts.maxIters;
   const startTime = Date.now();
   let totalPrompt = 0, totalCompletion = 0;
-  const executedTools: { name: string; args: any; result: MCPResponse }[] = [];
+  const executedTools: { name: string; args: Record<string, unknown>; result: MCPResponse }[] = [];
   let iters = 0, invalidCalls = 0;
   let inlineNarrationLen = 0;
 
@@ -718,16 +731,16 @@ async function runHarness(
   }
 
   for (iters = 0; iters < maxIters; iters++) {
-    let resp: any;
+    let resp: LLMResult;
     try {
       resp = await callLLM(messages, tools);
-    } catch (e: any) {
+    } catch (e: unknown) {
       return {
         pass: false, missing: scenario.expected, extra: [], invalidCalls,
         iters: iters + 1, promptTokens: totalPrompt, completionTokens: totalCompletion,
         totalTokens: totalPrompt + totalCompletion, latencyMs: Date.now() - startTime,
         inlineNarrationLen,
-        calledTools: executedTools.map(t => t.name), validationDetail: '', error: e.message,
+        calledTools: executedTools.map(t => t.name), validationDetail: '', error: (e instanceof Error ? e.message : String(e)),
       };
     }
 
@@ -749,15 +762,15 @@ async function runHarness(
     }
 
     
-    const hasNarrationTool = resp.toolCalls.some((tc: any) => tc.name === 'narrate_turn');
-    const hasInlineNarration = resp.toolCalls.some((tc: any) =>
+    const hasNarrationTool = resp.toolCalls.some((tc) => tc.name === 'narrate_turn');
+    const hasInlineNarration = resp.toolCalls.some((tc) =>
       tc.name !== 'narrate_turn' && (tc.args?.narration || tc.args?.route)
     );
     const isEndOfTurn = hasNarrationTool || hasInlineNarration;
 
     
-    const actionCalls = resp.toolCalls.filter((tc: any) => tc.name !== 'narrate_turn');
-    const narrateCall = resp.toolCalls.find((tc: any) => tc.name === 'narrate_turn');
+    const actionCalls = resp.toolCalls.filter((tc) => tc.name !== 'narrate_turn');
+    const narrateCall = resp.toolCalls.find((tc) => tc.name === 'narrate_turn');
 
     
     for (const tc of actionCalls) {
@@ -769,8 +782,8 @@ async function runHarness(
         if (result.data?.narration) {
           inlineNarrationLen = Math.max(inlineNarrationLen, String(result.data.narration).length);
         }
-      } catch (e: any) {
-        executedTools.push({ name: tc.name, args: tc.args, result: { success: false, data: {}, message: e.message } });
+      } catch (e: unknown) {
+        executedTools.push({ name: tc.name, args: tc.args, result: { success: false, data: {}, message: (e instanceof Error ? e.message : String(e)) } });
         invalidCalls++;
       }
     }
@@ -783,14 +796,14 @@ async function runHarness(
         if (result.data?.narration) {
           inlineNarrationLen = Math.max(inlineNarrationLen, String(result.data.narration).length);
         }
-      } catch (e: any) {
-        executedTools.push({ name: narrateCall.name, args: narrateCall.args, result: { success: false, data: {}, message: e.message } });
+      } catch (e: unknown) {
+        executedTools.push({ name: narrateCall.name, args: narrateCall.args, result: { success: false, data: {}, message: (e instanceof Error ? e.message : String(e)) } });
         invalidCalls++;
       }
     }
 
     
-    const defs = resp.toolCalls.map((tc: any) => ({ id: tc.id, type: 'function', function: { name: tc.name, arguments: JSON.stringify(tc.args) } }));
+    const defs = resp.toolCalls.map((tc) => ({ id: tc.id, type: 'function', function: { name: tc.name, arguments: JSON.stringify(tc.args) } }));
     messages.push({ role: 'assistant', content: '', tool_calls: defs });
     for (const tc of resp.toolCalls) {
       const result = executedTools.slice(-resp.toolCalls.length).find((_, i) => resp.toolCalls[i]?.id === tc.id)?.result;
@@ -869,11 +882,11 @@ async function main() {
   const currentOpts = { maxIters: MAX_ITERS_CURRENT, preInjectReminder: false };
   const proposedOpts = { maxIters: MAX_ITERS_PROPOSED, preInjectReminder: true };
 
-  const jobs = SCENARIOS.map((s, i) => {
+  const jobs = SCENARIOS.map((s) => {
     const runCurrent = runHarness(s, CURRENT_TOOLS, CURRENT_INSTRUCTION, currentExecTool, 'CURRENT', false, currentOpts)
-      .catch(e => ({ pass: false, missing: s.expected, extra: [], invalidCalls: 0, iters: 0, promptTokens: 0, completionTokens: 0, totalTokens: 0, latencyMs: 0, inlineNarrationLen: 0, calledTools: [], validationDetail: '', error: e.message } as Metrics));
+      .catch(e => ({ pass: false, missing: s.expected, extra: [], invalidCalls: 0, iters: 0, promptTokens: 0, completionTokens: 0, totalTokens: 0, latencyMs: 0, inlineNarrationLen: 0, calledTools: [], validationDetail: '', error: (e instanceof Error ? e.message : String(e)) } as Metrics));
     const runProposed = runHarness(s, PROPOSED_TOOLS, PROPOSED_INSTRUCTION, proposedExecTool, 'PROPOSED', true, proposedOpts)
-      .catch(e => ({ pass: false, missing: s.expected, extra: [], invalidCalls: 0, iters: 0, promptTokens: 0, completionTokens: 0, totalTokens: 0, latencyMs: 0, inlineNarrationLen: 0, calledTools: [], validationDetail: '', error: e.message } as Metrics));
+      .catch(e => ({ pass: false, missing: s.expected, extra: [], invalidCalls: 0, iters: 0, promptTokens: 0, completionTokens: 0, totalTokens: 0, latencyMs: 0, inlineNarrationLen: 0, calledTools: [], validationDetail: '', error: (e instanceof Error ? e.message : String(e)) } as Metrics));
     return { name: s.name, current: runCurrent, proposed: runProposed };
   });
 

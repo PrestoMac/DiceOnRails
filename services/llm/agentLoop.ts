@@ -1,6 +1,6 @@
 import { Message, MessageRole, LLMProvider, MCPResponse } from '../../types';
 import { SYSTEM_INSTRUCTION, PROGRESSION_SYSTEM_PROMPT } from '../../constants';
-import { getEnv, getThinkingDisabledBody } from '../../utils/envHelper';
+import { getThinkingDisabledBody } from '../../utils/envHelper';
 import { isDebugMode } from '../../utils/debug';
 import { safeParseJson } from '../../utils/safeJson';
 import { mcpServer } from '../mcpService';
@@ -24,18 +24,18 @@ function createToolMessage(toolName: string, result: MCPResponse, toolCallId?: s
 }
 
 async function executeToolBatch(
-    rawToolCalls: any[],
+    rawToolCalls: Array<{ id: string; function: { name?: string; arguments?: string } }>,
     toolCalls: { id: string; name: string; args: Record<string, unknown> }[],
     toolMessages: Message[],
     onToolResult?: (toolName: string, args: Record<string, unknown>, result: MCPResponse) => void,
-): Promise<{ results: Array<{ mapped: any; raw: any; result: MCPResponse }>; criticalFailed: boolean }> {
+): Promise<{ results: Array<{ mapped: { id: string; name?: string; args: Record<string, unknown> }; raw: { id: string; function: { name?: string; arguments?: string } }; result: MCPResponse }>; criticalFailed: boolean }> {
     if (isDebugMode) console.log(`[AgentLoop] executeToolBatch executing ${toolCalls.length} tool(s)`, toolCalls.map(tc => ({ name: tc.name, args: tc.args })));
     const batchStart = Date.now();
     const results = await Promise.all(toolCalls.map(async tc => {
         const execStart = Date.now();
         const result = await mcpServer.executeToolCall(tc.name, tc.args);
         if (isDebugMode) console.log(`[AgentLoop] Tool ${tc.name} completed in ${Date.now() - execStart}ms`, { success: result.success, messageLen: result.message.length });
-        return { mapped: tc, raw: rawToolCalls.find((r: any) => r.id === tc.id) || tc, result };
+        return { mapped: tc, raw: rawToolCalls.find((r: { id: string }) => r.id === tc.id) || tc, result };
     }));
     results.sort((a, b) => String(a.raw.id).localeCompare(String(b.raw.id)));
     let criticalFailed = false;
@@ -152,7 +152,7 @@ export async function runAgentLoop(
     content: contextParts.join('\n')
   };
 
-  const messages: any[] = [
+  const messages: Array<{ role: string; content: string }> = [
     systemMessage,
     ...(frozenMessages || []),
     ...mapHistoryToMessages(history),
@@ -171,7 +171,7 @@ export async function runAgentLoop(
     itersCompleted = iter + 1;
     const thinkingBody = getThinkingDisabledBody();
     const filteredTools = filterTools(tools, mcpServer.getFullState());
-    const body: any = { model, messages, temperature: 0.7, tools: filteredTools, tool_choice: "auto", ...(thinkingBody || {}) };
+    const body: Record<string, unknown> = { model, messages, temperature: 0.7, tools: filteredTools, tool_choice: "auto", ...(thinkingBody || {}) };
     if (isDebugMode) console.log(`[AgentLoop] Iter ${iter + 1}/${MAX_ITERS} starting, messageCount=${messages.length}`, { bodyKeys: Object.keys(body), hasThinking: !!thinkingBody, model, toolCount: filteredTools.length });
 
     const fetchController = new AbortController();
@@ -215,7 +215,7 @@ export async function runAgentLoop(
     if (isDebugMode) {
       console.log(`[Agent Loop] Iter ${iter + 1}: prompt=${promptT} completion=${completionT} cached=${cachedT} tools=${rawToolCalls.length} contentLen=${assistantContent.length} elapsed=${Date.now() - iterStart}ms`);
       if (rawToolCalls.length > 0) {
-        console.log(`[Agent Loop] Dispatched Tool Calls:\n${rawToolCalls.map((tc: any) => ` - ID: ${tc.id}, Function: ${tc.function.name}, Args: ${tc.function.arguments}`).join('\n')}`);
+        console.log(`[Agent Loop] Dispatched Tool Calls:\n${rawToolCalls.map((tc: { id: string; function: { name: string; arguments: string } }) => ` - ID: ${tc.id}, Function: ${tc.function.name}, Args: ${tc.function.arguments}`).join('\n')}`);
       }
       if (assistantContent) {
         console.log(`[Agent Loop] Assistant content: ${assistantContent.slice(0, 200)}`);
@@ -229,7 +229,7 @@ export async function runAgentLoop(
       }
       const state = mcpServer.getFullState();
       const combat = state.combat;
-      if (combat && combat.isActive && combat.enemies && combat.enemies.some((e: any) => !e.isDead)) {
+      if (combat && combat.isActive && combat.enemies && combat.enemies.some((e: { isDead: boolean }) => !e.isDead)) {
         
         
         
@@ -244,12 +244,11 @@ export async function runAgentLoop(
       }
       break;
     }
-
-    const toolCalls = rawToolCalls.map((tc: any) => ({
+    const toolCalls = rawToolCalls.map((tc: { id: string; function: { name: string; arguments: string } }) => ({
       id: tc.id, name: tc.function.name, args: JSON.parse(tc.function.arguments),
     }));
 
-    const isEndOfTurn = toolCalls.some((tc: any) =>
+    const isEndOfTurn = toolCalls.some((tc: { name: string; args?: { narration?: string; autoAdvanceTime?: boolean; route?: string } }) =>
       tc.name === 'narrate_turn' ||
       (tc.name === 'long_rest' && (tc.args?.narration || tc.args?.autoAdvanceTime)) ||
       (tc.name === 'short_rest' && (tc.args?.narration || tc.args?.autoAdvanceTime)) ||
@@ -258,7 +257,7 @@ export async function runAgentLoop(
 
     if (isEndOfTurn) {
       
-      const preEndCalls = toolCalls.filter((tc: any) => tc.name !== 'narrate_turn');
+      const preEndCalls = toolCalls.filter((tc: { name: string }) => tc.name !== 'narrate_turn');
       if (preEndCalls.length > 0) {
         const { criticalFailed } = await executeToolBatch(rawToolCalls, preEndCalls, toolMessages, onToolResult);
         if (criticalFailed) criticalToolFailed = true;
@@ -266,9 +265,10 @@ export async function runAgentLoop(
 
       
       
-      const narrateCall = toolCalls.find((tc: any) => tc.name === 'narrate_turn');
+      
+      const narrateCall = toolCalls.find((tc: { name: string }) => tc.name === 'narrate_turn');
       if (narrateCall) {
-        const timeAlreadyAdvanced = preEndCalls.some((tc: any) =>
+        const timeAlreadyAdvanced = preEndCalls.some((tc: { name: string; args?: { narration?: string; autoAdvanceTime?: boolean; route?: string } }) =>
           (tc.name === 'long_rest' && (tc.args?.narration || tc.args?.autoAdvanceTime)) ||
           (tc.name === 'short_rest' && (tc.args?.narration || tc.args?.autoAdvanceTime)) ||
           (tc.name === 'move_to' && tc.args?.route)
@@ -297,7 +297,7 @@ export async function runAgentLoop(
       break;
     }
 
-    const toolCallDefs = rawToolCalls.map((tc: any) => ({
+    const toolCallDefs = rawToolCalls.map((tc: { id: string; function: { name: string; arguments: string } }) => ({
       id: tc.id, type: 'function',
       function: { name: tc.function.name, arguments: tc.function.arguments }
     }));
@@ -311,7 +311,7 @@ export async function runAgentLoop(
     }
 
     
-    const iterTokens = messages.reduce((s: number, m: any) => s + estimateTokens(m.content || JSON.stringify(m) || '') + PER_MSG_OVERHEAD, 0)
+    const iterTokens = messages.reduce((s: number, m: { content?: string }) => s + estimateTokens(m.content || JSON.stringify(m) || '') + PER_MSG_OVERHEAD, 0)
         + STATIC_OVERHEAD + COMPLETION_RESERVE;
     if (iterTokens > CONTEXT_BUDGET * 0.95) {
         if (isDebugMode) console.warn(`[Agent Loop] Budget exceeded at iter ${iter + 1}: ~${iterTokens} tokens. Breaking early.`);
@@ -321,7 +321,7 @@ export async function runAgentLoop(
     
     
     
-    const nextTurnResult = batchResults.find((r: any) => r.mapped.name === 'next_turn');
+    const nextTurnResult = batchResults.find((r: { mapped: { name: string } }) => r.mapped.name === 'next_turn');
     if (nextTurnResult && nextTurnResult.result.success) {
       break;
     }

@@ -86,7 +86,7 @@ export interface SavedGameData {
   version: string;
   campaignId: string;
   campaignName?: string;
-  gameState: any;
+  gameState: Record<string, unknown>;
   messages: Message[];
   stage: AppStage;
   timestamp: number;
@@ -95,6 +95,6 @@ export interface SavedGameData {
 /** Standard response envelope from the MCP engine. */
 export interface MCPResponse {
   success: boolean;
-  data: any;
+  data: Record<string, unknown>;
   message?: string;
 }

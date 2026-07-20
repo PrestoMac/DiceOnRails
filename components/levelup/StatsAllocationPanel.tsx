@@ -23,7 +23,7 @@ const StatRow: React.FC<{
   newValue: number;
   modifier: number;
   disableAdd: boolean;
-  onAllocate: (stat: any, delta: number) => void;
+  onAllocate: (stat: string, delta: number) => void;
   hover?: boolean;
 }> = ({ stat, currentValue: cv, allocation: al, newValue: nv, modifier: nm, disableAdd, onAllocate, hover }) => (
   <div className={`flex items-center gap-3 bg-stone-950/40 border border-stone-850 rounded-lg p-3${hover ? ' hover:bg-stone-950/60 transition-colors' : ''}`}>

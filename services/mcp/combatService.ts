@@ -2,21 +2,17 @@ import { Character, Enemy, EnemyAttack, GameState, InitiativeEntry, MCPResponse 
 import { cryptoRoll } from '../../utils/random';
 import { fail, fuzzyMatchEntity, generateId } from './_shared';
 import { lookupMonster } from '../../utils/monsters';
-import { getMod, getProficiencyBonus, calculateAc, getClassDef, getSpellAttackBonus } from '../classEngine';
-import { getConditionEffects, isIncapacitated, isUnconscious, applyCondition, removeCondition, tickConditions, tickConditionsByTime, tickConditionsByRounds, hasCondition, rollSaveAgainstCondition, getExhaustionPenalty } from '../conditionEngine';
+import { getMod, getProficiencyBonus, calculateAc, getClassDef } from '../classEngine';
+import { getConditionEffects, isIncapacitated, isUnconscious, removeCondition, tickConditions, tickConditionsByTime, rollSaveAgainstCondition, getExhaustionPenalty } from '../conditionEngine';
 import {
   getAlertInitiativeBonus,
-  getHeavyArmorMasterReduction,
-  getOffHandAbilityModifier,
   hasFeat,
   getResilientSaveBonus,
   getShieldMasterSaveBonus,
 } from '../featsService';
 import { rollDice } from '../diceEngine';
 import { parseDiceFormula } from '../../utils/dice';
-import { SPELLS_BY_ID, parseDuration } from '../../utils/spells';
 import { breakConcentration as engineBreakConcentration } from '../spellcastingEngine';
-import { getTimePeriod, formatGameTime, AMBIENT_LINES } from '../../utils/timeUtils';
 
 /** Dependencies required by the CombatService. */
 export interface CombatDeps {
@@ -38,7 +34,7 @@ export interface CombatService {
   selectEnemyTarget(): Character | undefined;
   resolveEnemyTurn(): Promise<MCPResponse>;
   checkCombatEndConditions(): { ended: boolean; reason?: string; victory?: boolean };
-  resolveAllPendingEnemyTurns(): Promise<{ messages: string[]; combatEnded: boolean; victory?: boolean; attackResults: any[] }>;
+  resolveAllPendingEnemyTurns(): Promise<{ messages: string[]; combatEnded: boolean; victory?: boolean; attackResults: Record<string, unknown>[] }>;
   syncInitiativeConditions(): void;
   player_attack(attackerId: string, weaponName: string, targetId: string, isOffHand?: boolean, isSneakAttack?: boolean, sharpshooter?: boolean, greatWeaponMaster?: boolean): Promise<MCPResponse>;
   resolveAdvantage(attacker?: Character | Enemy, target?: Character | Enemy, roll?: number): { roll: number; hasAdvantage: boolean; hasDisadvantage: boolean };
@@ -77,15 +73,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
     }
   }
 
-  function breakConcentrationWithCleanup(char: Character): void {
-    if (!char.concentrationSpellId) return;
-    engineBreakConcentration(char, 'voluntary');
-    if (state.combat?.activeDoTs) {
-      state.combat.activeDoTs = state.combat.activeDoTs.filter(
-        dot => !(dot.casterId === char.id && dot.spellId === char.concentrationSpellId)
-      );
-    }
-  }
+
 
   return {
     initializeDeathSaves,
@@ -332,7 +320,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
           this.syncInitiativeConditions();
 
           if (saveMessages.length > 0) {
-            (currentEntry as any)._saveMessages = saveMessages;
+            (currentEntry as unknown as { _saveMessages: string[] })._saveMessages = saveMessages;
           }
         }
       }
@@ -466,9 +454,9 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       }
 
       const next = combat.initiative[nextIdx];
-      const saveMsgs = (currentEntry as any)?._saveMessages;
+      const saveMsgs = (currentEntry as unknown as { _saveMessages?: string[] })?._saveMessages;
       const saveText = saveMsgs && saveMsgs.length > 0 ? '\n\n' + saveMsgs.join('\n') : '';
-      delete (currentEntry as any)?._saveMessages;
+      delete (currentEntry as unknown as { _saveMessages?: string[] })?._saveMessages;
       return {
         success: true,
         data: { combat },
@@ -587,7 +575,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
         initializeDeathSaves(target);
       }
 
-      const concResult = engineBreakConcentration(target, 'damaged', damageTotal);
+      engineBreakConcentration(target, 'damaged', damageTotal);
 
       const critStr = isCrit ? ' **CRITICAL HIT!**' : '';
       return {
@@ -623,10 +611,10 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       }
 
       if (partyTarget) {
-        const statVal = (partyTarget.stats as any)[mappedStat] || 10;
+        const statVal = (partyTarget.stats as Record<string, number>)[mappedStat] || 10;
         const mod = getMod(statVal);
-        const resilientBonus = getResilientSaveBonus(partyTarget, mappedStat as any);
-        const shieldMasterBonus = getShieldMasterSaveBonus(partyTarget, mappedStat as any);
+        const resilientBonus = getResilientSaveBonus(partyTarget, mappedStat as 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha');
+        const shieldMasterBonus = getShieldMasterSaveBonus(partyTarget, mappedStat as 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha');
         const totalMod = mod + resilientBonus + shieldMasterBonus;
         const roll = cryptoRoll(20);
         const total = roll + totalMod - getExhaustionPenalty(partyTarget);
@@ -653,7 +641,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
 
       if (enemyTarget) {
         const stats = enemyTarget.stats ?? { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 };
-        const statVal = (stats as any)[mappedStat] ?? 10;
+        const statVal = (stats as Record<string, number>)[mappedStat] ?? 10;
         const mod = getMod(statVal);
         const roll = cryptoRoll(20);
         const total = roll + mod - getExhaustionPenalty(enemyTarget);
@@ -673,7 +661,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       if (target.hp.current > 0) return fail(`${target.name} is not dying.`);
 
       initializeDeathSaves(target);
-      const saves = target.deathSaves!;
+      const saves = target.deathSaves as NonNullable<typeof target.deathSaves>;
 
       if (saves.isStable) {
         return { success: true, data: { deathSaves: saves }, message: `${target.name} is stable.` };
@@ -752,7 +740,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       }
 
       const attackMessages: string[] = [];
-      const attackResults: any[] = [];
+      const attackResults: Record<string, unknown>[] = [];
       for (let i = 0; i < enemy.attacks.length; i++) {
         const atkResult = await this.enemy_attack(enemy.id, target.id, i);
         if (atkResult.success) {
@@ -774,7 +762,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
 
     async resolveAllPendingEnemyTurns() {
       const messages: string[] = [];
-      const attackResults: any[] = [];
+      const attackResults: Record<string, unknown>[] = [];
       let combatEnded = false;
       let victory: boolean | undefined;
 
@@ -840,7 +828,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       const abilityMod = isRanged
         ? getMod(attacker.stats.dex)
         : getMod(attacker.stats.str);
-      const profBonus = getProficiencyBonus(attacker as any);
+      const profBonus = getProficiencyBonus(attacker as unknown as Character);
       let atkBonus = abilityMod + profBonus;
       if (sharpshooter || greatWeaponMaster) atkBonus -= 5;
 
@@ -881,7 +869,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       const parsed = parseDiceFormula(damageDice);
       if (!damageDice.match(/^\d+d\d+/)) return fail(`Invalid damage dice: ${damageDice}`);
 
-      let diceCount = isCrit ? parsed.count * 2 : parsed.count;
+      const diceCount = isCrit ? parsed.count * 2 : parsed.count;
       const dieSides = parsed.sides;
       const flatMod = parsed.bonus;
 

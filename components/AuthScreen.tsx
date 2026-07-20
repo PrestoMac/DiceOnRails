@@ -26,15 +26,15 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onComplete }) => {
     try {
       if (isResetMode) {
         const { error } = await authService.resetPasswordForEmail(email);
-        error ? setMessage({ type: 'error', text: error.message }) : setMessage({ type: 'success', text: 'Password reset link sent! Check your email.' });
+        if (error) { setMessage({ type: 'error', text: error.message }); } else { setMessage({ type: 'success', text: 'Password reset link sent! Check your email.' }); }
       } else if (isLogin) {
         const { session, error } = await authService.signIn(email, password);
-        error ? setMessage({ type: 'error', text: error.message }) : session && onComplete(session.user.id);
+        if (error) { setMessage({ type: 'error', text: error.message }); } else if (session) { onComplete(session.user.id); }
       } else {
         const { error } = await authService.signUp(email, password);
-        error ? setMessage({ type: 'error', text: error.message }) : setMessage({ type: 'success', text: 'Registration successful! Please check your email to confirm.' });
+        if (error) { setMessage({ type: 'error', text: error.message }); } else { setMessage({ type: 'success', text: 'Registration successful! Please check your email to confirm.' }); }
       }
-    } catch (err: any) { setMessage({ type: 'error', text: err.message || 'An unexpected error occurred' }); }
+    } catch (err: unknown) { setMessage({ type: 'error', text: (err as Error).message || 'An unexpected error occurred' }); }
     finally { setLoading(false); }
   };
 

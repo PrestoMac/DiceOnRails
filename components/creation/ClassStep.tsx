@@ -1,13 +1,13 @@
 import React from 'react';
 import { StepProps } from './types';
 import { CLASSES_CATALOG } from '../../utils/classes';
-import { StepH, NavBtn, SubclassList, DragonColorPicker } from './SharedComponents';
+import { StepH, NavBtn } from './SharedComponents';
 
 const CLASSES = CLASSES_CATALOG;
 
 /** Class selection step of the character creation wizard. Displays available classes with their features, starting equipment, and handles subclass routing for classes with subclass at level 1. */
-const ClassStep: React.FC<StepProps> = ({ wizardState, updateWizard, onNext, goToStep }) => {
-  const { selectedClass, selectedSubclassId, draconicAncestry, level } = wizardState;
+const ClassStep: React.FC<StepProps> = ({ wizardState, updateWizard, onNext }) => {
+  const { selectedClass } = wizardState;
   const stepCls = "space-y-6 animate-in fade-in duration-500";
 
   const showSubclassInline = selectedClass.subclassLevel === 1;
@@ -41,7 +41,7 @@ const ClassStep: React.FC<StepProps> = ({ wizardState, updateWizard, onNext, goT
             </div>
             {selectedClass.name === cls.name && cls.features && (
               <ul className="mt-1 space-y-1 border-t border-stone-800 pt-2">
-                {cls.features.slice(0, 3).map((f: any) => (
+                {cls.features.slice(0, 3).map((f: { id: string; name: string; description: string }) => (
                   <li key={f.id} className="text-[10px] text-stone-400 flex items-start gap-1">
                     <i className="fas fa-star text-amber-700 text-[8px] mt-0.5 shrink-0"></i>
                     <span><strong className="text-stone-300">{f.name}:</strong> {f.description}</span>

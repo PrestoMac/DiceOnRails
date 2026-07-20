@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { GameState, Message, MessageRole, AppStage, SavedGameData, Character, Currency, InventoryItem } from '../types';
+import { GameState, Message, MessageRole, AppStage, SavedGameData, Currency, InventoryItem } from '../types';
 import { mcpServer } from '../services/mcpService';
 import { storageService } from '../services/storageService';
 import { generateAtmosphere } from '../services/llm';
@@ -128,7 +128,7 @@ export const useGameState = (userId: string | undefined) => {
                     // handleRewind bumps that generation. If a stale write lands during or after
                     // a rewind, its generation will be older than the local counter and must be
                     // discarded to avoid clobbering the restored state.
-                    const remoteGen = (remoteState as any)?._rewindGeneration ?? 0;
+                    const remoteGen = (remoteState as unknown as { _rewindGeneration?: number })?._rewindGeneration ?? 0;
                     const localGen = getRewindGeneration();
                     if (remoteGen < localGen) {
                         if (isDebugMode) console.log('[DEBUG useGameState] rejecting stale realtime update', { remoteGen, localGen });

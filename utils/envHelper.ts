@@ -9,10 +9,10 @@
 export const getEnv = (key: string): string | undefined => {
   try {
     if (import.meta?.env?.[key]) return import.meta.env[key];
-  } catch {}
+  } catch { /* import.meta.env may not exist in all environments */ }
   try {
     if (typeof process !== 'undefined' && process.env?.[key]) return process.env[key];
-  } catch {}
+  } catch { /* process.env may not exist in all environments */ }
   return undefined;
 };
 

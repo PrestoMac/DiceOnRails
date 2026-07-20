@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { getExhaustionPenalty, parseExhaustionLevel } from '../../services/conditionEngine';
 import { makeCharacter } from '../helpers/characters';
-import type { Character } from '../../types';
 
 describe('exhaustionEngine', () => {
   describe('getExhaustionPenalty', () => {

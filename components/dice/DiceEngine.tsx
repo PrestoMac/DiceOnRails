@@ -82,7 +82,7 @@ export function getDieSides(face: string): number {
 }
 
 const makeAudio = () => {
-  const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+  const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
   osc.connect(gain);
@@ -100,7 +100,7 @@ export function playDiceTick() {
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.06);
     osc.start();
     osc.stop(ctx.currentTime + 0.06);
-  } catch {}
+  } catch { /* AudioContext may not be available */ }
 }
 
 /** Plays an audio tone to indicate the roll outcome: ascending high tone for success (523→659 Hz), low sustained tone for failure (120 Hz, NOT a descending sweep), or ascending low tone when success is undefined (440→554 Hz). */
@@ -128,5 +128,5 @@ export function playDiceResult(success?: boolean) {
       osc.start();
       osc.stop(ctx.currentTime + 0.25);
     }
-  } catch {}
+  } catch { /* AudioContext may not be available */ }
 }

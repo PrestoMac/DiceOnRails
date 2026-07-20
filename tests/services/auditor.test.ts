@@ -202,8 +202,8 @@ describe('auditor', () => {
 
     it('fixes undefined unusedStatPoints', () => {
       const state = makeState({
-        
-        party: [makeCharacter({ unusedStatPoints: undefined as any })],
+        // @ts-expect-error - testing repair of undefined field
+        party: [makeCharacter({ unusedStatPoints: undefined })],
       });
       const repaired = repairState(state);
       expect(repaired.party[0].unusedStatPoints).toBe(0);
@@ -219,16 +219,16 @@ describe('auditor', () => {
   describe('classes-valid', () => {
     it('backfills missing resources/knownSpells/preparedSpells/racialTraits', () => {
       const char = makeCharacter();
-      
-      delete (char as any).resources;
-      
-      delete (char as any).knownSpells;
-      
-      delete (char as any).preparedSpells;
-      
-      delete (char as any).racialTraits;
-      
-      delete (char as any).unlockedSubclassFeatures;
+      // @ts-expect-error - testing backfill of deleted properties
+      delete (char as Record<string, unknown>).resources;
+      // @ts-expect-error - testing backfill of deleted properties
+      delete (char as Record<string, unknown>).knownSpells;
+      // @ts-expect-error - testing backfill of deleted properties
+      delete (char as Record<string, unknown>).preparedSpells;
+      // @ts-expect-error - testing backfill of deleted properties
+      delete (char as Record<string, unknown>).racialTraits;
+      // @ts-expect-error - testing backfill of deleted properties
+      delete (char as Record<string, unknown>).unlockedSubclassFeatures;
       const state = makeState({ party: [char] });
       const repaired = repairState(state);
       expect(repaired.party[0].resources).toEqual([]);

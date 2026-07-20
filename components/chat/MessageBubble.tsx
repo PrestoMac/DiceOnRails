@@ -46,7 +46,7 @@ export function parseRolls(text: string): ParsedRoll[] {
   let attackMatch;
   ATTACK_ROLL_RE.lastIndex = 0;
   while ((attackMatch = ATTACK_ROLL_RE.exec(text)) !== null) {
-    const [, count, sides, roll, mod] = attackMatch;
+    const [, , sides, roll, mod] = attackMatch;
     const dieRoll = parseInt(roll);
     const modifier = parseInt(mod);
     const total = dieRoll + modifier;

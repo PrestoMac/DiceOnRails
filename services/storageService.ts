@@ -22,7 +22,7 @@ function buildSaveData(id: string, name: string, gameState: GameState, messages:
 /** Storage service managing campaign persistence to Supabase (for named campaigns) and localStorage (for anonymous play). */
 export const storageService = {
     /** Subscribes to real-time updates on a Supabase campaign row, returning an unsubscribe function. */
-    subscribeToCampaign(campaignId: string, onUpdate: (data: any) => void) {
+    subscribeToCampaign(campaignId: string, onUpdate: (data: unknown) => void) {
         const channel = supabase
             .channel(`campaign-${campaignId}`)
             .on(
@@ -36,7 +36,7 @@ export const storageService = {
 
     /** Queues a sync of the game state and messages to Supabase for the given campaign (coalesced via microtask). */
     syncCampaignState(campaignId: string, gameState: GameState, messages?: Message[]): Promise<void> {
-        const payload: any = { game_state: { ...gameState, _rewindGeneration: getRewindGeneration() } };
+        const payload: Record<string, unknown> = { game_state: { ...gameState, _rewindGeneration: getRewindGeneration() } };
         if (messages) payload.messages = messages;
         enqueueSync(campaignId, payload);
         return Promise.resolve();
@@ -45,13 +45,13 @@ export const storageService = {
     /** Creates a new campaign record in Supabase, returning the campaign ID or an error. */
     async createCampaign(userId: string, name: string, gameState: GameState, specificId?: string): Promise<{ campaignId?: string; error?: string }> {
         try {
-            const payload: any = { host_id: userId, name, game_state: gameState, messages: [] };
+            const payload: Record<string, unknown> = { host_id: userId, name, game_state: gameState, messages: [] };
             if (specificId) payload.id = specificId;
             const { data, error } = await supabase.from(CAMPAIGNS_TABLE).insert(payload).select().single();
             if (error) return { error: error.message };
             return { campaignId: data.id };
-        } catch (e: any) {
-            return { error: e.message };
+        } catch (e: unknown) {
+            return { error: (e as Error).message };
         }
     },
 
@@ -78,7 +78,7 @@ export const storageService = {
             const list: Campaign[] = [];
 
             if (newCampaigns) {
-                list.push(...newCampaigns.map((row: any) => ({
+                list.push(...newCampaigns.map((row: Record<string, unknown>) => ({
                     id: row.id,
                     name: row.name,
                     createdAt: new Date(row.created_at).getTime(),
@@ -89,7 +89,7 @@ export const storageService = {
             }
 
             if (legacySaves) {
-                list.push(...legacySaves.map((row: any) => ({
+                list.push(...legacySaves.map((row: Record<string, unknown>) => ({
                     id: row.id,
                     name: `[LEGACY] ${row.name || 'Untitled'}`,
                     createdAt: new Date(row.created_at).getTime(),
@@ -101,8 +101,8 @@ export const storageService = {
 
             list.sort((a, b) => b.lastPlayed - a.lastPlayed);
             return { campaigns: list };
-        } catch (e: any) {
-            return { error: e.message };
+        } catch (e: unknown) {
+            return { error: (e as Error).message };
         }
     },
 
@@ -151,8 +151,8 @@ export const storageService = {
                     };
                 }
                 return { data: undefined };
-            } catch (e: any) {
-                return { error: e.message };
+            } catch (e: unknown) {
+                return { error: (e as Error).message };
             }
         }
 
@@ -171,8 +171,8 @@ export const storageService = {
             try {
                 await this.syncCampaignState(campaignId, data.gameState, data.messages);
                 return {};
-            } catch (e: any) {
-                return { error: e.message };
+            } catch (e: unknown) {
+                return { error: (e as Error).message };
             }
         }
         localStorage.setItem(LS_KEY, JSON.stringify(data));
@@ -204,8 +204,8 @@ export const storageService = {
                 .eq('host_id', userId);
             if (error) return { error: error.message };
             return {};
-        } catch (e: any) {
-            return { error: e.message };
+        } catch (e: unknown) {
+            return { error: (e as Error).message };
         }
     },
 
@@ -215,12 +215,12 @@ export const storageService = {
     },
 };
 
-const pendingPayloads = new Map<string, any>();
+const pendingPayloads = new Map<string, Record<string, unknown>>();
 let flushScheduled = false;
 let inflight = false;
 
 /** Queues a campaign sync payload, coalescing multiple updates within the same microtask into a single Supabase UPDATE. */
-function enqueueSync(campaignId: string, payload: any) {
+function enqueueSync(campaignId: string, payload: Record<string, unknown>) {
     pendingPayloads.set(campaignId, { ...(pendingPayloads.get(campaignId) || {}), ...payload });
     if (flushScheduled) return;
     flushScheduled = true;

@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Character, StartingLocation } from '../../types';
 import { WizardState } from './types';
-import { WizardStep, WizardStepContext } from '../wizard/WizardStep';
+import { WizardStep } from '../wizard/WizardStep';
 import StepWizard from '../wizard/StepWizard';
 import { ASI_LEVELS, FALLBACK_STARTING_LOCATION } from '../../constants';
 import { lookupSRDItem } from '../../utils/srdItems';
 import { CLASSES_CATALOG } from '../../utils/classes';
 import { RACES_CATALOG } from '../../utils/races';
-import { getMod, getClassDef, getRaceDef, recalculateResourcePools } from '../../services/classEngine';
+import { getMod, getRaceDef, recalculateResourcePools } from '../../services/classEngine';
 import { DRAGON_ANCESTRIES } from './constants';
 import { StepH, NavBtn, SubclassList, DragonColorPicker } from './SharedComponents';
 import NameStep from './NameStep';
@@ -47,7 +47,7 @@ const WizardShell: React.FC<WizardShellProps> = ({
     stats: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
     inventory: [], allocatedSkills: {}, goldPool: 10,
     selectedSpells: [], selectedCantrips: [], selectedSubclassId: null,
-    asiFeatSlots: ASI_LEVELS.filter(l => l <= 1).map(() => ({ type: null as any })), draconicAncestry: null,
+    asiFeatSlots: ASI_LEVELS.filter(l => l <= 1).map(() => ({ type: null as unknown as 'asi' | 'feat' | null })), draconicAncestry: null,
     halfElfChoice1: null, halfElfChoice2: null,
     generatedLocations: [], selectedLocation: null,
     isGeneratingLocs: false, isRerolling: false,
@@ -71,12 +71,11 @@ const WizardShell: React.FC<WizardShellProps> = ({
     const targetSlots = ASI_LEVELS.filter(l => l <= wizardState.level);
     if (wizardState.asiFeatSlots.length !== targetSlots.length) {
       const newSlots = wizardState.asiFeatSlots.slice(0, targetSlots.length);
-      while (newSlots.length < targetSlots.length) { newSlots.push({ type: null as any }); }
+      while (newSlots.length < targetSlots.length) { newSlots.push({ type: null as unknown as 'asi' | 'feat' | null }); }
       updateWizard({ asiFeatSlots: newSlots });
     }
   }, [wizardState.level, updateWizard, wizardState.asiFeatSlots.length]);
 
-  const needsSubclassStep = wizardState.selectedClass.subclassLevel > 1 && wizardState.selectedClass.subclassLevel <= wizardState.level;
   const needsSpellsStep = !!wizardState.selectedClass.spellcasting;
 
   const remainingSkillPoints = (() => {
@@ -96,16 +95,17 @@ const WizardShell: React.FC<WizardShellProps> = ({
     if (isNewCampaign && !loc) { setFinalizeError("Please select a starting location."); return; }
     if (loc && onSetStartingLocation) onSetStartingLocation(loc);
     const fs = { ...stats };
-    if (typeof selectedRace.asi === 'object') Object.entries(selectedRace.asi).forEach(([s, v]) => { (fs as any)[s] += v; });
+    if (typeof selectedRace.asi === 'object') Object.entries(selectedRace.asi).forEach(([s, v]) => { (fs as Record<string, number>)[s] += v as number; });
     const collectedFeats: string[] = [];
-    const featSelections: { level: number; type: 'asi' | 'feat'; featId?: string; statAllocations?: any }[] = [];
+    const featSelections: { level: number; type: 'asi' | 'feat'; featId?: string; statAllocations?: Record<string, number> }[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const featChoices: Record<string, Record<string, any>> = {};
     const updatedSkills = { ...allocatedSkills };
     asiFeatSlots.forEach((slot, idx) => {
       const slotLevel = ASI_LEVELS[idx];
       if (slot.type === 'asi' && slot.statAllocations) {
         for (const [stat, v] of Object.entries(slot.statAllocations)) {
-          if (typeof v === 'number' && v > 0) (fs as any)[stat] = ((fs as any)[stat] || 0) + v;
+          if (typeof v === 'number' && v > 0) (fs as Record<string, number>)[stat] = ((fs as Record<string, number>)[stat] || 0) + v;
         }
         featSelections.push({ level: slotLevel, type: 'asi', statAllocations: slot.statAllocations });
       } else if (slot.type === 'feat' && slot.featId) {
@@ -117,18 +117,18 @@ const WizardShell: React.FC<WizardShellProps> = ({
         featSelections.push({ level: slotLevel, type: 'feat', featId: slot.featId });
       }
     });
-    const finalRaceConBonus = typeof selectedRace.asi === 'object' ? (selectedRace.asi as any).con || 0 : 0;
+    const finalRaceConBonus = typeof selectedRace.asi === 'object' ? (selectedRace.asi as Record<string, number>).con || 0 : 0;
     const conMod = getMod(fs.con + finalRaceConBonus);
     const racialTraits: string[] = [];
     const raceDef = getRaceDef(selectedRace.id);
     if (raceDef) for (const t of raceDef.traits) { racialTraits.push(t.id); }
     const tempChar = { id: 'player-temp', name, race: selectedRace.id, class: selectedClass.id, level, stats: fs, inventory, racialTraits };
-    const resources = recalculateResourcePools(tempChar as any);
+    const resources = recalculateResourcePools(tempChar as unknown as Character);
     if (typeof selectedRace.asi === 'string') {
       const halfElfStats = { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 2 };
-      if (halfElfChoice1) (halfElfStats as any)[halfElfChoice1] += 1;
-      if (halfElfChoice2) (halfElfStats as any)[halfElfChoice2] += 1;
-      for (const [s, v] of Object.entries(halfElfStats)) (fs as any)[s] += v;
+      if (halfElfChoice1) (halfElfStats as Record<string, number>)[halfElfChoice1] += 1;
+      if (halfElfChoice2) (halfElfStats as Record<string, number>)[halfElfChoice2] += 1;
+      for (const [s, v] of Object.entries(halfElfStats)) (fs as Record<string, number>)[s] += v as number;
     }
     onComplete({
       id: 'player-' + Date.now(), name, race: selectedRace.id, class: selectedClass.id, level,
@@ -144,7 +144,7 @@ const WizardShell: React.FC<WizardShellProps> = ({
       preparedSpells: selectedClass.spellcasting?.prepMode === 'prepared' ? [...selectedCantrips, ...selectedSpells] : [...selectedCantrips],
       subclassId: selectedSubclassId || undefined,
       backstory: backstory || undefined,
-      halfElfStatChoices: (typeof selectedRace.asi === 'string' && halfElfChoice1 && halfElfChoice2) ? [halfElfChoice1, halfElfChoice2] as any : undefined,
+      halfElfStatChoices: (typeof selectedRace.asi === 'string' && halfElfChoice1 && halfElfChoice2) ? [halfElfChoice1, halfElfChoice2] as unknown as [string, string] : undefined,
       draconicAncestry: (() => {
         if (selectedRace.id === 'dragonborn' && draconicAncestry) return draconicAncestry;
         if (selectedClass.id === 'sorcerer' && selectedSubclassId === 'draconic-bloodline' && draconicAncestry) return draconicAncestry;
@@ -154,7 +154,7 @@ const WizardShell: React.FC<WizardShellProps> = ({
         const a = (selectedRace.id === 'dragonborn' && draconicAncestry) ? draconicAncestry
           : (selectedClass.id === 'sorcerer' && selectedSubclassId === 'draconic-bloodline' && draconicAncestry) ? draconicAncestry : null;
         if (!a) return undefined;
-        return (DRAGON_ANCESTRIES.find(d => d.id === a)?.damageType as any) || undefined;
+        return (DRAGON_ANCESTRIES.find(d => d.id === a)?.damageType as string) || undefined;
       })(),
       unlockedSubclassFeatures: [],
     });
@@ -168,7 +168,7 @@ const WizardShell: React.FC<WizardShellProps> = ({
     try {
       const locs = await onGenerateStartingLocations(charInfo);
       if (gid === generationIdRef.current) updateWizard({ generatedLocations: locs, selectedLocation: locs.length > 0 ? locs[0] : null });
-    } catch { }
+    } catch { /* location generation failed, will retry */ }
     if (gid === generationIdRef.current) updateWizard({ isRerolling: false, isGeneratingLocs: false });
   };
 
@@ -270,7 +270,6 @@ const WizardShell: React.FC<WizardShellProps> = ({
       isVisible: (s) => !!s.selectedClass.spellcasting,
       validate: () => null,
       render: ({ state, updateState, context }) => {
-        const needsLateSub = state.selectedClass.subclassLevel >= 2 && state.selectedClass.subclassLevel <= state.level;
         return (
           <SpellsStep wizardState={state} updateWizard={updateState} onNext={() => context.goToStep('gear')} onBack={context.goBack} goToStep={() => {}}
             onBackToSubclass={() => context.goToStep('subclass-late')}

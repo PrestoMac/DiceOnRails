@@ -1,5 +1,4 @@
 import React from 'react';
-import { StartingLocation } from '../../types';
 import { WizardState } from './types';
 import { StepH } from './SharedComponents';
 

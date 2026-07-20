@@ -45,7 +45,7 @@ export function mistyStep(
 /** Teleports a character with the Teleport spell, applying mishap chance based on destination familiarity. */
 export function teleport(
   character: Character,
-  range: number = 10,
+  _range: number = 10,
   familiarity: 'clear' | 'moderate' | 'poor' | 'none' = 'clear'
 ): TeleportResult {
   const mishapChance = familiarity === 'none' ? 33 : familiarity === 'poor' ? 13 : 0;

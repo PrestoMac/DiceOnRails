@@ -204,7 +204,7 @@ export function getCurrentCombatActor(cs: CombatState): { name: string; type: 'p
 export function rollDeathSave(ch: Character, cs: CombatState): {
   message: string; roll: number; total: number; successes: number; failures: number; isStable: boolean; revived: boolean; died: boolean;
 } {
-  ensureDeathSaves(ch); const s = ch.deathSaves!;
+  ensureDeathSaves(ch); const s = ch.deathSaves as NonNullable<typeof ch.deathSaves>;
   if (s.isStable) return { message: `${ch.name} is stable.`, roll: 0, total: 0, successes: s.successes, failures: s.failures, isStable: true, revived: false, died: false };
   const rawRoll = cryptoRoll(20);
   const total = rawRoll - getExhaustionPenalty(ch);
@@ -221,8 +221,8 @@ export function makeSavingThrow(target: Character, stat: string, dc: number): {
 } {
   const vs = ['str', 'dex', 'con', 'int', 'wis', 'cha'] as const;
   const ms = vs.find(s => stat.toLowerCase().includes(s) || s.includes(stat.toLowerCase().trim())) || 'dex';
-  const sv = (target.stats as any)[ms] || 10; const bm = getMod(sv);
-  const rb = getResilientSaveBonus(target, ms as any); const smb = getShieldMasterSaveBonus(target, ms as any);
+  const sv = (target.stats as Record<string, number>)[ms] || 10; const bm = getMod(sv);
+  const rb = getResilientSaveBonus(target, ms as 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha'); const smb = getShieldMasterSaveBonus(target, ms as 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha');
   const tm = bm + rb + smb; const roll = cryptoRoll(20); const total = roll + tm - getExhaustionPenalty(target);
   const success = total >= dc; const n20 = roll === 20; const n1 = roll === 1;
   const bp: string[] = []; if (rb > 0) bp.push(`Resilient +${rb}`); if (smb > 0) bp.push(`Shield Master +${smb}`);

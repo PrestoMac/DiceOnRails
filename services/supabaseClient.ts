@@ -5,7 +5,7 @@ let supabaseUrl: string | undefined, supabaseKey: string | undefined;
 try {
   supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-} catch (e) {
+} catch {
   supabaseUrl = typeof process !== 'undefined' ? process.env.VITE_SUPABASE_URL : undefined;
   supabaseKey = typeof process !== 'undefined' ? process.env.VITE_SUPABASE_ANON_KEY : undefined;
 }
@@ -28,7 +28,7 @@ export const supabase = new Proxy({} as ReturnType<typeof createClient>, {
   get(_, prop) {
     if (typeof prop === 'string' && (prop === 'then' || prop === 'catch' || prop === 'finally')) return undefined;
     const instance = getSupabaseClient();
-    const value = (instance as any)[prop];
+    const value = (instance as unknown as Record<string, unknown>)[prop];
     return typeof value === 'function' ? value.bind(instance) : value;
   },
 });

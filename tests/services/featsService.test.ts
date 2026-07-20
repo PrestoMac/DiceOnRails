@@ -493,14 +493,13 @@ describe('featsService', () => {
   describe('ensureCharacterFeatFields', () => {
     it('fills missing feat fields with defaults', () => {
       const c = makeCharacter();
-      
-      delete (c as any).feats;
-      
-      delete (c as any).featSelections;
-      
-      delete (c as any).featChoices;
-      
-      (c as any).pendingFeatChoice = undefined;
+      // @ts-expect-error - testing default fill for deleted property
+      delete (c as Record<string, unknown>).feats;
+      // @ts-expect-error - testing default fill for deleted property
+      delete (c as Record<string, unknown>).featSelections;
+      // @ts-expect-error - testing default fill for deleted property
+      delete (c as Record<string, unknown>).featChoices;
+      c.pendingFeatChoice = undefined;
       const updated = ensureCharacterFeatFields(c);
       expect(updated.feats).toEqual([]);
       expect(updated.featSelections).toEqual([]);

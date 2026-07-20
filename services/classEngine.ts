@@ -3,6 +3,7 @@ import { CLASSES_CATALOG, ClassDefinition } from '../utils/classes';
 import { RACES_CATALOG, RaceDefinition } from '../utils/races';
 import { SubclassSummary } from '../types';
 import { getExhaustionPenalty } from './conditionEngine';
+import { getResilientSaveBonus } from './featsService';
 
 /** Calculates the ability modifier for a given score. */
 function abilityMod(score: number): number {
@@ -55,7 +56,7 @@ export function canEquipArmor(character: Character, armorType: 'light' | 'medium
 }
 
 /** Determines the armor type category (light/medium/heavy/shield) from an inventory item's stats and name. */
-export function getArmorTypeFromItem(item: any): 'light' | 'medium' | 'heavy' | 'shield' {
+export function getArmorTypeFromItem(item: InventoryItem): 'light' | 'medium' | 'heavy' | 'shield' {
   if (item.type === 'shield') return 'shield';
   const formula = item.stats?.acFormula || '';
   if (formula.startsWith('11')) return 'light';
@@ -142,9 +143,8 @@ export function getSavingThrowBonus(character: Character, stat: 'str'|'dex'|'con
   let bonus = ability + (isProficient ? profBonus : 0);
   if (character.feats?.includes('resilient')) {
     try {
-      const { getResilientSaveBonus } = require('./featsService');
       bonus += getResilientSaveBonus(character, stat);
-    } catch { }
+    } catch { /* featsService unavailable in some contexts */ }
   }
   if (character.feats?.includes('shield-master') && stat === 'dex' &&
       character.inventory.some(i => i.equipped && i.type === 'shield')) {
@@ -345,7 +345,7 @@ export function recalculateResourcePools(character: Character): ResourcePool[] {
   if (raceDef) {
     for (const t of raceDef.traits) {
       if (t.kind === 'resource' && t.grantsResource) {
-        let max = 1;
+        const max = 1;
         let resetOn: 'short' | 'long' = 'short';
         if (t.grantsResource === 'relentless-endurance' || t.grantsResource === 'hellish-rebuke' || t.grantsResource === 'hellish-rebellion') {
           resetOn = 'long';

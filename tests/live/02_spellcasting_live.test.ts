@@ -1,5 +1,5 @@
-import { runLiveTest, createLiveContext, assert } from './helpers/liveRunner';
-import { makeCharacter, makeWizard, makeCleric } from '../helpers/characters';
+import { runLiveTest, assert } from './helpers/liveRunner';
+import { makeWizard, makeCleric } from '../helpers/characters';
 import { expect } from 'vitest';
 
 runLiveTest('Cast fireball at 3rd level', async (ctx) => {

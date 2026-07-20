@@ -1,23 +1,18 @@
-import { Character, Enemy, GameState, MCPResponse } from '../../types';
+import { Character, GameState, MCPResponse, InventoryItem, Enemy } from '../../types';
 import { cryptoRoll } from '../../utils/random';
-import { fail, generateId } from './_shared';
+import { fail } from './_shared';
 import { SKILLS_LIST } from '../../constants';
 import { isDebugMode } from '../../utils/debug';
-import { getMod, getProficiencyBonus, getClassDef, recoverResources as classEngineRecoverResources } from '../classEngine';
+import { getMod, getClassDef, recoverResources as classEngineRecoverResources } from '../classEngine';
 import { awardExperience } from '../progressionService';
-import { getConditionEffects, isIncapacitated, isUnconscious, applyCondition, removeCondition, tickConditions, tickConditionsByTime, tickConditionsByRounds, hasCondition, rollSaveAgainstCondition, getExhaustionPenalty } from '../conditionEngine';
-import { rollDice } from '../diceEngine';
-import { parseDiceFormula } from '../../utils/dice';
-import { getTimePeriod, formatGameTime, AMBIENT_LINES } from '../../utils/timeUtils';
+import { getConditionEffects, applyCondition, tickConditionsByTime, tickConditionsByRounds, hasCondition, getExhaustionPenalty } from '../conditionEngine';
+import { getTimePeriod, AMBIENT_LINES } from '../../utils/timeUtils';
 import { SPELLS_BY_ID, parseDuration } from '../../utils/spells';
 import { breakConcentration as engineBreakConcentration } from '../spellcastingEngine';
 import { ensureGameStateFields } from './stateService';
 import {
   rerollDamageValueIfApplicable,
   getOffHandAbilityModifier,
-  getResilientSaveBonus,
-  getShieldMasterSaveBonus,
-  hasFeat,
 } from '../featsService';
 
 interface Route {
@@ -45,21 +40,21 @@ function getRoute(id: string): Route | undefined { return ROUTES[id.toLowerCase(
 export interface TravelDeps {
   getTarget: (id?: string) => Character | undefined;
   adjust_currency: (gp?: number, sp?: number, cp?: number, targetId?: string) => Promise<MCPResponse>;
-  update_inventory: (item_name: string, action: 'add' | 'remove' | 'edit', quantity?: number, new_name?: string, targetId?: string, type?: any, rarity?: any, description?: string, stats?: any, equipped?: boolean, cost_gp?: number, cost_sp?: number, cost_cp?: number, autoDeductMarketPrice?: boolean, craft?: boolean) => Promise<MCPResponse>;
+  update_inventory: (item_name: string, action: 'add' | 'remove' | 'edit', quantity?: number, new_name?: string, targetId?: string, type?: InventoryItem['type'], rarity?: InventoryItem['rarity'], description?: string, stats?: InventoryItem['stats'], equipped?: boolean, cost_gp?: number, cost_sp?: number, cost_cp?: number, autoDeductMarketPrice?: boolean, craft?: boolean) => Promise<MCPResponse>;
   log_lore: (title: string, content: string, category: string) => Promise<MCPResponse>;
   upsert_quest: (title: string, description: string, status: 'active' | 'completed' | 'failed', reputationChanges?: Array<{ faction: string; delta: number }>) => Promise<MCPResponse>;
 }
 
 /** Service interface for movement, narration, rests, dice rolling, and skill checks. */
 export interface TravelService {
-  move_to(location_name: string, description?: string, targetId?: string, skillCheck?: any, route?: string, pace?: string): Promise<MCPResponse>;
+  move_to(location_name: string, description?: string, targetId?: string, skillCheck?: Record<string, unknown>, route?: string, pace?: string): Promise<MCPResponse>;
   narrate_turn(narration: string, timePassed?: number): Promise<MCPResponse>;
   setAtmosphere(url: string): void;
   setStartingLocation(location: { name: string; description: string; atmosphereUrl?: string }): void;
   cacheLocationImage(name: string, url: string): void;
   getCachedLocationImage(name: string): string | undefined;
   roll_dice(sides: number, count?: number, modifier?: number, target_ac?: number, target_name?: string, roll_label?: string, isDamageRoll?: boolean, isOffHand?: boolean, weaponName?: string, attackerId?: string): Promise<MCPResponse>;
-  check_skill(skill_name: string, difficulty: number, targetId?: string, onSuccess?: any): Promise<MCPResponse>;
+  check_skill(skill_name: string, difficulty: number, targetId?: string, onSuccess?: Record<string, unknown>): Promise<MCPResponse>;
   long_rest(narration?: string, autoAdvanceTime?: boolean): Promise<MCPResponse>;
   short_rest(targetId?: string, narration?: string, autoAdvanceTime?: boolean): Promise<MCPResponse>;
 }
@@ -101,7 +96,7 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
     return toRemove.map(c => c.id);
   }
 
-  async function executeOnSuccessConsequences(onSuccess: any, targetId?: string): Promise<string[]> {
+  async function executeOnSuccessConsequences(onSuccess: Record<string, unknown>, targetId?: string): Promise<string[]> {
     const logs: string[] = [];
     if (onSuccess.awardCurrency) {
       const cr = await deps.adjust_currency(
@@ -166,7 +161,7 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
         }
       }
       const results: number[] = [];
-      let rerolledIndices: number[] = [];
+      const rerolledIndices: number[] = [];
 
       for (let i = 0; i < count; i++) {
         let v = cryptoRoll(sides);
@@ -192,8 +187,8 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
 
       if (sides === 20 && count === 1 && !isDamageRoll) {
         const targetObj = target_name
-          ? state.party.find((c: any) => c.id === target_name || c.name.toLowerCase() === target_name.toLowerCase()) ||
-            state.combat?.enemies.find((e: any) => e.id === target_name || e.name.toLowerCase() === target_name.toLowerCase())
+          ? state.party.find((c: Character) => c.id === target_name || c.name.toLowerCase() === target_name.toLowerCase()) ||
+            state.combat?.enemies.find((e: Enemy) => e.id === target_name || e.name.toLowerCase() === target_name.toLowerCase())
           : undefined;
         const advResult = (() => {
           let hasAdvantage = false, hasDisadvantage = false;
@@ -225,7 +220,7 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
 
       state.lastDiceRoll = { sides, count, modifier: safeModifier + offHandBonus, results, total };
 
-      let labelText = roll_label ? ` [${roll_label}]` : '';
+      const labelText = roll_label ? ` [${roll_label}]` : '';
       const modStr = (safeModifier + offHandBonus) !== 0
         ? (safeModifier + offHandBonus > 0 ? '+' + (safeModifier + offHandBonus) : (safeModifier + offHandBonus))
         : '';
@@ -298,7 +293,7 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
         'cha': 'cha', 'charisma': 'cha'
       };
 
-      let cleanSkill = skill_name.toLowerCase().trim()
+      const cleanSkill = skill_name.toLowerCase().trim()
         .replace(/\s*(?:check|roll|save|saving\s+throw)$/i, '')
         .trim();
 
@@ -322,7 +317,7 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
         }
       }
 
-      const statValue = (target.stats as any)[statKey] || 10;
+      const statValue = (target.stats as Record<string, number>)[statKey] || 10;
       const modifier = getMod(statValue);
 
       const skillRank = matchedSkill ? (target.skills?.[matchedSkill] || 0) : 0;
@@ -485,8 +480,8 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
 
       if (safeTimePassed > 0) {
         ensureGameStateFields(state);
-        const oldTime = state.gameTime!;
-        state.gameTime! += safeTimePassed;
+        const oldTime = state.gameTime as number;
+        state.gameTime = (state.gameTime as number) + safeTimePassed;
 
         if (isDebugMode) {
           console.log(`[travelService] gameTime advanced: ${oldTime} → ${state.gameTime}`);
@@ -534,7 +529,7 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
         }
 
         const oldPeriod = getTimePeriod(oldTime);
-        const newPeriod = getTimePeriod(state.gameTime!);
+        const newPeriod = getTimePeriod(state.gameTime as number);
         if (oldPeriod !== newPeriod && AMBIENT_LINES[newPeriod]) {
           logs.push(AMBIENT_LINES[newPeriod]);
         }
@@ -556,14 +551,14 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
               const parsed = spell?.parsedDuration ?? (spell ? parseDuration(spell.duration) : undefined);
               return parsed?.unit === 'minute' ? parsed.value : undefined;
             })();
-            if (effectiveDuration != null && effectiveDuration <= (state.gameTime! - startTime)) {
+            if (effectiveDuration != null && effectiveDuration <= ((state.gameTime as number) - startTime)) {
               engineBreakConcentration(char, 'voluntary');
               if (state.combat?.activeDoTs) {
                 state.combat.activeDoTs = state.combat.activeDoTs.filter(
                   dot => !(dot.casterId === char.id && dot.spellId === char.concentrationSpellId)
                 );
               }
-              expired.push(`concentration (${spell!.name})`);
+              if (spell) expired.push(`concentration (${spell.name})`);
             }
           }
 
@@ -634,10 +629,10 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
 
     async long_rest(narration, autoAdvanceTime) {
       const messages: string[] = [];
-      const healResults: any[] = [];
+      const healResults: Array<{ name: string; class?: string; level: number; hpRestored: number; hpMax: number; hitDieSize: number; hitDicePrev: number; hitDiceNew: number; hitDiceMax: number }> = [];
       ensureCharacterFields();
       ensureGameStateFields(state);
-      const elapsed = state.gameTime! - (state.lastLongRestTime ?? -960);
+      const elapsed = (state.gameTime as number) - (state.lastLongRestTime ?? -960);
       if (elapsed < 960) {
         const remaining = 960 - elapsed;
         return fail(`Only ${Math.floor(elapsed / 60)}h since your last rest. You need ${Math.ceil(remaining / 60)}h more.`);
@@ -727,7 +722,7 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
         }
         clearNonMinuteConditions(char);
       }
-      let resultMsg = 'Short rest completed. Short-rest resources recovered.';
+      const resultMsg = 'Short rest completed. Short-rest resources recovered.';
 
       if (narration || autoAdvanceTime) {
         const timePassed = 60;

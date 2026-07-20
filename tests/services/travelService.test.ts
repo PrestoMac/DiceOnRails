@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createTravelService, TravelService } from '../../services/mcp/travelService';
-import { GameState, Character, Enemy } from '../../types';
+import { GameState, Character } from '../../types';
 import { makeGameState, makeEnemy } from '../helpers/state';
 
 vi.mock('../../utils/random', () => ({

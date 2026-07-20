@@ -100,7 +100,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ settings, userId, message
     })));
   }, []);
 
-  const hc = (key: keyof AppSettings, value: any) => setLocal(p => ({ ...p, [key]: value }));
+  const hc = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => setLocal(p => ({ ...p, [key]: value }));
 
   const copyDebugLogs = () => {
     navigator.clipboard.writeText(buildDebugLog(messages, gameState)).then(() => {

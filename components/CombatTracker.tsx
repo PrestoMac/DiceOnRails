@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CombatState, Character, Enemy } from '../types';
+import { CombatState, Character } from '../types';
 import HpBar from './shared/HpBar';
 
 interface CombatTrackerProps {

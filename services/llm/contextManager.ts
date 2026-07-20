@@ -36,7 +36,7 @@ export function enforceTokenBudget(params: {
 } {
     const { activeMessages, frozenMessages, contextString } = params;
     const frozenMsgCount = params.ctx.frozenMessageCount || 0;
-    let frozen = [...frozenMessages] as { role: 'user' | 'system'; content: string }[];
+    const frozen = [...frozenMessages] as { role: 'user' | 'system'; content: string }[];
     let droppedCheckpoints = 0;
     let droppedRaw = false;
 

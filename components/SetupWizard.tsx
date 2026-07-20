@@ -76,7 +76,7 @@ const SetupWizard: React.FC = () => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => setConfig({...config, [e.target.name]: e.target.value});
 
-  const checkTable = async (supabase: any, table: string) => {
+  const checkTable = async (supabase: { from: (table: string) => { select: (...cols: string[]) => { limit: (n: number) => Promise<{ error: { code?: string; message?: string } | null }> } } }, table: string) => {
     setStatus(`Checking table: ${table}...`);
     if (isDebugMode) console.log(`🔹 Verifying ${table} table...`);
     const { error: err } = await supabase.from(table).select('id').limit(1);
@@ -98,9 +98,10 @@ const SetupWizard: React.FC = () => {
       for (const t of ['campaigns', 'game_saves', 'srd_items']) { if (!(await checkTable(supabase, t))) return false; }
       setStatus(CONNECTED);
       return true;
-    } catch (e: any) {
-      if (e.message?.includes('does not exist') || e.code === '42P01') { setStatus('⚠️ Missing Tables Detected. Tables need creation.'); return false; }
-      setError(e.message); setStatus(null); return false;
+    } catch (e: unknown) {
+      const err = e as Error & { code?: string };
+      if (err.message?.includes('does not exist') || err.code === '42P01') { setStatus('⚠️ Missing Tables Detected. Tables need creation.'); return false; }
+      setError(err.message); setStatus(null); return false;
     }
   };
 
@@ -114,7 +115,7 @@ const SetupWizard: React.FC = () => {
         try { const d = await res.json(); if (d?.error) msg = d.error; } catch { msg = `Server returned ${res.status}: ${res.statusText}`; }
         throw new Error(msg);
       }
-    } catch (e: any) { setError(e.message); }
+    } catch (e: unknown) { setError((e as Error).message); }
   };
 
   const connected = status === CONNECTED;

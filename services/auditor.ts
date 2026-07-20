@@ -1,4 +1,4 @@
-import { GameState } from '../types';
+import { GameState, Character, SubclassSummary } from '../types';
 import { FEATS_CATALOG } from '../utils/feats';
 import { RACES_CATALOG } from '../utils/races';
 import { SPELLS_BY_ID } from '../utils/spells';
@@ -30,12 +30,12 @@ function fail(rule: string, details: string, autoFixed = false): AuditResult {
 }
 
 /** Applies a transformation function to every character in the party and returns the new state. */
-function mapParty(state: GameState, fn: (c: any) => any): GameState {
+function mapParty(state: GameState, fn: (c: Character) => Character): GameState {
   return { ...state, party: state.party.map(fn) };
 }
 
 /** Iterates over all party characters, returning the first non-null AuditResult from the predicate. */
-function checkEachChar(state: GameState, rule: string, predicate: (char: any) => AuditResult | null): AuditResult {
+function checkEachChar(state: GameState, rule: string, predicate: (char: Character) => AuditResult | null): AuditResult {
   for (const char of state.party) {
     const result = predicate(char);
     if (result) return result;
@@ -110,7 +110,7 @@ const AUDIT_RULES: AuditRule[] = [
     },
     repair: (state) => mapParty(state, c => ({
       ...c,
-      inventory: c.inventory.filter((item: any) => item.quantity > 0)
+      inventory: c.inventory.filter(item => item.quantity > 0)
     }))
   },
   {
@@ -213,7 +213,7 @@ const AUDIT_RULES: AuditRule[] = [
       return {
         ...state,
         party: state.party.map(c => {
-          const feats = Array.isArray(c.feats) ? c.feats.filter((id: any) => validIds.has(id)) : [];
+          const feats = Array.isArray(c.feats) ? c.feats.filter((id: string) => validIds.has(id)) : [];
           return {
             ...c,
             feats,
@@ -239,7 +239,7 @@ const AUDIT_RULES: AuditRule[] = [
         }
         if (char.subclassId) {
           const classDef = getClassDef(char.class?.toLowerCase() || '');
-          if (!classDef?.subclasses.find((s: any) => s.id === char.subclassId)) {
+          if (!classDef?.subclasses.find((s: SubclassSummary) => s.id === char.subclassId)) {
             details.push(`${char.name}: unknown subclass ${char.subclassId}`);
             needsRepair = true;
           }
@@ -266,7 +266,7 @@ const AUDIT_RULES: AuditRule[] = [
         }
         if (c.subclassId) {
           const classDef = getClassDef(c.class);
-          if (!classDef?.subclasses.find((s: any) => s.id === c.subclassId)) c.subclassId = undefined;
+          if (!classDef?.subclasses.find((s: SubclassSummary) => s.id === c.subclassId)) c.subclassId = undefined;
         }
         const validSpells = new Set(Object.keys(SPELLS_BY_ID));
         c.knownSpells = c.knownSpells.filter((s: string) => validSpells.has(s));
@@ -411,8 +411,7 @@ export function repairState(state: GameState): GameState {
     if (!result.passed) {
       try {
         current = rule.repair(current);
-      } catch {
-      }
+      } catch { /* repair may fail if state is valid */ }
     }
   }
 

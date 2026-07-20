@@ -1,8 +1,6 @@
-import { Character, StartingLocation, InventoryItem, FeatSelection } from '../../types';
-import { FeatDefinition, FeatCategory } from '../../utils/feats';
+import { Character, StartingLocation, InventoryItem, SpellDefinition } from '../../types';
 import { ClassDefinition } from '../../utils/classes';
 import { RaceDefinition } from '../../utils/races';
-import { SpellDefinition } from '../../types';
 
 /** Complete state of the character creation wizard, tracking all selections across every step. */
 export interface WizardState {

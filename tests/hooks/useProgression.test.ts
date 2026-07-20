@@ -479,7 +479,7 @@ describe('useProgression', () => {
         try {
           await result.current.handleConfirmAllocation();
         } catch {
-
+          // noop
         }
       });
 

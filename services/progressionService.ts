@@ -1,6 +1,6 @@
 import { Character, LevelUpSummary } from '../types';
 import { XP_TABLE, STAT_POINTS_PER_LEVEL, MAX_STAT_VALUE, ASI_LEVELS } from '../constants';
-import { calculateMaxHp as classEngineCalculateMaxHp, getClassDef, getSubclassDef, recalculateResourcePools } from './classEngine';
+import { calculateMaxHp as classEngineCalculateMaxHp, getSubclassDef, recalculateResourcePools } from './classEngine';
 
 /** Returns the XP required to reach a given character level from the XP table. */
 export function getXpForLevel(level: number): number {
@@ -39,9 +39,9 @@ export function awardExperience(
   let newLevel = character.level;
   let leveledUp = false;
 
-  while (true) {
+  while (newLevel < 20) {
     const xpRequiredForNext = calculateXPToNextLevel(newLevel);
-    if (newLevel < 20 && xpRequiredForNext > 0 && newExperience >= xpRequiredForNext) {
+    if (xpRequiredForNext > 0 && newExperience >= xpRequiredForNext) {
       newExperience -= xpRequiredForNext;
       newLevel++;
       leveledUp = true;

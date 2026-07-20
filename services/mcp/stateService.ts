@@ -1,5 +1,4 @@
-import { GameState, MCPResponse, Message } from '../../types';
-import { fail } from './_shared';
+import { GameState, Message } from '../../types';
 
 
 
@@ -44,8 +43,6 @@ export function createStateService(state: GameState): StateService {
   let _snapshot: GameState | undefined;
   let rewindPoint: { gameState: GameState; messages: Message[] } | null = null;
   let emergencySnapshot: GameState | null = null;
-  let lastCurrencyAdjustment: { targetId: string; amount: number; timestamp: number } | null = null;
-
   function ensureCharacterFields(): void {
     for (const char of state.party) {
       char.hitDice ??= { current: char.level, max: char.level };
@@ -99,10 +96,9 @@ export function createStateService(state: GameState): StateService {
         locationImages: {}
       };
       Object.assign(state, fresh);
-      delete (state as any).combat;
+      delete (state as { combat?: unknown }).combat;
       rewindPoint = null;
       emergencySnapshot = null;
-      lastCurrencyAdjustment = null;
       ensureLocalGameStateFields();
     },
 
@@ -130,7 +126,6 @@ export function createStateService(state: GameState): StateService {
     restoreSnapshot(snapshot: GameState): void {
       Object.assign(state, JSON.parse(JSON.stringify(snapshot)));
       _snapshot = undefined;
-      lastCurrencyAdjustment = null;
     },
 
     saveRewindPoint(gameState: GameState, messages: Message[]): void {

@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { AppStage, GameState, Message } from '../../types';
+import { AppStage } from '../../types';
 
 vi.mock('../../services/storageService', () => ({
   storageService: {

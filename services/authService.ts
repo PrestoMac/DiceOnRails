@@ -11,7 +11,7 @@ export interface AuthResult {
 /** Authentication service wrapping Supabase Auth for sign up, sign in, sign out, password management, and session retrieval. */
 export const authService = {
     /** Creates a new user account with the given email and password. */
-    async signUp(email: string, pass: string): Promise<{ error: any }> {
+    async signUp(email: string, pass: string): Promise<{ error: Error | null }> {
         const { error } = await supabase.auth.signUp({
             email,
             password: pass,
@@ -19,7 +19,7 @@ export const authService = {
         return { error };
     },
     /** Signs in an existing user with email and password credentials. */
-    async signIn(email: string, pass: string): Promise<{ session: Session | null; error: any }> {
+    async signIn(email: string, pass: string): Promise<{ session: Session | null; error: Error | null }> {
         const { data, error } = await supabase.auth.signInWithPassword({
             email,
             password: pass,
@@ -36,14 +36,14 @@ export const authService = {
         return data.session;
     },
     /** Updates the current user's password. */
-    async updatePassword(newPassword: string): Promise<{ error: any }> {
+    async updatePassword(newPassword: string): Promise<{ error: Error | null }> {
         const { error } = await supabase.auth.updateUser({
             password: newPassword
         });
         return { error };
     },
     /** Sends a password-reset email to the given address. */
-    async resetPasswordForEmail(email: string): Promise<{ error: any }> {
+    async resetPasswordForEmail(email: string): Promise<{ error: Error | null }> {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
             redirectTo: window.location.origin,
         });

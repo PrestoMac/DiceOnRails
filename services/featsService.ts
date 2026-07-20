@@ -54,7 +54,7 @@ export function validateFeatPrereqs(
 
   if (prereqs.stat) {
     for (const [stat, min] of Object.entries(prereqs.stat)) {
-      const current = (char.stats as any)[stat] as number;
+      const current = (char.stats as Record<string, number>)[stat] as number;
       if (current < (min as number)) {
         return { ok: false, reason: `Requires ${stat.toUpperCase()} ${min} or higher (you have ${current}).` };
       }
@@ -143,7 +143,7 @@ export function rerollDamageValueIfApplicable(
 }
 
 function cryptoRoll(sides: number): number {
-  const crypto = typeof globalThis !== 'undefined' && (globalThis as any).crypto;
+  const crypto = typeof globalThis !== 'undefined' && (globalThis as unknown as { crypto: Crypto }).crypto;
   if (crypto?.getRandomValues) {
     const arr = new Uint32Array(1);
     crypto.getRandomValues(arr);
@@ -216,7 +216,7 @@ export function getDualWielderAcBonus(char: Character): number {
 }
 
 /** Returns the passive perception/investigation bonus from the Observant feat (+5). */
-export function getObservantPassiveBonus(char: Character, skill: 'perception' | 'investigation'): number {
+export function getObservantPassiveBonus(char: Character, _skill: 'perception' | 'investigation'): number {
   return hasFeat(char, 'observant') ? 5 : 0;
 }
 
@@ -305,7 +305,7 @@ export function applyFeatChoice(
 }
 
 /** Retrieves a specific choice value from a character's feat choices for a given feat and key. */
-export function getFeatChoice(char: Character, featId: string, key: string): any {
+export function getFeatChoice(char: Character, featId: string, key: string): unknown {
   return char.featChoices?.[featId]?.[key];
 }
 

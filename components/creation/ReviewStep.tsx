@@ -1,5 +1,4 @@
 import React from 'react';
-import { Character } from '../../types';
 import { WizardState } from './types';
 import { SKILLS_LIST, ASI_LEVELS } from '../../constants';
 import { getMod } from '../../services/classEngine';
@@ -86,7 +85,7 @@ const ReviewStep: React.FC<ReviewStepProps> = ({
             {(Object.entries(stats) as [string, number][]).map(([stat, val]) => {
               const total = val + (asiMap[stat] || 0);
               const mod = getMod(total);
-              const isProficient = selectedClass.savingThrowProfs?.includes(stat as any);
+              const isProficient = selectedClass.savingThrowProfs?.includes(stat as 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha');
               const profBonus = Math.ceil(level / 4) + 1;
               const saveVal = mod + (isProficient ? profBonus : 0);
               return (
@@ -100,7 +99,7 @@ const ReviewStep: React.FC<ReviewStepProps> = ({
           <p className="text-[9px] text-stone-600 mt-1"><i className="fas fa-star text-amber-700 text-[7px] mr-1"></i>= Proficient</p>
         </div>
         {selectedSubclassId && (() => {
-          const sc = selectedClass.subclasses?.find((s: any) => s.id === selectedSubclassId);
+          const sc = selectedClass.subclasses?.find((s: { id: string }) => s.id === selectedSubclassId);
           return sc ? (
             <div>
               <p className="text-stone-500 uppercase text-[10px] font-bold tracking-widest mb-1">Subclass</p>

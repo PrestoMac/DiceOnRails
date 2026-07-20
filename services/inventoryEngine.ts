@@ -61,6 +61,7 @@ function cleanItemName(itemName: string): string {
 /** Adds an item (or increases its quantity) in a character's inventory, merging with existing stacks of the same name. */
 export function addInventoryItem(
   character: Character, itemName: string, quantity: number,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   itemMeta?: { type?: string; rarity?: string; description?: string; stats?: Record<string, any>; equipped?: boolean }
 ): { character: Character; message: string } {
   const cleanName = cleanItemName(itemName);
@@ -71,8 +72,8 @@ export function addInventoryItem(
     updatedInventory[existingIdx] = {
       ...updatedInventory[existingIdx],
       quantity: updatedInventory[existingIdx].quantity + quantity,
-      ...(itemMeta?.type && { type: itemMeta.type as any }),
-      ...(itemMeta?.rarity && { rarity: itemMeta.rarity as any }),
+      ...(itemMeta?.type && { type: itemMeta.type as unknown as InventoryItem['type'] }),
+      ...(itemMeta?.rarity && { rarity: itemMeta.rarity as unknown as InventoryItem['rarity'] }),
       ...(itemMeta?.description && { description: itemMeta.description }),
       ...(itemMeta?.stats && { stats: itemMeta.stats }),
       ...(itemMeta?.equipped !== undefined && { equipped: itemMeta.equipped })
@@ -84,8 +85,8 @@ export function addInventoryItem(
   }
 
   const newItem: InventoryItem = {
-    name: cleanName, quantity, type: (itemMeta?.type as any) || 'other',
-    rarity: (itemMeta?.rarity as any) || 'common',
+    name: cleanName, quantity, type: (itemMeta?.type as unknown as InventoryItem['type']) || 'other',
+    rarity: (itemMeta?.rarity as unknown as InventoryItem['rarity']) || 'common',
     description: itemMeta?.description || `A custom ${cleanName} found in the world.`,
     weight: 0, cost: '0 gp', stats: itemMeta?.stats || {}, equipped: itemMeta?.equipped || false
   };
@@ -198,7 +199,7 @@ export function healCharacter(
 /** Looks up an SRD item by name from the Supabase srd_items table. */
 export async function lookupItemByName(
   cleanName: string
-): Promise<{ data: any; error: any }> {
+): Promise<{ data: unknown; error: unknown }> {
   return supabase.from('srd_items').select('*').ilike('name', cleanName).maybeSingle();
 }
 
@@ -215,6 +216,7 @@ export function processInventoryAction(
     type?: string;
     rarity?: string;
     description?: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     stats?: Record<string, any>;
     equipped?: boolean;
   },
@@ -247,8 +249,8 @@ export function processInventoryAction(
     const updates: Partial<InventoryItem> = {};
     if (args.new_name) updates.name = args.new_name;
     if (quantity !== undefined) updates.quantity = Math.max(0, quantity);
-    if (args.type) updates.type = args.type as any;
-    if (args.rarity) updates.rarity = args.rarity as any;
+    if (args.type) updates.type = args.type as unknown as InventoryItem['type'];
+    if (args.rarity) updates.rarity = args.rarity as unknown as InventoryItem['rarity'];
     if (args.description) updates.description = args.description;
     if (args.stats) updates.stats = args.stats;
     if (args.equipped !== undefined) updates.equipped = args.equipped;

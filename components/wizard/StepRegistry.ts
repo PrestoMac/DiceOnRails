@@ -14,8 +14,8 @@ export class StepRegistry<TState> {
   get(key: string): WizardStep<TState> | undefined { return this.registry.get(key); }
 
   getVisibleSteps(state: TState): WizardStep<TState>[] {
-    return this.order.map(k => this.registry.get(k)!).filter(s => !s.isVisible || s.isVisible(state));
+    return this.order.map(k => this.registry.get(k) as WizardStep<TState>).filter(s => !s.isVisible || s.isVisible(state));
   }
 
-  getAllSteps(): WizardStep<TState>[] { return this.order.map(k => this.registry.get(k)!); }
+  getAllSteps(): WizardStep<TState>[] { return this.order.map(k => this.registry.get(k) as WizardStep<TState>); }
 }

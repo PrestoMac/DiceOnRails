@@ -9,6 +9,7 @@ interface StepWizardProps<TState> {
   renderProgress?: (props: { currentIndex: number; total: number; steps: WizardStep<TState>[]; goToStep: (stepKey: string) => void }) => React.ReactNode;
   renderHeader?: React.ReactNode;
   className?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   extraProps?: Record<string, any>;
 }
 
@@ -16,6 +17,7 @@ interface StepWizardProps<TState> {
 function StepWizard<TState>({
   steps, state, updateState, renderProgress, renderHeader, className, extraProps,
 }: StepWizardProps<TState>) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [stepHistory, setStepHistory] = useState<string[]>([]);
   const [currentKey, setCurrentKey] = useState(() => steps[0]?.key || '');
 

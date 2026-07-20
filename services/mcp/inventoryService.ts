@@ -1,9 +1,8 @@
 import { Character, Currency, GameState, MCPResponse, InventoryItem } from '../../types';
-import { fail, fuzzyMatchEntity, generateId } from './_shared';
+import { fail, fuzzyMatchEntity } from './_shared';
 import { isDebugMode } from '../../utils/debug';
 import { getHeavyArmorMasterReduction } from '../featsService';
 import { breakConcentration as engineBreakConcentration } from '../spellcastingEngine';
-import { getACMinimum } from '../classEngine';
 
 function parseCost(srdCost: string): { gp: number; sp: number; cp: number } | null {
   if (!srdCost) return null;
@@ -33,13 +32,13 @@ const RECIPES: Record<string, { result: string; resultType: 'weapon' | 'armor' |
   'alchemists-fire': { result: "Alchemist's Fire", resultType: 'gear', requiredTools: ['alchemists-supplies'], ingredients: [{ item: 'sulfur', quantity: 1 }, { item: 'oil', quantity: 1 }], craftTime: 30, description: 'Crafts a flask of Alchemist\'s Fire.' }
 };
 
-function getRecipe(name: string): any { return RECIPES[name.toLowerCase()]; }
+function getRecipe(name: string): Record<string, unknown> | undefined { return RECIPES[name.toLowerCase()]; }
 
 /** Dependencies required by the InventoryService. */
 export interface InventoryDeps {
   getTarget: (id?: string) => Character | undefined;
-  supabase: any;
-  lookupSRDItem: (name: string) => any;
+  supabase: { from: (table: string) => { select: (...args: string[]) => { ilike: (col: string, val: string) => { maybeSingle: () => Promise<{ data: Record<string, unknown> | null; error: unknown }> } } } };
+  lookupSRDItem: (name: string) => Record<string, unknown> | undefined;
 }
 
 /** Service interface for managing inventory, currency, and damage. */
@@ -47,8 +46,8 @@ export interface InventoryService {
   updateInventoryDirectly(newInventory: InventoryItem[], targetId?: string): void;
   updateCurrencyDirectly(newCurrency: Currency, targetId?: string): void;
   normalizeCurrency(totalCp: number): Currency;
-  lookupItemInDB(cleanName: string): Promise<{ data: any; error: any }>;
-  update_inventory(item_name: string, action: 'add' | 'remove' | 'edit', quantity?: number, new_name?: string, targetId?: string, type?: 'weapon' | 'armor' | 'potion' | 'shield' | 'gear' | 'other', rarity?: 'common' | 'uncommon' | 'rare' | 'very rare' | 'legendary', description?: string, stats?: any, equipped?: boolean, cost_gp?: number, cost_sp?: number, cost_cp?: number, autoDeductMarketPrice?: boolean, craft?: boolean): Promise<MCPResponse>;
+  lookupItemInDB(cleanName: string): Promise<{ data: Record<string, unknown> | null; error: unknown }>;
+  update_inventory(item_name: string, action: 'add' | 'remove' | 'edit', quantity?: number, new_name?: string, targetId?: string, type?: 'weapon' | 'armor' | 'potion' | 'shield' | 'gear' | 'other', rarity?: 'common' | 'uncommon' | 'rare' | 'very rare' | 'legendary', description?: string, stats?: InventoryItem['stats'], equipped?: boolean, cost_gp?: number, cost_sp?: number, cost_cp?: number, autoDeductMarketPrice?: boolean, craft?: boolean): Promise<MCPResponse>;
   adjust_currency(gp?: number, sp?: number, cp?: number, targetId?: string): Promise<MCPResponse>;
   inflict_damage(amount: number, targetId?: string, damageType?: string): Promise<MCPResponse>;
   parseCost(srdCost: string): { gp: number; sp: number; cp: number } | null;
@@ -64,26 +63,7 @@ export function createInventoryService(state: GameState, deps: InventoryDeps): I
     return Date.now();
   }
 
-  function ensureCharacterFields(): void {
-    for (const char of state.party) {
-      char.hitDice ??= { current: char.level, max: char.level };
-      char.feats ??= [];
-      char.featSelections ??= [];
-      char.featChoices ??= {};
-      char.pendingFeatChoice ??= false;
-      if (char.class) char.class = char.class.toLowerCase();
-      if (char.race) char.race = char.race.toLowerCase();
-      char.resources ??= [];
-      char.knownSpells ??= [];
-      char.preparedSpells ??= [];
-      char.racialTraits ??= [];
-      char.unlockedSubclassFeatures ??= [];
-      char.pendingSubclassFeature ??= false;
-      if (!char.conditionsImmunities && (char.racialTraits || []).includes('fey-ancestry')) {
-        char.conditionsImmunities = ['unconscious'];
-      }
-    }
-  }
+
 
   function initializeDeathSaves(character: Character): void {
     if (!character.deathSaves) {
@@ -170,7 +150,7 @@ export function createInventoryService(state: GameState, deps: InventoryDeps): I
     },
 
     async inflict_damage(amount, targetId, damageType) {
-      let safeAmount = Math.max(0, Number(amount) || 0);
+      const safeAmount = Math.max(0, Number(amount) || 0);
 
       if (state.combat?.enemies?.length > 0) {
         const enemy = state.combat.enemies.find(e => fuzzyMatchEntity(e, targetId || ''));
@@ -258,12 +238,12 @@ export function createInventoryService(state: GameState, deps: InventoryDeps): I
 
       let concentrationNote = '';
       let concentrationSave: { roll: number; d20Roll: number; modifier: number; dc: number; success: boolean } | undefined;
-      if (concResult.broken && concResult.dc !== undefined) {
+      if (concResult.broken && typeof concResult.dc === 'number') {
         concentrationNote = ` — CON Save: ${concResult.roll} (d20: ${concResult.d20Roll} + ${concResult.modifier}) vs DC ${concResult.dc} — Lost concentration!`;
-        concentrationSave = { roll: concResult.roll!, d20Roll: concResult.d20Roll!, modifier: concResult.modifier!, dc: concResult.dc!, success: concResult.success! };
-      } else if (concResult.dc !== undefined) {
+        concentrationSave = { roll: concResult.roll as number, d20Roll: concResult.d20Roll as number, modifier: concResult.modifier as number, dc: concResult.dc, success: concResult.success as boolean };
+      } else if (typeof concResult.dc === 'number') {
         concentrationNote = ` — CON Save: ${concResult.roll} (d20: ${concResult.d20Roll} + ${concResult.modifier}) vs DC ${concResult.dc} — Maintained concentration!`;
-        concentrationSave = { roll: concResult.roll!, d20Roll: concResult.d20Roll!, modifier: concResult.modifier!, dc: concResult.dc!, success: concResult.success! };
+        concentrationSave = { roll: concResult.roll as number, d20Roll: concResult.d20Roll as number, modifier: concResult.modifier as number, dc: concResult.dc, success: concResult.success as boolean };
       }
 
       return {
@@ -304,7 +284,7 @@ export function createInventoryService(state: GameState, deps: InventoryDeps): I
               if (parsed) { actualCostGp = parsed.gp; actualCostSp = parsed.sp; actualCostCp = parsed.cp; }
             }
           }
-        } catch (e) {}
+        } catch { /* lookupSRDItem may throw if item not found */ }
       }
 
       if (actualCostGp || actualCostSp || actualCostCp) {

@@ -12,7 +12,7 @@ export interface MockAgentLoopOptions {
 }
 
 export function createMockAgentLoop(options: MockAgentLoopOptions) {
-  const { toolSequences, throwOnUnexpected = true } = options;
+  const { toolSequences } = options;
   let sequenceIndex = 0;
 
   return async function mockAgentLoop(

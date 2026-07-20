@@ -72,7 +72,7 @@ export const useGameActions = (
 
     useEffect(() => {
         if (ctxLoadedRef.current || !gameState) return;
-        const gs = gameState as any;
+        const gs = gameState as unknown as { ctx?: { episodeCheckpoints?: unknown[]; frozenRawHistory?: string; frozenRawTokens?: number; frozenMessageCount?: number; turnCounter?: number } };
         if (!ctxLoadedRef.current && (gs.ctx?.episodeCheckpoints?.length || gs.ctx?.frozenRawHistory || (gs.ctx?.frozenMessageCount ?? 0) > 0)) {
             const ctx = ctxRef.current;
             ctx.episodeCheckpoints = gs.ctx?.episodeCheckpoints ?? [];
@@ -96,7 +96,6 @@ export const useGameActions = (
         }
     };
 
-    const prepareCtx = (ctx?: string) => prepContext(ctxRef.current, messagesRef.current, ctx);
     const runPipeline_ = () => runPipeline(ctxRef.current, FREEZE_INTERVAL, messagesRef.current, ACTIVE_MSG_WINDOW);
 
     const resolveNarration = async (
@@ -332,7 +331,7 @@ export const useGameActions = (
             if (emergencySnap) {
                 mcpServer.restoreSnapshot(emergencySnap);
             }
-            const gs = mcpServer.getFullState() as any;
+            const gs = mcpServer.getFullState() as unknown as { ctx?: { episodeCheckpoints?: unknown[]; frozenRawHistory?: string; frozenRawTokens?: number; frozenMessageCount?: number; turnCounter?: number } };
             ctxRef.current = {
                 episodeCheckpoints: gs.ctx?.episodeCheckpoints ?? [],
                 frozenRawHistory: gs.ctx?.frozenRawHistory ?? '',
@@ -366,7 +365,7 @@ export const useGameActions = (
         mcpServer.loadState(restoredState);
         setMessages(snapshot.messages.slice(0, -1)); setGameState(restoredState);
 
-        const gs = restoredState as any;
+        const gs = restoredState as unknown as { ctx?: { episodeCheckpoints?: unknown[]; frozenRawHistory?: string; frozenRawTokens?: number; frozenMessageCount?: number; turnCounter?: number } };
         ctxRef.current = {
             episodeCheckpoints: gs.ctx?.episodeCheckpoints ?? [],
             frozenRawHistory: gs.ctx?.frozenRawHistory ?? '',

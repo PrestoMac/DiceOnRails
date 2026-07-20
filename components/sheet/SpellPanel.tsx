@@ -1,7 +1,7 @@
 import React from 'react';
 import { Character } from '../../types';
 import { SPELLS_BY_ID } from '../../utils/spells';
-import { getClassDef, getSpellSaveDc, getSpellAttackBonus } from '../../services/classEngine';
+import { getClassDef } from '../../services/classEngine';
 
 /** Props for the SpellPanel component. */
 interface SpellPanelProps {

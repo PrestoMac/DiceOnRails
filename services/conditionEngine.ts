@@ -1,4 +1,4 @@
-import { Character, Enemy, ActiveCondition, SaveStat } from '../types';
+import { Character, Enemy, ActiveCondition } from '../types';
 import { cryptoRoll } from '../utils/random';
 import { getMod } from './classEngine';
 
@@ -213,7 +213,7 @@ export function rollSaveAgainstCondition(
   if (!condition.saveEnd) {
     return { succeeded: false, roll: 0, total: 0 };
   }
-  const statVal = (target as any).stats?.[condition.saveEnd] || 10;
+  const statVal = target.stats?.[condition.saveEnd as keyof typeof target.stats] || 10;
   const mod = getMod(statVal);
   const roll = cryptoRoll(20);
   const total = roll + mod - getExhaustionPenalty(target);

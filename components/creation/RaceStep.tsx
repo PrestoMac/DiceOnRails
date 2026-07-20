@@ -39,7 +39,7 @@ const RaceStep: React.FC<StepProps> = ({ wizardState, updateWizard, onNext }) =>
                   View Traits ({race.traits.length})
                 </summary>
                 <ul className="mt-1.5 space-y-1">
-                  {race.traits.map((trait: any) => (
+                  {race.traits.map((trait: { id: string; name: string; description: string }) => (
                     <li key={trait.id} className="text-[9px] text-stone-400">
                       <strong className="text-stone-300">{trait.name}:</strong> {trait.description}
                     </li>
