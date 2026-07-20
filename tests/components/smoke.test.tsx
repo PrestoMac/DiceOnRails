@@ -132,6 +132,19 @@ describe('Component Smoke Tests', () => {
       fireEvent.click(screen.getByText(/Create Account/i));
       expect(screen.getByText(/Sign Up/i)).toBeInTheDocument();
     });
+
+    it('auto-logs in and calls onComplete with user id on successful signup', async () => {
+      const { authService } = await import('../../services/authService');
+      const fakeSession = { user: { id: 'new-user-1' } };
+      vi.mocked(authService.signUp).mockResolvedValueOnce({ session: fakeSession as unknown as import('@supabase/supabase-js').Session, error: null });
+      const onComplete = vi.fn();
+      render(<AuthScreen onComplete={onComplete} />);
+      fireEvent.click(screen.getByText(/Create Account/i));
+      fireEvent.change(screen.getByPlaceholderText(/adventurer@example.com/i), { target: { value: 'new@test.com' } });
+      fireEvent.change(screen.getByPlaceholderText(/••••••••/i), { target: { value: 'password123' } });
+      fireEvent.click(screen.getByText(/Sign Up/i));
+      await vi.waitFor(() => expect(onComplete).toHaveBeenCalledWith('new-user-1'));
+    });
   });
 
   describe('CampaignDashboard', () => {

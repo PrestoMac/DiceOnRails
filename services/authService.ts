@@ -10,13 +10,13 @@ export interface AuthResult {
 
 /** Authentication service wrapping Supabase Auth for sign up, sign in, sign out, password management, and session retrieval. */
 export const authService = {
-    /** Creates a new user account with the given email and password. */
-    async signUp(email: string, pass: string): Promise<{ error: Error | null }> {
-        const { error } = await supabase.auth.signUp({
+    /** Creates a new user account with the given email and password. Returns a session when Supabase email confirmation is disabled. */
+    async signUp(email: string, pass: string): Promise<{ session: Session | null; error: Error | null }> {
+        const { data, error } = await supabase.auth.signUp({
             email,
             password: pass,
         });
-        return { error };
+        return { session: data.session, error };
     },
     /** Signs in an existing user with email and password credentials. */
     async signIn(email: string, pass: string): Promise<{ session: Session | null; error: Error | null }> {

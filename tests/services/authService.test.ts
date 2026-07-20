@@ -29,16 +29,26 @@ describe('authService', () => {
 
   describe('signUp', () => {
     it('calls supabase.auth.signUp with email and password', async () => {
-      mockSignUp.mockResolvedValue({ error: null });
+      const fakeSession = { user: { id: 'user-1' } };
+      mockSignUp.mockResolvedValue({ data: { session: fakeSession }, error: null });
       const result = await authService.signUp('test@test.com', 'password123');
       expect(mockSignUp).toHaveBeenCalledWith({ email: 'test@test.com', password: 'password123' });
       expect(result.error).toBeNull();
+      expect(result.session).toEqual(fakeSession);
+    });
+
+    it('returns null session when supabase provides none', async () => {
+      mockSignUp.mockResolvedValue({ data: { session: null }, error: null });
+      const result = await authService.signUp('test@test.com', 'password123');
+      expect(result.error).toBeNull();
+      expect(result.session).toBeNull();
     });
 
     it('returns error on signup failure', async () => {
-      mockSignUp.mockResolvedValue({ error: new Error('User already exists') });
+      mockSignUp.mockResolvedValue({ data: { session: null }, error: new Error('User already exists') });
       const result = await authService.signUp('exists@test.com', 'pass');
       expect(result.error).toBeTruthy();
+      expect(result.session).toBeNull();
     });
   });
 

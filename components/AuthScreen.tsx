@@ -31,8 +31,15 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onComplete }) => {
         const { session, error } = await authService.signIn(email, password);
         if (error) { setMessage({ type: 'error', text: error.message }); } else if (session) { onComplete(session.user.id); }
       } else {
-        const { error } = await authService.signUp(email, password);
-        if (error) { setMessage({ type: 'error', text: error.message }); } else { setMessage({ type: 'success', text: 'Registration successful! Please check your email to confirm.' }); }
+        const { session, error } = await authService.signUp(email, password);
+        if (error) {
+          setMessage({ type: 'error', text: error.message });
+        } else if (session) {
+          onComplete(session.user.id);
+        } else {
+          setIsLogin(true);
+          setMessage({ type: 'success', text: 'Account created! Please sign in.' });
+        }
       }
     } catch (err: unknown) { setMessage({ type: 'error', text: (err as Error).message || 'An unexpected error occurred' }); }
     finally { setLoading(false); }
