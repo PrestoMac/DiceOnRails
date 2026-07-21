@@ -2,6 +2,7 @@ import React from 'react';
 import { StepProps } from './types';
 import { StepH, NavBtn } from './SharedComponents';
 import { ASI_LEVELS } from '../../constants';
+import Tooltip from '../ui/Tooltip';
 
 /** Name and starting level step. Captures the character name, backstory, and starting level with ASI slot preview. */
 const NameStep: React.FC<StepProps> = ({ wizardState, updateWizard, onNext }) => {
@@ -56,16 +57,20 @@ const NameStep: React.FC<StepProps> = ({ wizardState, updateWizard, onNext }) =>
         <p className="text-[9px] text-stone-700 text-right">{backstory.length}/500</p>
       </div>
       <div className="flex gap-4 text-[10px] text-stone-400 justify-center flex-wrap">
-        <span>
-          <i className="fas fa-shield-alt text-amber-700 mr-1"></i>
-          Proficiency Bonus:
-          <strong className="text-amber-400 ml-1">+{Math.ceil(level / 4) + 1}</strong>
-        </span>
-        <span>
-          <i className="fas fa-star text-amber-700 mr-1"></i>
-          ASI Slots at Level {level}:
-          <strong className="text-amber-400 ml-1">{ASI_LEVELS.filter(l => l <= level).length}</strong>
-        </span>
+        <Tooltip content="Proficiency Bonus is added to attack rolls, saving throws, and skill checks you are trained in. Scales with level: +2 at L1, +3 at L5, +4 at L9, +5 at L13, +6 at L17." side="top">
+          <span>
+            <i className="fas fa-shield-alt text-amber-700 mr-1"></i>
+            Proficiency Bonus:
+            <strong className="text-amber-400 ml-1">+{Math.ceil(level / 4) + 1}</strong>
+          </span>
+        </Tooltip>
+        <Tooltip content="ASI/Feat slots are milestones (levels 4, 8, 12, 16, 19) where you can either increase ability scores (+1 to two stats, or +2 to one) OR take a feat instead. Level 1 grants one starting slot under the variant rule." side="top">
+          <span>
+            <i className="fas fa-star text-amber-700 mr-1"></i>
+            ASI Slots at Level {level}:
+            <strong className="text-amber-400 ml-1">{ASI_LEVELS.filter(l => l <= level).length}</strong>
+          </span>
+        </Tooltip>
       </div>
       <NavBtn disabled={!name.trim()} onClick={onNext}>Set Destiny</NavBtn>
     </div>

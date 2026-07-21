@@ -4,6 +4,7 @@ import { StepProps, ShopItem } from './types';
 import { lookupSRDItem } from '../../utils/srdItems';
 import { getMod } from '../../services/classEngine';
 import { SHOP_ITEMS } from './constants';
+import Tooltip from '../ui/Tooltip';
 
 type ShopFilter = 'All' | 'Weapon' | 'Armor' | 'Consumable' | 'Gear';
 
@@ -77,7 +78,12 @@ const GearStep: React.FC<StepProps & { onBackToSpells: () => void; onBackToFeats
           <span className="text-amber-500 font-bold font-mono text-base">{goldPool} GP</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-stone-400">Est. AC:</span>
+          <Tooltip content="Armor Class formula: Unarmored = 10 + DEX mod. Light armor = 11 + DEX. Medium armor = 13 + min(DEX, 2). Heavy armor = fixed value. Add shield (+2) if equipped." side="bottom">
+            <span className="text-stone-400 flex items-center gap-1">
+              Est. AC:
+              <i className="fas fa-info-circle text-[9px] text-stone-600"></i>
+            </span>
+          </Tooltip>
           <span className="text-blue-400 font-bold font-mono text-base">{estimatedAC}</span>
         </div>
         <div className="flex gap-1 bg-stone-900 p-0.5 rounded border border-stone-800 text-[10px]">

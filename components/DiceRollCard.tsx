@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { DIE_POLYGONS, getDieSides, playDiceTick, playDiceResult } from './dice/DiceEngine';
+import Tooltip from './ui/Tooltip';
 
 interface DiceRollCardProps {
   type: 'attack' | 'skill' | 'damage' | 'cast_spell' | 'save' | 'death_save';
@@ -232,9 +233,13 @@ const DiceRollCard: React.FC<DiceRollCardProps> = ({
       </div>
 
       {dc !== undefined && (
-        <div className="text-stone-600 text-xs">
-          vs {type === 'attack' ? 'AC' : 'DC'} {dc}
-        </div>
+        <Tooltip content={type === 'attack'
+          ? `Attack roll vs Armor Class ${dc}. Your d20 + modifier must meet or beat the target's AC to hit.`
+          : `Saving Throw vs DC ${dc}. The target rolls d20 + stat modifier (and proficiency if trained); a result of ${dc}+ resists.`} side="top">
+          <div className="text-stone-600 text-xs">
+            vs {type === 'attack' ? 'AC' : 'DC'} {dc}
+          </div>
+        </Tooltip>
       )}
 
       {!rolling && success !== undefined && (

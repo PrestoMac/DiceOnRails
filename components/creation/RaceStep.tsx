@@ -2,6 +2,8 @@ import React from 'react';
 import { StepProps } from './types';
 import { RACES_CATALOG } from '../../utils/races';
 import { StepH, NavBtn, DragonColorPicker } from './SharedComponents';
+import Tooltip from '../ui/Tooltip';
+import { STAT_INFO } from '../../data/referenceConstants';
 
 const RACES = RACES_CATALOG;
 
@@ -27,10 +29,18 @@ const RaceStep: React.FC<StepProps> = ({ wizardState, updateWizard, onNext }) =>
             <p className="text-xs text-stone-500 italic mt-1">{race.description}</p>
             <div className="mt-2 flex flex-wrap gap-1">
               {typeof race.asi === 'object'
-                ? Object.entries(race.asi).map(([s, v]) => (
-                    <span key={s} className="text-[9px] uppercase font-bold text-amber-700 bg-amber-950/20 px-1 rounded">+{v} {s}</span>
-                  ))
-                : <span className="text-[9px] uppercase font-bold text-amber-700 bg-amber-950/20 px-1 rounded">+2 CHA, +1 flex</span>
+                ? Object.entries(race.asi).map(([s, v]) => {
+                    const info = STAT_INFO[s];
+                    const tip = info ? `${info.label}: ${info.governs}` : s.toUpperCase();
+                    return (
+                      <Tooltip key={s} content={tip} side="top">
+                        <span className="text-[9px] uppercase font-bold text-amber-700 bg-amber-950/20 px-1 rounded">+{v} {s}</span>
+                      </Tooltip>
+                    );
+                  })
+                : <Tooltip content="Half-Elf flexible ASI: +2 CHA and choose two additional stats for +1 each." side="top">
+                    <span className="text-[9px] uppercase font-bold text-amber-700 bg-amber-950/20 px-1 rounded">+2 CHA, +1 flex</span>
+                  </Tooltip>
               }
             </div>
             {race.traits && race.traits.length > 0 && (

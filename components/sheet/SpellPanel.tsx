@@ -1,15 +1,17 @@
 import React from 'react';
-import { Character } from '../../types';
+import { Character, SpellDefinition } from '../../types';
 import { SPELLS_BY_ID } from '../../utils/spells';
 import { getClassDef } from '../../services/classEngine';
 
 /** Props for the SpellPanel component. */
 interface SpellPanelProps {
   character: Character;
+  /** Optional handler invoked when the user clicks a spell badge to view details. */
+  onViewSpell?: (spell: SpellDefinition) => void;
 }
 
 /** Displays a character's spellcasting information: spell slot resources and known/prepared spells list. */
-const SpellPanel: React.FC<SpellPanelProps> = ({ character }) => {
+const SpellPanel: React.FC<SpellPanelProps> = ({ character, onViewSpell }) => {
   const classDef = getClassDef(character.class);
   if (!classDef?.spellcasting) return null;
 
@@ -39,7 +41,20 @@ const SpellPanel: React.FC<SpellPanelProps> = ({ character }) => {
           <div className="flex flex-wrap gap-1">
             {spellList.map(sid => {
               const spell = SPELLS_BY_ID[sid];
-              return spell ? <span key={sid} className="text-[10px] text-stone-400 bg-stone-900/50 px-1.5 py-0.5 rounded border border-stone-800">{spell.name}</span> : null;
+              if (!spell) return null;
+              if (onViewSpell) {
+                return (
+                  <button
+                    key={sid}
+                    onClick={() => onViewSpell(spell)}
+                    className="text-[10px] text-stone-300 hover:text-amber-400 bg-stone-900/50 hover:bg-amber-950/30 hover:border-amber-800/50 px-1.5 py-0.5 rounded border border-stone-800 transition-all cursor-pointer"
+                    title={`View ${spell.name} details`}
+                  >
+                    {spell.name}
+                  </button>
+                );
+              }
+              return <span key={sid} className="text-[10px] text-stone-400 bg-stone-900/50 px-1.5 py-0.5 rounded border border-stone-800">{spell.name}</span>;
             })}
           </div>
         </div>

@@ -12,6 +12,7 @@ interface SettingsModalProps {
   gameState?: GameState;
   onSave: (settings: AppSettings) => void;
   onClose: () => void;
+  onReplayOnboarding?: () => void;
 }
 
 const ToggleRow: React.FC<{ label: string; on: boolean; onClick: () => void; description?: string; className?: string }> = ({ label, on, onClick, description, className = '' }) => (
@@ -86,7 +87,7 @@ const buildDebugLog = (messages: Message[] | undefined, gameState: GameState | u
 };
 
 /** Settings modal with voice selection, atmosphere toggle, debug mode, password update, and debug log export. */
-const SettingsModal: React.FC<SettingsModalProps> = ({ settings, userId, messages, gameState, onSave, onClose }) => {
+const SettingsModal: React.FC<SettingsModalProps> = ({ settings, userId, messages, gameState, onSave, onClose, onReplayOnboarding }) => {
   const [local, setLocal] = useState<AppSettings>(settings);
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [newPassword, setNewPassword] = useState('');
@@ -163,6 +164,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ settings, userId, message
           <section className="space-y-4 pt-4 border-t border-stone-800">
             <SectionH>Chronicler's Insight</SectionH>
             <ToggleRow label="Debug Mode" on={local.debugMode} onClick={() => hc('debugMode', !local.debugMode)} description="Enable verbose console logging for prompt caching & game state diagnostics" className="px-3" />
+            <ToggleRow label="Suggested Actions (LLM)" on={!!local.enableSuggestions} onClick={() => hc('enableSuggestions', !local.enableSuggestions)} description="Opt-in: makes one extra lightweight LLM call per turn to suggest 2-3 next actions. Incurs small additional API cost." className="px-3" />
             <div className="px-3">
               <button onClick={copyDebugLogs} className="w-full py-2 bg-stone-950 hover:bg-stone-900 border border-stone-800 rounded-lg text-[10px] font-bold uppercase tracking-widest text-stone-400 hover:text-amber-500 transition-all flex items-center justify-center gap-2">
                 <i className="fas fa-clipboard text-[9px]"></i>
@@ -170,6 +172,15 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ settings, userId, message
               </button>
               <p className="text-[10px] text-stone-600 mt-1 px-1">Copies last chat messages, party state, and active combat data to clipboard</p>
             </div>
+            {onReplayOnboarding && (
+              <div className="px-3">
+                <button onClick={onReplayOnboarding} className="w-full py-2 bg-stone-950 hover:bg-stone-900 border border-stone-800 rounded-lg text-[10px] font-bold uppercase tracking-widest text-stone-400 hover:text-amber-500 transition-all flex items-center justify-center gap-2">
+                  <i className="fas fa-route text-[9px]"></i>
+                  <span>Replay Onboarding Tour</span>
+                </button>
+                <p className="text-[10px] text-stone-600 mt-1 px-1">Re-runs the first-session tour of the play screen</p>
+              </div>
+            )}
           </section>
         </div>
         <div className="pt-6 flex gap-3 border-t border-stone-800 mt-6">

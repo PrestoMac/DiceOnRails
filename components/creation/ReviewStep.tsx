@@ -5,6 +5,7 @@ import { getMod } from '../../services/classEngine';
 import { FEATS_CATALOG } from '../../utils/feats';
 import { STAT_LABELS } from './constants';
 import { StepH, ErrorBanner } from './SharedComponents';
+import Tooltip from '../ui/Tooltip';
 
 /** Props for the review/final summary step of character creation. */
 interface ReviewStepProps {
@@ -96,7 +97,11 @@ const ReviewStep: React.FC<ReviewStepProps> = ({
               );
             })}
           </div>
-          <p className="text-[9px] text-stone-600 mt-1"><i className="fas fa-star text-amber-700 text-[7px] mr-1"></i>= Proficient</p>
+          <p className="text-[9px] text-stone-600 mt-1">
+            <Tooltip content="Proficient saves add your Proficiency Bonus (scales with level) on top of the stat modifier. Each class is proficient in two specific saving throws." side="top">
+              <span><i className="fas fa-star text-amber-700 text-[7px] mr-1"></i>= Proficient</span>
+            </Tooltip>
+          </p>
         </div>
         {selectedSubclassId && (() => {
           const sc = selectedClass.subclasses?.find((s: { id: string }) => s.id === selectedSubclassId);

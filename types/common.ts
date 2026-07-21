@@ -40,6 +40,8 @@ export interface AppSettings {
   autoSpeak: boolean;
   enableAtmosphere: boolean;
   debugMode: boolean;
+  /** Opt-in: enable per-turn LLM-driven Suggested Actions (extra API call per turn). */
+  enableSuggestions?: boolean;
 }
 
 /** Structured data about a dice roll, used for UI rendering and result display. */

@@ -1,12 +1,6 @@
 /** Re-exported shop items catalog used by the GearStep for buying/selling equipment. */
 export { SHOP_ITEMS } from '../../data/shopItems';
 
-/** Ordered labels for each step in the character creation wizard. */
-export const STEP_LABELS = [
-  'Name', 'Race', 'Class', 'Stats', 'Skills', 'Feats',
-  'Path', 'Spells', 'Gear', 'Review', 'Start'
-];
-
 /** Maps stat keys to their human-readable names. */
 export const STAT_LABELS: Record<string, string> = {
   str: 'Strength',

@@ -2,6 +2,7 @@ import React from 'react';
 import { StepProps } from './types';
 import { CLASSES_CATALOG } from '../../utils/classes';
 import { StepH, NavBtn } from './SharedComponents';
+import Tooltip from '../ui/Tooltip';
 
 const CLASSES = CLASSES_CATALOG;
 
@@ -35,7 +36,9 @@ const ClassStep: React.FC<StepProps> = ({ wizardState, updateWizard, onNext }) =
               <div>
                 <h3 className="font-bold text-base text-stone-100">{cls.name}</h3>
                 <p className="text-[10px] text-stone-500 uppercase tracking-tighter">
-                  Primary: {cls.primaryStat}
+                  <Tooltip content="The primary stat governs attack rolls, spell DC, and class features. Boost this stat first when assigning ability scores." side="top">
+                    <span>Primary: {cls.primaryStat}</span>
+                  </Tooltip>
                 </p>
               </div>
             </div>

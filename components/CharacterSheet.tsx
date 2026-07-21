@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Character, InventoryItem, ActiveCondition } from '../types';
+import { Character, InventoryItem, ActiveCondition, SpellDefinition } from '../types';
 import { SKILLS_LIST } from '../constants';
 import { cryptoRoll } from '../utils/random';
 import { getAllFeats } from '../services/featsService';
@@ -8,16 +8,18 @@ import { FeatDefinition } from '../utils/feats';
 import { getClassDef, getSubclassDef, calculateAc, getProficiencyBonus, calculateSpeed, getDarkvisionRange, getSavingThrowBonus, getSpellSaveDc, getSpellAttackBonus, getDamageResistances, getMod } from '../services/classEngine';
 import { parseExhaustionLevel } from '../services/conditionEngine';
 import { SPELLS_BY_ID } from '../utils/spells';
+import { CONDITION_INFO, EXHAUSTION_LEVELS, getExhaustionSummary } from '../data/conditionInfo';
+import { BUFF_SOURCES, STAT_INFO } from '../data/referenceConstants';
 import FeatDetailModal from './FeatDetailModal';
+import SpellDetailModal from './modals/SpellDetailModal';
+import ItemDetailModal from './modals/ItemDetailModal';
+import ConditionDetailModal from './modals/ConditionDetailModal';
+import Tooltip from './ui/Tooltip';
 
-const BUFF_SOURCES = new Set([
-  'mage-armor', 'shield', 'shield-of-faith', 'barkskin',
-  'heroism', 'hunters-mark', 'divine-favor', 'branding-smite', 'magic-weapon',
-  'bless',
-]);
+const BUFF_SOURCES_SET = BUFF_SOURCES;
 
 function isBuffCondition(c: ActiveCondition): boolean {
-  if (BUFF_SOURCES.has(c.source)) return true;
+  if (BUFF_SOURCES_SET.has(c.source)) return true;
   if (c.id.endsWith('-ac')) return true;
   if (typeof c.onRemove === 'object' && c.onRemove?.kind === 'acBonus') return true;
   if (c.id === 'bless') return true;
@@ -55,11 +57,17 @@ const rarityStyle = (rarity?: string) =>
 
 
 
-const InfoChip: React.FC<{ icon: string; iconColor: string; label: string; value: React.ReactNode }> = ({ icon, iconColor, label, value }) => (
-  <div className="bg-stone-900/40 border border-stone-850 p-2 rounded flex items-center gap-2 text-xs">
-    <i className={`fas ${icon} ${iconColor}`}></i><span className="text-stone-400">{label}:</span><span className="font-bold text-stone-200">{value}</span>
-  </div>
-);
+const InfoChip: React.FC<{ icon: string; iconColor: string; label: string; value: React.ReactNode; tooltip?: string }> = ({ icon, iconColor, label, value, tooltip }) => {
+  const inner = (
+    <div className="bg-stone-900/40 border border-stone-850 p-2 rounded flex items-center gap-2 text-xs">
+      <i className={`fas ${icon} ${iconColor}`}></i><span className="text-stone-400">{label}:</span><span className="font-bold text-stone-200">{value}</span>
+    </div>
+  );
+  if (tooltip) {
+    return <Tooltip content={tooltip} side="top">{inner}</Tooltip>;
+  }
+  return inner;
+};
 
 const FeatureList: React.FC<{ title: string; icon: string; features?: Array<{ id: string; level: number; name: string; description: string }>; level: number }> = ({ title, icon, features, level }) => {
   const filtered = (features ?? []).filter(f => f.level <= level);
@@ -78,7 +86,17 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ character, onUpdateInve
   const [hoveredItem, setHoveredItem] = useState<InventoryItem|null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x:0, y:0 });
   const [viewingFeat, setViewingFeat] = useState<FeatDefinition | null>(null);
+  const [viewingSpell, setViewingSpell] = useState<SpellDefinition | null>(null);
+  const [viewingItem, setViewingItem] = useState<InventoryItem | null>(null);
+  const [viewingCondition, setViewingCondition] = useState<{ id: string; name: string } | null>(null);
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth <= 768);
   const feats = getAllFeats(character);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const handleMouseEnter = (item: InventoryItem, e: React.MouseEvent) => {
     const r = e.currentTarget.getBoundingClientRect(), tw=288, th=240;
@@ -170,13 +188,17 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ character, onUpdateInve
 
       <div className="space-y-2">
         <div className="flex justify-between text-sm uppercase font-bold tracking-wider"><span>Vitality</span><span className={character.hp.current<5?'text-red-500 animate-pulse':'text-stone-300'}>{character.hp.current} / {character.hp.max} HP</span></div>
-        <div className="h-3 bg-stone-900 rounded-full overflow-hidden border border-stone-800"><div className={`h-full transition-all duration-500 ${hpPercent<30?'bg-red-600':'bg-green-600'}`} style={{width:`${hpPercent}%`}}/></div>
+        <Tooltip content="At 0 HP you fall unconscious and begin death saves (3 successes = stable / 3 failures = death). Nat 20 = 2 successes; nat 1 = 2 failures." side="top">
+          <div className="h-3 bg-stone-900 rounded-full overflow-hidden border border-stone-800"><div className={`h-full transition-all duration-500 ${hpPercent<30?'bg-red-600':'bg-green-600'}`} style={{width:`${hpPercent}%`}}/></div>
+        </Tooltip>
       </div>
 
-      <div className="flex items-center justify-between bg-stone-900/40 border border-stone-850 p-2.5 rounded-lg">
-        <div className="flex items-center gap-2"><i className="fas fa-shield-halved text-amber-500"></i><span className="text-xs uppercase font-bold tracking-wider text-stone-400">Armor Class</span></div>
-        <span className="text-lg font-bold font-mono text-amber-400">{totalAc} AC</span>
-      </div>
+      <Tooltip content={`AC ${totalAc}. Formula: Light armor = 11 + DEX, Medium = 13 + min(DEX, 2), Heavy = fixed. Unarmored = 10 + DEX. Add shield (+2) if equipped.`} side="top">
+        <div className="flex items-center justify-between bg-stone-900/40 border border-stone-850 p-2.5 rounded-lg">
+          <div className="flex items-center gap-2"><i className="fas fa-shield-halved text-amber-500"></i><span className="text-xs uppercase font-bold tracking-wider text-stone-400">Armor Class</span></div>
+          <span className="text-lg font-bold font-mono text-amber-400">{totalAc} AC</span>
+        </div>
+      </Tooltip>
 
       <div className="space-y-1 mt-2">
         <div className="flex justify-between text-xs uppercase font-bold tracking-wider"><span>Experience</span><span className="text-amber-600">{character.experience||0} / {character.experienceToNextLevel||300} XP</span></div>
@@ -184,15 +206,26 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ character, onUpdateInve
         {((character.unusedStatPoints||0)>0||(character.unusedSkillPoints||0)>0)&&onLevelUp&&<button onClick={()=>onLevelUp(character.id)} className="w-full py-2 bg-amber-700 hover:bg-amber-600 rounded font-bold text-white animate-pulse uppercase tracking-wider text-xs mt-2 transition-all shadow-md shadow-amber-900/20 flex items-center justify-center gap-1.5 border border-amber-600/30"><i className="fas fa-crown text-[10px]"></i>Level Up Available!{character.unusedStatPoints>0&&<span className="bg-amber-900/50 px-1.5 py-0.5 rounded text-[8px] font-mono font-normal">+{character.unusedStatPoints} Stats</span>}{(character.unusedSkillPoints||0)>0&&<span className="bg-amber-950/50 px-1.5 py-0.5 rounded text-[8px] font-mono font-normal">+{character.unusedSkillPoints} Skills</span>}</button>}
       </div>
 
-      <div className="grid grid-cols-3 gap-3">{(Object.entries(character.stats) as [string,number][]).map(([stat,val])=><div key={stat} className="bg-stone-900/50 border border-stone-800 p-2 rounded text-center"><div className="text-[10px] uppercase text-stone-500 font-bold">{stat}</div><div className="text-xl font-bold text-stone-100">{val}</div><div className="text-[10px] text-amber-600 font-medium">{getMod(val)>=0?'+':''}{getMod(val)}</div></div>)}</div>
+      <div className="grid grid-cols-3 gap-3">{(Object.entries(character.stats) as [string,number][]).map(([stat,val])=>{
+        const info = STAT_INFO[stat];
+        return (
+          <Tooltip key={stat} content={info ? `${info.label}: ${info.governs}` : stat} side="top" ariaLabel={info?.label}>
+            <div className="bg-stone-900/50 border border-stone-800 p-2 rounded text-center">
+              <div className="text-[10px] uppercase text-stone-500 font-bold">{stat}</div>
+              <div className="text-xl font-bold text-stone-100">{val}</div>
+              <div className="text-[10px] text-amber-600 font-medium">{getMod(val)>=0?'+':''}{getMod(val)}</div>
+            </div>
+          </Tooltip>
+        );
+      })}</div>
 
       {classDef && <div className="flex flex-wrap gap-3 mt-1">
-        <InfoChip icon="fa-shoe-prints" iconColor="text-amber-600" label="Speed" value={`${speed} ft`} />
-        {darkvision > 0 && <InfoChip icon="fa-eye" iconColor="text-blue-500" label="Darkvision" value={`${darkvision} ft`} />}
-        <InfoChip icon="fa-medal" iconColor="text-amber-600" label="Prof Bonus" value={`+${profBonus}`} />
-        {character.hitDice && classDef?.hitDie && <InfoChip icon="fa-dice-d20" iconColor="text-amber-600" label="Hit Dice" value={`${character.hitDice.current}/${character.hitDice.max} d${classDef.hitDie}`} />}
-        {spellSaveDc && <InfoChip icon="fa-magic" iconColor="text-purple-500" label="Spell DC" value={spellSaveDc} />}
-        {spellAttackBonus && <InfoChip icon="fa-crosshairs" iconColor="text-purple-500" label="Spell Atk" value={`+${spellAttackBonus}`} />}
+        <InfoChip icon="fa-shoe-prints" iconColor="text-amber-600" label="Speed" value={`${speed} ft`} tooltip="Movement per turn. Halved by grappled or exhaustion level 2; zeroed by restrained, paralysis, or exhaustion level 5." />
+        {darkvision > 0 && <InfoChip icon="fa-eye" iconColor="text-blue-500" label="Darkvision" value={`${darkvision} ft`} tooltip="See in dim light as if bright, and in darkness as if dim, up to this range." />}
+        <InfoChip icon="fa-medal" iconColor="text-amber-600" label="Prof Bon" value={`+${profBonus}`} tooltip="Added to attack rolls, saving throws, and skill checks you are proficient in. Scales with level." />
+        {character.hitDice && classDef?.hitDie && <InfoChip icon="fa-dice-d20" iconColor="text-amber-600" label="Hit Dice" value={`${character.hitDice.current}/${character.hitDice.max} d${classDef.hitDie}`} tooltip="Spend during a Short Rest to recover HP. A Long Rest restores half (min 1)." />}
+        {spellSaveDc && <InfoChip icon="fa-magic" iconColor="text-purple-500" label="Spell DC" value={spellSaveDc} tooltip="8 + proficiency + spellcasting modifier. The target a creature must roll on a saving throw to resist your spell." />}
+        {spellAttackBonus && <InfoChip icon="fa-crosshairs" iconColor="text-purple-500" label="Spell Atk" value={`+${spellAttackBonus}`} tooltip="proficiency + spellcasting modifier. Added to your d20 on spell attack rolls." />}
       </div>}
 
       {classDef && <FeatureList title={`${classDef.name} Features`} icon="fa-hat-wizard" features={classDef.features} level={character.level} />}
@@ -251,7 +284,17 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ character, onUpdateInve
           <div className="flex flex-wrap gap-1">
             {(spellList ?? []).map(sid => {
               const spell = SPELLS_BY_ID[sid];
-              return spell ? <span key={sid} className="text-[10px] text-stone-400 bg-stone-900/50 px-1.5 py-0.5 rounded border border-stone-800">{spell.name}</span> : null;
+              if (!spell) return null;
+              return (
+                <button
+                  key={sid}
+                  onClick={() => setViewingSpell(spell)}
+                  className="text-[10px] text-stone-300 hover:text-amber-400 bg-stone-900/50 hover:bg-amber-950/30 hover:border-amber-800/50 px-1.5 py-0.5 rounded border border-stone-800 transition-all cursor-pointer"
+                  title={`View ${spell.name} details`}
+                >
+                  {spell.name}
+                </button>
+              );
             })}
           </div>
         </div>}
@@ -269,40 +312,18 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ character, onUpdateInve
         const debuffs = visibleConditions.filter(c => !isBuffCondition(c));
         if (exhaustionLevel === 0 && buffs.length === 0 && debuffs.length === 0) return null;
 
-        const CONDITION_INFO: Record<string, { icon: string; summary: string }> = {
-          blinded:       { icon: 'fa-eye-slash',        summary: 'Auto-fail sight checks; attacks have disadvantage; attacks against you have advantage.' },
-          charmed:       { icon: 'fa-heart',             summary: "Can't attack charmer; charmer has advantage on social checks against you." },
-          deafened:      { icon: 'fa-deaf',              summary: 'Auto-fail hearing checks; immune to sonic effects.' },
-          frightened:    { icon: 'fa-ghost',             summary: 'Disadvantage on ability checks/attacks while source is in sight; cannot move closer to source.' },
-          grappled:      { icon: 'fa-hand-grab',         summary: 'Speed becomes 0.' },
-          incapacitated: { icon: 'fa-ban',               summary: "Can't take actions or reactions." },
-          invisible:     { icon: 'fa-user-secret',       summary: 'Attacks against you have disadvantage; your attacks have advantage.' },
-          paralyzed:     { icon: 'fa-person-falling',    summary: "Incapacitated, can't move or speak; attacks against you have advantage; hits within 5 ft auto-crit." },
-          petrified:     { icon: 'fa-cube',              summary: 'Incapacitated, resistant to all damage, immune to poison/disease.' },
-          poisoned:      { icon: 'fa-skull-crossbones',  summary: 'Disadvantage on attack rolls and ability checks.' },
-          prone:         { icon: 'fa-person-falling',    summary: 'Disadvantage on attacks; melee attacks against you have advantage, ranged have disadvantage.' },
-          restrained:    { icon: 'fa-link',              summary: 'Speed 0; attacks against you have advantage; disadvantage on DEX saves.' },
-          stunned:       { icon: 'fa-dizzy',             summary: "Incapacitated, can't move; attacks against you have advantage; auto-fail STR/DEX saves." },
-          unconscious:   { icon: 'fa-bed',               summary: 'Incapacitated, can\'t move/speak; attacks against you have advantage; hits within 5 ft auto-crit.' },
-          bane:          { icon: 'fa-minus-circle',      summary: 'Roll 1d4 and subtract from attack rolls and saving throws.' },
-          bless:         { icon: 'fa-plus-circle',       summary: 'Roll 1d4 and add to attack rolls and saving throws.' },
-          'mage-armor-ac':     { icon: 'fa-shield-halved',   summary: '+3 AC while unarmored (Mage Armor).' },
-          'shield-ac':         { icon: 'fa-shield',          summary: '+5 AC bonus (Shield reaction).' },
-          'shield-of-faith-ac':{ icon: 'fa-shield-halved',   summary: '+2 AC bonus (Shield of Faith).' },
-          heroism:       { icon: 'fa-medal',          summary: 'Immune to frightened; temporary HP each turn.' },
-          'hunters-mark':    { icon: 'fa-bullseye',     summary: '+1d6 weapon damage vs marked target.' },
-          'divine-favor':    { icon: 'fa-sun',          summary: '+1d4 radiant damage on weapon hits.' },
-          'branding-smite':  { icon: 'fa-eye',          summary: 'Next hit deals +2d6 radiant and prevents invisibility.' },
-          'magic-weapon':    { icon: 'fa-wand-magic',   summary: '+1 to attack and damage rolls with affected weapon.' },
-        };
-
         const renderCondition = (c: ActiveCondition, tone: 'red' | 'emerald') => {
           const info = CONDITION_INFO[c.id];
           const toneText = tone === 'red' ? 'text-red-300' : 'text-emerald-300';
           const toneIcon = tone === 'red' ? 'text-red-400' : 'text-emerald-400';
           const toneBg = tone === 'red' ? 'bg-red-900/20 border-red-800/20' : 'bg-emerald-900/20 border-emerald-800/20';
           return (
-            <div key={`${c.id}-${c.source}`} className={`${toneBg} border rounded px-2 py-1.5`}>
+            <button
+              key={`${c.id}-${c.source}`}
+              onClick={() => setViewingCondition({ id: c.id, name: c.id })}
+              className={`${toneBg} border rounded px-2 py-1.5 w-full text-left hover:border-amber-700/40 hover:bg-stone-900/40 transition-colors cursor-pointer`}
+              title="View condition details"
+            >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
                   <i className={`fas ${info?.icon ?? 'fa-circle'} ${toneIcon} text-[10px]`}></i>
@@ -318,7 +339,7 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ character, onUpdateInve
               {info && (
                 <p className="text-[9px] text-stone-500 mt-0.5 leading-relaxed">{info.summary}</p>
               )}
-            </div>
+            </button>
           );
         };
 
@@ -334,14 +355,18 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ character, onUpdateInve
                   <span className="text-[10px] font-mono text-orange-300 bg-orange-900/30 px-1.5 rounded">Level {exhaustionLevel}</span>
                 </div>
                 <p className="text-[9px] text-stone-500 mt-1 leading-relaxed">
-                  {exhaustionLevel >= 1 && 'Disadvantage on ability checks. '}
-                  {exhaustionLevel >= 2 && 'Speed halved. '}
-                  {exhaustionLevel >= 3 && 'Disadvantage on attacks and saves. '}
-                  {exhaustionLevel >= 4 && 'HP max halved. '}
-                  {exhaustionLevel >= 5 && 'Speed reduced to 0. '}
-                  {exhaustionLevel >= 6 && 'Dead. '}
-                  {!exhaustionLevel || exhaustionLevel < 1 ? '' : `Speed penalty: -${exhaustionLevel * 5} ft. `}
+                  {getExhaustionSummary(exhaustionLevel)} Speed penalty: -{exhaustionLevel * 5} ft.
                 </p>
+                <details className="mt-1">
+                  <summary className="text-[9px] uppercase text-orange-700 cursor-pointer font-bold tracking-wider">All exhaustion levels</summary>
+                  <ul className="mt-1 space-y-0.5">
+                    {EXHAUSTION_LEVELS.map(l => (
+                      <li key={l.level} className={`text-[9px] ${l.level <= exhaustionLevel ? 'text-orange-300' : 'text-stone-600'}`}>
+                        <strong>L{l.level}:</strong> {l.description}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
               </div>
             )}
 
@@ -393,7 +418,13 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ character, onUpdateInve
         <div className="flex justify-between items-center border-b border-stone-800 pb-1"><h3 className="text-lg font-bold text-stone-300 uppercase tracking-tighter">Inventory</h3></div>
         <ul className="text-sm space-y-2 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
           {character.inventory.map((item,idx)=>(
-            <li key={idx} onMouseEnter={e=>handleMouseEnter(item,e)} onMouseLeave={()=>setHoveredItem(null)} className="group flex flex-col text-stone-400 hover:bg-stone-900/40 p-2 rounded transition-colors border border-transparent hover:border-stone-800">
+            <li
+              key={idx}
+              onMouseEnter={e=>handleMouseEnter(item,e)}
+              onMouseLeave={()=>setHoveredItem(null)}
+              onClick={isMobile ? () => setViewingItem(item) : undefined}
+              className={`group flex flex-col text-stone-400 hover:bg-stone-900/40 p-2 rounded transition-colors border border-transparent hover:border-stone-800 ${isMobile ? 'cursor-pointer' : ''}`}
+            >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 flex-1">
                   <span className="text-amber-900/60 text-[10px]">◈</span>
@@ -424,6 +455,9 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ character, onUpdateInve
 
       {renderItemTooltip()}
       <FeatDetailModal feat={viewingFeat} onClose={() => setViewingFeat(null)} />
+      <SpellDetailModal spell={viewingSpell} onClose={() => setViewingSpell(null)} />
+      <ItemDetailModal item={viewingItem} onClose={() => setViewingItem(null)} />
+      <ConditionDetailModal data={viewingCondition} onClose={() => setViewingCondition(null)} />
     </div>
   );
 };

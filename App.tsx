@@ -29,6 +29,9 @@ import { ProgressionProvider } from './contexts/ProgressionContext';
 import { CampaignProvider, useCampaignContext } from './contexts/CampaignContext';
 import { ActionsProvider, useActionsContext } from './contexts/ActionsContext';
 import ErrorBoundary from './components/ErrorBoundary';
+import { useOnboarding } from './hooks/useOnboarding';
+import OnboardingTour from './components/onboarding/OnboardingTour';
+import CompendiumModal from './components/CompendiumModal';
 
 const QueueNotification: React.FC<{ message: string }> = ({ message }) => (
   <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-top-4 fade-in duration-300">
@@ -73,9 +76,10 @@ const AppContent: React.FC = () => {
     currentCampaignId, setCurrentCampaignId, loadGameData, syncState,
     queueNotification
   } = useGameContext();
-  const { settings, settingsOpen, setSettingsOpen, saveSettings, isMobile, diceRollData, clearDiceRoll } = useUIContext();
+  const { settings, settingsOpen, setSettingsOpen, saveSettings, isMobile, diceRollData, clearDiceRoll, isCompendiumOpen, setCompendiumOpen } = useUIContext();
   const { campaigns, showCreateModal, setShowCreateModal, loadCampaigns, handleCreateNewCampaign, handleConfirmCreateCampaign, handleJoinCampaign, handleDeleteCampaign, handleRenameCampaign } = useCampaignContext();
   const { handleCharacterCreated } = useActionsContext();
+  const onboarding = useOnboarding();
 
   const handleGenerateStartingLocations = useCallback(async (charInfo: { name: string; race: string; class: string }): Promise<StartingLocation[]> => {
     const apiKey = getEnv("VITE_LLM_API_KEY");
@@ -117,6 +121,13 @@ const AppContent: React.FC = () => {
 
   useEffect(() => {
     if (stage !== AppStage.PLAY) return;
+    if (onboarding.shouldAutoLaunchTour && !onboarding.tourActive) {
+      onboarding.launchTour();
+    }
+  }, [stage, onboarding.shouldAutoLaunchTour, onboarding.tourActive, onboarding.launchTour]);
+
+  useEffect(() => {
+    if (stage !== AppStage.PLAY) return;
     const apiKey = getEnv('VITE_LLM_API_KEY');
     if (!apiKey) return;
     const apiBase = getEnv('VITE_LLM_API_BASE');
@@ -153,7 +164,7 @@ const AppContent: React.FC = () => {
       <div className="absolute inset-0 opacity-5 pointer-events-none" style={{backgroundImage:'radial-gradient(#444 1px, transparent 1px)', backgroundSize:'40px 40px'}}></div>
       {getContent()}
       {queueNotification && <QueueNotification message={queueNotification} />}
-      {settingsOpen && <SettingsModal settings={settings} userId={userId} messages={messages} gameState={gameState} onSave={saveSettings} onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && <SettingsModal settings={settings} userId={userId} messages={messages} gameState={gameState} onSave={saveSettings} onClose={() => setSettingsOpen(false)} onReplayOnboarding={() => { setSettingsOpen(false); onboarding.resetOnboarding(); }} />}
       {showCreateModal && <CampaignModal mode="create" isOpen={true} onConfirm={handleConfirmCreateCampaign} onCancel={() => setShowCreateModal(false)} />}
       {diceRollData?.isOpen && (
         <DiceRollModal
@@ -175,6 +186,14 @@ const AppContent: React.FC = () => {
         />
       )}
       <Analytics /><SpeedInsights />
+      {stage === AppStage.PLAY && (
+        <OnboardingTour
+          active={onboarding.tourActive}
+          combatActive={gameState.combat?.isActive}
+          onDismiss={onboarding.dismissTour}
+        />
+      )}
+      <CompendiumModal isOpen={isCompendiumOpen} onClose={() => setCompendiumOpen(false)} />
     </div>
   );
 };

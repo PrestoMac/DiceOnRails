@@ -8,6 +8,7 @@ import { ASI_LEVELS } from '../../constants';
 import { STAT_LABELS } from './constants';
 import { StepH } from './SharedComponents';
 import FeatDetailModal from '../FeatDetailModal';
+import Tooltip from '../ui/Tooltip';
 
 /** Feats and Ability Score Improvements step. Manages ASI/feat selection per slot, including point allocation for ASI and feat browsing/filtering. */
 const FeatsStep: React.FC<StepProps & { onGoToSpells: () => void; onGoToGear: () => void; onGoToSubclass: () => void; needsSpellsStep: boolean; needsSubclassStep: boolean }> = ({
@@ -85,19 +86,15 @@ const FeatsStep: React.FC<StepProps & { onGoToSpells: () => void; onGoToGear: ()
       <div className="bg-stone-950/60 border border-amber-900/30 rounded-xl p-3 text-center mb-2">
         <p className="text-xs text-stone-400">
           At level <span className="text-amber-500 font-bold">{level}</span>, you have reached{' '}
-          <span className="text-amber-500 font-bold">{asiFeatSlots.length}</span> Ability Score Improvement milestone{asiFeatSlots.length === 1 ? '' : 's'}.
+          <Tooltip content="ASI/Feat milestones occur at levels 4, 8, 12, 16, 19. At each, you choose between an Ability Score Improvement (+1 to two stats or +2 to one) OR a Feat. Level 1 grants one starting slot (variant rule)." side="top">
+            <span className="text-amber-500 font-bold underline decoration-dotted">{asiFeatSlots.length} Ability Score Improvement milestone{asiFeatSlots.length === 1 ? '' : 's'}</span>
+          </Tooltip>
+          .
         </p>
         <p className="text-[10px] text-stone-500 mt-1">
           For each, choose: Ability Score Improvement <span className="text-amber-600">or</span> a Feat
         </p>
       </div>
-
-      {asiFeatSlots.length === 0 && (
-        <div className="text-center py-8 text-stone-500 text-sm">
-          <i className="fas fa-info-circle text-3xl mb-2 opacity-50"></i>
-          <p>Level 1 characters get one starting feat (variant rule). Higher levels gain additional ASI/Feat slots at levels 4, 8, 12, 16, 19.</p>
-        </div>
-      )}
 
       {asiFeatSlots.map((slot, idx) => {
         const slotLevel = ASI_LEVELS[idx];

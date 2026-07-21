@@ -15,7 +15,9 @@ import LevelUpModal from '../LevelUpModal';
 import CombatTracker from '../CombatTracker';
 import ActivityBell from '../shared/ActivityBell';
 import AtmosphereOverlay from '../shared/AtmosphereOverlay';
+import SuggestedActions from '../SuggestedActions';
 import { useActivityTracking } from '../../hooks/useActivityTracking';
+import { useOnboarding } from '../../hooks/useOnboarding';
 import { formatGameTime } from '../../utils/timeUtils';
 
 /** Primary desktop layout with resizable sidebar, chat log, input area, and full header controls. */
@@ -34,8 +36,9 @@ const DesktopLayout: React.FC = () => {
     handleAllocateStat, handleConfirmAllocation, handleConfirmAsiChoice,
     handleConfirmFeatChoice, handleAcknowledgeSubclass
   } = useProgressionContext();
-  const { settings, setSettingsOpen, handleTriggerDiceRoll } = useUIContext();
+  const { settings, setSettingsOpen, handleTriggerDiceRoll, setCompendiumOpen } = useUIContext();
   const { userId, handleLogout } = useAuthContext();
+  const onboarding = useOnboarding();
 
   const [tab, setTab] = useState<'character' | 'journal'>('character');
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -96,10 +99,10 @@ const DesktopLayout: React.FC = () => {
   const handleBackOrReset = () => userId ? confirm('Return to dashboard?') && setStage(AppStage.DASHBOARD) : confirm('Are you sure you want to reset the game? All progress will be lost.') && resetGame();
 
   return (<>
-    <aside style={{ width: sidebarOpen ? sidebarWidth : 0 }} className={`bg-stone-950/90 backdrop-blur-xl border-r border-stone-800 flex flex-col overflow-hidden relative z-20 ${isDragging ? '' : 'transition-all duration-300'}`}>
+    <aside style={{ width: sidebarOpen ? sidebarWidth : 0 }} data-tour="character-sheet" className={`bg-stone-950/90 backdrop-blur-xl border-r border-stone-800 flex flex-col overflow-hidden relative z-20 ${isDragging ? '' : 'transition-all duration-300'}`}>
       <div className="flex border-b border-stone-800" style={{ fontSize: `${fontScale}rem` }}>
         <button onClick={() => setTab('character')} className={`flex-1 py-3 uppercase font-bold tracking-widest transition-all ${tab === 'character' ? 'bg-amber-900/20 text-amber-500' : 'text-stone-600 hover:text-stone-400'}`}>Character</button>
-        <button onClick={() => setTab('journal')} className={`flex-1 py-3 uppercase font-bold tracking-widest transition-all relative ${tab === 'journal' ? 'bg-amber-900/20 text-amber-500' : 'text-stone-600 hover:text-stone-400'}`}>Journal{gameState.quests.some(q => q.status === 'active') && <span className="absolute top-2 right-4 h-1.5 w-1.5 rounded-full bg-amber-600 animate-pulse" />}</button>
+        <button onClick={() => setTab('journal')} data-tour="journal" className={`flex-1 py-3 uppercase font-bold tracking-widest transition-all relative ${tab === 'journal' ? 'bg-amber-900/20 text-amber-500' : 'text-stone-600 hover:text-stone-400'}`}>Journal{gameState.quests.some(q => q.status === 'active') && <span className="absolute top-2 right-4 h-1.5 w-1.5 rounded-full bg-amber-600 animate-pulse" />}</button>
       </div>
       <div ref={sidebarScrollRef} className="flex-1 overflow-y-auto custom-scrollbar relative" style={{ padding: `${Math.max(12, sidebarWidth * 0.075)}px`, fontSize: `${fontScale}rem` }}>
         {tab === 'character' ? <div className="flex flex-col h-full">
@@ -108,7 +111,7 @@ const DesktopLayout: React.FC = () => {
         </div> : <Journal quests={gameState.quests} lore={gameState.lore} />}
         {hasScrollOverflow && <div className="sticky bottom-0 left-0 right-0 h-12 -mt-12 pointer-events-none bg-gradient-to-t from-stone-950/95 via-stone-950/60 to-transparent z-10" />}
       </div>
-      <div className={`border-t border-stone-800 bg-stone-900/40 transition-all duration-300 ${isQueueOpen ? 'h-1/3' : 'h-auto'} flex flex-col`} style={{ fontSize: `${fontScale}rem` }}>
+      <div className={`border-t border-stone-800 bg-stone-900/40 transition-all duration-300 ${isQueueOpen ? 'h-1/3' : 'h-auto'} flex flex-col`} style={{ fontSize: `${fontScale}rem` }} data-tour="queue">
         <ActionQueuePanel queue={gameState.actionQueue || []} userId={userId} onRemove={handleRemoveQueueItem} onUpdate={handleUpdateQueueItem} onReorder={handleReorderQueue} onExecute={handleExecuteBatch} isProcessing={gameState.isProcessing} isCollapsed={!isQueueOpen} onToggleCollapse={() => setIsQueueOpen(!isQueueOpen)} />
       </div>
       {sidebarOpen && <div onMouseDown={handleDragStart} className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-amber-600/40 transition-colors z-30" />}
@@ -133,6 +136,7 @@ const DesktopLayout: React.FC = () => {
         </div>
         <div className="flex items-center gap-4">
           <button onClick={handleBackOrReset} className="p-2 hover:bg-stone-900 rounded-lg text-stone-400 transition-colors" title={userId ? "Return to Dashboard" : "Reset Game"}><i className={`fas ${userId ? 'fa-arrow-left' : 'fa-undo'} text-xl`} /></button>
+          <button onClick={() => setCompendiumOpen(true)} className="p-2 hover:bg-stone-900 rounded-lg text-stone-400 transition-colors group" title="Open Compendium"><i className="fas fa-book-open text-xl group-hover:text-amber-500 transition-colors" /></button>
           <button onClick={() => setSettingsOpen(true)} className="p-2 hover:bg-stone-900 rounded-lg text-stone-400 transition-colors group" title="Settings"><i className="fas fa-cog text-xl group-hover:rotate-90 transition-transform duration-500" /></button>
           <button onClick={handleLogout} className="p-2 hover:bg-stone-900 rounded-lg text-stone-400 transition-colors"><i className="fas fa-sign-out-alt text-xl" /></button>
           {stage === AppStage.PLAY && isSyncableCampaign(currentCampaignId) && <div className="flex items-center gap-2 bg-stone-900/50 px-3 py-1.5 rounded-lg border border-stone-800"><span className="text-[10px] uppercase font-bold tracking-wider text-stone-500">Share Campaign</span><span className="text-xs text-stone-300 truncate max-w-[140px]">{campaignName || currentCampaignId}</span><button onClick={() => { navigator.clipboard.writeText(currentCampaignId); alert("Campaign ID copied to clipboard!"); }} className="text-amber-600 hover:text-amber-500 transition-colors"><i className="fas fa-copy" /></button></div>}
@@ -140,11 +144,28 @@ const DesktopLayout: React.FC = () => {
           <div className="h-2 w-2 rounded-full bg-green-500 shadow-sm shadow-green-900 animate-pulse" />
         </div>
       </header>
-      {gameState.combat?.isActive && <div className="relative z-10"><CombatTracker combat={gameState.combat} party={gameState.party} /></div>}
+      {gameState.combat?.isActive && <div className="relative z-10" data-tour="combat-tracker"><CombatTracker combat={gameState.combat} party={gameState.party} /></div>}
       <div className="flex-1 flex flex-col relative z-10 min-h-0">
-        <ChatLog messages={messages} settings={settings} onRewind={handleRewind} isProcessing={isLoading} onExpandAtmosphere={() => setIsAtmosphereExpanded(true)} atmosphereUrl={gameState.currentAtmosphereUrl} scrollRef={chatScrollRef} onScrollChange={setIsChatScrolledUp} />
+        <ChatLog
+          messages={messages}
+          settings={settings}
+          onRewind={handleRewind}
+          isProcessing={isLoading}
+          onExpandAtmosphere={() => setIsAtmosphereExpanded(true)}
+          atmosphereUrl={gameState.currentAtmosphereUrl}
+          scrollRef={chatScrollRef}
+          onScrollChange={setIsChatScrolledUp}
+          showWelcomeChips={onboarding.shouldShowWelcomeChips}
+          onPrefillInput={(text) => { onboarding.markWelcomeSeen(); handleSendMessage(text); }}
+        />
       </div>
       <div className="relative z-10 shrink-0">
+        {settings.enableSuggestions && gameState.lastSuggestions && gameState.lastSuggestions.length > 0 && (
+          <SuggestedActions
+            suggestions={gameState.lastSuggestions}
+            onPick={(text) => handleSendMessage(text)}
+          />
+        )}
         <InputArea onSendMessage={handleSendMessage} onQueueAction={handleEnqueueAction} onResolveEnemyTurn={handleResolveEnemyTurn} isLoading={isLoading || gameState.isProcessing} combat={gameState.combat} character={charToShow} />
       </div>
     </main>

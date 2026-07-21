@@ -4,6 +4,7 @@ import DiceRollCard from './DiceRollCard';
 import { speakText, stopSpeaking } from '../services/audioService';
 import ReactMarkdown from 'react-markdown';
 import { isDebugMode } from '../utils/debug';
+import WelcomeChips from './onboarding/WelcomeChips';
 
 interface ParsedRoll {
   type: 'attack' | 'skill';
@@ -146,6 +147,10 @@ interface ChatLogProps {
   scrollRef?: React.RefObject<HTMLDivElement>;
   onScrollChange?: (scrolledUp: boolean) => void;
   disableInternalScroll?: boolean;
+  /** Called when the user picks an example prompt from the welcome chips. */
+  onPrefillInput?: (text: string) => void;
+  /** Whether to show the welcome chips empty state (first session only). */
+  showWelcomeChips?: boolean;
 }
 
 type FilterType = 'all' | 'narration' | 'player' | 'system';
@@ -168,7 +173,7 @@ const EXPORT_BTN_CLASS = 'w-full flex items-center gap-3 px-4 py-2.5 text-sm tex
 const EXPORT_ICON_CLASS = 'text-xs w-5 text-center text-stone-500';
 
 /** Renders the scrollable message history with search, filter, export, speech playback, rewind, and roll-highlighting cards. */
-const ChatLog: React.FC<ChatLogProps> = ({ messages, settings, onRewind, isProcessing, onExpandAtmosphere, atmosphereUrl, scrollRef: externalScrollRef, onScrollChange, disableInternalScroll }) => {
+const ChatLog: React.FC<ChatLogProps> = ({ messages, settings, onRewind, isProcessing, onExpandAtmosphere, atmosphereUrl, scrollRef: externalScrollRef, onScrollChange, disableInternalScroll, onPrefillInput, showWelcomeChips }) => {
   const internalScrollRef = useRef<HTMLDivElement>(null);
   const scrollRef = externalScrollRef || internalScrollRef;
   const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
@@ -386,10 +391,14 @@ const ChatLog: React.FC<ChatLogProps> = ({ messages, settings, onRewind, isProce
 
       <div ref={externalScrollRef || internalScrollRef} onScroll={handleScroll} className={`flex-1 p-4 md:p-8 space-y-8 ${disableInternalScroll ? '' : 'overflow-y-auto'}`}>
         {messages.length === 0 && (
-          <div className="h-full flex flex-col items-center justify-center text-stone-600 space-y-4">
-            <i className="fas fa-dragon text-6xl opacity-20"></i>
-            <p className="fantasy-font italic text-lg tracking-wide">The chronicles await your first move...</p>
-          </div>
+          showWelcomeChips && onPrefillInput ? (
+            <WelcomeChips onPick={onPrefillInput} />
+          ) : (
+            <div className="h-full flex flex-col items-center justify-center text-stone-600 space-y-4">
+              <i className="fas fa-dragon text-6xl opacity-20"></i>
+              <p className="fantasy-font italic text-lg tracking-wide">The chronicles await your first move...</p>
+            </div>
+          )
         )}
 
         {messages.length > 0 && filteredMessages.length === 0 && (

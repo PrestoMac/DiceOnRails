@@ -68,4 +68,6 @@ export interface GameState {
   lastLongRestTime?: number;     
   _tiredWarningFired?: boolean;  
   factionReputations?: Record<string, number>; 
+  /** Optional LLM-generated suggested next actions, cached per turn. */
+  lastSuggestions?: string[];
 }

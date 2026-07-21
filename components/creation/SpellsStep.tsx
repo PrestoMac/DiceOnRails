@@ -4,6 +4,8 @@ import { StepProps } from './types';
 import { getSpellsForClass } from '../../utils/spells';
 import { getCantripsKnown, getSpellsKnown, getMaxPrepared } from '../../services/spellcastingEngine';
 import { StepH, SpellCard } from './SharedComponents';
+import SpellDetailModal from '../modals/SpellDetailModal';
+import Tooltip from '../ui/Tooltip';
 
 const SPELL_FILTERS = ['all', 'damage', 'healing', 'utility', 'control'];
 
@@ -50,7 +52,15 @@ const SpellsStep: React.FC<StepProps & { onBackToSubclass: () => void; onBackToF
       <StepH>Choose Spells</StepH>
       <p className="text-xs text-stone-400 text-center">Select your spells known or prepared.</p>
       <div className="bg-stone-950/40 border border-stone-800 rounded-lg p-3 mb-3">
-        <p className="text-xs text-stone-400">Cantrips: {selectedCantrips.length}/{maxCantrips} | {isPrepared ? 'Prepared' : 'Known'}: {preparedCount}/{maxSpells}</p>
+        <p className="text-xs text-stone-400">
+          Cantrips: {selectedCantrips.length}/{maxCantrips} |{' '}
+          <Tooltip content={isPrepared
+            ? 'Prepared spells (Cleric/Druid/Paladin/Wizard): you can change your selection after a Long Rest. Limit = spellcasting modifier + level.'
+            : 'Known spells (Bard/Sorcerer/Warlock/Ranger): permanently learned. Only changed on level-up.'} side="top">
+            <span className="underline decoration-dotted">{isPrepared ? 'Prepared' : 'Known'}</span>
+          </Tooltip>
+          : {preparedCount}/{maxSpells}
+        </p>
       </div>
       <div className="flex flex-wrap gap-1 mb-3">
         {SPELL_FILTERS.map(filter => (
@@ -110,56 +120,7 @@ const SpellsStep: React.FC<StepProps & { onBackToSubclass: () => void; onBackToF
         </button>
       </div>
 
-      {viewingSpell && (
-        <div
-          className="fixed inset-0 z-[200] bg-stone-950/80 flex items-center justify-center p-6"
-          onClick={() => setViewingSpell(null)}
-        >
-          <div className="bg-stone-900 border border-stone-700 rounded-2xl p-6 max-w-md w-full shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h2 className="fantasy-font text-2xl text-amber-400">{viewingSpell.name}</h2>
-                <p className="text-[10px] text-stone-500 uppercase tracking-widest mt-0.5">
-                  {viewingSpell.level === 0 ? 'Cantrip' : `Level ${viewingSpell.level} Spell`}
-                  {' · '}{viewingSpell.school}
-                </p>
-              </div>
-              <button onClick={() => setViewingSpell(null)} className="text-stone-500 hover:text-stone-200 text-xl">
-                <i className="fas fa-times"></i>
-              </button>
-            </div>
-            <div className="space-y-3 text-xs text-stone-300">
-              <div className="grid grid-cols-2 gap-2 bg-stone-950/50 rounded-lg p-3 border border-stone-800">
-                <div>
-                  <span className="text-stone-500 uppercase text-[9px] font-bold">Casting Time</span>
-                  <p className="font-bold capitalize">{viewingSpell.castingTime}</p>
-                </div>
-                <div>
-                  <span className="text-stone-500 uppercase text-[9px] font-bold">Range</span>
-                  <p className="font-bold">{viewingSpell.range}</p>
-                </div>
-                <div>
-                  <span className="text-stone-500 uppercase text-[9px] font-bold">Duration</span>
-                  <p className="font-bold">{viewingSpell.duration}</p>
-                </div>
-                <div>
-                  <span className="text-stone-500 uppercase text-[9px] font-bold">Concentration</span>
-                  <p className="font-bold">{viewingSpell.requiresConcentration ? 'Yes' : 'No'}</p>
-                </div>
-              </div>
-              {viewingSpell.damage && (
-                <div className="bg-red-950/20 border border-red-900/30 rounded-lg p-2">
-                  <span className="text-[9px] uppercase font-bold text-red-400">Damage</span>
-                  <p className="font-mono font-bold text-red-300">
-                    {viewingSpell.damage.dice} {viewingSpell.damage.type}
-                  </p>
-                </div>
-              )}
-              <p className="text-stone-400 leading-relaxed">{viewingSpell.description}</p>
-            </div>
-          </div>
-        </div>
-      )}
+      <SpellDetailModal spell={viewingSpell} onClose={() => setViewingSpell(null)} />
     </div>
   );
 };

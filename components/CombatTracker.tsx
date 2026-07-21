@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { CombatState, Character } from '../types';
 import HpBar from './shared/HpBar';
+import Tooltip from './ui/Tooltip';
 
 interface CombatTrackerProps {
   combat: CombatState;
@@ -137,7 +138,9 @@ const CombatTracker: React.FC<CombatTrackerProps> = ({ combat, party, isMobile }
             <span className="text-amber-500 text-sm">⚔️</span>
             {!collapsed && (
               <>
-                <span className="text-xs font-bold uppercase tracking-wider text-stone-200">Round {combat.round}</span>
+                <Tooltip content="The current combat round. Each combatant takes one turn per round in initiative order." side="bottom">
+                  <span className="text-xs font-bold uppercase tracking-wider text-stone-200">Round {combat.round}</span>
+                </Tooltip>
                 <span className="text-[10px] font-mono text-stone-400 ml-1">
                   {combat.initiative[combat.turnIndex]?.name || '—'}
                 </span>
@@ -172,7 +175,9 @@ const CombatTracker: React.FC<CombatTrackerProps> = ({ combat, party, isMobile }
                     <span className={`flex-1 truncate ${isCurrent ? 'text-amber-200 font-bold' : 'text-stone-400'}`}>
                       {entry.name}{isDead ? ' 💀' : ''}{isCurrent && !isDead ? ' ◀' : ''}
                     </span>
-                    <span className="font-mono text-[10px] text-stone-500 w-7 text-right">{entry.initiative}</span>
+                    <Tooltip content="Initiative = d20 + DEX modifier, rolled at the start of combat. Higher goes first; ties broken by DEX score, then rolled-off." side="left">
+                      <span className="font-mono text-[10px] text-stone-500 w-7 text-right">{entry.initiative}</span>
+                    </Tooltip>
                     {hp && !isDead && <HpBar current={hp.current} max={hp.max} />}
                     {hp && !isDead && <span className="text-[9px] font-mono text-stone-500 w-10 text-right">{hp.current}/{hp.max}</span>}
                     <i className={`fas fa-chevron-${isExpanded ? 'down' : 'right'} text-[8px] text-stone-600 transition-transform`}></i>

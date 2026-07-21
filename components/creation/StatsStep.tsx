@@ -5,6 +5,7 @@ import { getMod } from '../../services/classEngine';
 import { cryptoRoll } from '../../utils/random';
 import { STAT_LABELS, POINT_BUY_COSTS, GEN_MODES } from './constants';
 import { TabBtn, AdjBtn, ErrorBanner } from './SharedComponents';
+import Tooltip from '../ui/Tooltip';
 
 const CLASS_RECOMMENDED_STATS: Record<string, Record<string, number>> =
   Object.fromEntries(CLASSES_CATALOG.map(c => [c.name, c.recommendedStats]));
@@ -100,13 +101,15 @@ const StatsStep: React.FC<StepProps> = ({ wizardState, updateWizard, onNext }) =
   return (
     <div className={`${stepCls} max-h-[75vh] overflow-y-auto pr-1 custom-scrollbar`}>
       <h2 className="fantasy-font text-3xl font-bold text-amber-500 text-center uppercase tracking-widest">Attributes</h2>
-      <div className="flex justify-between items-center bg-green-950/20 border border-green-900/30 rounded-lg px-4 py-2 text-xs">
-        <span className="text-stone-400">
-          <i className="fas fa-heart text-red-500 mr-1.5"></i>
-          Estimated Max HP
-        </span>
-        <span className="font-bold font-mono text-green-400 text-base">{previewHp}</span>
-      </div>
+      <Tooltip content={`Formula: Hit Die (${selectedClass.hpBase} at L1) + CON mod (${conMod >= 0 ? '+' : ''}${conMod}) + (Hit Die Per Level + CON mod) × (level - 1). Each level adds the class hit die average rounded up, plus your CON modifier, to your max HP.`} side="top">
+        <div className="flex justify-between items-center bg-green-950/20 border border-green-900/30 rounded-lg px-4 py-2 text-xs">
+          <span className="text-stone-400">
+            <i className="fas fa-heart text-red-500 mr-1.5"></i>
+            Estimated Max HP
+          </span>
+          <span className="font-bold font-mono text-green-400 text-base">{previewHp}</span>
+        </div>
+      </Tooltip>
       <div className="flex border border-stone-800 bg-stone-950/60 rounded-lg p-1 text-xs">
         {GEN_MODES.map(m => (
           <TabBtn key={m.key} active={genMode === m.key} onClick={() => {
@@ -198,7 +201,9 @@ const StatsStep: React.FC<StepProps> = ({ wizardState, updateWizard, onNext }) =
                   {(priorities[0] === stat || (selectedClass.name === 'Paladin' && priorities[1] === stat)) && <i className="fas fa-star text-amber-500 text-[8px]"></i>}
                   {priorities[1] === stat && selectedClass.name !== 'Paladin' && <i className="fas fa-star text-stone-500 text-[8px]"></i>}
                 </div>
-                <span className={`font-mono text-xs font-bold ${totalMod >= 0 ? 'text-green-500' : 'text-red-400'}`}>{totalMod >= 0 ? '+' : ''}{totalMod} MOD</span>
+                <Tooltip content="Modifier is derived from (score − 10) / 2, rounded down. Applied to d20 rolls tied to this stat." side="top">
+                  <span className={`font-mono text-xs font-bold ${totalMod >= 0 ? 'text-green-500' : 'text-red-400'}`}>{totalMod >= 0 ? '+' : ''}{totalMod} MOD</span>
+                </Tooltip>
               </div>
               <div className="flex items-center justify-between gap-2 bg-stone-950 p-1.5 rounded border border-stone-800">
                 {genMode === 'buy' ? (

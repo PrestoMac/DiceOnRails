@@ -10,6 +10,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     autoSpeak: false,
     enableAtmosphere: true,
     debugMode: false,
+    enableSuggestions: false,
 };
 
 /** Manages app settings (voice, atmosphere, debug mode) persisted to localStorage. */

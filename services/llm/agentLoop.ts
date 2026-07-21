@@ -6,6 +6,7 @@ import { safeParseJson } from '../../utils/safeJson';
 import { mcpServer } from '../mcpService';
 import { tools, TOOL_MODE_INSTRUCTION } from './tools';
 import { extractRollData } from './narration';
+import { generateSuggestions } from './suggestions';
 import { estimateTokens, PER_MSG_OVERHEAD, STATIC_OVERHEAD, COMPLETION_RESERVE, CONTEXT_BUDGET } from './tokenEstimation';
 import { filterTools } from './toolFilter';
 import { resolveLLMConfig, mapHistoryToMessages } from './llmApiClient';
@@ -69,7 +70,7 @@ export async function runAgentLoop(
   frozenMessages?: { role: 'user' | 'system'; content: string }[],
   onToolResult?: (toolName: string, args: Record<string, unknown>, result: MCPResponse) => void,
   providerConfig?: { provider: LLMProvider; apiKey: string; apiBase?: string },
-  options?: { requestEndNarration?: boolean; maxIters?: number; signal?: AbortSignal }
+  options?: { requestEndNarration?: boolean; maxIters?: number; signal?: AbortSignal; enableSuggestions?: boolean }
 ): Promise<{
   toolMessages: Message[];
   iterationCount: number;
@@ -77,6 +78,7 @@ export async function runAgentLoop(
   completionTokens: number;
   cachedTokens: number;
   inlineNarration?: string;
+  suggestions?: string[];
 }> {
   const { model, apiUrl, apiHeaders } = resolveLLMConfig(providerConfig);
   if (isDebugMode) {
@@ -342,6 +344,21 @@ export async function runAgentLoop(
     if (isDebugMode) console.log('[AgentLoop] Enforcement: auto-called narrate_turn(timePassed=0) — no time advanced this turn');
   }
 
+  // Phase 5B: LLM-driven suggested actions (opt-in, cached per turn)
+  let suggestions: string[] | undefined;
+  if (options?.enableSuggestions) {
+    try {
+      suggestions = await generateSuggestions(history, { signal: options.signal });
+      if (suggestions.length > 0) {
+        // Cache on gameState.lastSuggestions for the UI to read after sync.
+        mcpServer.getFullState().lastSuggestions = suggestions;
+        if (isDebugMode) console.log('[AgentLoop] Generated suggestions:', suggestions);
+      }
+    } catch (err) {
+      if (isDebugMode) console.warn('[AgentLoop] Suggestions generation failed:', err);
+    }
+  }
+
   if (isDebugMode) {
     console.log(`[AgentLoop] runAgentLoop complete in ${Date.now() - agentLoopStart}ms`, {
       itersCompleted,
@@ -352,6 +369,7 @@ export async function runAgentLoop(
       hasInlineNarration: !!inlineNarration,
       inlineNarrationLen: inlineNarration?.length ?? 0,
       timeAdvancedThisTurn,
+      hasSuggestions: !!suggestions?.length,
     });
   }
   return {
@@ -361,5 +379,6 @@ export async function runAgentLoop(
     completionTokens: totalCompletion,
     cachedTokens: totalCached,
     inlineNarration,
+    suggestions,
   };
 }

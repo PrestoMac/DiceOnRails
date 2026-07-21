@@ -167,7 +167,7 @@ export const useGameActions = (
                     async (toolName, args, toolResult) => {
                         await dispatchToolRolls(toolName, args, toolResult, onTriggerDiceRoll, currentState, myCharacterId);
                         if (toolName === 'move_to' && settings.enableAtmosphere) performAtmosphereUpdate(args.location_name as string, args.description as string | undefined, settings);
-                    }, undefined, { requestEndNarration: true });
+                    }, undefined, { requestEndNarration: true, enableSuggestions: !!settings.enableSuggestions });
                 toolMessages = result.toolMessages;
                 inlineNarration = result.inlineNarration;
             }

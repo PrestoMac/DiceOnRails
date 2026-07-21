@@ -323,4 +323,62 @@ describe('runAgentLoop', () => {
     const userMsg = body.messages.find((m: { role: string }) => m.role === 'user');
     expect(userMsg.content).toContain('[Valerius]: I attack the goblin!');
   });
+
+  it('suppresses suggestions when enableSuggestions is not set', async () => {
+    mockFetch.mockResolvedValueOnce(makeLLMResponse('', [
+      { name: 'narrate_turn', args: { narration: 'Done.', timePassed: 0 } },
+    ]));
+
+    const result = await runAgentLoop([], 'Test');
+
+    expect(result.suggestions).toBeUndefined();
+    // Only the main loop fetch should have occurred — no extra suggestion call.
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('produces suggestions when enableSuggestions is true and the LLM returns valid JSON', async () => {
+    // Setup combat state so the tactical gate (combat OR low HP) passes.
+    const char = makeCharacter();
+    mcpServer.loadState(buildCombatState(char, false));
+
+    mockFetch
+      .mockResolvedValueOnce(makeLLMResponse('', [
+        { name: 'narrate_turn', args: { narration: 'Done.', timePassed: 0 } },
+      ]))
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({
+          choices: [{ message: { content: '{"suggestions":["Attack the goblin","Cast Shield","Drink a potion"]}', role: 'assistant' } }],
+          usage: { prompt_tokens: 10, completion_tokens: 5 },
+        }),
+      } as unknown as Response);
+
+    const result = await runAgentLoop([], 'Test', undefined, undefined, undefined, { enableSuggestions: true });
+
+    expect(result.suggestions).toEqual(['Attack the goblin', 'Cast Shield', 'Drink a potion']);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('gracefully handles malformed suggestion JSON', async () => {
+    const char = makeCharacter();
+    mcpServer.loadState(buildCombatState(char, false));
+
+    mockFetch
+      .mockResolvedValueOnce(makeLLMResponse('', [
+        { name: 'narrate_turn', args: { narration: 'Done.', timePassed: 0 } },
+      ]))
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({
+          choices: [{ message: { content: 'sorry I cannot help with that', role: 'assistant' } }],
+          usage: { prompt_tokens: 10, completion_tokens: 5 },
+        }),
+      } as unknown as Response);
+
+    const result = await runAgentLoop([], 'Test', undefined, undefined, undefined, { enableSuggestions: true });
+
+    expect(result.suggestions).toEqual([]);
+  });
 });

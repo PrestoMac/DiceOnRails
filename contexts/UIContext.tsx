@@ -31,6 +31,8 @@ interface UIContextValue {
   handleTriggerDiceRoll: (data: Record<string, unknown>) => Promise<void>;
   diceRollData: DiceRollData | null;
   clearDiceRoll: () => void;
+  isCompendiumOpen: boolean;
+  setCompendiumOpen: (open: boolean) => void;
 }
 
 const UIContext = createContext<UIContextValue | null>(null);
@@ -40,6 +42,7 @@ export function UIProvider({ children }: { children: ReactNode }) {
   const { settings, settingsOpen, setSettingsOpen, saveSettings } = useSettings();
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [diceRollData, setDiceRollData] = useState<DiceRollData | null>(null);
+  const [isCompendiumOpen, setCompendiumOpen] = useState(false);
 
   useEffect(() => {
     const h = () => setIsMobile(window.innerWidth < 768);
@@ -58,7 +61,8 @@ export function UIProvider({ children }: { children: ReactNode }) {
   return (
     <UIContext.Provider value={{
       settings, settingsOpen, setSettingsOpen, saveSettings,
-      isMobile, handleTriggerDiceRoll, diceRollData, clearDiceRoll
+      isMobile, handleTriggerDiceRoll, diceRollData, clearDiceRoll,
+      isCompendiumOpen, setCompendiumOpen
     }}>
       {children}
     </UIContext.Provider>

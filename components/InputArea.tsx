@@ -3,13 +3,15 @@ import { CombatState, Character } from '../types';
 import { isDebugMode } from '../utils/debug';
 import { SPELLS_BY_ID } from '../utils/spells';
 import { CLASSES_BY_ID } from '../utils/classes';
+import { SKILLS_LIST } from '../constants';
+import Tooltip from './ui/Tooltip';
 
 interface QuickAction {
   id: string;
   label: string;
   icon: string;
   fillText: string;
-  category: 'spell' | 'weapon' | 'feature' | 'rest';
+  category: 'spell' | 'weapon' | 'feature' | 'rest' | 'skill' | 'save' | 'item' | 'death';
 }
 
 interface InputAreaProps {
@@ -34,6 +36,10 @@ const CATEGORY_STYLES: Record<string, string> = {
   weapon: 'bg-red-900/40 text-red-300 border border-red-800/50 hover:bg-red-800/50 hover:border-red-600/50 hover:text-red-200',
   feature: 'bg-amber-900/40 text-amber-300 border border-amber-800/50 hover:bg-amber-800/50 hover:border-amber-600/50 hover:text-amber-200',
   rest: 'bg-stone-800/60 text-stone-300 border border-stone-700 hover:bg-stone-700/60 hover:border-amber-700 hover:text-amber-400',
+  skill: 'bg-emerald-900/40 text-emerald-300 border border-emerald-800/50 hover:bg-emerald-800/50 hover:border-emerald-600/50 hover:text-emerald-200',
+  save: 'bg-blue-900/40 text-blue-300 border border-blue-800/50 hover:bg-blue-800/50 hover:border-blue-600/50 hover:text-blue-200',
+  item: 'bg-teal-900/40 text-teal-300 border border-teal-800/50 hover:bg-teal-800/50 hover:border-teal-600/50 hover:text-teal-200',
+  death: 'bg-red-950/50 text-red-400 border border-red-900 hover:bg-red-900/50 hover:border-red-700 hover:text-red-300 animate-pulse',
 };
 
 const QUICK_BTN = 'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium whitespace-nowrap transition-all shrink-0';
@@ -94,6 +100,58 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onQueueAction, onR
       }
     }
 
+    // Skills: top 3-4 trained skills (or class-recommended defaults)
+    const trainedSkills = Object.entries(character.skills ?? {})
+      .filter(([, rank]) => (rank ?? 0) > 0)
+      .sort(([, a], [, b]) => (b ?? 0) - (a ?? 0))
+      .slice(0, 4);
+    for (const [skillName] of trainedSkills) {
+      const def = SKILLS_LIST.find(s => s.name === skillName);
+      actions.push({
+        id: `skill-${skillName}`,
+        label: def?.label ?? skillName,
+        icon: 'fa-dice-d20',
+        fillText: `I roll a ${def?.label ?? skillName} check`,
+        category: 'skill',
+      });
+    }
+
+    // Saves: 2 proficient saving throws
+    if (classDef?.savingThrowProfs) {
+      for (const stat of classDef.savingThrowProfs.slice(0, 2)) {
+        actions.push({
+          id: `save-${stat}`,
+          label: `${stat.toUpperCase()} Save`,
+          icon: 'fa-shield-halved',
+          fillText: `I roll a ${stat.toUpperCase()} saving throw`,
+          category: 'save',
+        });
+      }
+    }
+
+    // Inventory shortcuts: any potion
+    const potions = (character.inventory || []).filter(i => i.type === 'potion');
+    for (const p of potions.slice(0, 3)) {
+      actions.push({
+        id: `item-${p.name}`,
+        label: p.name,
+        icon: 'fa-flask',
+        fillText: `Drink ${p.name}`,
+        category: 'item',
+      });
+    }
+
+    // Death save button when at 0 HP
+    if (character.hp.current === 0) {
+      actions.push({
+        id: 'death-save',
+        label: 'Death Save',
+        icon: 'fa-skull',
+        fillText: 'I roll a death saving throw',
+        category: 'death',
+      });
+    }
+
     return actions;
   }, [character]);
 
@@ -131,7 +189,7 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onQueueAction, onR
 
   return (
     <div className="border-t border-stone-800 p-4 bg-stone-950/80 backdrop-blur-md">
-      <div className="max-w-4xl mx-auto mb-3">
+      <div className="max-w-4xl mx-auto mb-3" data-tour="quick-actions">
         <div className="flex items-center gap-2 mb-1.5">
           <span className="text-[10px] uppercase font-bold text-stone-600 tracking-widest">Quick Actions</span>
           <div className="flex-1 h-px bg-stone-800"></div>
@@ -140,8 +198,12 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onQueueAction, onR
           {quickActions.map(action => (
             <QuickActionBtn key={action.id} action={action} locked={effectivelyLocked} onClick={() => setInput(action.fillText)} />
           ))}
-          <QuickActionBtn action={{ id: 'shortrest', label: 'Short Rest', icon: 'fa-campground', fillText: '/shortrest', category: 'rest' }} locked={effectivelyLocked} onClick={() => setInput('/shortrest')} extraTitle="Pre-fill Short Rest command" />
-          <QuickActionBtn action={{ id: 'longrest', label: 'Long Rest', icon: 'fa-bed', fillText: '/longrest', category: 'rest' }} locked={effectivelyLocked} onClick={() => setInput('/longrest')} extraTitle="Pre-fill Long Rest command" />
+          <Tooltip content="Short Rest (1h): spend Hit Dice to recover HP. Refreshes Fighter Second Wind, Warlock pact slots, and other short-rest resources. No automatic HP." side="top">
+            <QuickActionBtn action={{ id: 'shortrest', label: 'Short Rest', icon: 'fa-campground', fillText: '/shortrest', category: 'rest' }} locked={effectivelyLocked} onClick={() => setInput('/shortrest')} extraTitle="Pre-fill Short Rest command" />
+          </Tooltip>
+          <Tooltip content="Long Rest (8h, 24h cooldown): restores all HP, half of Hit Dice, all spell slots (except Warlock pact slots), and reduces exhaustion by 1 level. Must have ≥1 HP." side="top">
+            <QuickActionBtn action={{ id: 'longrest', label: 'Long Rest', icon: 'fa-bed', fillText: '/longrest', category: 'rest' }} locked={effectivelyLocked} onClick={() => setInput('/longrest')} extraTitle="Pre-fill Long Rest command" />
+          </Tooltip>
         </div>
       </div>
       <form onSubmit={handleSubmit} className="max-w-4xl mx-auto flex flex-col gap-3">
