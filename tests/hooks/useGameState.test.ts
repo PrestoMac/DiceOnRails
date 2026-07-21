@@ -105,7 +105,7 @@ describe('useGameState', () => {
     vi.unstubAllGlobals();
   });
 
-  it('loadGameData advances first-time anonymous users to CREATION when no save exists', async () => {
+  it('loadGameData advances first-time anonymous users to START_MODE when no save exists', async () => {
     mockLoadGame.mockResolvedValue({ data: undefined });
 
     const { result } = renderHook(() => useGameState(undefined));
@@ -114,7 +114,7 @@ describe('useGameState', () => {
       await result.current.loadGameData(undefined, 'anonymous');
     });
 
-    expect(result.current.stage).toBe(AppStage.CREATION);
+    expect(result.current.stage).toBe(AppStage.START_MODE);
     expect(result.current.isNewCampaign).toBe(true);
   });
 
@@ -133,7 +133,7 @@ describe('useGameState', () => {
     expect(result.current.isNewCampaign).toBe(false);
   });
 
-  it('resetGame resets mcpServer and goes to CREATION', async () => {
+  it('resetGame resets mcpServer and goes to START_MODE (quick-start decision)', async () => {
     mockGetFullState.mockReturnValue({
       party: [], worldDescription: 'Reset', sessionLogs: [],
       quests: [], lore: [], actionQueue: [],
@@ -146,7 +146,7 @@ describe('useGameState', () => {
     });
 
     expect(mockReset).toHaveBeenCalled();
-    expect(result.current.stage).toBe(AppStage.CREATION);
+    expect(result.current.stage).toBe(AppStage.START_MODE);
     expect(result.current.messages).toEqual([]);
   });
 
@@ -164,7 +164,7 @@ describe('useGameState', () => {
 
     expect(mockClearLocalSave).toHaveBeenCalled();
     expect(mockReset).toHaveBeenCalled();
-    expect(result.current.stage).toBe(AppStage.CREATION);
+    expect(result.current.stage).toBe(AppStage.START_MODE);
   });
 
   it('syncState calls setGameState with mcpServer state', () => {

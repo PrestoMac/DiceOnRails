@@ -11,7 +11,11 @@ export enum AppStage {
   CREATION = 'creation',
   PLAY = 'play',
   AUTH = 'auth',
-  DASHBOARD = 'dashboard'
+  DASHBOARD = 'dashboard',
+  /** Decision screen shown before character creation: Quick Start vs Custom Character. */
+  START_MODE = 'start_mode',
+  /** Quick Start flow: pick a preset character, then a starting ground. */
+  QUICK_START = 'quick_start'
 }
 
 /** A saved campaign with metadata for listing and resuming. */

@@ -37,7 +37,7 @@ export const useCampaigns = (
         const newCampaignId = crypto.randomUUID();
         setCurrentCampaignId(newCampaignId);
         setCampaignName(name);
-        setStage(AppStage.CREATION);
+        setStage(AppStage.START_MODE);
         setIsNewCampaign(true);
         mcpServer.reset();
         setGameState(mcpServer.getFullState());

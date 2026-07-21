@@ -1,9 +1,12 @@
-import { Character, StartingLocation } from '../types';
+import { Character, StartingLocation, InventoryItem, FeatSelection } from '../types';
 import { WizardState } from '../components/creation/types';
 import { calculateXPToNextLevel } from './progressionService';
 import { ASI_LEVELS, FALLBACK_STARTING_LOCATION } from '../constants';
 import { getMod, getRaceDef, recalculateResourcePools } from './classEngine';
 import { DRAGON_ANCESTRIES } from '../components/creation/constants';
+import { RACES_BY_ID } from '../utils/races';
+import { CLASSES_BY_ID } from '../utils/classes';
+import { lookupSRDItem } from '../utils/srdItems';
 
 /** Builds a fully-formed Character object from wizard creation state, validating name, location, stats, feats, and subclass choices. */
 export function buildCharacterFromWizard(
@@ -98,4 +101,121 @@ export function buildCharacterFromWizard(
     },
     errors,
   };
+}
+
+/** Authoring-level specification for a quick-start preset character. Only the meaningful choices are stored; HP, resources, racial traits, and other derived fields are computed by {@link buildCharacterFromWizard}. All presets are level 1. */
+export interface PresetCharacterSpec {
+  /** Stable unique id, e.g. `'human-fighter'`. */
+  id: string;
+  /** Display name of the character. */
+  name: string;
+  /** Race id matching {@link RaceDefinition.id} (e.g. `'human'`, `'half-elf'`). */
+  raceId: string;
+  /** Class id matching {@link ClassDefinition.id} (e.g. `'fighter'`, `'cleric'`). */
+  classId: string;
+  /** One-line descriptor shown on the preset card (e.g. "Front-line sword-and-board warrior"). */
+  tagline: string;
+  /** Optional longer flavor text shown when the preset is selected. */
+  description?: string;
+  /** Base ability scores BEFORE racial ASIs are applied. Use the standard array (15/14/13/12/10/8) allocated to the class's priorities. */
+  stats: Character['stats'];
+  /** Skill proficiency allocations. Each key is a skill name (lowercase, matches {@link SKILLS_LIST}); each value is typically `1` (proficiency). Must satisfy the class's `skillChoices.count`. */
+  allocatedSkills: Record<string, number>;
+  /** The level-1 ASI/Feat slot choice. `level` is injected automatically. */
+  asiFeatSlot: Omit<FeatSelection, 'level'>;
+  /** Cantrip ids for spellcasters (matches {@link SpellDefinition.id}). */
+  cantrips?: string[];
+  /** Level-1 spell ids for spellcasters (matches {@link SpellDefinition.id}). */
+  spells?: string[];
+  /** Subclass id for classes that choose one at level 1 (cleric, sorcerer, warlock). */
+  subclassId?: string;
+  /** Dragon ancestry id for Dragonborn and Draconic Bloodline sorcerers (matches {@link DRAGON_ANCESTRIES}). */
+  draconicAncestry?: string;
+  /** The two +1 stat choices for Half-Elf (`'flexible-2'` ASI). Each entry is a stat key (`'str'|'dex'|'con'|'int'|'wis'` — cha is automatic). */
+  halfElfChoices?: [Exclude<keyof Character['stats'], 'cha'>, Exclude<keyof Character['stats'], 'cha'>];
+  /** Starting gold (integer GP). Defaults to `10` (matching the wizard's level-1 default). */
+  goldPool?: number;
+  /** Optional character backstory. */
+  backstory?: string;
+}
+
+/**
+ * Hydrates starting equipment for a class into full InventoryItem objects, mirroring the
+ * useEffect logic in WizardShell. Each catalog item name is resolved via lookupSRDItem and
+ * auto-equipped if it is a weapon/armor/shield. An "Explorer's Pack" is always appended.
+ */
+export function hydrateStartingEquipment(classId: string): InventoryItem[] {
+  const cls = CLASSES_BY_ID[classId];
+  const names: string[] = cls?.startingEquipment ?? [];
+  const items: InventoryItem[] = names.map((itemName) => {
+    const srd = lookupSRDItem(itemName);
+    return {
+      name: itemName,
+      quantity: 1,
+      type: srd?.type || 'other',
+      rarity: srd?.rarity || 'common',
+      description: srd?.description || 'No description available.',
+      weight: srd?.weight || 0,
+      cost: srd?.cost || '0 gp',
+      stats: srd?.stats || {},
+      equipped: srd?.type === 'weapon' || srd?.type === 'armor' || srd?.type === 'shield',
+    };
+  });
+  const epName = "Explorer's Pack";
+  const ep = lookupSRDItem(epName);
+  items.push({
+    name: epName, quantity: 1,
+    type: ep?.type || 'other', rarity: ep?.rarity || 'common',
+    description: ep?.description || 'No description available.',
+    weight: ep?.weight || 0, cost: ep?.cost || '0 gp',
+    stats: ep?.stats || {}, equipped: false,
+  });
+  return items;
+}
+
+/**
+ * Builds a fully-formed level-1 Character from a preset spec by delegating to
+ * {@link buildCharacterFromWizard}. Throws if the race/class ids are unknown or the
+ * resulting character fails validation. Location handling is left to the caller
+ * (the quick-start flow sets it via `onSetStartingLocation` before `handleCharacterCreated`).
+ */
+export function buildPresetCharacter(spec: PresetCharacterSpec): Character {
+  const race = RACES_BY_ID[spec.raceId];
+  const cls = CLASSES_BY_ID[spec.classId];
+  if (!race) throw new Error(`buildPresetCharacter: unknown raceId "${spec.raceId}" (spec "${spec.id}")`);
+  if (!cls) throw new Error(`buildPresetCharacter: unknown classId "${spec.classId}" (spec "${spec.id}")`);
+
+  const wizard: WizardState = {
+    name: spec.name,
+    level: 1,
+    backstory: spec.backstory ?? '',
+    selectedRace: race,
+    selectedClass: cls,
+    stats: spec.stats,
+    inventory: hydrateStartingEquipment(spec.classId),
+    allocatedSkills: spec.allocatedSkills,
+    goldPool: spec.goldPool ?? 10,
+    selectedSpells: spec.spells ?? [],
+    selectedCantrips: spec.cantrips ?? [],
+    selectedSubclassId: spec.subclassId ?? null,
+    asiFeatSlots: [{ ...spec.asiFeatSlot, level: 1 } as FeatSelection],
+    draconicAncestry: spec.draconicAncestry ?? null,
+    halfElfChoice1: spec.halfElfChoices?.[0] ?? null,
+    halfElfChoice2: spec.halfElfChoices?.[1] ?? null,
+    generatedLocations: [],
+    selectedLocation: null,
+    isGeneratingLocs: false,
+    isRerolling: false,
+  };
+
+  // Replicate WizardShell's remainingSkillPoints formula at level 1 (no per-level bonus term).
+  const skillBudget = cls.skillChoices.count * 2;
+  const allocatedSum = Object.values(spec.allocatedSkills).reduce((s, v) => s + v, 0);
+  const remainingSkillPoints = skillBudget - allocatedSum;
+
+  const { character, errors } = buildCharacterFromWizard(wizard, { isNewCampaign: false, remainingSkillPoints });
+  if (errors.length > 0 || !character) {
+    throw new Error(`buildPresetCharacter: preset "${spec.id}" failed validation: ${errors.join('; ')}`);
+  }
+  return character;
 }

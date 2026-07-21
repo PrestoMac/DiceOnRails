@@ -69,9 +69,9 @@ export const useGameState = (userId: string | undefined) => {
                 }
                 setStage(data.stage);
             } else if (campaignId === ANONYMOUS_CAMPAIGN_ID) {
-                // First-time anonymous user with no local save → advance to character creation.
+                // First-time anonymous user with no local save → start at the Quick Start vs Custom decision.
                 setIsNewCampaign(true);
-                setStage(AppStage.CREATION);
+                setStage(AppStage.START_MODE);
             }
         } catch (e) {
             console.error('[loadGameData] Error:', e);
@@ -104,7 +104,7 @@ export const useGameState = (userId: string | undefined) => {
                 campaignId: currentCampaignId,
                 gameState: cleanState,
                 messages: [],
-                stage: AppStage.CREATION,
+                stage: AppStage.START_MODE,
                 timestamp: Date.now()
             };
             await storageService.saveGame(emptyGameData, userId, currentCampaignId);
@@ -113,7 +113,7 @@ export const useGameState = (userId: string | undefined) => {
         }
 
         setIsNewCampaign(true);
-        setStage(AppStage.CREATION);
+        setStage(AppStage.START_MODE);
         setMessages([]);
         setGameState(cleanState);
     }, [userId, currentCampaignId]);

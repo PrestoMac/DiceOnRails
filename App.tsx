@@ -4,6 +4,8 @@ import SplashScreen from './components/SplashScreen';
 import AuthScreen from './components/AuthScreen';
 import CampaignDashboard from './components/CampaignDashboard';
 import WizardShell from './components/creation/WizardShell';
+import StartModeScreen from './components/StartModeScreen';
+import QuickStartFlow from './components/QuickStartFlow';
 import SettingsModal from './components/SettingsModal';
 import CampaignModal from './components/CampaignModal';
 import MobileLayout from './components/layouts/MobileLayout';
@@ -133,6 +135,12 @@ const AppContent: React.FC = () => {
   const getContent = () => {
     if (stage === AppStage.DASHBOARD) {
       return <CampaignDashboard campaigns={campaigns} onSelectCampaign={id => handleJoinCampaign(id, loadGameData)} onCreateNew={handleCreateNewCampaign} onDeleteCampaign={handleDeleteCampaign} onRenameCampaign={handleRenameCampaign} onJoinCampaign={id => handleJoinCampaign(id, loadGameData)} onOpenSettings={() => setSettingsOpen(true)} onLogout={handleLogout} loading={isLoading} />;
+    }
+    if (stage === AppStage.START_MODE) {
+      return <StartModeScreen onQuickStart={() => setStage(AppStage.QUICK_START)} onCustom={() => setStage(AppStage.CREATION)} />;
+    }
+    if (stage === AppStage.QUICK_START) {
+      return <QuickStartFlow onComplete={handleCharacterCreated} onGenerateStartingLocations={handleGenerateStartingLocations} onSetStartingLocation={handleSetStartingLocation} onSwitchToCustom={() => setStage(AppStage.CREATION)} />;
     }
     if (stage === AppStage.CREATION) {
       return <WizardShell onComplete={handleCharacterCreated} isNewCampaign={isNewCampaign} campaignStartingLocation={gameState.startingLocation} onGenerateStartingLocations={isNewCampaign ? handleGenerateStartingLocations : undefined} onSetStartingLocation={handleSetStartingLocation} />;

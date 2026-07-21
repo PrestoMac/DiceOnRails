@@ -1,0 +1,164 @@
+import { PresetCharacterSpec } from '../services/characterCreationService';
+
+/**
+ * Ten pre-made level-1 characters spanning every race and a spread of class archetypes.
+ * Each spec stores only authored choices (stats, skills, ASI/feat, spells, subclass);
+ * all derived fields (HP, resources, racial traits, currency) are computed by
+ * {@link buildPresetCharacter} via the canonical {@link buildCharacterFromWizard} path.
+ *
+ * Stats use the standard array (15/14/13/12/10/8) allocated to each class's statPriority.
+ * Skills are lowercase names from SKILLS_LIST, one rank per proficiency, capped at the
+ * class's skillChoices.count. The level-1 ASI/feat slot boosts the primary stat (+2)
+ * except for the Half-Elf Bard, who takes the Alert feat.
+ */
+export const PRESET_CHARACTERS: readonly PresetCharacterSpec[] = Object.freeze([
+  {
+    id: 'human-fighter',
+    name: 'Valerius the Steadfast',
+    raceId: 'human',
+    classId: 'fighter',
+    tagline: 'Sword-and-board frontline stalwart.',
+    description: 'A seasoned mercenary with no family name, only a notched blade and a shield that has held a hundred lines. Reliable in any company.',
+    stats: { str: 15, dex: 12, con: 14, int: 8, wis: 10, cha: 13 },
+    allocatedSkills: { athletics: 1, perception: 1 },
+    asiFeatSlot: { type: 'asi', statAllocations: { str: 2 } },
+    goldPool: 10,
+    backstory: 'A sellsword who outlived three captains and remembers every debt.',
+  },
+  {
+    id: 'elf-wizard',
+    name: 'Magus Starfall',
+    raceId: 'elf',
+    classId: 'wizard',
+    tagline: 'Evocation scholar raining fire and force.',
+    description: 'An elven arcanist fresh from a century of study, eager to test theory against the messiness of the wild world.',
+    stats: { str: 8, dex: 14, con: 13, int: 15, wis: 12, cha: 10 },
+    allocatedSkills: { arcana: 1, investigation: 1 },
+    asiFeatSlot: { type: 'asi', statAllocations: { int: 2 } },
+    cantrips: ['fire-bolt', 'light', 'mage-hand'],
+    spells: ['magic-missile', 'shield', 'burning-hands', 'sleep'],
+    goldPool: 10,
+    backstory: 'Left the tower because scrolls do not bleed, and only bleeding things teach.',
+  },
+  {
+    id: 'dwarf-cleric',
+    name: 'Aria Ironvein',
+    raceId: 'dwarf',
+    classId: 'cleric',
+    subclassId: 'life-domain',
+    tagline: 'Life-domain healer and shield-maiden.',
+    description: 'A dwarf sworn to the forge-father, whose prayers close wounds and whose mace breaks sieges. Stoic, devoted, slow to anger.',
+    stats: { str: 14, dex: 8, con: 13, int: 10, wis: 15, cha: 12 },
+    allocatedSkills: { religion: 1, medicine: 1 },
+    asiFeatSlot: { type: 'asi', statAllocations: { wis: 2 } },
+    cantrips: ['sacred-flame', 'guidance', 'light'],
+    spells: ['cure-wounds', 'bless', 'healing-word', 'guiding-bolt'],
+    goldPool: 10,
+    backstory: 'The last of her stronghold\'s healers; the stronghold did not fall, but it emptied.',
+  },
+  {
+    id: 'halfling-rogue',
+    name: 'Pip Nightwhisper',
+    raceId: 'halfling',
+    classId: 'rogue',
+    tagline: 'Lucky thief with quick hands.',
+    description: 'A halfling who learned that the best fight is the one nobody notices. Cheerful, light-fingered, and never where he seemed to be.',
+    stats: { str: 8, dex: 15, con: 12, int: 13, wis: 10, cha: 14 },
+    allocatedSkills: { stealth: 1, perception: 1, 'sleight of hand': 1, investigation: 1 },
+    asiFeatSlot: { type: 'asi', statAllocations: { dex: 2 } },
+    goldPool: 10,
+    backstory: 'Three siblings, one loaf, one roof, and a talent that grew from hunger.',
+  },
+  {
+    id: 'dragonborn-paladin',
+    name: 'Vorel Ashbringer',
+    raceId: 'dragonborn',
+    classId: 'paladin',
+    draconicAncestry: 'red',
+    tagline: 'Oathbound warrior with fire in the blood.',
+    description: 'A dragonborn who turned his inherited fury toward a sacred oath. Heavy armor, heavier blade, and a vow he will not explain twice.',
+    stats: { str: 15, dex: 10, con: 13, int: 8, wis: 12, cha: 14 },
+    allocatedSkills: { athletics: 1, persuasion: 1 },
+    asiFeatSlot: { type: 'asi', statAllocations: { str: 2 } },
+    goldPool: 10,
+    backstory: 'Exiled for an oath sworn in the wrong tongue; he keeps it anyway.',
+  },
+  {
+    id: 'half-orc-barbarian',
+    name: 'Grishnak Bonebreak',
+    raceId: 'half-orc',
+    classId: 'barbarian',
+    tagline: 'Primal fury with a great-axe.',
+    description: 'A half-orc who has lived more of his life in a rage than out of one. Speaks little, swings hard, and does not stay down.',
+    stats: { str: 15, dex: 13, con: 14, int: 8, wis: 12, cha: 10 },
+    allocatedSkills: { athletics: 1, intimidation: 1 },
+    asiFeatSlot: { type: 'asi', statAllocations: { str: 2 } },
+    goldPool: 10,
+    backstory: 'The tribe is gone. The rage stayed.',
+  },
+  {
+    id: 'gnome-monk',
+    name: 'Fenwick Swiftstep',
+    raceId: 'gnome',
+    classId: 'monk',
+    tagline: 'Ki-channeling flurry of tiny fists.',
+    description: 'A gnome who turned restless curiosity into discipline. Small, fast, and unexpectedly devastating in a flurry of precise strikes.',
+    stats: { str: 12, dex: 15, con: 13, int: 8, wis: 14, cha: 10 },
+    allocatedSkills: { acrobatics: 1, stealth: 1 },
+    asiFeatSlot: { type: 'asi', statAllocations: { dex: 2 } },
+    goldPool: 10,
+    backstory: 'The monastery took him in for a laugh; he stayed for the silence.',
+  },
+  {
+    id: 'tiefling-warlock',
+    name: 'Mordai Emberpact',
+    raceId: 'tiefling',
+    classId: 'warlock',
+    subclassId: 'the-fiend',
+    tagline: 'Fiend-pact caster of eldritch blasts.',
+    description: 'A tiefling whose infernal heritage was answered by a deeper bargain. Charismatic, guarded, and never without a way out that costs more than it should.',
+    stats: { str: 8, dex: 13, con: 14, int: 10, wis: 12, cha: 15 },
+    allocatedSkills: { arcana: 1, intimidation: 1 },
+    asiFeatSlot: { type: 'asi', statAllocations: { cha: 2 } },
+    cantrips: ['eldritch-blast', 'chill-touch'],
+    spells: ['charm-person', 'false-life'],
+    goldPool: 10,
+    backstory: 'The pact was signed in ash. He has not yet asked the price.',
+  },
+  {
+    id: 'half-elf-bard',
+    name: 'Lyra Songweaver',
+    raceId: 'half-elf',
+    classId: 'bard',
+    halfElfChoices: ['dex', 'con'],
+    tagline: 'Versatile lore-keeper with a silver tongue.',
+    description: 'A half-elf collector of stories, songs, and the occasional secret. Quick to laugh, quicker to act, and never caught off guard.',
+    stats: { str: 8, dex: 14, con: 13, int: 10, wis: 12, cha: 15 },
+    allocatedSkills: { persuasion: 1, performance: 1, deception: 1 },
+    asiFeatSlot: { type: 'feat', featId: 'alert' },
+    cantrips: ['vicious-mockery', 'dancing-lights'],
+    spells: ['cure-wounds', 'charm-person', 'faerie-fire', 'sleep'],
+    goldPool: 10,
+    backstory: 'She knows a verse for every occasion, and a knife for the rest.',
+  },
+  {
+    id: 'elf-ranger',
+    name: 'Thalin Greenleaf',
+    raceId: 'elf',
+    classId: 'ranger',
+    tagline: 'Forest tracker with a steady aim.',
+    description: 'A wood-elf who reads the land like a city reads its streets. Patient, precise, and lethal at range before a foe ever hears the bowstring.',
+    stats: { str: 12, dex: 15, con: 13, int: 8, wis: 14, cha: 10 },
+    allocatedSkills: { survival: 1, perception: 1, stealth: 1 },
+    asiFeatSlot: { type: 'asi', statAllocations: { dex: 2 } },
+    goldPool: 10,
+    backstory: 'The forest marked him; he marks what enters it in return.',
+  },
+]);
+
+/** Lookup map of preset id to spec, for O(1) selection by the quick-start UI. */
+export const PRESETS_BY_ID: Readonly<Record<string, PresetCharacterSpec>> = (() => {
+  const map: Record<string, PresetCharacterSpec> = {};
+  for (const p of PRESET_CHARACTERS) map[p.id] = p;
+  return Object.freeze(map);
+})();
