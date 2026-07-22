@@ -105,10 +105,19 @@ export function createStateService(state: GameState): StateService {
         currentAtmosphereUrl: undefined as string | undefined,
         actionQueue: [],
         startingLocation: undefined,
-        locationImages: {}
+        locationImages: {},
+        gameTime: 0,
+        lastLongRestTime: -960,
+        factionReputations: {},
       };
       Object.assign(state, fresh);
       delete (state as { combat?: unknown }).combat;
+      delete (state as { ctx?: unknown }).ctx;
+      delete (state as { lastDiceRoll?: unknown }).lastDiceRoll;
+      delete (state as { lastSuggestions?: unknown }).lastSuggestions;
+      delete (state as { _tiredWarningFired?: unknown })._tiredWarningFired;
+      delete (state as { isProcessing?: unknown }).isProcessing;
+      delete (state as { processingUser?: unknown }).processingUser;
       rewindPoint = null;
       emergencySnapshot = null;
       ensureLocalGameStateFields();

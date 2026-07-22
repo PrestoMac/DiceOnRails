@@ -94,3 +94,50 @@ describe('stateService.loadState campaign isolation', () => {
     expect(after.ctx).toBeDefined();
   });
 });
+
+describe('stateService.reset() campaign isolation', () => {
+  it('clears gameTime, lastSuggestions, ctx, and all transient fields', () => {
+    const state = makeBaseState();
+    const stateService = createStateService(state);
+
+    // Populate every field that previously leaked through reset().
+    stateService.loadState({
+      ...makeBaseState(),
+      gameTime: 720,
+      lastLongRestTime: 600,
+      factionReputations: { orcs: -10, elves: 5 },
+      combat: { isActive: true, round: 3, initiative: [] } as unknown as GameState['combat'],
+      lastDiceRoll: { sides: 20, count: 1, modifier: 0, results: [15], total: 15 },
+      lastSuggestions: ['Attack', 'Dodge'],
+      ctx: { episodeCheckpoints: ['summary'], frozenRawHistory: 'history' } as unknown as GameState['ctx'],
+      _tiredWarningFired: true,
+      isProcessing: true,
+      processingUser: 'Player',
+    });
+
+    // Sanity: fields are present before reset.
+    const before = stateService.getFullState();
+    expect(before.gameTime).toBe(720);
+    expect(before.lastSuggestions).toEqual(['Attack', 'Dodge']);
+    expect(before.ctx).toBeDefined();
+    expect(before.combat?.isActive).toBe(true);
+
+    // Reset — should produce a pristine new-campaign state.
+    stateService.reset();
+
+    const after = stateService.getFullState();
+    // gameTime and lastLongRestTime must be at their default values, not leaked.
+    expect(after.gameTime).toBe(0);
+    expect(after.lastLongRestTime).toBe(-960);
+    // Transient optional fields must be gone entirely.
+    expect(after.combat).toBeUndefined();
+    expect(after.lastDiceRoll).toBeUndefined();
+    expect(after.lastSuggestions).toBeUndefined();
+    expect(after.ctx).toBeUndefined();
+    expect((after as { _tiredWarningFired?: boolean })._tiredWarningFired).toBeUndefined();
+    expect(after.isProcessing).toBeUndefined();
+    expect(after.processingUser).toBeUndefined();
+    // factionReputations should be a fresh empty object.
+    expect(after.factionReputations).toEqual({});
+  });
+});

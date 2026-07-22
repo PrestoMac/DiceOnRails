@@ -93,7 +93,7 @@ describe('useCampaigns', () => {
     expect(result.current.showCreateModal).toBe(true);
   });
 
-  it('handleConfirmCreateCampaign resets state and starts at the start-mode decision', () => {
+  it('handleConfirmCreateCampaign resets engine + rewind generation for a pristine new campaign', () => {
     vi.stubGlobal('crypto', { randomUUID: vi.fn(() => 'new-uuid') });
 
     const { result } = render();
@@ -103,6 +103,7 @@ describe('useCampaigns', () => {
     expect(setCampaignName).toHaveBeenCalledWith('My Campaign');
     expect(setStage).toHaveBeenCalledWith(AppStage.START_MODE);
     expect(mcpServer.reset).toHaveBeenCalled();
+    expect(resetRewindGeneration).toHaveBeenCalled();
     expect(result.current.showCreateModal).toBe(false);
     vi.unstubAllGlobals();
   });

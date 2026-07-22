@@ -93,6 +93,10 @@ const AppContent: React.FC = () => {
     resetContextState();
     handleJoinCampaign(id, loadGameData);
   };
+  const handleConfirmCreateCampaignWrapped = (name: string) => {
+    resetContextState();
+    handleConfirmCreateCampaign(name);
+  };
 
   const handleGenerateStartingLocations = useCallback(async (charInfo: { name: string; race: string; class: string }): Promise<StartingLocation[]> => {
     const apiKey = getEnv("VITE_LLM_API_KEY");
@@ -178,7 +182,7 @@ const AppContent: React.FC = () => {
       {getContent()}
       {queueNotification && <QueueNotification message={queueNotification} />}
       {settingsOpen && <SettingsModal settings={settings} userId={userId} messages={messages} gameState={gameState} onSave={saveSettings} onClose={() => setSettingsOpen(false)} onReplayOnboarding={() => { setSettingsOpen(false); onboarding.resetOnboarding(); }} />}
-      {showCreateModal && <CampaignModal mode="create" isOpen={true} onConfirm={handleConfirmCreateCampaign} onCancel={() => setShowCreateModal(false)} />}
+      {showCreateModal && <CampaignModal mode="create" isOpen={true} onConfirm={handleConfirmCreateCampaignWrapped} onCancel={() => setShowCreateModal(false)} />}
       {diceRollData?.isOpen && (
         <DiceRollModal
           characterName={diceRollData.characterName}

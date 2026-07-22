@@ -37,6 +37,7 @@ export const useCampaigns = (
 
     const handleConfirmCreateCampaign = (name: string) => {
         const newCampaignId = crypto.randomUUID();
+        resetRewindGeneration();
         setCurrentCampaignId(newCampaignId);
         setCampaignName(name);
         setStage(AppStage.START_MODE);
