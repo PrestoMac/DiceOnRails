@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { AppStage } from '../../types';
+import { AppStage, GameState } from '../../types';
 
 vi.mock('../../services/storageService', () => ({
   storageService: {
@@ -20,11 +20,21 @@ vi.mock('../../services/mcpService', () => ({
   },
 }));
 
+vi.mock('../../services/rewindGeneration', () => ({
+  resetRewindGeneration: vi.fn(),
+}));
+
 vi.mock('../../utils/debug', () => ({ isDebugMode: false }));
 
 const { useCampaigns } = await import('../../hooks/useCampaigns');
 import { storageService } from '../../services/storageService';
 import { mcpServer } from '../../services/mcpService';
+import { resetRewindGeneration } from '../../services/rewindGeneration';
+
+const freshGameState = (): GameState => ({
+  party: [], worldDescription: '', sessionLogs: [],
+  quests: [], lore: [], actionQueue: [],
+} as unknown as GameState);
 
 describe('useCampaigns', () => {
   const setStage = vi.fn();
@@ -42,10 +52,10 @@ describe('useCampaigns', () => {
     vi.clearAllMocks();
   });
 
-  const render = () =>
+  const render = (gameState: GameState = freshGameState()) =>
     renderHook(() =>
       useCampaigns(
-        'user-1', setStage, setGameState, setMessages,
+        'user-1', gameState, setStage, setGameState, setMessages,
         setCurrentCampaignId, setCampaignName, setIsNewCampaign,
         setMyCharacterId, setViewingCharacterId, setIsLoading,
       ),
@@ -141,13 +151,41 @@ describe('useCampaigns', () => {
     vi.unstubAllGlobals();
   });
 
-  it('handleJoinCampaign sets id and loads game', async () => {
+  it('handleJoinCampaign resets engine + rewind generation before loading the new campaign', async () => {
     const { result } = render();
     await act(async () => {
       await result.current.handleJoinCampaign('campaign-id-123', loadGameCallback);
     });
 
+    // Engine reset (clears rewindPoint/emergencySnapshot + GameState singleton)
+    expect(mcpServer.reset).toHaveBeenCalledTimes(1);
+    // Module-level rewind generation counter zeroed so new campaign's realtime
+    // updates aren't rejected as stale.
+    expect(resetRewindGeneration).toHaveBeenCalledTimes(1);
+    // Reset must happen BEFORE the load callback runs (so loadGame sees clean state).
+    expect(vi.mocked(mcpServer.reset).mock.invocationCallOrder[0])
+      .toBeLessThan(vi.mocked(loadGameCallback).mock.invocationCallOrder[0]);
+    expect(vi.mocked(resetRewindGeneration).mock.invocationCallOrder[0])
+      .toBeLessThan(vi.mocked(loadGameCallback).mock.invocationCallOrder[0]);
+
     expect(setCurrentCampaignId).toHaveBeenCalledWith('campaign-id-123');
     expect(loadGameCallback).toHaveBeenCalledWith('user-1', 'campaign-id-123');
+  });
+
+  it('handleJoinCampaign refuses to switch while a turn is processing', async () => {
+    const alertMock = vi.fn();
+    vi.stubGlobal('alert', alertMock);
+
+    const processingState = { ...freshGameState(), isProcessing: true } as unknown as GameState;
+    const { result } = render(processingState);
+    await act(async () => {
+      await result.current.handleJoinCampaign('campaign-id-123', loadGameCallback);
+    });
+
+    expect(alertMock).toHaveBeenCalledWith(expect.stringContaining('current turn'));
+    expect(mcpServer.reset).not.toHaveBeenCalled();
+    expect(resetRewindGeneration).not.toHaveBeenCalled();
+    expect(loadGameCallback).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 });

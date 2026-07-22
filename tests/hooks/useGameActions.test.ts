@@ -172,6 +172,99 @@ describe('useGameActions', () => {
     expect(result.current.handleExecuteBatch).toBeDefined();
     expect(result.current.handleCharacterCreated).toBeDefined();
     expect(result.current.handleRewind).toBeDefined();
+    expect(result.current.resetContextState).toBeDefined();
+  });
+
+  describe('resetContextState (campaign switch isolation)', () => {
+    afterEach(() => {
+      // Restore defaultProps.gameState to a clean base so subsequent describes aren't polluted.
+      defaultProps.gameState = makeBaseState();
+    });
+
+    it('synchronously re-hydrates ctxRef from the current gameState.ctx', async () => {
+      // Start in Campaign A with no ctx.
+      defaultProps.gameState = makeBaseState();
+      const { result, rerender } = render();
+
+      // Switch gameState to Campaign B which has a populated ctx.
+      const campaignBState: GameState = {
+        ...makeBaseState(),
+        ctx: {
+          episodeCheckpoints: ['B summary: the heroes met the king'],
+          frozenRawHistory: 'B earlier events',
+          frozenRawTokens: 42,
+          frozenMessageCount: 3,
+          turnCounter: 1,
+          generation: 7,
+        } as unknown as GameState['ctx'],
+      };
+      defaultProps.gameState = campaignBState;
+      rerender();
+
+      // Call resetContextState — should synchronously pick up B's ctx.
+      act(() => {
+        result.current.resetContextState();
+      });
+
+      // The proof that re-hydration occurred: trigger a handleSendMessage and
+      // inspect the arguments passed to runAgentLoop (it receives frozen msgs
+      // built from ctxRef via prepContext). We verify the frozen array reflects
+      // Campaign B's checkpoint, not Campaign A's empty state.
+      mockRunAgentLoop.mockClear();
+      mockGenerateTightNarration.mockClear();
+      await act(async () => {
+        await result.current.handleSendMessage('I look around');
+      });
+
+      expect(mockRunAgentLoop).toHaveBeenCalledTimes(1);
+      const frozenArg = mockRunAgentLoop.mock.calls[0][2];
+      // frozenArg is an array of { role, content }; Campaign B's checkpoint
+      // is wrapped as `[RECENT SESSION]\nB summary...`.
+      const frozenText = Array.isArray(frozenArg)
+        ? frozenArg.map((m: { content?: string }) => m.content || '').join('\n')
+        : '';
+      expect(frozenText).toContain('B summary');
+      expect(frozenText).toContain('B earlier events');
+    });
+
+    it('produces an empty frozen layer when gameState has no ctx (no bleed)', async () => {
+      // Campaign A had ctx.
+      defaultProps.gameState = {
+        ...makeBaseState(),
+        ctx: {
+          episodeCheckpoints: ['A summary'],
+          frozenRawHistory: 'A earlier events',
+          frozenRawTokens: 99,
+          frozenMessageCount: 5,
+          turnCounter: 2,
+          generation: 3,
+        } as unknown as GameState['ctx'],
+      };
+      const { result, rerender } = render();
+
+      // Switch to Campaign B with no ctx at all.
+      defaultProps.gameState = makeBaseState();
+      rerender();
+
+      act(() => {
+        result.current.resetContextState();
+      });
+
+      mockRunAgentLoop.mockClear();
+      mockGenerateTightNarration.mockClear();
+      await act(async () => {
+        await result.current.handleSendMessage('I do something');
+      });
+
+      expect(mockRunAgentLoop).toHaveBeenCalledTimes(1);
+      const frozenArg = mockRunAgentLoop.mock.calls[0][2];
+      // Frozen should NOT contain Campaign A's data.
+      const frozenText = Array.isArray(frozenArg)
+        ? frozenArg.map((m: { content?: string }) => m.content || '').join('\n')
+        : '';
+      expect(frozenText).not.toContain('A summary');
+      expect(frozenText).not.toContain('A earlier events');
+    });
   });
 
   it('handleSendMessage creates user message and calls generateNarration', async () => {

@@ -13,6 +13,7 @@ interface ActionsContextValue {
   handleExecuteBatch: () => Promise<void>;
   handleCharacterCreated: (character: Character) => void;
   handleResolveEnemyTurn: () => Promise<void>;
+  resetContextState: () => void;
 }
 
 const ActionsContext = createContext<ActionsContextValue | null>(null);

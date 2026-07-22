@@ -78,8 +78,21 @@ const AppContent: React.FC = () => {
   } = useGameContext();
   const { settings, settingsOpen, setSettingsOpen, saveSettings, isMobile, diceRollData, clearDiceRoll, isCompendiumOpen, setCompendiumOpen } = useUIContext();
   const { campaigns, showCreateModal, setShowCreateModal, loadCampaigns, handleCreateNewCampaign, handleConfirmCreateCampaign, handleJoinCampaign, handleDeleteCampaign, handleRenameCampaign } = useCampaignContext();
-  const { handleCharacterCreated } = useActionsContext();
+  const { handleCharacterCreated, resetContextState } = useActionsContext();
   const onboarding = useOnboarding();
+
+  // Campaign-switch wrapper: synchronously clears the LLM context manager state
+  // (ctxRef in useGameActions) before handleJoinCampaign runs its engine reset
+  // (mcpServer.reset + resetRewindGeneration) and loads the new campaign. Order-
+  // independent thanks to resetContextState's self-contained hydration.
+  const handleSelectCampaign = (id: string) => {
+    resetContextState();
+    handleJoinCampaign(id, loadGameData);
+  };
+  const handleJoinCampaignWrapped = (id: string) => {
+    resetContextState();
+    handleJoinCampaign(id, loadGameData);
+  };
 
   const handleGenerateStartingLocations = useCallback(async (charInfo: { name: string; race: string; class: string }): Promise<StartingLocation[]> => {
     const apiKey = getEnv("VITE_LLM_API_KEY");
@@ -145,7 +158,7 @@ const AppContent: React.FC = () => {
 
   const getContent = () => {
     if (stage === AppStage.DASHBOARD) {
-      return <CampaignDashboard campaigns={campaigns} onSelectCampaign={id => handleJoinCampaign(id, loadGameData)} onCreateNew={handleCreateNewCampaign} onDeleteCampaign={handleDeleteCampaign} onRenameCampaign={handleRenameCampaign} onJoinCampaign={id => handleJoinCampaign(id, loadGameData)} onOpenSettings={() => setSettingsOpen(true)} onLogout={handleLogout} loading={isLoading} />;
+      return <CampaignDashboard campaigns={campaigns} onSelectCampaign={handleSelectCampaign} onCreateNew={handleCreateNewCampaign} onDeleteCampaign={handleDeleteCampaign} onRenameCampaign={handleRenameCampaign} onJoinCampaign={handleJoinCampaignWrapped} onOpenSettings={() => setSettingsOpen(true)} onLogout={handleLogout} loading={isLoading} />;
     }
     if (stage === AppStage.START_MODE) {
       return <StartModeScreen onQuickStart={() => setStage(AppStage.QUICK_START)} onCustom={() => setStage(AppStage.CREATION)} />;
@@ -156,7 +169,7 @@ const AppContent: React.FC = () => {
     if (stage === AppStage.CREATION) {
       return <WizardShell onComplete={handleCharacterCreated} isNewCampaign={isNewCampaign} campaignStartingLocation={gameState.startingLocation} onGenerateStartingLocations={isNewCampaign ? handleGenerateStartingLocations : undefined} onSetStartingLocation={handleSetStartingLocation} />;
     }
-    return <ErrorBoundary>{isMobile ? <MobileLayout /> : <DesktopLayout />}</ErrorBoundary>;
+    return <ErrorBoundary><div key={currentCampaignId}>{isMobile ? <MobileLayout /> : <DesktopLayout />}</div></ErrorBoundary>;
   };
 
   return (

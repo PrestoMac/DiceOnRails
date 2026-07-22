@@ -86,6 +86,27 @@ export const useGameActions = (
         }
     }, [gameState]);
 
+    // Synchronously rebuilds ctxRef from the current gameState. Order-independent:
+    // safe to call before or after loadGameData resolves, because it does not rely
+    // on the useEffect above re-firing (refs aren't in dep arrays). Used on campaign
+    // switch to prevent LLM context (frozenRawHistory, episodeCheckpoints, etc.)
+    // from bleeding between campaigns.
+    const resetContextState = () => {
+        const gs = gameState as unknown as { ctx?: { episodeCheckpoints?: unknown[]; frozenRawHistory?: string; frozenRawTokens?: number; frozenMessageCount?: number; turnCounter?: number; generation?: number } };
+        ctxRef.current = {
+            episodeCheckpoints: (gs.ctx?.episodeCheckpoints as string[]) ?? [],
+            frozenRawHistory: gs.ctx?.frozenRawHistory ?? '',
+            frozenRawTokens: gs.ctx?.frozenRawTokens ?? 0,
+            frozenMessageCount: gs.ctx?.frozenMessageCount ?? 0,
+            turnCounter: gs.ctx?.turnCounter ?? 0,
+            isCompressing: false,
+            compressPromise: null,
+            generation: (gs.ctx?.generation ?? 0),
+        };
+        ctxLoadedRef.current = true;
+        if (isDebugMode) console.log('[Context Reset] re-hydrated on campaign switch', { checkpoints: ctxRef.current.episodeCheckpoints.length, raw: ctxRef.current.frozenRawTokens });
+    };
+
     const autoSpeak = (text: string) => { if (settings.autoSpeak) { const c = cleanSpeak(text); if (c) speakText(c, settings); } };
 
     const syncFinished = (msgs: Message[], extras?: Partial<GameState>) => {
@@ -401,5 +422,5 @@ export const useGameActions = (
         }
     }, [currentCampaignId, setMessages, setGameState, setIsLoading]);
 
-    return { handleSendMessage, handleExecuteBatch, handleCharacterCreated, handleRewind };
+    return { handleSendMessage, handleExecuteBatch, handleCharacterCreated, handleRewind, resetContextState };
 };

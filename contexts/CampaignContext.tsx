@@ -22,13 +22,14 @@ const CampaignContext = createContext<CampaignContextValue | null>(null);
 export function CampaignProvider({ children }: { children: ReactNode }) {
   const { userId } = useAuthContext();
   const {
-    setStage, setGameState, setMessages, setCurrentCampaignId,
+    setStage, gameState, setGameState, setMessages, setCurrentCampaignId,
     setCampaignName, setIsNewCampaign, setMyCharacterId,
     setViewingCharacterId, setIsLoading
   } = useGameContext();
 
   const campaigns = useCampaigns(
     userId,
+    gameState,
     setStage, setGameState, setMessages, setCurrentCampaignId,
     setCampaignName, setIsNewCampaign, setMyCharacterId,
     setViewingCharacterId, setIsLoading
