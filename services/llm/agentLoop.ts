@@ -95,7 +95,7 @@ export async function runAgentLoop(
 
   const systemMessage = {
     role: "system" as const,
-    content: `${SYSTEM_INSTRUCTION}\n\n${PROGRESSION_SYSTEM_PROMPT}${options?.enableSuggestions ? '\n15. SUGGESTED ACTIONS: When ending a turn with narrate_turn, ALWAYS include 2-3 short suggested next actions in the suggestions field. Each must be ≤60 chars, second person, concrete action (e.g. "Attack the goblin", "Cast Cure Wounds on the fighter"). This is mandatory.\n' : ''}\n\n=== TOOL MODE ===\n${TOOL_MODE_INSTRUCTION}`
+    content: `${SYSTEM_INSTRUCTION}\n\n${PROGRESSION_SYSTEM_PROMPT}${options?.enableSuggestions ? '\n15. SUGGESTED ACTIONS: When ending a turn with narrate_turn, ALWAYS include 2-3 short suggested next actions in the suggestions field. Each must be ≤60 chars, in first person from the player\'s perspective (e.g. "I attack the goblin with my longsword", "I order a drink and sit down"). This is mandatory.\n' : ''}\n\n=== TOOL MODE ===\n${TOOL_MODE_INSTRUCTION}`
   };
   const state = mcpServer.getFullState();
   const contextParts: string[] = [];
@@ -146,6 +146,10 @@ export async function runAgentLoop(
   }
   if (effects.length > 0) {
     contextParts.push('ACTIVE EFFECTS: ' + effects.join(' | '));
+  }
+
+  if (options?.enableSuggestions) {
+    contextParts.push('REMEMBER: Include 2-3 short suggested next actions in the suggestions field of narrate_turn. Each must be in FIRST PERSON from the player perspective.');
   }
 
   const contextMessage = {

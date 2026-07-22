@@ -15,7 +15,6 @@ import LevelUpModal from '../LevelUpModal';
 import CombatTracker from '../CombatTracker';
 import ActivityBell from '../shared/ActivityBell';
 import HpBar from '../shared/HpBar';
-import SuggestedActions from '../SuggestedActions';
 import { useActivityTracking } from '../../hooks/useActivityTracking';
 import { useOnboarding } from '../../hooks/useOnboarding';
 import { calculateAc } from '../../services/classEngine';
@@ -103,7 +102,7 @@ const MobileLayout: React.FC = () => {
             {gameState.currentAtmosphereUrl?<img src={gameState.currentAtmosphereUrl} alt="Atmosphere" className="w-full h-full object-cover opacity-70" onClick={()=>setIsAtmosphereExpanded(true)}/>:<div className="w-full h-full flex items-center justify-center text-stone-700"><i className="fas fa-compass text-2xl"></i></div>}
             <div className="absolute bottom-2 left-3 flex items-center gap-2"><div className="bg-stone-950/70 backdrop-blur-sm px-2 py-0.5 rounded-full flex items-center gap-1.5 border border-stone-800/50"><i className="fas fa-eye text-amber-600/60 text-[10px]"></i><span className="fantasy-font text-stone-300 text-xs tracking-widest uppercase text-shadow-sm leading-tight line-clamp-2">{gameState.party[0]?.location||"Unknown"}</span></div></div>
           </div>}
-          <div ref={chatScrollRef} onScroll={handleChatScroll} className="flex-1 overflow-y-auto relative"><ChatLog messages={messages} settings={settings} onRewind={handleRewind} isProcessing={isLoading} scrollRef={chatScrollRef} onScrollChange={setIsScrolledUp} disableInternalScroll showWelcomeChips={onboarding.shouldShowWelcomeChips} onPrefillInput={(text) => { onboarding.markWelcomeSeen(); handleSendMessage(text); }} /></div>
+          <div ref={chatScrollRef} onScroll={handleChatScroll} className="flex-1 overflow-y-auto relative"><ChatLog messages={messages} settings={settings} onRewind={handleRewind} isProcessing={isLoading} scrollRef={chatScrollRef} onScrollChange={setIsScrolledUp} disableInternalScroll showWelcomeChips={onboarding.shouldShowWelcomeChips} onPrefillInput={(text) => { onboarding.markWelcomeSeen(); handleSendMessage(text); }} suggestions={settings.enableSuggestions ? gameState.lastSuggestions : undefined} onPickSuggestion={(text) => handleSendMessage(text)} onDismissSuggestion={() => { mcpServer.setLastSuggestions([]); syncState(); }} /></div>
           <button
             onClick={()=>{if(chatScrollRef.current)chatScrollRef.current.scrollTop=chatScrollRef.current.scrollHeight;}}
             className={`absolute right-3 top-1/2 -translate-y-1/2 z-40 w-9 h-9 rounded-full bg-stone-800/80 hover:bg-amber-700/70 text-stone-400 hover:text-amber-300 shadow-lg border border-stone-700/40 hover:border-amber-600/50 transition-all duration-300 flex items-center justify-center ${isScrolledUp?'opacity-100 scale-100':'opacity-0 scale-75 pointer-events-none'}`}
@@ -116,13 +115,6 @@ const MobileLayout: React.FC = () => {
             <button onClick={()=>setShowQueue(!showQueue)} className={`px-3 py-1 rounded text-[10px] font-bold uppercase tracking-wider whitespace-nowrap border transition-all ${showQueue?'bg-amber-900 border-amber-700 text-amber-100':'bg-stone-800 border-stone-700 text-stone-400'}${queueLen>0?' animate-glow-pulse':''}`}><i className="fas fa-layer-group mr-1"></i> Queue ({queueLen})</button>
           </div>
           {charToShow&&!showQueue&&<HpStatusBar character={charToShow} />}
-          {settings.enableSuggestions && gameState.lastSuggestions && gameState.lastSuggestions.length > 0 && !showQueue && (
-            <SuggestedActions
-              suggestions={gameState.lastSuggestions}
-              onPick={(text) => { handleSendMessage(text); }}
-              onDismiss={() => { mcpServer.setLastSuggestions([]); syncState(); }}
-            />
-          )}
           {!showQueue&&<InputArea onSendMessage={handleSendMessage} onQueueAction={(t: string, ty: 'action'|'dialogue') => handleEnqueueAction(t, ty)} onResolveEnemyTurn={handleResolveEnemyTurn} isLoading={isLoading||gameState.isProcessing===true} combat={gameState.combat} character={charToShow}/>}
         </>}
         {mobileTab==='character'&&<div className="flex-1 overflow-y-auto p-4 custom-scrollbar">

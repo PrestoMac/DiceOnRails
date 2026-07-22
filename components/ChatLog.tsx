@@ -5,6 +5,7 @@ import { speakText, stopSpeaking } from '../services/audioService';
 import ReactMarkdown from 'react-markdown';
 import { isDebugMode } from '../utils/debug';
 import WelcomeChips from './onboarding/WelcomeChips';
+import SuggestedActions from './SuggestedActions';
 
 interface ParsedRoll {
   type: 'attack' | 'skill';
@@ -151,6 +152,12 @@ interface ChatLogProps {
   onPrefillInput?: (text: string) => void;
   /** Whether to show the welcome chips empty state (first session only). */
   showWelcomeChips?: boolean;
+  /** Suggested action pills rendered inside the chat area after the last narration. */
+  suggestions?: string[];
+  /** Called when the user clicks a suggestion pill. */
+  onPickSuggestion?: (text: string) => void;
+  /** Called when the user dismisses the suggestion pills. */
+  onDismissSuggestion?: () => void;
 }
 
 type FilterType = 'all' | 'narration' | 'player' | 'system';
@@ -173,7 +180,7 @@ const EXPORT_BTN_CLASS = 'w-full flex items-center gap-3 px-4 py-2.5 text-sm tex
 const EXPORT_ICON_CLASS = 'text-xs w-5 text-center text-stone-500';
 
 /** Renders the scrollable message history with search, filter, export, speech playback, rewind, and roll-highlighting cards. */
-const ChatLog: React.FC<ChatLogProps> = ({ messages, settings, onRewind, isProcessing, onExpandAtmosphere, atmosphereUrl, scrollRef: externalScrollRef, onScrollChange, disableInternalScroll, onPrefillInput, showWelcomeChips }) => {
+const ChatLog: React.FC<ChatLogProps> = ({ messages, settings, onRewind, isProcessing, onExpandAtmosphere, atmosphereUrl, scrollRef: externalScrollRef, onScrollChange, disableInternalScroll, onPrefillInput, showWelcomeChips, suggestions, onPickSuggestion, onDismissSuggestion }) => {
   const internalScrollRef = useRef<HTMLDivElement>(null);
   const scrollRef = externalScrollRef || internalScrollRef;
   const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
@@ -439,6 +446,19 @@ const ChatLog: React.FC<ChatLogProps> = ({ messages, settings, onRewind, isProce
           </div>
           );
         })}
+
+        {suggestions && suggestions.length > 0 && onPickSuggestion && (
+          <div className="flex flex-col items-start pt-2">
+            <div className="max-w-[85%]">
+              <SuggestedActions
+                suggestions={suggestions}
+                onPick={onPickSuggestion}
+                onDismiss={onDismissSuggestion}
+              />
+            </div>
+          </div>
+        )}
+
         {isProcessing && (
           <div className="flex flex-col items-start">
             <div className="rounded-lg p-4 text-stone-300 fantasy-font text-lg leading-relaxed bg-stone-900/20 shadow-inner shadow-stone-950/20">

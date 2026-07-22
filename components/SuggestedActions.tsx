@@ -11,7 +11,7 @@ export interface SuggestedActionsProps {
 }
 
 /** Transient pill row of suggested actions shown after the GM narration. Clicking one sends it immediately. */
-const SuggestedActions: React.FC<SuggestedActionsProps> = ({ suggestions, onPick, onDismiss, autoDismissMs = 30000 }) => {
+const SuggestedActions: React.FC<SuggestedActionsProps> = ({ suggestions, onPick, onDismiss, autoDismissMs = 0 }) => {
   const timerRef = useRef<number | null>(null);
 
   useEffect(() => {

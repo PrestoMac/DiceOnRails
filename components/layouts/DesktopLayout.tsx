@@ -15,7 +15,6 @@ import LevelUpModal from '../LevelUpModal';
 import CombatTracker from '../CombatTracker';
 import ActivityBell from '../shared/ActivityBell';
 import AtmosphereOverlay from '../shared/AtmosphereOverlay';
-import SuggestedActions from '../SuggestedActions';
 import { useActivityTracking } from '../../hooks/useActivityTracking';
 import { useOnboarding } from '../../hooks/useOnboarding';
 import { formatGameTime } from '../../utils/timeUtils';
@@ -158,16 +157,12 @@ const DesktopLayout: React.FC = () => {
           onScrollChange={setIsChatScrolledUp}
           showWelcomeChips={onboarding.shouldShowWelcomeChips}
           onPrefillInput={(text) => { onboarding.markWelcomeSeen(); handleSendMessage(text); }}
+          suggestions={settings.enableSuggestions ? gameState.lastSuggestions : undefined}
+          onPickSuggestion={(text) => handleSendMessage(text)}
+          onDismissSuggestion={() => { mcpServer.setLastSuggestions([]); syncState(); }}
         />
       </div>
       <div className="relative z-10 shrink-0">
-        {settings.enableSuggestions && gameState.lastSuggestions && gameState.lastSuggestions.length > 0 && (
-          <SuggestedActions
-            suggestions={gameState.lastSuggestions}
-            onPick={(text) => { handleSendMessage(text); }}
-            onDismiss={() => { mcpServer.setLastSuggestions([]); syncState(); }}
-          />
-        )}
         <InputArea onSendMessage={handleSendMessage} onQueueAction={handleEnqueueAction} onResolveEnemyTurn={handleResolveEnemyTurn} isLoading={isLoading || gameState.isProcessing} combat={gameState.combat} character={charToShow} />
       </div>
     </main>

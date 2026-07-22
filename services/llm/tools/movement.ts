@@ -56,9 +56,9 @@ export const tools = [
                     },
                     suggestions: {
                         type: 'array',
-                        items: { type: 'string', description: 'A single suggested action, e.g. "Attack the goblin" (max 80 chars).' },
+                        items: { type: 'string', description: 'A single suggested action in first person, e.g. "I attack the goblin" (max 80 chars).' },
                         maxItems: 3,
-                        description: 'Optional: 2-3 suggested next actions as short strings. Include when the player might need tactical guidance.'
+                        description: 'Optional: 2-3 suggested next actions in first person, e.g. "I cast Cure Wounds on the fighter". Include when the player might need tactical guidance.'
                     }
                 },
                 required: ['narration', 'timePassed']
