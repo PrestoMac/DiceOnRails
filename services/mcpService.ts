@@ -257,7 +257,7 @@ export class MockMCPServer {
         case 'end_combat':
           res = await this.combat.end_combat(); break;
         case 'player_attack':
-          res = await this.combat.player_attack(String(args.attackerId || ''), String(args.weaponName || ''), String(args.targetId || ''), args.isOffHand as boolean | undefined, args.isSneakAttack as boolean | undefined, args.sharpshooter as boolean | undefined, args.greatWeaponMaster as boolean | undefined); break;
+          res = await this.combat.player_attack(String(args.attackerId || ''), String(args.weaponName || ''), String(args.targetId || args.target_name || args.target || ''), args.isOffHand as boolean | undefined, args.isSneakAttack as boolean | undefined, args.sharpshooter as boolean | undefined, args.greatWeaponMaster as boolean | undefined); break;
         case 'move_to':
           res = await this.travel.move_to(String(args.location_name || 'Unknown'), String(args.description || ''), args.targetId as string | undefined, args.skillCheck as unknown as { skill_name?: string; difficulty?: number; onSuccess?: unknown }, args.route as string | undefined, args.pace as string | undefined); break;
         case 'check_skill':

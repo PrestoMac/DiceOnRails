@@ -64,7 +64,7 @@ export function formatToolResult(toolName: string, result: MCPResponse): string 
       case 'start_combat': return JSON.stringify({tool:'start_combat', success:result.success, message:result.message, combatants:d.combat?.initiative?.length, first:d.currentTurn});
       case 'next_turn': return JSON.stringify({tool:'next_turn', success:result.success, message:result.message, next:d.combat?.initiative?.[d.combat?.turnIndex]?.name, round:d.combat?.round, ended:d.combatEnded});
       case 'end_combat': return JSON.stringify({tool:'end_combat', success:result.success, message:result.message});
-      case 'player_attack': return JSON.stringify({tool:'player_attack', success:result.success, message:result.message, enemy:d.targetName, target:d.targetId, hit:d.isHit, damage:d.damage, crit:d.isCritical});
+      case 'player_attack': return JSON.stringify({tool:'player_attack', success:result.success, message:result.message, attacker:d.attacker, enemy:d.enemy, target:d.targetName, targetId:d.targetId, roll:d.roll, attackRoll:d.attackRoll, ac:d.targetAc, hit:d.isHit, damage:d.damage, crit:d.isCritical, fumble:d.isFumble, targetDefeated:d.targetDefeated});
       case 'move_to': return JSON.stringify({tool:'move_to', success:result.success, message:result.message, location:d.newLocation});
       case 'check_skill': return JSON.stringify({tool:'check_skill', toolSuccess:result.success, message:result.message, skill:d.character, roll:d.roll, total:d.total, dc:d.difficulty, checkSuccess:d.success, xp:d.xpGained});
       case 'inflict_damage': return JSON.stringify({tool:'inflict_damage', success:result.success, message:result.message, target:d.character, damage:d.damage, hp_remaining:d.newHp, defeated:d.enemyDefeated, concSave: d.concentrationSave});

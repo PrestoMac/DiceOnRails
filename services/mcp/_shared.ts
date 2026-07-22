@@ -13,6 +13,7 @@ export function generateId(length = 9): string {
 /** Checks if a query string loosely matches an entity by ID or name. */
 export function fuzzyMatchEntity(entity: { id: string; name: string }, query: string): boolean {
   const clean = (query || '').toLowerCase().trim();
+  if (!clean) return false;
   const cleanName = entity.name.toLowerCase();
-  return entity.id === query || cleanName === clean || clean.includes(cleanName) || cleanName.includes(clean);
+  return entity.id.toLowerCase() === clean || cleanName === clean || clean.includes(cleanName) || cleanName.includes(clean);
 }

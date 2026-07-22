@@ -7,7 +7,8 @@ import { getResilientSaveBonus } from './featsService';
 
 /** Calculates the ability modifier for a given score. */
 function abilityMod(score: number): number {
-  return Math.floor((score - 10) / 2);
+  const s = typeof score === 'number' && !Number.isNaN(score) ? score : 10;
+  return Math.floor((s - 10) / 2);
 }
 
 /** Returns the ability modifier for a given stat value. */

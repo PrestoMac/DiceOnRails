@@ -108,7 +108,14 @@ export async function dispatchToolRolls(toolName: string, args: Record<string, u
         const wn = ac ? getWeaponInfo(ac).weaponName : 'Weapon';
         await onTriggerDiceRoll({ characterName: d.character || ac?.name || 'Character', rollType: d.sides === 20 ? 'attack' : d.sides >= 4 ? 'damage' : 'check', label: d.target_name ? `${wn} vs ${d.target_name}` : wn, rollResult: d.results?.reduce((a: number, b: number) => a + b, 0) || 0, modifier: d.modifier || 0, sides: d.sides || 20, difficulty: d.target_ac, success: d.success, isCritical: d.isCritical, isFumble: d.isFumble, count: d.count || d.results?.length || 1, results: d.results || [] });
     } else if (toolName === 'player_attack') {
-        setTimeout(() => onTriggerDiceRoll({ characterName: d.enemy || d.targetName || 'Enemy', rollType: 'attack', label: `${d.targetName || 'Player'}'s Attack vs ${d.enemy || 'Target'}`, rollResult: d.roll, modifier: (d.attackRoll || 0) - (d.roll || 0), sides: 20, difficulty: d.targetAc, success: d.isHit, isCritical: d.isCritical, isFumble: d.isFumble }), 0);
+        const attackerName = d.attacker as string | undefined
+          || currentState.party.find(c => c.id === myCharacterId || c.id === currentState.party[0]?.id)?.name
+          || 'Player';
+        const targetName = (d.enemy as string | undefined) || (d.target as string | undefined) || (d.targetName as string | undefined) || 'Enemy';
+        const rollNum = (d.roll as number | undefined) || 0;
+        const attackRollNum = (d.attackRoll as number | undefined) || 0;
+        const targetAc = (d.targetAc as number | undefined) || 0;
+        setTimeout(() => onTriggerDiceRoll({ characterName: attackerName, rollType: 'attack', label: `${attackerName}'s Attack vs ${targetName}`, rollResult: rollNum, modifier: attackRollNum - rollNum, sides: 20, difficulty: targetAc, success: d.isHit as boolean | undefined, isCritical: d.isCritical as boolean | undefined, isFumble: d.isFumble as boolean | undefined }), 0);
     } else if (toolName === 'check_skill') {
         await onTriggerDiceRoll({ characterName: d.character || 'Character', skillName: args.skill_name as string, rollResult: d.roll, modifier: d.modifier, skillRank: d.skillRank, difficulty: d.difficulty, success: d.success, xpGained: d.xpGained });
     } else if (toolName === 'make_save') {

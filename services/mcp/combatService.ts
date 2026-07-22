@@ -826,8 +826,8 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
         || ['bow', 'crossbow', 'javelin', 'dart', 'sling'].some(s => weaponName.toLowerCase().includes(s));
 
       const abilityMod = isRanged
-        ? getMod(attacker.stats.dex)
-        : getMod(attacker.stats.str);
+        ? getMod(attacker.stats?.dex ?? 10)
+        : getMod(attacker.stats?.str ?? 10);
       const profBonus = getProficiencyBonus(attacker as unknown as Character);
       let atkBonus = abilityMod + profBonus;
       if (sharpshooter || greatWeaponMaster) atkBonus -= 5;
@@ -839,13 +839,23 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       const attackRoll = roll + atkBonus - getExhaustionPenalty(attacker);
       const isCrit = roll === 20;
       const isFumble = roll === 1;
-      const isHit = isCrit || (!isFumble && attackRoll >= enemy.ac);
+      const enemyAc = typeof enemy.ac === 'number' ? enemy.ac : 10;
+      const isHit = isCrit || (!isFumble && attackRoll >= enemyAc);
+
+      const baseData = {
+        roll, attackRoll, targetAc: enemyAc,
+        isHit, hit: isHit,
+        isCritical: isCrit, isFumble,
+        enemy: enemy.name, target: enemy.name,
+        targetId: enemy.id, targetName: enemy.name,
+        attacker: attacker.name, attackerId: attacker.id,
+      };
 
       if (isFumble) {
-        return { success: true, data: { isCritical: false, isFumble: true }, message: `**Critical Miss!** (Nat 1) Your weapon slips as you attack ${enemy.name}.` };
+        return { success: true, data: { ...baseData, isHit: false, isCritical: false, isFumble: true }, message: `**Critical Miss!** (Nat 1) Your weapon slips as you attack ${enemy.name}.` };
       }
       if (!isHit) {
-        return { success: true, data: { isHit: false }, message: `You attack ${enemy.name} with ${weaponName}: **MISS** (Rolled ${attackRoll} vs AC ${enemy.ac}).` };
+        return { success: true, data: { ...baseData, isHit: false }, message: `You attack ${enemy.name} with ${weaponName}: **MISS** (Rolled ${attackRoll} vs AC ${enemyAc}).` };
       }
 
       let damageDice: string;
@@ -908,8 +918,12 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       const offHandText = isOffHand ? ' (off-hand)' : '';
       return {
         success: true,
-        data: { hit: true, isCritical: isCrit, damage: damageTotal, targetNewHp: enemy.hp.current, targetDefeated: enemy.isDead },
-        message: `You attack ${enemy.name} with ${weaponName}${offHandText}: **HIT${critText}** (Rolled ${attackRoll} vs AC ${enemy.ac}) dealing **${damageTotal}** ${dmgType} damage! ${enemy.name}: ${enemy.hp.current}/${enemy.hp.max} HP.`
+        data: {
+          ...baseData, isHit: true,
+          damage: damageTotal, damageResults, damageDice, damageType: dmgType,
+          targetNewHp: enemy.hp.current, targetDefeated: enemy.isDead,
+        },
+        message: `You attack ${enemy.name} with ${weaponName}${offHandText}: **HIT${critText}** (Rolled ${attackRoll} vs AC ${enemyAc}) dealing **${damageTotal}** ${dmgType} damage! ${enemy.name}: ${enemy.hp.current}/${enemy.hp.max} HP.`
       };
     },
   };

@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MockMCPServer } from '../../services/mcpService';
 import { makeCharacter, makeWizard, makeBarbarian } from '../helpers/characters';
+import { extractRollData } from '../../services/llm/narration';
+import type { Character } from '../../types';
 
 vi.mock('../../utils/random', () => ({
   cryptoRoll: vi.fn(),
@@ -226,6 +228,154 @@ describe('combatTools', () => {
       expect(stateAfter.combat).toBeDefined();
       const damageDealt = hpBefore - stateAfter.combat.enemies[0].hp.current;
       expect(damageDealt).toBeGreaterThan(6);
+    });
+
+    it('message contains no literal "NaN" when stats are malformed (regression)', async () => {
+      mockRoll(10);
+      server.joinParty(makeCharacter({ stats: { str: undefined as unknown as number, dex: 10, con: 10, int: 10, wis: 10, cha: 10 } }));
+      await server.add_enemy('Goblin');
+      await server.start_combat();
+      const result = await server.player_attack('Valerius', 'Longsword', 'Goblin');
+      expect(result.success).toBe(true);
+      expect(result.message).not.toMatch(/\bNaN\b/);
+    });
+
+    it('message contains no literal "NaN" when stats object is missing (regression)', async () => {
+      mockRoll(10);
+      server.joinParty(makeCharacter({ stats: {} as Character['stats'] }));
+      await server.add_enemy('Goblin');
+      await server.start_combat();
+      const result = await server.player_attack('Valerius', 'Longsword', 'Goblin');
+      expect(result.success).toBe(true);
+      expect(result.message).not.toMatch(/\bNaN\b/);
+    });
+
+    it('message contains no "undefined" AC when enemy AC missing (regression)', async () => {
+      mockRoll(10);
+      server.joinParty(makeCharacter());
+      await server.start_combat(undefined, [{ name: 'Weird Golem', hp: 20 }]);
+      const state = server.getFullState();
+      expect(state.combat).toBeDefined();
+      state.combat.enemies[0].ac = undefined as unknown as number;
+      const result = await server.player_attack('Valerius', 'Longsword', 'Weird Golem');
+      expect(result.success).toBe(true);
+      expect(result.message).not.toMatch(/undefined/i);
+      expect(result.message).not.toMatch(/\bNaN\b/);
+    });
+
+    it('target_name arg resolves via executeToolCall (regression)', async () => {
+      mockRoll(20);
+      server.joinParty(makeCharacter());
+      await server.add_enemy('Goblin');
+      await server.start_combat();
+      const result = await server.executeToolCall('player_attack', {
+        attackerId: 'Valerius',
+        weaponName: 'Longsword',
+        target_name: 'Goblin',
+      });
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('Goblin');
+    });
+
+    it('target arg (third alias) resolves via executeToolCall (regression)', async () => {
+      mockRoll(20);
+      server.joinParty(makeCharacter());
+      await server.add_enemy('Goblin');
+      await server.start_combat();
+      const result = await server.executeToolCall('player_attack', {
+        attackerId: 'Valerius',
+        weaponName: 'Longsword',
+        target: 'Goblin',
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('empty targetId returns clean failure (regression: no silent first-enemy hit)', async () => {
+      mockRoll(20);
+      server.joinParty(makeCharacter());
+      await server.add_enemy('Goblin');
+      await server.add_enemy('Orc');
+      await server.start_combat();
+      const hpBeforeGoblin = server.getFullState().combat?.enemies[0].hp.current;
+      const result = await server.executeToolCall('player_attack', {
+        attackerId: 'Valerius',
+        weaponName: 'Longsword',
+        targetId: '',
+      });
+      expect(result.success).toBe(false);
+      const stateAfter = server.getFullState();
+      expect(stateAfter.combat).toBeDefined();
+      expect(stateAfter.combat.enemies[0].hp.current).toBe(hpBeforeGoblin);
+    });
+
+    it('returns unified data shape with roll/attackRoll/targetAc/isHit on hit (regression)', async () => {
+      mockRoll(15);
+      server.joinParty(makeCharacter());
+      await server.add_enemy('Goblin');
+      await server.start_combat();
+      const result = await server.player_attack('Valerius', 'Longsword', 'Goblin');
+      expect(result.success).toBe(true);
+      const d = result.data as Record<string, unknown>;
+      expect(d.roll).toBe(15);
+      expect(typeof d.attackRoll).toBe('number');
+      expect(typeof d.targetAc).toBe('number');
+      expect(d.isHit).toBe(true);
+      expect(d.hit).toBe(true);
+      expect(d.enemy).toBe('Goblin');
+      expect(d.target).toBe('Goblin');
+      expect(d.targetName).toBe('Goblin');
+      expect(typeof d.targetId).toBe('string');
+      expect(d.attacker).toBe('Valerius');
+      expect(typeof d.damage).toBe('number');
+    });
+
+    it('returns unified data shape on miss (regression)', async () => {
+      mockRoll(2);
+      server.joinParty(makeCharacter({ stats: { str: 3, dex: 3, con: 10, int: 10, wis: 10, cha: 10 } }));
+      await server.start_combat(undefined, [{ name: 'Heavy Knight', ac: 20, hp: 30 }]);
+      const result = await server.player_attack('Valerius', 'Longsword', 'Heavy Knight');
+      expect(result.success).toBe(true);
+      const d = result.data as Record<string, unknown>;
+      expect(d.roll).toBe(2);
+      expect(typeof d.attackRoll).toBe('number');
+      expect(typeof d.targetAc).toBe('number');
+      expect(d.isHit).toBe(false);
+      expect(d.hit).toBe(false);
+      expect(d.enemy).toBe('Heavy Knight');
+      expect(d.attacker).toBe('Valerius');
+      expect(d.isFumble).toBe(false);
+    });
+
+    it('returns unified data shape on fumble (regression)', async () => {
+      mockRoll(1);
+      server.joinParty(makeCharacter());
+      await server.add_enemy('Goblin');
+      await server.start_combat();
+      const result = await server.player_attack('Valerius', 'Longsword', 'Goblin');
+      expect(result.success).toBe(true);
+      const d = result.data as Record<string, unknown>;
+      expect(d.roll).toBe(1);
+      expect(d.isFumble).toBe(true);
+      expect(d.isHit).toBe(false);
+      expect(d.enemy).toBe('Goblin');
+    });
+
+    it('extractRollData produces well-formed RollData (no NaN) (regression)', async () => {
+      mockRoll(15);
+      server.joinParty(makeCharacter());
+      await server.add_enemy('Goblin');
+      await server.start_combat();
+      const result = await server.player_attack('Valerius', 'Longsword', 'Goblin');
+      const rollData = extractRollData('player_attack', result);
+      expect(rollData).toBeDefined();
+      expect(rollData?.type).toBe('attack');
+      expect(rollData?.dieFace).toBe('d20');
+      expect(rollData?.dieRoll).toBe(15);
+      expect(Number.isNaN(rollData?.dieRoll ?? NaN)).toBe(false);
+      expect(Number.isNaN(rollData?.total ?? NaN)).toBe(false);
+      expect(Number.isNaN(rollData?.modifier ?? NaN)).toBe(false);
+      expect(Number.isNaN(rollData?.dc ?? NaN)).toBe(false);
+      expect(rollData?.success).toBe(true);
     });
   });
 
