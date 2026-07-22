@@ -63,18 +63,21 @@ DiceOnRails/
 ├── index.html                # Vite HTML shell (Tailwind CDN, fonts, animations)
 ├── constants.ts              # Re-exports + SYSTEM_INSTRUCTION + INITIAL_CHARACTER
 ├── components/               # All React UI components
-│   ├── chat/                 # ChatLog subcomponents
-│   ├── creation/             # Character creation wizard (12 steps)
+│   ├── compendium/           # Compendium modal tabs (Glossary, Conditions, Rules, Spells, Items)
+│   ├── creation/             # Character creation wizard (12+ steps)
 │   ├── dice/                 # DiceEngine component
 │   ├── layouts/              # DesktopLayout, MobileLayout
 │   ├── levelup/              # Level-up modal panels
+│   ├── modals/               # Extracted detail modals (Spell, Item, Condition)
+│   ├── onboarding/           # OnboardingTour, WelcomeChips
 │   ├── shared/               # Reusable atoms (HpBar, BaseModal, Toggle, …)
-│   ├── sheet/                # CharacterSheet subpanels
-│   ├── wizard/               # Generic StepWizard framework
-│   └── *.tsx                 # Top-level screens & modals
+│   ├── sheet/                # CharacterSheet subpanels (SpellPanel)
+│   ├── ui/                   # Generic Tooltip primitive (portal + mobile long-press)
+│   ├── wizard/               # Generic StepWizard framework + shared ASI/skill UI
+│   └── *.tsx                 # Top-level screens & modals (incl. CompendiumModal, SuggestedActions, QuickStartFlow, StartModeScreen)
 ├── contexts/                 # 6 React Context providers
-├── data/                     # Static SRD catalogs (classes, races, spells, …)
-├── hooks/                    # 11 custom hooks backing the contexts
+├── data/                     # Static SRD catalogs + reference data (classes, races, spells, conditionInfo, glossary, referenceConstants, …)
+├── hooks/                    # 10 custom hooks backing the contexts
 ├── public/                   # Static assets (splash-bg.png)
 ├── scripts/                  # Node tooling (preflight, installer, benchmarks)
 ├── services/                 # All business logic
@@ -106,9 +109,9 @@ DiceOnRails/
 
 `index.html` → `/index.tsx` → `App.tsx` (default export).
 
-`App.tsx:39-63` — the root `App` component decides what to render:
+`App.tsx:45-69` — the root `App` component decides what to render:
 
-1. If `import.meta.env.VITE_SETUP_MODE === 'true'` → render `<SetupWizard />` (first-run installer that writes `.env`). The flag is injected by `vite.config.ts:80-85` based on whether `.env` contains `VITE_SUPABASE_URL`.
+1. If `import.meta.env.VITE_SETUP_MODE === 'true'` → render `<SetupWizard />` (first-run installer that writes `.env`). The flag is injected by `vite.config.ts` based on whether `.env` contains `VITE_SUPABASE_URL`.
 2. `initAudio()` on mount (primes `speechSynthesis` voices).
 3. Show `<SplashScreen />` once per page load (purely decorative).
 4. Wrap the rest in the provider stack:
@@ -133,12 +136,14 @@ The order matters: each provider consumes the contexts above it.
 |---|---|---|
 | `AUTH` | `<AuthScreen />` | No user id and not anonymous |
 | `DASHBOARD` | `<CampaignDashboard />` | User signed in, not yet in a campaign |
-| `CREATION` | `<WizardShell />` | New/joined campaign, character not yet built |
+| `START_MODE` | `<StartModeScreen />` | New/joined campaign, choosing Quick Start vs. Custom |
+| `QUICK_START` | `<QuickStartFlow />` | Quick Start path — pick a preset character, then starting grounds |
+| `CREATION` | `<WizardShell />` | Custom path — full character creation wizard |
 | `PLAY` | `<DesktopLayout />` or `<MobileLayout />` (wrapped in `<ErrorBoundary>`) | Active game |
 
 Layout choice (`isMobile`) comes from `UIContext` which listens to `window.innerWidth < 768`.
 
-Overlays rendered on top regardless of stage: `<SettingsModal>`, `<CampaignModal>`, `<DiceRollModal>`, `<QueueNotification>`, plus `<Analytics />` and `<SpeedInsights />`.
+Overlays rendered on top regardless of stage: `<SettingsModal>`, `<CampaignModal>`, `<DiceRollModal>`, `<QueueNotification>`, `<CompendiumModal>` (reference browser), `<OnboardingTour>` (PLAY stage only), plus `<Analytics />` and `<SpeedInsights />`.
 
 A `useEffect` in `AppContent` does a one-time "warmup" POST to the LLM (a `ping` with `max_tokens: 1`) when entering the PLAY stage — this primes the provider's cache for faster first-turn response.
 
@@ -161,7 +166,7 @@ Every context throws if `useXContext` is called outside its provider (`Error: us
 
 ### Two singletons
 
-- **`mcpServer`** — proxy around `MockMCPServer`, defined in `services/mcpService.ts:333` (singleton getter `getMcpServer` at `:328`). Lazy-instantiated, accessed globally.
+- **`mcpServer`** — proxy around `MockMCPServer`, defined in `services/mcpService.ts:343` (singleton getter `getMcpServer` at `:338`). Lazy-instantiated, accessed globally.
 - **`supabase`** — proxy around the Supabase client, defined in `services/supabaseClient.ts:27`. Lazy-instantiated, falls back to placeholder URLs if env is missing.
 
 Both are `Proxy` objects that bind method calls to a lazily-created underlying instance, so importing them never crashes even when misconfigured.
@@ -174,7 +179,7 @@ The single most important file in the repo. The `MockMCPServer` class is the **i
 
 ### State
 
-Holds a single `GameState` object (shape in `types/game.ts:40`):
+Holds a single `GameState` object (shape in `types/game.ts:46`):
 
 ```ts
 GameState = {
@@ -196,6 +201,7 @@ GameState = {
   lastLongRestTime?: number,
   _tiredWarningFired?: boolean,
   factionReputations?: Record<string, number>,
+  lastSuggestions?: string[],                 // LLM-generated suggested next actions (cached per turn)
 }
 ```
 
@@ -218,7 +224,7 @@ Sub-services are factory functions (`createXService(state, deps?)`) that close o
 
 ### Tool dispatcher
 
-`MockMCPServer.executeToolCall(name, args)` (`mcpService.ts:235-323`, switch at `:241-311`) is the **canonical entry point for all mutations**. It's a switch over ~30 tool names. Every branch:
+`MockMCPServer.executeToolCall(name, args)` (`mcpService.ts:236-330`, switch at `:242-321`) is the **canonical entry point for all mutations**. It's a switch over ~30 tool names. Every branch:
 
 1. Coerces args to the correct types (LLMs send strings; engine needs numbers).
 2. Delegates to the relevant sub-service method.
@@ -234,7 +240,7 @@ The state manager supports:
 - **`saveRewindPoint(gameState, messages)` / `loadRewindPoint`** — full state+messages snapshot saved before every player turn so a "retry" can restore it.
 - **`saveEmergencySnapshot / loadEmergencySnapshot`** — second-chance snapshot in case the rewind point itself was lost.
 
-`handleRewind` in `hooks/useGameActions.ts:305-385` orchestrates all of this and either replays the user's message or falls back to the emergency snapshot.
+`handleRewind` in `hooks/useGameActions.ts:333-423` orchestrates all of this and either replays the user's message or falls back to the emergency snapshot.
 
 ---
 
@@ -249,6 +255,7 @@ services/llm/
 ├── atmosphere.ts         # generateAtmosphere (image), generateStartingLocations, compressRawToCheckpoint
 ├── contextManager.ts     # Token-budget enforcement + episode-checkpoint pipeline
 ├── tokenEstimation.ts    # Heuristic length→token estimator + budget constants
+├── toolDefinitions.ts    # Re-export shim (tools + TOOL_MODE_INSTRUCTION)
 ├── toolFilter.ts         # Strips irrelevant tools from the schema based on state
 ├── prompts/
 │   └── toolModePrompt.ts # TOOL_MODE_INSTRUCTION — the giant system instruction
@@ -280,7 +287,7 @@ A flat array of OpenAI-style `{ type: "function", function: { name, description,
 
 ### `resolveLLMConfig`
 
-`llmApiClient.ts:6` — picks model, URL, and headers based on env (`VITE_LLM_MODEL`, `VITE_LLM_API_BASE`, `VITE_LLM_API_KEY`) and an optional provider override. The provider resolution logic is in `services/llmClient.ts`:
+`llmApiClient.ts:11` — picks model, URL, and headers based on env (`VITE_LLM_MODEL`, `VITE_LLM_API_BASE`, `VITE_LLM_API_KEY`) and an optional provider override. The provider resolution logic is in `services/llmClient.ts`:
 
 - `resolveProvider` → `'openai'` if the base isn't openrouter.ai, else `'openrouter'`
 - `normalizeModelName` → strips the `vendor/` prefix for non-OpenRouter bases (OpenAI's API doesn't accept `deepseek/...`)
@@ -298,7 +305,7 @@ A flat array of OpenAI-style `{ type: "function", function: { name, description,
 
 ## 7. The Turn Lifecycle (end-to-end)
 
-The single most important flow to understand. Entry point: `useGameActions.handleSendMessage` in `hooks/useGameActions.ts:128`.
+The single most important flow to understand. Entry point: `useGameActions.handleSendMessage` in `hooks/useGameActions.ts:147`.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -371,13 +378,13 @@ The single most important flow to understand. Entry point: `useGameActions.handl
    - **Budget guard:** if estimated payload exceeds 95% of `CONTEXT_BUDGET`, break early.
    - **Combat shortcut:** if `next_turn` succeeded, break (turn is over).
 
-3. **Post-loop enforcement:** if no `narrate_turn` / rest / move-with-route fired, synthesize a `narrate_turn(narration='', timePassed=0)` so conditions/DoTs/concentration still tick consistently. The check is gated by `if (!timeAdvancedThisTurn)` at `agentLoop.ts:335-343` — it is conditional, not unconditional.
+3. **Post-loop enforcement:** if no `narrate_turn` / rest / move-with-route fired, synthesize a `narrate_turn(narration='', timePassed=0)` so conditions/DoTs/concentration still tick consistently. The check is gated by `if (!timeAdvancedThisTurn)` at `agentLoop.ts:353-361` — it is conditional, not unconditional.
 
 4. **Return:** `{ toolMessages, iterationCount, promptTokens, completionTokens, cachedTokens, inlineNarration }`.
 
 ### Batched party turns (`handleExecuteBatch`)
 
-`useGameActions.ts:212`. When multiplayer action queue is flushed:
+`useGameActions.ts:234`. When multiplayer action queue is flushed:
 
 - Builds a `[Collaborative Turn]` user message containing every queued entry tagged with player name.
 - Same agent-loop flow but with a `batchContext` that emphasizes "process ALL actions".
@@ -386,7 +393,7 @@ The single most important flow to understand. Entry point: `useGameActions.handl
 
 ### Rewind flow (`handleRewind`)
 
-`useGameActions.ts:307`:
+`useGameActions.ts:333`:
 
 1. If currently processing → bail.
 2. Load the rewind point (state + messages from before the user's last message).
@@ -429,7 +436,7 @@ Before each turn (`prepareContext` in `contextManager.ts:186`):
 
 ### Persistence
 
-The `ContextState` is serialized into `GameState.ctx` (`ContextMetadata` in `types/game.ts:36`) on every `syncFinishedState` call. On load, `useGameActions`'s `useEffect` at line 73 hydrates `ctxRef.current` from `gameState.ctx`. This means checkpoints survive page reloads and sync to other multiplayer clients.
+The `ContextState` is serialized into `GameState.ctx` (`ContextMetadata` in `types/game.ts:36`) on every `syncFinishedState` call. On load, `useGameActions`'s `useEffect` at line 74 hydrates `ctxRef.current` from `gameState.ctx`. This means checkpoints survive page reloads and sync to other multiplayer clients.
 
 ---
 
@@ -515,7 +522,7 @@ The persistence facade. Behavior switches on whether `userId` and a real `campai
 Key methods:
 
 - `subscribeToCampaign(campaignId, onUpdate)` — Supabase Realtime channel on the `campaigns` table; used by `useGameState` to sync multiplayer state.
-- `syncCampaignState(campaignId, gameState, messages?)` — **batched** update. Multiple calls within a microtask are coalesced into a single Supabase UPDATE via `enqueueSync` (`storageService.ts:223`)/`drain` (`:231`) using a per-campaign merge Map (`pendingPayloads` at `:218`). This prevents one player's turn from generating 20 separate DB writes.
+- `syncCampaignState(campaignId, gameState, messages?)` — **batched** update. Multiple calls within a microtask are coalesced into a single Supabase UPDATE via `enqueueSync` (`storageService.ts:241`)/`drain` (`:249`) using a per-campaign merge Map (`pendingPayloads` at `:236`). This prevents one player's turn from generating 20 separate DB writes.
 - `createCampaign`, `loadCampaigns`, `loadGame`, `saveGame`, `deleteCampaign`, `renameCampaign`, `clearLocalSave`.
 
 `loadCampaigns` queries both the modern `campaigns` table **and** the legacy `game_saves` table (tagged `[LEGACY]`), preserving saves from older versions of the app.
@@ -531,7 +538,7 @@ The runtime uses static TS catalogs (`data/srdItems.ts`, `data/monsters.ts`) —
 
 ### Multiplayer lock
 
-Before any turn, `handleSendMessage` sets `isProcessing: true` and `processingUser: <name>` and writes that to Supabase. Other clients in `useGameState`'s subscription handler (lines 118-159) check `isProcessingRef`: if the local client thinks it's processing and the remote cleared the flag, that's the "unlock" signal; otherwise incoming remote state is applied.
+Before any turn, `handleSendMessage` sets `isProcessing: true` and `processingUser: <name>` and writes that to Supabase. Other clients in `useGameState`'s subscription handler (lines 124-159) check `isProcessingRef`: if the local client thinks it's processing and the remote cleared the flag, that's the "unlock" signal; otherwise incoming remote state is applied.
 
 ---
 
@@ -563,7 +570,7 @@ Plus the generic framework:
 components/wizard/
 ├── WizardStep.ts        # WizardStep<TState> interface + context type
 ├── StepWizard.tsx       # Generic visible-step / history / navigation engine
-└── StepRegistry.ts      # (helper)
+└── shared/              # Reusable ASI/skill/feat UI atoms (StatRow, SkillRow, FeatCard, …)
 ```
 
 ### How it works
@@ -577,7 +584,7 @@ components/wizard/
 
 ### `onComplete` → `handleCharacterCreated`
 
-`useGameActions.ts:277`:
+`useGameActions.ts:299`:
 
 1. Tag character with `ownerId = userId`.
 2. Set `myCharacterId`, `viewingCharacterId`.
@@ -613,6 +620,10 @@ Differences:
 | `AuthScreen` | Sign-in / sign-up / anonymous play; calls `onComplete(uid?)`. |
 | `CampaignDashboard` | Lists campaigns; create / join (by ID) / delete / rename. |
 | `CampaignModal` | Modal for naming a new campaign. |
+| `StartModeScreen` | Choose Quick Start (preset) vs. Custom character creation. |
+| `QuickStartFlow` | Pick a preset character, then a starting ground; can switch to Custom. |
+| `CompendiumModal` | Tabbed reference browser: Glossary, Conditions, Rules, Spells, Items (read-only). |
+| `SuggestedActions` | Collapsible panel of LLM-suggested next actions (opt-in, cached per turn). |
 | `SetupWizard` | First-run installer; writes `.env` via dev-server middleware or pastes SQL into Supabase. |
 | `SettingsModal` | Toggles for voice, atmosphere, debug mode, TTS sliders, account actions, debug-log export. |
 | `DiceRollModal` | Big animated dice popup for skill checks / attacks. |
@@ -681,9 +692,9 @@ types/
 - `Character.stats` is always `{ str, dex, con, int, wis, cha }` (all six).
 - `Character.conditions?: ActiveCondition[]` — duration is in **rounds** unless `durationUnit: 'minute'` is set.
 - `Message.role` uses the `MessageRole` enum; mapped to lowercase strings for the LLM API by `mapHistoryToMessages`.
-- `AppStage` enum has exactly 4 values: `CREATION`, `PLAY`, `AUTH`, `DASHBOARD`.
+- `AppStage` enum has 6 values: `AUTH`, `DASHBOARD`, `START_MODE`, `QUICK_START`, `CREATION`, `PLAY`.
 - `RollData.type` is one of `'attack' | 'skill' | 'damage' | 'cast_spell' | 'save' | 'death_save'`.
-- `MCPResponse = { success: boolean; data: any; message?: string }` — every tool returns this shape.
+- `MCPResponse = { success: boolean; data: Record<string, unknown>; message?: string }` — every tool returns this shape.
 
 The `Character` interface has ~50 optional fields covering every subclass choice (divine domain, sorcerous origin, warlock patron, arcane tradition, fighting style, draconic ancestry, sneak attack dice, …). The `stateService.ensureCharacterFields` function (in `mcp/stateService.ts:46`) hydrates sane defaults whenever a character enters the engine.
 
@@ -693,14 +704,18 @@ The `Character` interface has ~50 optional fields covering every subclass choice
 
 ```
 data/
-├── constants.ts    # SKILLS_LIST (18 skills), XP_TABLE (levels 1-20), STAT_POINTS_PER_LEVEL, MAX_STAT_VALUE, ASI_LEVELS, FALLBACK_STARTING_LOCATION
-├── classes.ts      # 12 SRD classes with full class features, subclasses, spellcasting profiles, proficiencies
-├── races.ts        # SRD races with ASIs, traits (darkvision, lucky, relentless endurance, …), size, speed
-├── feats.ts        # SRD feat catalog (Alert, Great Weapon Master, Sharpshooter, Tough, Resilient, …)
-├── spells.ts       # SRD spell definitions (level, school, damage, save, scaling, components, …)
-├── monsters.ts     # SRD monster stat blocks (goblin, orc, dragon, …) — used by lookupMonster
-├── srdItems.ts     # SRD weapons, armor, shields, potions with mechanical stats
-└── shopItems.ts    # Purchaseable shop stock
+├── constants.ts          # SKILLS_LIST (18 skills), XP_TABLE (levels 1-20), STAT_POINTS_PER_LEVEL, MAX_STAT_VALUE, ASI_LEVELS, FALLBACK_STARTING_LOCATION
+├── classes.ts            # 12 SRD classes with full class features, subclasses, spellcasting profiles, proficiencies
+├── races.ts              # 9 SRD races with ASIs, traits (darkvision, lucky, relentless endurance, …), size, speed
+├── feats.ts              # SRD feat catalog (Alert, Great Weapon Master, Sharpshooter, Tough, Resilient, …)
+├── spells.ts             # SRD spell definitions (level, school, damage, save, scaling, components, …)
+├── monsters.ts           # SRD monster stat blocks (goblin, orc, dragon, …) — used by lookupMonster
+├── srdItems.ts           # SRD weapons, armor, shields, potions with mechanical stats
+├── shopItems.ts          # Purchaseable shop stock
+├── presetCharacters.ts   # 10 pre-made level-1 characters for Quick Start (specs built via buildCharacterFromWizard)
+├── conditionInfo.ts      # Condition + exhaustion reference data (icon, summary, effects) — single source of truth for sheet/Compendium/tooltips
+├── referenceConstants.ts # Pure-data reference (stat/skill/derived-stat/rest/death-save/currency metadata) for Compendium + tooltips
+└── glossary.ts           # Jargon glossary entries surfaced in the Compendium Glossary tab
 ```
 
 These same catalogs are re-exported via `utils/classes.ts`, `utils/races.ts`, `utils/spells.ts`, `utils/feats.ts`, `utils/monsters.ts`, `utils/srdItems.ts` and accessible through the `utils/index.ts` barrel.
@@ -884,7 +899,7 @@ These are unwritten rules that hold across the codebase. Violate them at your pe
 ### Files
 
 - **No comments.** Codebase convention is to write self-documenting code. (Inline `// ───` section banners appear in some services but are rare.)
-- **No barrel exports for components.** Components are imported by direct path (`./components/chat/MessageBubble`). Services and utils do have barrels (`services/index.ts`, `utils/index.ts`).
+- **No barrel exports for components.** Components are imported by direct path (e.g. `./components/chat/MessageBubble` historically; today `./components/modals/SpellDetailModal`). Services and utils do have barrels (`services/index.ts`, `utils/index.ts`).
 - **Hook names start with `use`.** Context hooks are `useXContext` (e.g. `useGameContext`); raw hooks are `useX` (e.g. `useGameState`).
 - **All React components are default exports.** All engine functions are named exports.
 

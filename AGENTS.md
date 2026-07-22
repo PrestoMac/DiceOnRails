@@ -44,14 +44,14 @@
 - **Tool calls are batched**: all tool calls from one LLM response run in **parallel** via `Promise.all`, then sorted by `id.localeCompare` for deterministic ordering.
 - **End-of-turn detection**: `narrate_turn`, `long_rest`/`short_rest` (when called with `narration` **or** `autoAdvanceTime: true`), `move_to` (with `route`). When detected: pre-narration tools execute first, then `narrate_turn` (skipped if time already advanced by a rest/move), then loop breaks.
 - **`next_turn` causes immediate loop break** — the LLM cannot follow `next_turn` with `narrate_turn` in a later iteration. `narrate_turn` must be called before or simultaneously with `next_turn`.
-- **Synthetic `narrate_turn(timePassed=0)` appended at loop end** if no time-advancing tool was called (`agentLoop.ts:335-343`). This ensures conditions/DoTs/concentration always tick. The check is gated by `if (!timeAdvancedThisTurn)` — it is conditional, not unconditional.
+- **Synthetic `narrate_turn(timePassed=0)` appended at loop end** if no time-advancing tool was called (`agentLoop.ts:353-361`). This ensures conditions/DoTs/concentration always tick. The check is gated by `if (!timeAdvancedThisTurn)` — it is conditional, not unconditional.
 - **No-tool-call retries**: iter 0 → "You MUST call at least one tool". Iters 1-4 in combat (non-player turn only) → "call `next_turn`". Otherwise break.
 - **Post-loop guarantee**: if no `narrate_turn` / rest / move-with-route fired, a synthetic `narrate_turn(narration='', timePassed=0)` is enforced so DoTs/conditions tick.
 - **Critical tool failure** (`cast_spell`, `inflict_damage`, `roll_dice`, `player_attack`) sets `criticalToolFailed`, suppressing inline narration even if >= 50 chars.
 - **Token budget checked AFTER batch execution**, not before — can't prevent an iteration from exceeding budget.
 
 ### Tool system
-**28 tool schemas** (29 dispatch cases, 1 default) in `executeToolCall` (`mcpService.ts:235-323`, switch at `:241-311`):
+**28 tool schemas** (29 dispatch cases, 1 default) in `executeToolCall` (`mcpService.ts:236-330`, switch at `:242-321`):
 `check_skill` and `move_to` support **onSuccess chaining** via `ON_SUCCESS_PROPERTIES` shared schema — can auto-fire `awardCurrency`, `logLore`, `upsertQuest`, `updateInventory` in the same call.
 | Tool | Sub-service | Notes |
 |------|-------------|-------|
@@ -116,10 +116,10 @@
 
 ### State
 - Campaign ID `'anonymous'` is the sentinel for local-only play (no Supabase sync). All persistence methods check this.
-- The ONLY way game time advances: `narrate_turn`, `long_rest`, `short_rest`, `move_to` (with narration/route). A synthetic no-op `narrate_turn(timePassed=0)` is appended at loop end if no time-advancing tool ran (gated by `if (!timeAdvancedThisTurn)` at `agentLoop.ts:335-343`) so DoTs/conditions always tick.
+- The ONLY way game time advances: `narrate_turn`, `long_rest`, `short_rest`, `move_to` (with narration/route). A synthetic no-op `narrate_turn(timePassed=0)` is appended at loop end if no time-advancing tool ran (gated by `if (!timeAdvancedThisTurn)` at `agentLoop.ts:353-361`) so DoTs/conditions always tick.
 - Never call `inflict_damage` after `player_attack` or `cast_spell` — those tools handle damage atomically.
 - Spells never use `roll_dice`; spell attack rolls and damage are inside `cast_spell`.
-- **`ensureCharacterFields()` is duplicated verbatim in 3 services** (stateService, inventoryService, travelService). Not shared. Modify all copies.
+- **`ensureCharacterFields()` is duplicated verbatim in 2 services** (stateService, travelService). Not shared. Modify all copies.
 - **`inflict_damage` lives in `InventoryService`**, not `CombatService`. Both CombatService and SpellcastingService depend on it. All damage in the system flows through one function.
 - **Transactions**: deep-clone via `JSON.parse(JSON.stringify(...))`. 3-tier: transaction (in-flight rollback), rewind point (full state+messages per turn), emergency snapshot (crash recovery).
 - **Duplicate currency detection**: `adjust_currency` is suppressed within 500ms for same target+amount. Cleared on `restoreSnapshot`.

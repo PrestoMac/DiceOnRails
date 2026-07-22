@@ -94,7 +94,7 @@ Open <http://localhost:3000>, watch the splash, then either:
 - **Play anonymously** — solo, saved to `localStorage`. No account needed.
 - **Sign in** — create an account (Supabase Auth) to enable cloud campaigns.
 
-Create a campaign → walk through the **Character Creation Wizard** (Name → Race → Class → Stats → Skills → Feats → Spells → Gear → Starting Grounds) → start playing.
+Create a campaign → choose **Quick Start** (a pre-made hero) or **Custom** creation (Name → Race → Class → Stats → Skills → Feats → Spells → Gear → Starting Grounds) → start playing.
 
 ---
 
@@ -105,12 +105,15 @@ Create a campaign → walk through the **Character Creation Wizard** (Name → R
 | Area | What it does |
 |---|---|
 | **Chat Log (center)** | The GM's narration, your actions, system logs. Filterable, searchable, and exportable. |
-| **Character Sheet (left)** | Your hero's HP, AC, stats, skills, inventory, spellbook, conditions, feats, and resources. Edit anything inline. |
+| **Character Sheet (left)** | Your hero's HP, AC, stats, skills, inventory, spellbook, conditions, feats, and resources. Edit anything inline; click spells, items, and conditions for detail popups. |
 | **Journal tab** | Active quests + categorized lore (NPCs, Locations, History, Items) the GM has logged. |
+| **Compendium (📖)** | In-app reference browser: glossary, all conditions + exhaustion levels, rules tables, the full spell catalog, and SRD items. Read-only, pulls from the same data the engine uses. |
 | **Combat Tracker** | Slides in during fights — shows initiative order, current turn, HP bars, conditions. |
 | **Atmosphere image** | Generated scene art behind the chat. Click to expand fullscreen. |
 | **Action Queue** (multiplayer) | Queue up actions/dialogue and resolve them as a batched "party turn". |
-| **Quick Actions** | One-tap buttons for your prepared spells, equipped weapons, and class resources. |
+| **Quick Actions** | One-tap buttons for your prepared spells, equipped weapons, class resources, skills, saves, and potions. |
+| **Suggested Actions** (opt-in) | Per-turn LLM-suggested next actions, shown as clickable chips above the input. |
+| **Onboarding tour** | Auto-launches once on first play; replayable from Settings. |
 | **Voice input & TTS** | Microphone button for speech-to-text; speaker icon to hear the GM. |
 
 ### Common Actions
@@ -134,7 +137,14 @@ Just type naturally — the GM figures out the mechanics.
 
 ---
 
-## Character Creation Wizard
+## Character Creation
+
+When you start a new campaign you first choose between two paths:
+
+- **Quick Start** — pick one of 10 pre-made level-1 heroes (spanning every race and a spread of classes), then choose your starting grounds. Fastest way into the game.
+- **Custom Character** — the full creation wizard.
+
+### The Creation Wizard
 
 The 10–12 step wizard walks you through a fully SRD-compliant build:
 

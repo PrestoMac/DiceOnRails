@@ -35,7 +35,7 @@ When a caster first casts a concentration spell (not replacing an existing one),
 ---
 
 ### C3. Prior tool results are orphaned in LLM history every turn
-**Files:** `services/llm/llmApiClient.ts:31-42` + `types/common.ts:62-71`
+**Files:** `services/llm/llmApiClient.ts:31-42` + `types/common.ts:68-77`
 
 OpenAI's API requires every `role: "tool"` message to be paired with the assistant `tool_calls` that produced it. The persisted `Message` type has no field to store assistant `tool_calls`, so `mapHistoryToMessages` produces orphan tool messages whose `tool_call_id` doesn't match any stored assistant message.
 
@@ -94,7 +94,7 @@ When combat ends, the engine just sets `state.combat = undefined`. It does not c
 ---
 
 ### C8. `handleExecuteBatch` calls `rollbackTransaction()` without ever calling `beginTransaction()`
-**File:** `hooks/useGameActions.ts:212-275`
+**File:** `hooks/useGameActions.ts:234-297`
 
 Multiplayer batched turns have a try/catch that tries to roll back on failure, but the rollback is a no-op because no transaction was started.
 
@@ -105,7 +105,7 @@ Multiplayer batched turns have a try/catch that tries to roll back on failure, b
 ---
 
 ### C9. `isEndOfTurn` / `timeAdvancedThisTurn` look at LLM input args, not actual success
-**Files:** `services/llm/agentLoop.ts:252-257, 335-343`
+**Files:** `services/llm/agentLoop.ts:264-269, 353-361`
 
 When the LLM calls `long_rest(narration="X")` and the rest **fails** (e.g., on cooldown), the loop still thinks "time advanced" because it inspects the args, not the result, so it skips the enforcement `narrate_turn`.
 
@@ -118,7 +118,7 @@ When the LLM calls `long_rest(narration="X")` and the rest **fails** (e.g., on c
 ## HIGH — Visible misbehavior or state corruption
 
 ### H1. `handleUpdateInventory` / `handleUpdateCurrency` silently route to character #1
-**File:** `hooks/useGameState.ts:161-171`
+**File:** `hooks/useGameState.ts:164-171`
 
 TypeScript types claim `handleUpdateInventory(charId, items)` but the implementation drops `charId` and always targets `party[0]`.
 
@@ -202,7 +202,7 @@ A party at full HP but with exhaustion, depleted spell slots, or used Rage/Ki ca
 ---
 
 ### H8. Context message omits active DoTs, transformations, temp HP, AC bonuses
-**File:** `services/llm/agentLoop.ts:104-137`
+**File:** `services/llm/agentLoop.ts:100-158`
 
 The "current state" context message is missing: Moonbeam/Flaming Sphere/Spirit Guardians damage ticks, Polymorph/Wild Shape state, temporary HP, mage armor's +3 AC numeric value, enemy-sourced DoTs.
 
@@ -213,7 +213,7 @@ The "current state" context message is missing: Moonbeam/Flaming Sphere/Spirit G
 ---
 
 ### H9. Malformed JSON in any tool-call arg aborts the loop without rolling back
-**File:** `services/llm/agentLoop.ts:249`
+**File:** `services/llm/agentLoop.ts:261`
 
 No try/catch around `JSON.parse(tc.function.arguments)`. If a weaker LLM emits one bad JSON arg, the whole loop throws.
 
@@ -224,7 +224,7 @@ No try/catch around `JSON.parse(tc.function.arguments)`. If a weaker LLM emits o
 ---
 
 ### H10. `inlineNarration` from long_rest/short_rest/move_to is discarded — extra LLM call wasted
-**File:** `services/llm/agentLoop.ts:259-298`
+**File:** `services/llm/agentLoop.ts:264-316`
 
 When long_rest produces narration internally, the agent loop doesn't capture it as `inlineNarration` because there was no top-level `narrate_turn` call. `useGameActions` then makes a *second* LLM call to generate narration that was already produced.
 
@@ -365,8 +365,8 @@ Would cause 100% of unconfigured turns to fail.
 
 ---
 
-### L8. Variable shadow: `const state = mcpServer.getFullState()` at `agentLoop.ts:230` shadows the outer `state` from line 99
-**File:** `services/llm/agentLoop.ts:99, 230`
+### L8. Variable shadow: `const state = mcpServer.getFullState()` at `agentLoop.ts:243` shadows the outer `state` from line 100
+**File:** `services/llm/agentLoop.ts:100, 243`
 
 **Fix direction:** Rename the inner binding to `currentState`.
 

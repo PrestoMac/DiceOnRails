@@ -1,5 +1,7 @@
 # Dice On Rails — Onboarding & Reference UX Implementation Plan
 
+> **Status: IMPLEMENTED.** All five phases (Compendium, Tooltip system, clickable sheet, onboarding tour + welcome chips, and Suggested Actions) have shipped, along with the Phase 0 foundation and the dead-code cleanup. The features now live in `components/compendium/`, `components/onboarding/`, `components/modals/`, `components/ui/Tooltip.tsx`, `components/CompendiumModal.tsx`, `components/SuggestedActions.tsx`, and `hooks/useOnboarding.ts`, backed by the new `data/conditionInfo.ts`, `data/referenceConstants.ts`, and `data/glossary.ts` catalogs. This document is retained as the original design rationale; note that some `file:line` references below have drifted as the codebase evolved — cross-check against the current source.
+
 > Goal: Close the "AI knows everything, player knows nothing" gap with five additive features that serve both new and seasoned 5e players. None of these changes alter game mechanics, engine state shape (except an optional `lastSuggestions` field), or break save compatibility.
 
 ---
@@ -239,7 +241,7 @@ Per the scope decision, this is allowed to modify the agent loop / state pipelin
 ### Risk notes
 
 - Adds one extra LLM call per turn (cost). Mitigated by opt-in setting + cheap model.
-- Agent loop is the most sensitive file in the codebase; changes here must preserve the existing end-of-turn detection logic (`agentLoop.ts:335-343` synthetic narrate guard).
+- Agent loop is the most sensitive file in the codebase; changes here must preserve the existing end-of-turn detection logic (`agentLoop.ts:353-361` synthetic narrate guard).
 
 ---
 
@@ -333,9 +335,9 @@ No new vendor chunks. All new files compile into the default chunk per `vite.con
 - `data/srdItems.ts` (849 lines — weapons/armor/potions/gear)
 - `data/races.ts` (9 races; `asi: 'flexible-2'` is Half-Elf's special string)
 - `data/classes.ts` (12 classes, subclasses, features)
-- `data/feats.ts` (~33 feats with prerequisites)
+- `data/feats.ts` (30 feats with prerequisites)
 - `data/monsters.ts` (enemy catalog)
-- `data/shopItems.ts` (20 shop items, 4 categories)
+- `data/shopItems.ts` (21 shop items, 4 categories)
 - `data/constants.ts` (`SKILLS_LIST`, `XP_TABLE`, `ASI_LEVELS`)
 
 ### Natural placements for new UI
@@ -358,4 +360,4 @@ Each phase ships when:
 4. Build succeeds (`npm run build`).
 5. Mobile parity verified (manual smoke test on a 375px viewport).
 6. No regression in existing tests.
-7. For Phase 5B only: agent loop end-of-turn detection logic (`agentLoop.ts:335-343` synthetic narrate guard) verified intact via a new live scenario test.
+7. For Phase 5B only: agent loop end-of-turn detection logic (`agentLoop.ts:353-361` synthetic narrate guard) verified intact via a new live scenario test.
