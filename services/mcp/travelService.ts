@@ -7,8 +7,8 @@ import { getMod, getClassDef, recoverResources as classEngineRecoverResources } 
 import { awardExperience } from '../progressionService';
 import { getConditionEffects, applyCondition, tickConditionsByTime, tickConditionsByRounds, hasCondition, getExhaustionPenalty } from '../conditionEngine';
 import { getTimePeriod, AMBIENT_LINES } from '../../utils/timeUtils';
-import { SPELLS_BY_ID, parseDuration } from '../../utils/spells';
-import { breakConcentration as engineBreakConcentration } from '../spellcastingEngine';
+import { SPELLS_BY_ID } from '../../utils/spells';
+import { breakConcentration as engineBreakConcentration, checkConcentrationExpiry } from '../spellcastingEngine';
 import { ensureGameStateFields } from './stateService';
 import {
   rerollDamageValueIfApplicable,
@@ -545,20 +545,16 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
           }
 
           if (char.concentrationSpellId) {
-            const spell = SPELLS_BY_ID[char.concentrationSpellId];
+            const sid = char.concentrationSpellId;
             const startTime = char.runtime?.concentrationStartTime ?? 0;
-            const effectiveDuration = char.runtime?.concentrationEffectiveDuration ?? (() => {
-              const parsed = spell?.parsedDuration ?? (spell ? parseDuration(spell.duration) : undefined);
-              return parsed?.unit === 'minute' ? parsed.value : undefined;
-            })();
-            if (effectiveDuration != null && effectiveDuration <= ((state.gameTime as number) - startTime)) {
-              engineBreakConcentration(char, 'voluntary');
+            const ended = checkConcentrationExpiry(char, (state.gameTime as number) - startTime);
+            if (ended) {
               if (state.combat?.activeDoTs) {
                 state.combat.activeDoTs = state.combat.activeDoTs.filter(
-                  dot => !(dot.casterId === char.id && dot.spellId === char.concentrationSpellId)
+                  dot => !(dot.casterId === char.id && dot.spellId === sid)
                 );
               }
-              if (spell) expired.push(`concentration (${spell.name})`);
+              expired.push(`concentration (${ended})`);
             }
           }
 
@@ -657,6 +653,15 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
       state._tiredWarningFired = false;
 
       for (const char of state.party) {
+        if (char.concentrationSpellId) {
+          engineBreakConcentration(char, char.hp.current <= 0 ? 'incapacitated' : 'voluntary');
+          if (state.combat?.activeDoTs) {
+            state.combat.activeDoTs = state.combat.activeDoTs.filter(dot => dot.casterId !== char.id);
+          }
+        }
+      }
+
+      for (const char of state.party) {
         if (char.hp.current <= 0) {
           messages.push(`${char.name} is unconscious and cannot benefit from the rest.`);
           continue;
@@ -664,7 +669,6 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
         const prevHp = char.hp.current;
         const hpRestored = char.hp.max - prevHp;
         char.hp.current = char.hp.max;
-        char.concentrationSpellId = undefined;
         clearNonMinuteConditions(char);
         char.tempHp = 0;
         const recovered = Math.max(1, Math.floor(char.level / 2));

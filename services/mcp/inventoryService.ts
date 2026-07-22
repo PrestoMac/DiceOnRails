@@ -221,6 +221,7 @@ export function createInventoryService(state: GameState, deps: InventoryDeps): I
 
       if (newHp === 0 && current > 0) {
         initializeDeathSaves(target);
+        if (target.concentrationSpellId) engineBreakConcentration(target, 'incapacitated');
       } else if (newHp === 0 && current === 0 && target.deathSaves) {
         target.deathSaves.failures++;
         if (target.deathSaves.failures >= 3) {

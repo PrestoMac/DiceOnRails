@@ -499,4 +499,84 @@ describe('combatTools', () => {
       expect(server.getFullState().party[0].concentrationSpellId).toBeUndefined();
     });
   });
+
+  describe('concentration & condition fixes (C6/C7/M8/H3)', () => {
+    it('inflict_damage breaks concentration when target drops to 0 HP (C7)', async () => {
+      server.joinParty(makeWizard());
+      server.getFullState().party[0].concentrationSpellId = 'bless';
+      const result = await server.inflict_damage(100, 'wizard-1', 'slashing');
+      expect(result.success).toBe(true);
+      const after = server.getFullState().party[0];
+      expect(after.hp.current).toBe(0);
+      expect(after.concentrationSpellId).toBeUndefined();
+    });
+
+    it('long_rest clears concentration for an unconscious (0 HP) caster (M8)', async () => {
+      server.joinParty(makeWizard({ hp: { current: 0, max: 32 } }));
+      server.getFullState().party[0].concentrationSpellId = 'bless';
+      await server.long_rest();
+      const after = server.getFullState().party[0];
+      expect(after.concentrationSpellId).toBeUndefined();
+      expect(after.hp.current).toBe(0);
+    });
+
+    it('end_combat clears combat-only conditions but keeps minute/permanent (C6)', async () => {
+      const char = makeCharacter();
+      char.conditions = [
+        { id: 'stunned', source: 'hold-person', duration: null as unknown as number },
+        { id: 'mage-armor-ac', source: 'mage-armor', duration: 480, durationUnit: 'minute' },
+        { id: 'exhaustion-1', source: 'fatigue', duration: -1, durationUnit: 'permanent' },
+      ];
+      server.loadState({
+        party: [char],
+        worldDescription: 't', sessionLogs: [], quests: [], lore: [], actionQueue: [],
+        combat: { isActive: true, round: 1, turnIndex: 0, initiative: [], enemies: [] },
+      });
+      await server.end_combat();
+      const ids = (server.getFullState().party[0].conditions ?? []).map(c => c.id);
+      expect(ids).not.toContain('stunned');
+      expect(ids).toContain('mage-armor-ac');
+      expect(ids).toContain('exhaustion-1');
+    });
+
+    it('concentration expires after its round duration in combat (H3)', async () => {
+      const wizard = makeWizard();
+      wizard.concentrationSpellId = 'bless';
+      wizard.runtime = { concentrationEffectiveDuration: 1, concentrationStartRound: 1 };
+      server.loadState({
+        party: [wizard],
+        worldDescription: 't', sessionLogs: [], quests: [], lore: [], actionQueue: [],
+        combat: {
+          isActive: true, round: 11, turnIndex: 0,
+          initiative: [
+            { id: wizard.id, name: wizard.name, initiative: 10, type: 'player', isDead: false, hasActedThisTurn: true },
+            { id: 'gob-1', name: 'Goblin', initiative: 5, type: 'enemy', isDead: false, hasActedThisTurn: true },
+          ],
+          enemies: [{ id: 'gob-1', name: 'Goblin', ac: 12, hp: { current: 10, max: 10 }, attacks: [], isDead: false }],
+        },
+      });
+      await server.next_turn(false);
+      expect(server.getFullState().party[0].concentrationSpellId).toBeUndefined();
+    });
+
+    it('concentration persists within duration in combat (H3)', async () => {
+      const wizard = makeWizard();
+      wizard.concentrationSpellId = 'bless';
+      wizard.runtime = { concentrationEffectiveDuration: 10, concentrationStartRound: 1 };
+      server.loadState({
+        party: [wizard],
+        worldDescription: 't', sessionLogs: [], quests: [], lore: [], actionQueue: [],
+        combat: {
+          isActive: true, round: 3, turnIndex: 0,
+          initiative: [
+            { id: wizard.id, name: wizard.name, initiative: 10, type: 'player', isDead: false, hasActedThisTurn: true },
+            { id: 'gob-1', name: 'Goblin', initiative: 5, type: 'enemy', isDead: false, hasActedThisTurn: true },
+          ],
+          enemies: [{ id: 'gob-1', name: 'Goblin', ac: 12, hp: { current: 10, max: 10 }, attacks: [], isDead: false }],
+        },
+      });
+      await server.next_turn(false);
+      expect(server.getFullState().party[0].concentrationSpellId).toBe('bless');
+    });
+  });
 });

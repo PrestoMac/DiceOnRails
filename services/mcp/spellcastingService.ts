@@ -6,7 +6,7 @@ import { castSpell as engineCastSpell, learnSpell as engineLearnSpell, prepareSp
 import { SPELLS_BY_ID, parseDuration } from '../../utils/spells';
 import { rollDice } from '../diceEngine';
 import { parseDiceFormula } from '../../utils/dice';
-import { applyCondition, getConditionEffects, getExhaustionPenalty } from '../conditionEngine';
+import { applyCondition, removeCondition, getConditionEffects, getExhaustionPenalty } from '../conditionEngine';
 
 /** Dependencies required by the SpellcastingService. */
 export interface SpellcastingDeps {
@@ -184,6 +184,7 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
       if (result.concentrationStarted) {
         if (!char.runtime) char.runtime = {};
         char.runtime.concentrationStartTime = state.gameTime;
+        char.runtime.concentrationStartRound = state.combat?.isActive ? state.combat.round : undefined;
         if (spellDef?.durationScaling) {
           const scale = [...spellDef.durationScaling].reverse().find(s => slotLevel >= s.atSlotLevel);
           char.runtime.concentrationEffectiveDuration = scale ? scale.value : (spellDef.parsedDuration?.value ?? 60);
@@ -570,30 +571,64 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
       };
     },
 
-    async spell_effect(mode, casterId, targetSpellLevel, _targetId) {
+    async spell_effect(mode, casterId, targetSpellLevel, targetId) {
       const caster = deps.getTarget(casterId);
       if (!caster) return fail('Caster not found.');
       if (!getClassDef(caster.class)?.spellcasting) return fail(`${caster.name} cannot cast spells.`);
 
-      if (targetSpellLevel <= 3) {
-        const verb = mode === 'counter' ? 'counters' : 'dispels';
-        return {
-          success: true,
-          data: { autoSuccess: true, mode, targetSpellLevel },
-          message: `${caster.name} ${verb} the level ${targetSpellLevel} spell automatically!`
-        };
-      }
-
-      const check = abilityCheckForSpell(caster, targetSpellLevel) as { roll: number; total: number; dc: number; success: boolean };
       const pastVerb = mode === 'counter' ? 'counters' : 'dispels';
       const baseVerb = mode === 'counter' ? 'counter' : 'dispel';
+      const autoSuccess = targetSpellLevel <= 3;
+
+      let succeeded: boolean;
+      let rollData: { autoSuccess?: true; roll?: number; total?: number; dc?: number } = {};
+      if (autoSuccess) {
+        succeeded = true;
+        rollData = { autoSuccess: true };
+      } else {
+        const check = abilityCheckForSpell(caster, targetSpellLevel) as { roll: number; total: number; dc: number; success: boolean };
+        succeeded = check.success;
+        rollData = { roll: check.roll, total: check.total, dc: check.dc };
+      }
+
+      const removed: string[] = [];
+      let removedSummary = '';
+      if (succeeded && mode === 'dispel' && targetId) {
+        const playerTarget = deps.getTarget(targetId);
+        const enemyTarget = !playerTarget
+          ? state.combat?.enemies.find(e => e.id === targetId || e.name.toLowerCase() === targetId.toLowerCase())
+          : undefined;
+        const target = playerTarget ?? enemyTarget;
+        if (target) {
+          for (const cond of [...(target.conditions ?? [])]) {
+            if (cond.source && SPELLS_BY_ID[cond.source]) {
+              removeCondition(target, cond.id, cond.source);
+              removed.push(cond.id);
+            }
+          }
+          if (playerTarget && playerTarget.concentrationSpellId) {
+            breakConcentrationWithCleanup(playerTarget);
+            removed.push('concentration');
+          }
+          if (state.combat?.activeDoTs) {
+            state.combat.activeDoTs = state.combat.activeDoTs.filter(dot => !dot.targetIds.includes(targetId));
+          }
+          removedSummary = removed.length
+            ? ` Removed: ${removed.join(', ')}.`
+            : ' No spell effects found to dispel.';
+        }
+      }
+
+      const baseMsg = autoSuccess
+        ? `${caster.name} ${pastVerb} the level ${targetSpellLevel} spell automatically!`
+        : succeeded
+          ? `${caster.name} ${pastVerb} the spell! (Rolled ${rollData.total} vs DC ${rollData.dc})`
+          : `${caster.name} fails to ${baseVerb} the spell. (Rolled ${rollData.total} vs DC ${rollData.dc})`;
 
       return {
         success: true,
-        data: { mode, roll: check.roll, total: check.total, dc: check.dc, success: check.success },
-        message: check.success
-          ? `${caster.name} ${pastVerb} the spell! (Rolled ${check.total} vs DC ${check.dc})`
-          : `${caster.name} fails to ${baseVerb} the spell. (Rolled ${check.total} vs DC ${check.dc})`
+        data: { mode, targetSpellLevel, success: succeeded, ...rollData, removed },
+        message: `${baseMsg}${removedSummary}`
       };
     },
 

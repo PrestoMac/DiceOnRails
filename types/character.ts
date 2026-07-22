@@ -166,6 +166,7 @@ export interface TransformationState {
 export interface RuntimeMetadata {
   concentrationStartTime?: number;
   concentrationEffectiveDuration?: number;
+  concentrationStartRound?: number;
   transformationState?: TransformationState;
 }
 

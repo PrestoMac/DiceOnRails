@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Character, Enemy } from '../../types';
-import { hasSpellSlot, consumeSpellSlot, getCantripsKnown, getSpellsKnown, getMaxPrepared, castSpell, breakConcentration, canLearnSpell, learnSpell, prepareSpell, unprepareSpell } from '../../services/spellcastingEngine';
+import { hasSpellSlot, consumeSpellSlot, getCantripsKnown, getSpellsKnown, getMaxPrepared, castSpell, breakConcentration, checkConcentrationExpiry, canLearnSpell, learnSpell, prepareSpell, unprepareSpell } from '../../services/spellcastingEngine';
 
 const mockCryptoRoll = vi.fn();
 vi.mock('../../utils/random', () => ({
@@ -261,6 +261,35 @@ describe('spellcastingEngine', () => {
       expect(result.affectedTargets).toBeDefined();
       expect(result.affectedTargets?.length).toBe(2);
       expect(result.hasEffect).toBe(true);
+    });
+  });
+
+  describe('concentration (C2 + helper)', () => {
+    it('sets concentrationStarted on a fresh concentration cast (C2)', () => {
+      const wiz = makeWizard({
+        preparedSpells: ['magic-missile', 'shield', 'fireball', 'burning-hands', 'fire-bolt', 'hold-person'],
+        knownSpells: ['magic-missile', 'shield', 'fireball', 'burning-hands', 'fire-bolt', 'hold-person'],
+      });
+      const result = castSpell(wiz, 'hold-person', 2, []);
+      expect(result.success).toBe(true);
+      expect(result.concentrationStarted).toBe(true);
+      expect(wiz.concentrationSpellId).toBe('hold-person');
+    });
+
+    it('returns null and keeps concentration when within duration', () => {
+      const wiz = makeWizard();
+      wiz.concentrationSpellId = 'hold-person';
+      wiz.runtime = { concentrationStartTime: 0, concentrationEffectiveDuration: 10 };
+      expect(checkConcentrationExpiry(wiz, 5)).toBeNull();
+      expect(wiz.concentrationSpellId).toBe('hold-person');
+    });
+
+    it('breaks concentration and returns spell name when duration exceeded', () => {
+      const wiz = makeWizard();
+      wiz.concentrationSpellId = 'hold-person';
+      wiz.runtime = { concentrationStartTime: 0, concentrationEffectiveDuration: 10 };
+      expect(checkConcentrationExpiry(wiz, 10)).toBe('Hold Person');
+      expect(wiz.concentrationSpellId).toBeUndefined();
     });
   });
 });

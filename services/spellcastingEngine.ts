@@ -3,7 +3,7 @@ import { getClassDef, getMod, getProficiencyBonus, getSpellSaveDc, getSpellAttac
 import { rollDice } from './diceEngine';
 import { parseDiceFormula } from '../utils/dice';
 import { cryptoRoll } from '../utils/random';
-import { SPELLS_BY_ID } from '../utils/spells';
+import { SPELLS_BY_ID, parseDuration } from '../utils/spells';
 import { getConditionEffects, getExhaustionPenalty } from './conditionEngine';
 
 function findSpellSlot(character: Character, level: number) {
@@ -208,10 +208,10 @@ export function castSpell(
   let concentrationEnded = false;
   if (spell.requiresConcentration) {
     if (character.concentrationSpellId && character.concentrationSpellId !== spell.id) {
-      concentrationStarted = true;
       breakConcentration(character, 'voluntary');
       concentrationEnded = true;
     }
+    concentrationStarted = true;
     character.concentrationSpellId = spell.id;
   }
 
@@ -505,4 +505,23 @@ export function breakConcentration(character: Character, reason: 'damaged' | 'vo
     }
   }
   return { broken: true };
+}
+
+/**
+ * Breaks a character's concentration if its effective duration has elapsed.
+ * @param elapsedMinutes minutes since concentration began (gameTime-based for narration, round-based for combat).
+ * @returns the spell name (or id) if concentration was broken, otherwise null.
+ */
+export function checkConcentrationExpiry(char: Character, elapsedMinutes: number): string | null {
+  if (!char.concentrationSpellId) return null;
+  const spell = SPELLS_BY_ID[char.concentrationSpellId];
+  const effectiveDuration = char.runtime?.concentrationEffectiveDuration ?? (() => {
+    const parsed = spell?.parsedDuration ?? (spell ? parseDuration(spell.duration) : undefined);
+    return parsed?.unit === 'minute' ? parsed.value : undefined;
+  })();
+  if (effectiveDuration != null && effectiveDuration <= elapsedMinutes) {
+    breakConcentration(char, 'voluntary');
+    return spell?.name ?? char.concentrationSpellId;
+  }
+  return null;
 }

@@ -12,7 +12,7 @@ import {
 } from '../featsService';
 import { rollDice } from '../diceEngine';
 import { parseDiceFormula } from '../../utils/dice';
-import { breakConcentration as engineBreakConcentration } from '../spellcastingEngine';
+import { breakConcentration as engineBreakConcentration, checkConcentrationExpiry } from '../spellcastingEngine';
 
 /** Dependencies required by the CombatService. */
 export interface CombatDeps {
@@ -39,6 +39,18 @@ export interface CombatService {
   player_attack(attackerId: string, weaponName: string, targetId: string, isOffHand?: boolean, isSneakAttack?: boolean, sharpshooter?: boolean, greatWeaponMaster?: boolean): Promise<MCPResponse>;
   resolveAdvantage(attacker?: Character | Enemy, target?: Character | Enemy, roll?: number): { roll: number; hasAdvantage: boolean; hasDisadvantage: boolean };
   initializeDeathSaves(character: Character): void;
+}
+
+/** Clears combat-only conditions (duration == null) from a target, preserving minute/permanent durations. Returns the ids removed. */
+function clearEndOfCombatConditions(target: Character | Enemy): string[] {
+  if (!target.conditions?.length) return [];
+  const toRemove = target.conditions.filter(c => c.duration == null);
+  const removed: string[] = [];
+  for (const cond of toRemove) {
+    removeCondition(target, cond.id, cond.source);
+    removed.push(cond.id);
+  }
+  return removed;
 }
 
 /** Creates a new CombatService instance operating on the given GameState. */
@@ -268,6 +280,12 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       state.combat.round = 1;
       state.combat.turnIndex = 0;
 
+      for (const c of state.party) {
+        if (c.concentrationSpellId && c.runtime && c.runtime.concentrationStartRound == null) {
+          c.runtime.concentrationStartRound = state.combat.round;
+        }
+      }
+
       const firstActor = initiative[0];
       const initiativeStr = initiative.map(e =>
         `${e.type === 'player' ? '👤' : '👾'} ${e.name}: ${e.initiative}`
@@ -338,9 +356,14 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
           const skipCombatant = entry.type === 'player'
             ? state.party.find(c => c.id === entry.id)
             : combat.enemies.find(e => e.id === entry.id);
-          if (entry.type !== 'player' && skipCombatant && (isIncapacitated(skipCombatant) || isUnconscious(skipCombatant))) {
-            entry.hasActedThisTurn = true;
-            continue;
+          if (skipCombatant && (isIncapacitated(skipCombatant) || isUnconscious(skipCombatant))) {
+            if (entry.type === 'player') {
+              const player = skipCombatant as Character;
+              if (player.concentrationSpellId) engineBreakConcentration(player, 'incapacitated');
+            } else {
+              entry.hasActedThisTurn = true;
+              continue;
+            }
           }
           nextIdx = currentIdx;
           break;
@@ -366,6 +389,23 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
             const allExpired = [...roundExpired, ...timeExpired];
             for (const condId of allExpired) {
               expiryMessages.push(`**${combatant.name}**'s ${condId} condition wore off.`);
+            }
+            if (entry.type === 'player') {
+              const player = combatant as Character;
+              if (player.concentrationSpellId) {
+                const sid = player.concentrationSpellId;
+                const startRound = player.runtime?.concentrationStartRound;
+                const elapsedMin = startRound != null ? (combat.round - startRound) / 10 : 0;
+                const ended = checkConcentrationExpiry(player, elapsedMin);
+                if (ended) {
+                  if (combat.activeDoTs) {
+                    combat.activeDoTs = combat.activeDoTs.filter(
+                      dot => !(dot.casterId === combatant.id && dot.spellId === sid)
+                    );
+                  }
+                  expiryMessages.push(`**${combatant.name}**'s concentration on ${ended} ended.`);
+                }
+              }
             }
           }
         }
@@ -469,12 +509,20 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
         return fail("No active combat to end.");
       }
       const rounds = state.combat.round;
+      const cleared: string[] = [];
+      for (const c of state.party) {
+        cleared.push(...clearEndOfCombatConditions(c));
+      }
+      for (const e of state.combat.enemies) {
+        cleared.push(...clearEndOfCombatConditions(e));
+      }
       state.combat.isActive = false;
       state.combat = undefined;
+      const clearedMsg = cleared.length ? ` Cleared: ${[...new Set(cleared)].join(', ')}.` : '';
       return {
         success: true,
-        data: {},
-        message: `Combat ended after ${rounds} round(s). The battle is over!`
+        data: { cleared },
+        message: `Combat ended after ${rounds} round(s). The battle is over!${clearedMsg}`
       };
     },
 
@@ -573,9 +621,13 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
 
       if (newHp === 0 && prevHp > 0) {
         initializeDeathSaves(target);
+        if (target.concentrationSpellId) engineBreakConcentration(target, 'incapacitated');
       }
 
-      engineBreakConcentration(target, 'damaged', damageTotal);
+      const concResult = engineBreakConcentration(target, 'damaged', damageTotal);
+      if (concResult.broken && state.combat?.activeDoTs) {
+        state.combat.activeDoTs = state.combat.activeDoTs.filter(dot => dot.casterId !== target.id);
+      }
 
       const critStr = isCrit ? ' **CRITICAL HIT!**' : '';
       return {

@@ -725,3 +725,43 @@ describe('buff spell durations', () => {
     expect(hpAfter).toBe(hpBefore);
   });
 });
+
+describe('spell_effect dispel (C1)', () => {
+  let server: MockMCPServer;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(cryptoRoll).mockReturnValue(10);
+    server = new MockMCPServer();
+  });
+
+  it('removes spell-sourced conditions, breaks concentration, keeps non-spell conditions', async () => {
+    const wizard = makeWizard();
+    wizard.conditions = [
+      { id: 'blinded', source: 'faerie-fire', duration: 5 },
+      { id: 'exhaustion-1', source: 'fatigue', duration: -1, durationUnit: 'permanent' },
+    ];
+    wizard.concentrationSpellId = 'bless';
+    server.joinParty(wizard);
+
+    const result = await server.spell_effect('dispel', 'wizard-1', 3, 'wizard-1');
+    expect(result.success).toBe(true);
+
+    const after = server.getFullState().party[0];
+    const ids = (after.conditions ?? []).map(c => c.id);
+    expect(ids).not.toContain('blinded');
+    expect(ids).toContain('exhaustion-1');
+    expect(after.concentrationSpellId).toBeUndefined();
+  });
+
+  it('counter mode performs no target cleanup', async () => {
+    const wizard = makeWizard();
+    wizard.conditions = [{ id: 'blinded', source: 'faerie-fire', duration: 5 }];
+    server.joinParty(wizard);
+
+    const result = await server.spell_effect('counter', 'wizard-1', 3, 'wizard-1');
+    expect(result.success).toBe(true);
+    const ids = (server.getFullState().party[0].conditions ?? []).map(c => c.id);
+    expect(ids).toContain('blinded');
+  });
+});

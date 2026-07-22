@@ -8,8 +8,10 @@ The implemented fixes cover: duration literals, `applyAcBuff` recast stacking, e
 
 ## CRITICAL — Break core gameplay right now
 
-### C1. `spell_effect` (Dispel Magic / Counterspell) is a no-op stub
-**File:** `services/mcp/spellcastingService.ts:572-597`
+### C1. `spell_effect` (Dispel Magic / Counterspell) is a no-op stub — FIXED
+**File:** `services/mcp/spellcastingService.ts:573-630`
+
+**Status: FIXED.** `spell_effect` now performs real cleanup on a successful dispel: it resolves the target (party member or combat enemy), removes every condition whose `source` is a spell ID, breaks concentration (via `breakConcentrationWithCleanup`) for a concentrating player target, and clears `activeDoTs` affecting the target. Counterspell (`mode === 'counter'`) remains purely reactive. Original description retained for reference:
 
 The function rolls an ability check and returns a "you dispelled it!" message, but **never actually removes any condition, breaks any concentration, or clears any DoT**. The `targetId` parameter is accepted by the schema but completely ignored.
 
@@ -19,8 +21,10 @@ The function rolls an ability check and returns a "you dispelled it!" message, b
 
 ---
 
-### C2. Fresh concentration spells break the first time any time passes
+### C2. Fresh concentration spells break the first time any time passes — FIXED
 **Files:** `services/spellcastingEngine.ts:207-216` + `services/mcp/spellcastingService.ts:184-194`
+
+**Status: FIXED.** `concentrationStarted` is now set to `true` for every concentration cast (fresh and replacement), so `runtime.concentrationStartTime`/`concentrationEffectiveDuration` are always seeded. Original description retained for reference:
 
 When a caster first casts a concentration spell (not replacing an existing one), `concentrationStarted` stays `false`, so `runtime.concentrationStartTime` is never set. The next `narrate_turn` with `timePassed > 0` reads `startTime = 0`, computes `elapsed = gameTime - 0 = hundreds of minutes`, and instantly ends the spell.
 
@@ -41,14 +45,16 @@ OpenAI's API requires every `role: "tool"` message to be paired with the assista
 
 ---
 
-### C4. Long Rest wipes ALL exhaustion instead of 1 level
+### C4. Long Rest wipes ALL exhaustion — BY DESIGN (not a bug)
 **File:** `services/mcp/travelService.ts:646-648`
 
-Per 5e RAW, a long rest removes one exhaustion level. The code strips every `exhaustion-N` condition for the entire party at once.
+**Status: Intended behavior.** Removing all exhaustion levels on a long rest is a deliberate house rule for this game, **not** a bug. The code intentionally strips every `exhaustion-N` condition for the entire party at once:
 
-**Symptom:** A character at level 6 exhaustion wakes up at level 0 after one night's sleep.
+```js
+char.conditions = char.conditions.filter(c => !c.id.startsWith('exhaustion-'));
+```
 
-**Fix direction:** Mirror the `greater-restoration` logic at `spellcastingService.ts:291-300` — find the highest `exhaustion-N`, remove only that one.
+This differs from 5e RAW (which removes only one level), but the deviation is a conscious design choice. No fix required. Kept here for documentation and because C5 references the same code line.
 
 ---
 
@@ -61,8 +67,10 @@ The exhaustion-clear loop runs *before* the "is this character conscious enough 
 
 ---
 
-### C6. `end_combat` leaves Stunned/Paralyzed/Prone etc. on every combatant forever
-**File:** `services/mcp/combatService.ts:479-491`
+### C6. `end_combat` leaves Stunned/Paralyzed/Prone etc. on every combatant forever — FIXED
+**File:** `services/mcp/combatService.ts:467-502`
+
+**Status: FIXED.** `end_combat` now sweeps every party member and enemy via `clearEndOfCombatConditions`, clearing conditions with `duration == null` (the save-or-end combat debuffs) while preserving `durationUnit === 'minute'` (mage armor, heroism) and `'permanent'` (exhaustion). Original description retained for reference:
 
 When combat ends, the engine just sets `state.combat = undefined`. It does not clean up conditions applied during the fight. Many combat conditions have `duration: null` so they never tick down.
 
@@ -72,8 +80,10 @@ When combat ends, the engine just sets `state.combat = undefined`. It does not c
 
 ---
 
-### C7. Concentration is never broken when caster falls unconscious or gets Paralyzed/Stunned
-**File:** `services/spellcastingEngine.ts:461`
+### C7. Concentration is never broken when caster falls unconscious or gets Paralyzed/Stunned — FIXED
+**File:** `services/spellcastingEngine.ts:458` (plus call sites)
+
+**Status: FIXED.** Concentration now breaks on incapacitation in three damage/turn paths: `inflict_damage` and `enemy_attack` call `engineBreakConcentration(target, 'incapacitated')` when HP hits 0, and `next_turn`'s turn-start check breaks concentration for any incapacitated/unconscious combatant (players and enemies). The `'damaged'` CON-save path still runs but no-ops once concentration is cleared. Original description retained for reference:
 
 `breakConcentration(character, reason)` accepts `'incapacitated'` as a reason, but no caller ever passes it. Grep confirms only `'damaged'` and `'voluntary'` are ever used.
 
@@ -134,8 +144,10 @@ if (!('combat' in savedState) || savedState.combat == null) {
 
 ---
 
-### H3. Concentration duration isn't checked during combat
-**File:** `services/mcp/combatService.ts:367-383`
+### H3. Concentration duration isn't checked during combat — FIXED
+**File:** `services/mcp/combatService.ts:380-410`
+
+**Status: FIXED (Option A — round-based tracking).** A new `checkConcentrationExpiry(char, elapsedMinutes)` helper was extracted (lives in `spellcastingEngine.ts`) and is now called from both `travelService.narrate_turn` (gameTime-based) and `combatService.next_turn`'s round-tick (round-based). A `runtime.concentrationStartRound` field is set when a concentration spell is cast in combat (and seeded in `start_combat` for pre-existing concentrations); the round-tick breaks concentration when `(round - startRound)/10 >= effectiveDuration`. This also fixed a latent sub-bug where time-expiry never cleared `activeDoTs`. Original description retained for reference:
 
 The `runtime.concentrationEffectiveDuration` check lives only in `travelService.narrate_turn`. Combat never advances `gameTime` and never calls that check.
 
@@ -285,8 +297,10 @@ Only `tickConditions` is called (round-unit only). Minute-based conditions are n
 
 ---
 
-### M8. Long_rest clears `concentrationSpellId` only for resting chars — unconscious casters stay "concentrating"
-**File:** `services/mcp/travelService.ts:664-674`
+### M8. Long_rest clears `concentrationSpellId` only for resting chars — unconscious casters stay "concentrating" — FIXED
+**File:** `services/mcp/travelService.ts:653-665`
+
+**Status: FIXED.** `long_rest` now clears concentration for every party member in a dedicated loop *before* the HP-gated healing loop, using `engineBreakConcentration(char, 'incapacitated')` for 0-HP chars (which also cleans up tied conditions and `activeDoTs`) and `'voluntary'` otherwise. The redundant raw `concentrationSpellId = undefined` inside the HP-gated branch was removed. Original description retained for reference:
 
 An unconscious caster (who per 5e cannot concentrate) retains their `concentrationSpellId` through a long rest.
 
