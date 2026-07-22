@@ -138,7 +138,7 @@ export class MockMCPServer {
   public async move_to(location_name: string, description?: string, targetId?: string, skillCheck?: { skill_name?: string; difficulty?: number; onSuccess?: unknown }, route?: string, pace?: string): Promise<MCPResponse> { return this.travel.move_to(location_name, description, targetId, skillCheck, route, pace); }
   public async narrate_turn(narration: string, timePassed?: number): Promise<MCPResponse> { return this.travel.narrate_turn(narration, timePassed); }
   public setAtmosphere(url: string) { this.travel.setAtmosphere(url); }
-  public setStartingLocation(location: { name: string; description: string; atmosphereUrl?: string }) { this.travel.setStartingLocation(location); }
+  public setStartingLocation(location: { name: string; description: string; introHook?: string; atmosphereUrl?: string }) { this.travel.setStartingLocation(location); }
   public cacheLocationImage(name: string, url: string) { this.travel.cacheLocationImage(name, url); }
   public getCachedLocationImage(name: string): string | undefined { return this.travel.getCachedLocationImage(name); }
   public async roll_dice(sides: number, count?: number, modifier?: number, target_ac?: number, target_name?: string, roll_label?: string, isDamageRoll?: boolean, isOffHand?: boolean, weaponName?: string, attackerId?: string): Promise<MCPResponse> { return this.travel.roll_dice(sides, count, modifier, target_ac, target_name, roll_label, isDamageRoll, isOffHand, weaponName, attackerId); }

@@ -50,7 +50,7 @@ export interface TravelService {
   move_to(location_name: string, description?: string, targetId?: string, skillCheck?: Record<string, unknown>, route?: string, pace?: string): Promise<MCPResponse>;
   narrate_turn(narration: string, timePassed?: number): Promise<MCPResponse>;
   setAtmosphere(url: string): void;
-  setStartingLocation(location: { name: string; description: string; atmosphereUrl?: string }): void;
+  setStartingLocation(location: { name: string; description: string; introHook?: string; atmosphereUrl?: string }): void;
   cacheLocationImage(name: string, url: string): void;
   getCachedLocationImage(name: string): string | undefined;
   roll_dice(sides: number, count?: number, modifier?: number, target_ac?: number, target_name?: string, roll_label?: string, isDamageRoll?: boolean, isOffHand?: boolean, weaponName?: string, attackerId?: string): Promise<MCPResponse>;
@@ -131,8 +131,8 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
       state.currentAtmosphereUrl = url;
     },
 
-    setStartingLocation(location: { name: string; description: string; atmosphereUrl?: string }) {
-      state.startingLocation = { name: location.name, description: location.description };
+    setStartingLocation(location: { name: string; description: string; introHook?: string; atmosphereUrl?: string }) {
+      state.startingLocation = { name: location.name, description: location.description, introHook: location.introHook || '' };
       state.worldDescription = location.description;
       if (location.atmosphereUrl) {
         state.currentAtmosphereUrl = location.atmosphereUrl;
