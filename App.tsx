@@ -169,7 +169,7 @@ const AppContent: React.FC = () => {
     if (stage === AppStage.CREATION) {
       return <WizardShell onComplete={handleCharacterCreated} isNewCampaign={isNewCampaign} campaignStartingLocation={gameState.startingLocation} onGenerateStartingLocations={isNewCampaign ? handleGenerateStartingLocations : undefined} onSetStartingLocation={handleSetStartingLocation} />;
     }
-    return <ErrorBoundary><div key={currentCampaignId}>{isMobile ? <MobileLayout /> : <DesktopLayout />}</div></ErrorBoundary>;
+    return <ErrorBoundary>{isMobile ? <MobileLayout key={currentCampaignId} /> : <DesktopLayout key={currentCampaignId} />}</ErrorBoundary>;
   };
 
   return (
