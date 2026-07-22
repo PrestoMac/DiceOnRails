@@ -311,6 +311,9 @@ export class MockMCPServer {
               .filter((s: unknown): s is string => typeof s === 'string' && s.trim().length > 0)
               .map(s => s.slice(0, 80))
               .slice(0, 3);
+            if (isDebugMode) console.log(`[narrate_turn] Stored ${this.state.lastSuggestions.length} suggestions on state:`, this.state.lastSuggestions);
+          } else if (isDebugMode) {
+            console.log('[narrate_turn] No suggestions in args');
           }
           res = await this.travel.narrate_turn(String(args.narration || ''), Number(args.timePassed || 0)); break;
         default:

@@ -95,7 +95,7 @@ export async function runAgentLoop(
 
   const systemMessage = {
     role: "system" as const,
-    content: `${SYSTEM_INSTRUCTION}\n\n${PROGRESSION_SYSTEM_PROMPT}\n\n=== TOOL MODE ===\n${TOOL_MODE_INSTRUCTION}${options?.enableSuggestions ? '\n\nSUGGESTIONS OPT-IN: After your turn narration, provide 2-3 short suggested next actions for the player in the suggestions field of narrate_turn as a JSON array of strings. Each suggestion should be ≤60 characters and describe a concrete action in second person (e.g. "Attack the goblin", "Cast Cure Wounds on the fighter").' : ''}`
+    content: `${SYSTEM_INSTRUCTION}\n\n${PROGRESSION_SYSTEM_PROMPT}${options?.enableSuggestions ? '\n15. SUGGESTED ACTIONS: When ending a turn with narrate_turn, ALWAYS include 2-3 short suggested next actions in the suggestions field. Each must be ≤60 chars, second person, concrete action (e.g. "Attack the goblin", "Cast Cure Wounds on the fighter"). This is mandatory.\n' : ''}\n\n=== TOOL MODE ===\n${TOOL_MODE_INSTRUCTION}`
   };
   const state = mcpServer.getFullState();
   const contextParts: string[] = [];

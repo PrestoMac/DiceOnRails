@@ -360,8 +360,8 @@ describe('runAgentLoop', () => {
     const callArg = mockFetch.mock.calls[0][1] as { body: string };
     const body = JSON.parse(callArg.body);
     const sysMsg = body.messages.find((m: { role: string }) => m.role === 'system');
-    expect(sysMsg.content).toContain('SUGGESTIONS OPT-IN');
-    expect(sysMsg.content).toContain('suggestions field of narrate_turn');
+    expect(sysMsg.content).toContain('SUGGESTED ACTIONS');
+    expect(sysMsg.content).toContain('suggestions field');
   });
 
   it('omits suggestions prompt hint when enableSuggestions is not set', async () => {
@@ -374,6 +374,6 @@ describe('runAgentLoop', () => {
     const callArg = mockFetch.mock.calls[0][1] as { body: string };
     const body = JSON.parse(callArg.body);
     const sysMsg = body.messages.find((m: { role: string }) => m.role === 'system');
-    expect(sysMsg.content).not.toContain('SUGGESTIONS OPT-IN');
+    expect(sysMsg.content).not.toContain('SUGGESTED ACTIONS');
   });
 });

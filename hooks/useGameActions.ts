@@ -157,6 +157,7 @@ export const useGameActions = (
             const isClientSideAction = text.startsWith('[');
             const isTrivial = isTrivialInput(text);
             let inlineNarration: string | undefined;
+            let turnSuggestions: string[] = [];
 
             if (isClientSideAction) {
                 if (isDebugMode) console.log('[handleSendMessage] client-side action, skipping agent loop', { text: text.slice(0, 80) });
@@ -171,6 +172,7 @@ export const useGameActions = (
                     }, undefined, { requestEndNarration: true, enableSuggestions: !!settings.enableSuggestions });
                 toolMessages = result.toolMessages;
                 inlineNarration = result.inlineNarration;
+                turnSuggestions = result.suggestions || [];
             }
 
             const streamingId = `model-${Date.now()}`;
@@ -185,7 +187,7 @@ export const useGameActions = (
             processingRef.current = false;
 
             const messagesToSync = [...currentMessages, userMsg, ...toolMessages, modelMsg];
-            syncFinished(messagesToSync);
+            syncFinished(messagesToSync, { lastSuggestions: turnSuggestions });
             autoSpeak(modelMsg.text);
             messagesRef.current = messagesToSync;
             runPipeline_();
