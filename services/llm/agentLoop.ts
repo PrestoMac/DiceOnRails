@@ -177,6 +177,13 @@ export async function runAgentLoop(
     itersCompleted = iter + 1;
     const thinkingBody = getThinkingDisabledBody();
     const filteredTools = filterTools(tools, mcpServer.getFullState());
+    if (options?.enableSuggestions) {
+      const nt = filteredTools.find((t: { function: { name: string } }) => t.function.name === 'narrate_turn') as
+        { function: { name: string; parameters: { type: string; properties: Record<string, unknown>; required: string[] } } } | undefined;
+      if (nt) {
+        nt.function.parameters.required = ['narration', 'timePassed', 'suggestions'];
+      }
+    }
     const body: Record<string, unknown> = { model, messages, temperature: 0.7, tools: filteredTools, tool_choice: "auto", ...(thinkingBody || {}) };
     if (isDebugMode) console.log(`[AgentLoop] Iter ${iter + 1}/${MAX_ITERS} starting, messageCount=${messages.length}`, { bodyKeys: Object.keys(body), hasThinking: !!thinkingBody, model, toolCount: filteredTools.length });
 
