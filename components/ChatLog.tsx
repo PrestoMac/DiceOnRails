@@ -5,7 +5,6 @@ import { speakText, stopSpeaking } from '../services/audioService';
 import ReactMarkdown from 'react-markdown';
 import { isDebugMode } from '../utils/debug';
 import WelcomeChips from './onboarding/WelcomeChips';
-import SuggestedActions from './SuggestedActions';
 
 interface ParsedRoll {
   type: 'attack' | 'skill';
@@ -448,13 +447,28 @@ const ChatLog: React.FC<ChatLogProps> = ({ messages, settings, onRewind, isProce
         })}
 
         {suggestions && suggestions.length > 0 && onPickSuggestion && (
-          <div className="flex flex-col items-start pt-2">
-            <div className="max-w-[85%]">
-              <SuggestedActions
-                suggestions={suggestions}
-                onPick={onPickSuggestion}
-                onDismiss={onDismissSuggestion}
-              />
+          <div className="flex flex-col items-start pt-1 pb-2 w-full">
+            <div className="max-w-[85%] w-full space-y-1">
+              <p className="text-[9px] uppercase font-bold text-amber-600/70 tracking-widest mb-1">Suggested actions</p>
+              {suggestions.map((s, i) => (
+                <button
+                  key={`${s}-${i}`}
+                  onClick={() => onPickSuggestion(s)}
+                  className="w-full text-left flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all bg-stone-900/60 border border-stone-800 hover:bg-amber-950/30 hover:border-amber-700/50 hover:text-amber-300 text-stone-300 group cursor-pointer"
+                >
+                  <i className="fas fa-bolt text-[10px] text-amber-600/60 group-hover:text-amber-400 shrink-0"></i>
+                  <span className="flex-1 leading-snug">{s}</span>
+                  <i className="fas fa-arrow-right text-[10px] text-stone-700 group-hover:text-amber-500 opacity-0 group-hover:opacity-100 transition-all shrink-0"></i>
+                </button>
+              ))}
+              {onDismissSuggestion && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onDismissSuggestion(); }}
+                  className="text-[10px] text-stone-600 hover:text-stone-400 transition-colors pt-0.5"
+                >
+                  <i className="fas fa-times mr-1"></i>Dismiss
+                </button>
+              )}
             </div>
           </div>
         )}
