@@ -19,6 +19,7 @@ import SuggestedActions from '../SuggestedActions';
 import { useActivityTracking } from '../../hooks/useActivityTracking';
 import { useOnboarding } from '../../hooks/useOnboarding';
 import { formatGameTime } from '../../utils/timeUtils';
+import { mcpServer } from '../../services/mcpService';
 
 /** Primary desktop layout with resizable sidebar, chat log, input area, and full header controls. */
 const DesktopLayout: React.FC = () => {
@@ -27,7 +28,7 @@ const DesktopLayout: React.FC = () => {
     isLoading, myCharacterId, viewingCharacterId, setViewingCharacterId,
     setStage, resetGame, handleUpdateInventory,
     handleEnqueueAction, handleRemoveQueueItem, handleUpdateQueueItem,
-    handleReorderQueue
+    handleReorderQueue, syncState,
   } = useGameContext();
   const { handleSendMessage, handleRewind, handleExecuteBatch, handleResolveEnemyTurn } = useActionsContext();
   const {
@@ -163,7 +164,8 @@ const DesktopLayout: React.FC = () => {
         {settings.enableSuggestions && gameState.lastSuggestions && gameState.lastSuggestions.length > 0 && (
           <SuggestedActions
             suggestions={gameState.lastSuggestions}
-            onPick={(text) => handleSendMessage(text)}
+            onPick={(text) => { handleSendMessage(text); }}
+            onDismiss={() => { mcpServer.getFullState().lastSuggestions = []; syncState(); }}
           />
         )}
         <InputArea onSendMessage={handleSendMessage} onQueueAction={handleEnqueueAction} onResolveEnemyTurn={handleResolveEnemyTurn} isLoading={isLoading || gameState.isProcessing} combat={gameState.combat} character={charToShow} />

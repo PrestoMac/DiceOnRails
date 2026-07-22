@@ -132,6 +132,7 @@ export const useGameActions = (
         if (isRetry && processingRef.current) return;
 
         processingRef.current = true;
+        mcpServer.getFullState().lastSuggestions = [];
         const currentMessages = messagesRef.current;
         setMessages(prev => [...prev, userMsg]);
         setIsLoading(true);

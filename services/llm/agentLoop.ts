@@ -6,7 +6,6 @@ import { safeParseJson } from '../../utils/safeJson';
 import { mcpServer } from '../mcpService';
 import { tools, TOOL_MODE_INSTRUCTION } from './tools';
 import { extractRollData } from './narration';
-import { generateSuggestions } from './suggestions';
 import { estimateTokens, PER_MSG_OVERHEAD, STATIC_OVERHEAD, COMPLETION_RESERVE, CONTEXT_BUDGET } from './tokenEstimation';
 import { filterTools } from './toolFilter';
 import { resolveLLMConfig, mapHistoryToMessages } from './llmApiClient';
@@ -96,7 +95,7 @@ export async function runAgentLoop(
 
   const systemMessage = {
     role: "system" as const,
-    content: `${SYSTEM_INSTRUCTION}\n\n${PROGRESSION_SYSTEM_PROMPT}\n\n=== TOOL MODE ===\n${TOOL_MODE_INSTRUCTION}`
+    content: `${SYSTEM_INSTRUCTION}\n\n${PROGRESSION_SYSTEM_PROMPT}\n\n=== TOOL MODE ===\n${TOOL_MODE_INSTRUCTION}${options?.enableSuggestions ? '\n\nSUGGESTIONS OPT-IN: After your turn narration, provide 2-3 short suggested next actions for the player in the suggestions field of narrate_turn as a JSON array of strings. Each suggestion should be ≤60 characters and describe a concrete action in second person (e.g. "Attack the goblin", "Cast Cure Wounds on the fighter").' : ''}`
   };
   const state = mcpServer.getFullState();
   const contextParts: string[] = [];
@@ -166,6 +165,7 @@ export async function runAgentLoop(
   const MAX_ITERS = options?.maxIters ?? 20;
   let itersCompleted = 0;
   let inlineNarration: string | undefined;
+  let suggestions: string[] | undefined;
   let criticalToolFailed = false;
   let narrateTurnExecuted = false;
 
@@ -278,6 +278,11 @@ export async function runAgentLoop(
         if (!timeAlreadyAdvanced) {
           const narrateResult = await mcpServer.executeToolCall('narrate_turn', narrateCall.args);
           narrateTurnExecuted = true;
+          if (Array.isArray(narrateCall.args?.suggestions)) {
+            suggestions = narrateCall.args.suggestions
+              .filter((s: unknown): s is string => typeof s === 'string' && s.trim().length > 0)
+              .slice(0, 3);
+          }
           const logs = narrateResult.data?.logs;
           if (Array.isArray(logs) && logs.length > 0) {
             toolMessages.push({
@@ -342,21 +347,6 @@ export async function runAgentLoop(
   if (!timeAdvancedThisTurn) {
     await mcpServer.executeToolCall('narrate_turn', { narration: '', timePassed: 0 });
     if (isDebugMode) console.log('[AgentLoop] Enforcement: auto-called narrate_turn(timePassed=0) — no time advanced this turn');
-  }
-
-  // Phase 5B: LLM-driven suggested actions (opt-in, cached per turn)
-  let suggestions: string[] | undefined;
-  if (options?.enableSuggestions) {
-    try {
-      suggestions = await generateSuggestions(history, { signal: options.signal });
-      if (suggestions.length > 0) {
-        // Cache on gameState.lastSuggestions for the UI to read after sync.
-        mcpServer.getFullState().lastSuggestions = suggestions;
-        if (isDebugMode) console.log('[AgentLoop] Generated suggestions:', suggestions);
-      }
-    } catch (err) {
-      if (isDebugMode) console.warn('[AgentLoop] Suggestions generation failed:', err);
-    }
   }
 
   if (isDebugMode) {

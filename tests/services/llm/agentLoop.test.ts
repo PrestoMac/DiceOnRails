@@ -324,61 +324,56 @@ describe('runAgentLoop', () => {
     expect(userMsg.content).toContain('[Valerius]: I attack the goblin!');
   });
 
-  it('suppresses suggestions when enableSuggestions is not set', async () => {
+  it('extracts suggestions from narrate_turn args when enableSuggestions is true', async () => {
+    mockFetch.mockResolvedValueOnce(makeLLMResponse('', [
+      { name: 'narrate_turn', args: {
+        narration: 'The goblin falls.',
+        timePassed: 0,
+        suggestions: ['Attack the next goblin', 'Cast Cure Wounds', 'Search the room'],
+      } },
+    ]));
+
+    const result = await runAgentLoop([], 'Combat.', undefined, undefined, undefined, { enableSuggestions: true });
+
+    expect(result.suggestions).toEqual(['Attack the next goblin', 'Cast Cure Wounds', 'Search the room']);
+    // Only the main loop fetch — no separate API call.
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns undefined suggestions when narrate_turn args lack suggestions', async () => {
+    mockFetch.mockResolvedValueOnce(makeLLMResponse('', [
+      { name: 'narrate_turn', args: { narration: 'Quiet night.', timePassed: 60 } },
+    ]));
+
+    const result = await runAgentLoop([], 'Rest.', undefined, undefined, undefined, { enableSuggestions: true });
+
+    expect(result.suggestions).toBeUndefined();
+  });
+
+  it('includes suggestions prompt hint in system message when enableSuggestions is true', async () => {
+    mockFetch.mockResolvedValueOnce(makeLLMResponse('', [
+      { name: 'narrate_turn', args: { narration: 'Done.', timePassed: 0, suggestions: ['Fight'] } },
+    ]));
+
+    await runAgentLoop([], 'Test', undefined, undefined, undefined, { enableSuggestions: true });
+
+    const callArg = mockFetch.mock.calls[0][1] as { body: string };
+    const body = JSON.parse(callArg.body);
+    const sysMsg = body.messages.find((m: { role: string }) => m.role === 'system');
+    expect(sysMsg.content).toContain('SUGGESTIONS OPT-IN');
+    expect(sysMsg.content).toContain('suggestions field of narrate_turn');
+  });
+
+  it('omits suggestions prompt hint when enableSuggestions is not set', async () => {
     mockFetch.mockResolvedValueOnce(makeLLMResponse('', [
       { name: 'narrate_turn', args: { narration: 'Done.', timePassed: 0 } },
     ]));
 
-    const result = await runAgentLoop([], 'Test');
+    await runAgentLoop([], 'Test');
 
-    expect(result.suggestions).toBeUndefined();
-    // Only the main loop fetch should have occurred — no extra suggestion call.
-    expect(mockFetch).toHaveBeenCalledTimes(1);
-  });
-
-  it('produces suggestions when enableSuggestions is true and the LLM returns valid JSON', async () => {
-    // Setup combat state so the tactical gate (combat OR low HP) passes.
-    const char = makeCharacter();
-    mcpServer.loadState(buildCombatState(char, false));
-
-    mockFetch
-      .mockResolvedValueOnce(makeLLMResponse('', [
-        { name: 'narrate_turn', args: { narration: 'Done.', timePassed: 0 } },
-      ]))
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: () => Promise.resolve({
-          choices: [{ message: { content: '{"suggestions":["Attack the goblin","Cast Shield","Drink a potion"]}', role: 'assistant' } }],
-          usage: { prompt_tokens: 10, completion_tokens: 5 },
-        }),
-      } as unknown as Response);
-
-    const result = await runAgentLoop([], 'Test', undefined, undefined, undefined, { enableSuggestions: true });
-
-    expect(result.suggestions).toEqual(['Attack the goblin', 'Cast Shield', 'Drink a potion']);
-    expect(mockFetch).toHaveBeenCalledTimes(2);
-  });
-
-  it('gracefully handles malformed suggestion JSON', async () => {
-    const char = makeCharacter();
-    mcpServer.loadState(buildCombatState(char, false));
-
-    mockFetch
-      .mockResolvedValueOnce(makeLLMResponse('', [
-        { name: 'narrate_turn', args: { narration: 'Done.', timePassed: 0 } },
-      ]))
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: () => Promise.resolve({
-          choices: [{ message: { content: 'sorry I cannot help with that', role: 'assistant' } }],
-          usage: { prompt_tokens: 10, completion_tokens: 5 },
-        }),
-      } as unknown as Response);
-
-    const result = await runAgentLoop([], 'Test', undefined, undefined, undefined, { enableSuggestions: true });
-
-    expect(result.suggestions).toEqual([]);
+    const callArg = mockFetch.mock.calls[0][1] as { body: string };
+    const body = JSON.parse(callArg.body);
+    const sysMsg = body.messages.find((m: { role: string }) => m.role === 'system');
+    expect(sysMsg.content).not.toContain('SUGGESTIONS OPT-IN');
   });
 });

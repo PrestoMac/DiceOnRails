@@ -7,12 +7,12 @@ describe('<SuggestedActions>', () => {
 
   it('renders nothing when suggestions is empty', () => {
     const { queryByText } = render(<SuggestedActions suggestions={[]} onPick={vi.fn()} />);
-    expect(queryByText(/Suggested Actions/i)).toBeNull();
+    expect(queryByText('Suggest:')).toBeNull();
   });
 
-  it('renders the header label when suggestions are present', () => {
+  it('renders the suggest label and chips when present', () => {
     const { getByText } = render(<SuggestedActions suggestions={['Do X']} onPick={vi.fn()} />);
-    expect(getByText(/Suggested Actions/i)).toBeTruthy();
+    expect(getByText('Suggest:')).toBeTruthy();
     expect(getByText('Do X')).toBeTruthy();
   });
 

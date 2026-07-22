@@ -305,6 +305,12 @@ export class MockMCPServer {
         case 'cast_ritual':
           res = await this.spells.cast_ritual(String(args.characterId || args.casterId || ''), String(args.spellId || '')); break;
         case 'narrate_turn':
+          if (Array.isArray(args.suggestions)) {
+            this.getFullState().lastSuggestions = args.suggestions
+              .filter((s: unknown): s is string => typeof s === 'string' && s.trim().length > 0)
+              .map(s => s.slice(0, 80))
+              .slice(0, 3);
+          }
           res = await this.travel.narrate_turn(String(args.narration || ''), Number(args.timePassed || 0)); break;
         default:
           res = fail(`Unknown tool: ${name}`);

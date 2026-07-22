@@ -53,6 +53,12 @@ export const tools = [
                     timePassed: {
                         type: 'integer',
                         description: 'REQUIRED. Minutes this action takes. Always estimate: 1-2=quick action/talk, 5-10=search/conversation, 30+=travel. Use 0 ONLY for truly instant events (a single reaction, a brief line). Every narration moves time forward.'
+                    },
+                    suggestions: {
+                        type: 'array',
+                        items: { type: 'string', description: 'A single suggested action, e.g. "Attack the goblin" (max 80 chars).' },
+                        maxItems: 3,
+                        description: 'Optional: 2-3 suggested next actions as short strings. Include when the player might need tactical guidance.'
                     }
                 },
                 required: ['narration', 'timePassed']

@@ -1,42 +1,53 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 
 export interface SuggestedActionsProps {
   suggestions: string[];
-  /** Pre-fill the input with the chosen suggestion. */
+  /** Immediately send the chosen suggestion as the user's action. */
   onPick: (text: string) => void;
-  /** Dismiss the panel until the next turn. */
+  /** Called when the user explicitly dismisses the suggestions row. */
   onDismiss?: () => void;
+  /** Auto-dismiss timeout in ms (default 30s). Pass 0 to disable. */
+  autoDismissMs?: number;
 }
 
-/** Collapsible panel of LLM-driven suggested actions shown above the InputArea. */
-const SuggestedActions: React.FC<SuggestedActionsProps> = ({ suggestions, onPick, onDismiss }) => {
+/** Transient pill row of suggested actions shown after the GM narration. Clicking one sends it immediately. */
+const SuggestedActions: React.FC<SuggestedActionsProps> = ({ suggestions, onPick, onDismiss, autoDismissMs = 30000 }) => {
+  const timerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!onDismiss || autoDismissMs <= 0) return;
+    timerRef.current = window.setTimeout(() => {
+      onDismiss();
+    }, autoDismissMs);
+    return () => {
+      if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+    };
+  }, [suggestions, onDismiss, autoDismissMs]);
+
   if (!suggestions || suggestions.length === 0) return null;
+
   return (
-    <div className="border-t border-stone-800 bg-gradient-to-b from-amber-950/10 to-transparent px-4 pt-2 pb-1">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex items-center gap-2 mb-1">
-          <i className="fas fa-lightbulb text-[10px] text-amber-500"></i>
-          <span className="text-[10px] uppercase font-bold text-amber-500 tracking-widest">Suggested Actions</span>
-          <div className="flex-1 h-px bg-stone-800"></div>
-          {onDismiss && (
-            <button onClick={onDismiss} className="text-stone-600 hover:text-stone-400 text-[10px]" aria-label="Dismiss suggestions">
-              <i className="fas fa-times"></i>
-            </button>
-          )}
-        </div>
-        <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-stone-700 scrollbar-track-transparent" style={{ scrollbarWidth: 'thin' }}>
+    <div className="px-4 py-2">
+      <div className="max-w-4xl mx-auto flex items-center gap-2">
+        <span className="text-[9px] uppercase font-bold text-amber-600 tracking-widest shrink-0">Suggest:</span>
+        <div className="flex gap-1.5 overflow-x-auto scrollbar-thin scrollbar-thumb-stone-700" style={{ scrollbarWidth: 'thin' }}>
           {suggestions.map((s, i) => (
             <button
               key={`${s}-${i}`}
               onClick={() => onPick(s)}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium whitespace-nowrap transition-all shrink-0 bg-amber-900/30 text-amber-200 border border-amber-800/40 hover:bg-amber-800/50 hover:border-amber-600/60 hover:text-amber-100"
-              title="Click to fill input — press Enter to send"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium whitespace-nowrap transition-all shrink-0 bg-amber-900/30 text-amber-200 border border-amber-800/40 hover:bg-amber-700/50 hover:border-amber-600/60 hover:text-white hover:scale-105 active:scale-95"
             >
-              <i className="fas fa-arrow-right text-[8px] opacity-70"></i>
+              <i className="fas fa-bolt text-[8px] opacity-80"></i>
               {s}
+              <i className="fas fa-arrow-right text-[8px] opacity-60 ml-0.5"></i>
             </button>
           ))}
         </div>
+        {onDismiss && (
+          <button onClick={onDismiss} className="text-stone-600 hover:text-stone-400 text-[9px] shrink-0 ml-1" aria-label="Dismiss suggestions">
+            <i className="fas fa-times"></i>
+          </button>
+        )}
       </div>
     </div>
   );

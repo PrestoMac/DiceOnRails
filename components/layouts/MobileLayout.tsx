@@ -20,6 +20,7 @@ import { useActivityTracking } from '../../hooks/useActivityTracking';
 import { useOnboarding } from '../../hooks/useOnboarding';
 import { calculateAc } from '../../services/classEngine';
 import { formatGameTime } from '../../utils/timeUtils';
+import { mcpServer } from '../../services/mcpService';
 
 /** Compact HP/AC status bar displayed below the chat area on mobile. */
 const HpStatusBar: React.FC<{ character: Character }> = ({ character }) => (
@@ -44,7 +45,7 @@ const MobileLayout: React.FC = () => {
     isLoading, myCharacterId, viewingCharacterId, setViewingCharacterId,
     setStage, resetGame, handleUpdateInventory,
     handleEnqueueAction, handleRemoveQueueItem, handleUpdateQueueItem,
-    handleReorderQueue
+    handleReorderQueue, syncState,
   } = useGameContext();
   const { handleSendMessage, handleRewind, handleExecuteBatch, handleResolveEnemyTurn } = useActionsContext();
   const {
@@ -67,9 +68,6 @@ const MobileLayout: React.FC = () => {
   const [showQueue, setShowQueue] = useState(false);
   const [isScrolledUp, setIsScrolledUp] = useState(false);
   const chatScrollRef = useRef<HTMLDivElement>(null);
-
-  const { recentActivity } = useActivityTracking(gameState, messages, userId);
-
   const handleChatScroll = useCallback(() => {
     const el = chatScrollRef.current;
     if (el) setIsScrolledUp(el.scrollHeight - el.scrollTop - el.clientHeight > 200);
@@ -78,6 +76,7 @@ const MobileLayout: React.FC = () => {
   const charToShow = gameState.party.find((c: Character) => c.id === viewingCharacterId) || gameState.party[0];
   const handleBackOrReset = () => userId ? confirm('Return to dashboard?') && setStage(AppStage.DASHBOARD) : confirm('Are you sure you want to reset the game? All progress will be lost.') && resetGame();
   const queueLen = gameState.actionQueue?.length || 0;
+  const { recentActivity } = useActivityTracking(gameState, messages, userId);
 
   return (
     <div className="flex flex-col h-screen w-full relative overflow-hidden bg-stone-950">
@@ -120,7 +119,8 @@ const MobileLayout: React.FC = () => {
           {settings.enableSuggestions && gameState.lastSuggestions && gameState.lastSuggestions.length > 0 && !showQueue && (
             <SuggestedActions
               suggestions={gameState.lastSuggestions}
-              onPick={(text) => handleSendMessage(text)}
+              onPick={(text) => { handleSendMessage(text); }}
+              onDismiss={() => { mcpServer.getFullState().lastSuggestions = []; syncState(); }}
             />
           )}
           {!showQueue&&<InputArea onSendMessage={handleSendMessage} onQueueAction={(t: string, ty: 'action'|'dialogue') => handleEnqueueAction(t, ty)} onResolveEnemyTurn={handleResolveEnemyTurn} isLoading={isLoading||gameState.isProcessing===true} combat={gameState.combat} character={charToShow}/>}
