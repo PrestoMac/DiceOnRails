@@ -120,7 +120,7 @@ const MobileLayout: React.FC = () => {
             <SuggestedActions
               suggestions={gameState.lastSuggestions}
               onPick={(text) => { handleSendMessage(text); }}
-              onDismiss={() => { mcpServer.getFullState().lastSuggestions = []; syncState(); }}
+              onDismiss={() => { mcpServer.setLastSuggestions([]); syncState(); }}
             />
           )}
           {!showQueue&&<InputArea onSendMessage={handleSendMessage} onQueueAction={(t: string, ty: 'action'|'dialogue') => handleEnqueueAction(t, ty)} onResolveEnemyTurn={handleResolveEnemyTurn} isLoading={isLoading||gameState.isProcessing===true} combat={gameState.combat} character={charToShow}/>}

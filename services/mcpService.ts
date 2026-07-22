@@ -94,6 +94,7 @@ export class MockMCPServer {
   public loadState(savedState: GameState) { this.stateManager.loadState(savedState); }
   public reset() { this.stateManager.reset(); }
   public getFullState(): GameState { return this.stateManager.getFullState(); }
+  public setLastSuggestions(suggestions: string[]): void { this.state.lastSuggestions = suggestions; }
   public beginTransaction(): void { this.stateManager.beginTransaction(); }
   public rollbackTransaction(): void { this.stateManager.rollbackTransaction(); }
   public commitTransaction(): void { this.stateManager.commitTransaction(); }
@@ -306,7 +307,7 @@ export class MockMCPServer {
           res = await this.spells.cast_ritual(String(args.characterId || args.casterId || ''), String(args.spellId || '')); break;
         case 'narrate_turn':
           if (Array.isArray(args.suggestions)) {
-            this.getFullState().lastSuggestions = args.suggestions
+            this.state.lastSuggestions = args.suggestions
               .filter((s: unknown): s is string => typeof s === 'string' && s.trim().length > 0)
               .map(s => s.slice(0, 80))
               .slice(0, 3);

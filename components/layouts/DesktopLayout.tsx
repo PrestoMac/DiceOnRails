@@ -165,7 +165,7 @@ const DesktopLayout: React.FC = () => {
           <SuggestedActions
             suggestions={gameState.lastSuggestions}
             onPick={(text) => { handleSendMessage(text); }}
-            onDismiss={() => { mcpServer.getFullState().lastSuggestions = []; syncState(); }}
+            onDismiss={() => { mcpServer.setLastSuggestions([]); syncState(); }}
           />
         )}
         <InputArea onSendMessage={handleSendMessage} onQueueAction={handleEnqueueAction} onResolveEnemyTurn={handleResolveEnemyTurn} isLoading={isLoading || gameState.isProcessing} combat={gameState.combat} character={charToShow} />

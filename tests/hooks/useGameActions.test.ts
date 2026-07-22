@@ -32,6 +32,7 @@ const mcpServerMock = {
   joinParty: vi.fn(),
   roll_dice: vi.fn(),
   loadState: vi.fn(),
+  setLastSuggestions: vi.fn(),
 };
 
 vi.mock('../../services/mcpService', () => ({
