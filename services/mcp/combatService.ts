@@ -18,7 +18,7 @@ import { breakConcentration as engineBreakConcentration, checkConcentrationExpir
 /** Dependencies required by the CombatService. */
 export interface CombatDeps {
   getTarget: (id?: string) => Character | undefined;
-  inflict_damage: (amount: number, targetId?: string, damageType?: string) => Promise<MCPResponse>;
+  inflict_damage: (amount: number, targetId?: string, damageType?: string, options?: { skipTargetDerivedReductions?: boolean }) => Promise<MCPResponse>;
 }
 
 /** Service interface for managing combat encounters, initiative, attacks, and saves. */
@@ -611,19 +611,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       for (let i = 0; i < diceCount; i++) damageResults.push(cryptoRoll(diceSides));
       const damageTotal = damageResults.reduce((a, b) => a + b, 0) + flatMod;
 
-      const prevHp = target.hp.current;
-      const newHp = Math.max(0, prevHp - damageTotal);
-      target.hp.current = newHp;
-
-      if (newHp === 0 && prevHp > 0) {
-        initializeDeathSaves(target);
-        if (target.concentrationSpellId) engineBreakConcentration(target, 'incapacitated');
-      }
-
-      const concResult = engineBreakConcentration(target, 'damaged', damageTotal);
-      if (concResult.broken && state.combat?.activeDoTs) {
-        state.combat.activeDoTs = state.combat.activeDoTs.filter(dot => dot.casterId !== target.id);
-      }
+      await deps.inflict_damage(damageTotal, target.id, attack.damageType, { skipTargetDerivedReductions: true });
 
       const critStr = isCrit ? ' **CRITICAL HIT!**' : '';
       return {
@@ -635,7 +623,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
         },
         message: `${enemy.name} attacks ${target.name} with ${attack.name}: **HIT${critStr}**` +
           ` (Rolled ${attackRoll} vs AC ${targetAc}) dealing **${damageTotal}** ${attack.damageType} damage!` +
-          ` ${target.name}: ${newHp}/${target.hp.max} HP.`
+          ` ${target.name}: ${target.hp.current}/${target.hp.max} HP.`
       };
     },
 

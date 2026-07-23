@@ -11,7 +11,7 @@ import { applyCondition, removeCondition, getConditionEffects, getExhaustionPena
 /** Dependencies required by the SpellcastingService. */
 export interface SpellcastingDeps {
   getTarget: (id?: string) => Character | undefined;
-  inflict_damage: (amount: number, targetId?: string, damageType?: string) => Promise<MCPResponse>;
+  inflict_damage: (amount: number, targetId?: string, damageType?: string, options?: { skipTargetDerivedReductions?: boolean }) => Promise<MCPResponse>;
   make_save: (targetId: string, stat: string, dc: number) => Promise<MCPResponse>;
   syncInitiativeConditions: () => void;
 }

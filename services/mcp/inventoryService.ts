@@ -49,7 +49,7 @@ export interface InventoryService {
   lookupItemInDB(cleanName: string): Promise<{ data: Record<string, unknown> | null; error: unknown }>;
   update_inventory(item_name: string, action: 'add' | 'remove' | 'edit', quantity?: number, new_name?: string, targetId?: string, type?: 'weapon' | 'armor' | 'potion' | 'shield' | 'gear' | 'other', rarity?: 'common' | 'uncommon' | 'rare' | 'very rare' | 'legendary', description?: string, stats?: InventoryItem['stats'], equipped?: boolean, cost_gp?: number, cost_sp?: number, cost_cp?: number, autoDeductMarketPrice?: boolean, craft?: boolean): Promise<MCPResponse>;
   adjust_currency(gp?: number, sp?: number, cp?: number, targetId?: string): Promise<MCPResponse>;
-  inflict_damage(amount: number, targetId?: string, damageType?: string): Promise<MCPResponse>;
+  inflict_damage(amount: number, targetId?: string, damageType?: string, options?: { skipTargetDerivedReductions?: boolean }): Promise<MCPResponse>;
   parseCost(srdCost: string): { gp: number; sp: number; cp: number } | null;
   clearCurrencyAdjustment(): void;
   getLastCurrencyAdjustment(): { targetId: string; amount: number; timestamp: number } | null;
@@ -149,7 +149,7 @@ export function createInventoryService(state: GameState, deps: InventoryDeps): I
       };
     },
 
-    async inflict_damage(amount, targetId, damageType) {
+    async inflict_damage(amount, targetId, damageType, options) {
       const safeAmount = Math.max(0, Number(amount) || 0);
 
       if (state.combat?.enemies?.length > 0) {
@@ -159,7 +159,7 @@ export function createInventoryService(state: GameState, deps: InventoryDeps): I
         }
         if (enemy && !enemy.isDead) {
           let dmg = safeAmount;
-          if (damageType) {
+          if (damageType && !options?.skipTargetDerivedReductions) {
             if (enemy.damageImmunities?.some(d => d.toLowerCase().includes(damageType.toLowerCase()))) {
               dmg = 0;
             } else if (enemy.damageResistances?.some(d => d.toLowerCase().includes(damageType.toLowerCase()))) {
@@ -206,17 +206,18 @@ export function createInventoryService(state: GameState, deps: InventoryDeps): I
         return fail(`Target "${targetId}" not found in party or combat.${hint}`);
       }
 
-      const hamReduction = getHeavyArmorMasterReduction(target, damageType);
-      const reducedAmount = Math.max(0, safeAmount - hamReduction);
-      const current = target.hp.current;
-      let remainingDmg = reducedAmount;
-
-      if (target.tempHp && target.tempHp > 0) {
-        const absorbed = Math.min(target.tempHp, remainingDmg);
-        target.tempHp -= absorbed;
-        remainingDmg -= absorbed;
+      let effectiveDmg = safeAmount;
+      if (!options?.skipTargetDerivedReductions) {
+        const ham = getHeavyArmorMasterReduction(target, damageType);
+        effectiveDmg = Math.max(0, safeAmount - ham);
+        if (target.tempHp && target.tempHp > 0) {
+          const absorbed = Math.min(target.tempHp, effectiveDmg);
+          target.tempHp -= absorbed;
+          effectiveDmg -= absorbed;
+        }
       }
-      const newHp = Math.max(0, current - remainingDmg);
+      const current = target.hp.current;
+      const newHp = Math.max(0, current - effectiveDmg);
       target.hp.current = newHp;
 
       if (newHp === 0 && current > 0) {
@@ -228,9 +229,11 @@ export function createInventoryService(state: GameState, deps: InventoryDeps): I
           updateInitiativeDeathStatus(target.id, true);
         }
       }
+      const displayedDmg = options?.skipTargetDerivedReductions ? safeAmount : effectiveDmg;
+      const hamReduction = options?.skipTargetDerivedReductions ? 0 : (safeAmount - effectiveDmg);
       const hamNote = hamReduction > 0 ? ` (Heavy Armor Master reduced by ${hamReduction})` : '';
 
-      const concResult = engineBreakConcentration(target, 'damaged', reducedAmount);
+      const concResult = engineBreakConcentration(target, 'damaged', displayedDmg);
       if (concResult.broken && state.combat?.activeDoTs) {
         state.combat.activeDoTs = state.combat.activeDoTs.filter(
           dot => dot.casterId !== target.id
@@ -249,8 +252,8 @@ export function createInventoryService(state: GameState, deps: InventoryDeps): I
 
       return {
         success: true,
-        data: { character: target.name, previousHp: current, newHp, damage: reducedAmount, hamReduction, concentrationSave },
-        message: `${target.name} took ${reducedAmount} damage${damageType ? ' (' + damageType + ')' : ''}${hamNote}. Current HP: ${newHp}/${target.hp.max}${target.deathSaves ? ' — DYING!' : ''}${concentrationNote}`
+        data: { character: target.name, previousHp: current, newHp, damage: displayedDmg, hamReduction, concentrationSave },
+        message: `${target.name} took ${displayedDmg} damage${damageType ? ' (' + damageType + ')' : ''}${hamNote}. Current HP: ${newHp}/${target.hp.max}${target.deathSaves ? ' — DYING!' : ''}${concentrationNote}`
       };
     },
 

@@ -6,6 +6,7 @@ import { calculateAc, getMod } from './classEngine';
 import { getAlertInitiativeBonus, getResilientSaveBonus, getShieldMasterSaveBonus } from './featsService';
 import { ensureDeathSaves, updateCombatantDeathStatus } from './characterUtils';
 import { rollDeathSave as diceRollDeathSave } from './diceEngine';
+import { parseDamageDice } from '../utils/dice';
 
 /** Adds a new enemy to the combat state, optionally auto-filling stats from the SRD monster lookup, and rolls initiative if combat is active. */
 export function addEnemyToCombat(args: {
@@ -129,10 +130,10 @@ export function resolveEnemySingleAttack(enemy: Enemy, atkIdx: number, target: C
   const hit = crit || (!fumble && aRoll >= tAc);
   if (fumble) return { message: `${enemy.name} attacks ${target.name} with ${atk.name}... **Critical Miss! (1)**`, isHit: false, isCrit: false, damage: 0, fumble: true };
   if (!hit) return { message: `${enemy.name} attacks ${target.name}: **MISS** (${aRoll} vs AC ${tAc})`, isHit: false, isCrit: false, damage: 0, fumble: false };
-  const m = atk.damageDice.match(/(\d+)d(\d+)([+-]\d+)?/);
-  if (!m) return { message: `Invalid damage dice: ${atk.damageDice}`, isHit: false, isCrit: false, damage: 0, fumble: false };
-  const cnt = crit ? parseInt(m[1]) * 2 : parseInt(m[1]); const sides = parseInt(m[2]); const flat = parseInt(m[3] || '0');
-  let dmg = 0; for (let i = 0; i < cnt; i++) dmg += cryptoRoll(sides); dmg += flat;
+  const parsed = parseDamageDice(atk.damageDice);
+  if (!parsed) return { message: `Invalid damage dice: ${atk.damageDice}`, isHit: false, isCrit: false, damage: 0, fumble: false };
+  const cnt = crit ? parsed.count * 2 : parsed.count;
+  let dmg = 0; for (let i = 0; i < cnt; i++) dmg += cryptoRoll(parsed.sides); dmg += parsed.flatBonus;
   const prev = target.hp.current; target.hp.current = Math.max(0, prev - dmg);
   if (target.hp.current === 0 && prev > 0) {
     ensureDeathSaves(target);
