@@ -51,6 +51,8 @@ export class MockMCPServer {
       getTarget: (id) => this.party.getTarget(id),
       supabase,
       lookupSRDItem,
+      initializeDeathSaves: (c) => this.combat.initializeDeathSaves(c),
+      updateInitiativeDeathStatus: (id, isDead) => this.combat.updateInitiativeDeathStatus(id, isDead),
     });
     this.combat = createCombatService(this.state, {
       getTarget: (id) => this.party.getTarget(id),
@@ -73,26 +75,25 @@ export class MockMCPServer {
     });
   }
 
-  
+
   public setCharacter(character: Character) { this.party.setCharacter(character); }
   public joinParty(character: Character) { this.party.joinParty(character); }
   public getTarget(id?: string): Character | undefined { return this.party.getTarget(id); }
   public getResource(uri: string): unknown { return this.party.getResource(uri); }
 
-  
+
   public updateInventoryDirectly(newInventory: InventoryItem[], targetId?: string) { this.inventory.updateInventoryDirectly(newInventory, targetId); }
   public updateCurrencyDirectly(newCurrency: Currency, targetId?: string) { this.inventory.updateCurrencyDirectly(newCurrency, targetId); }
   public async inflict_damage(amount: number, targetId?: string, damageType?: string): Promise<MCPResponse> { return this.inventory.inflict_damage(amount, targetId, damageType); }
   public async update_inventory(item_name: string, action: 'add' | 'remove' | 'edit', quantity?: number, new_name?: string, targetId?: string, type?: InventoryItem['type'], rarity?: InventoryItem['rarity'], description?: string, stats?: InventoryItem['stats'], equipped?: boolean, cost_gp?: number, cost_sp?: number, cost_cp?: number, autoDeductMarketPrice?: boolean, craft?: boolean): Promise<MCPResponse> { return this.inventory.update_inventory(item_name, action, quantity, new_name, targetId, type, rarity, description, stats, equipped, cost_gp, cost_sp, cost_cp, autoDeductMarketPrice, craft); }
   public async adjust_currency(gp?: number, sp?: number, cp?: number, targetId?: string): Promise<MCPResponse> { return this.inventory.adjust_currency(gp, sp, cp, targetId); }
 
-  
-  public get lastCurrencyAdjustment() { return this.inventory.getLastCurrencyAdjustment(); }
-  public set lastCurrencyAdjustment(val: { target: string; gp: number; sp: number; cp: number; time: number } | null) { }
 
-  
+  public get lastCurrencyAdjustment() { return this.inventory.getLastCurrencyAdjustment(); }
+
+
   public loadState(savedState: GameState) { this.stateManager.loadState(savedState); }
-  public reset() { this.stateManager.reset(); }
+  public reset() { this.stateManager.reset(); this.inventory.clearCurrencyAdjustment(); }
   public getFullState(): GameState { return this.stateManager.getFullState(); }
   public setLastSuggestions(suggestions: string[]): void { this.state.lastSuggestions = suggestions; }
   public beginTransaction(): void { this.stateManager.beginTransaction(); }
@@ -107,13 +108,13 @@ export class MockMCPServer {
   public loadEmergencySnapshot(): GameState | null { return this.stateManager.loadEmergencySnapshot(); }
   public clearEmergencySnapshot(): void { this.stateManager.clearEmergencySnapshot(); }
 
-  
+
   public awardExperience(amount: number, targetId?: string) { return this.progression.awardExperience(amount, targetId); }
   public async level_up(targetId: string, statAllocations?: Record<string, number>, subclassSelection?: string, chosenFeats?: string[]): Promise<MCPResponse> { return this.progression.level_up(targetId, statAllocations, subclassSelection, chosenFeats); }
   public allocateStatPoints(allocations: Partial<Record<keyof Character['stats'], number>>, targetId?: string, skillAllocations?: Record<string, number>, hpDeviation?: number): MCPResponse { return this.progression.allocateStatPoints(allocations, targetId, skillAllocations, hpDeviation); }
   public getCharacterProgression(targetId?: string): string { return this.progression.getCharacterProgression(targetId); }
 
-  
+
   public async add_enemy(name: string, ac?: number, hp?: number, attacks?: EnemyAttack[], cr?: number, xp?: number, size?: string, type?: string, damageResistances?: string[], damageImmunities?: string[], damageVulnerabilities?: string[]): Promise<MCPResponse> { return this.combat.add_enemy(name, ac, hp, attacks, cr, xp, size, type, damageResistances, damageImmunities, damageVulnerabilities); }
   public async start_combat(targetId?: string, enemies?: Array<{ name: string; ac?: number; hp?: number; cr?: number; xp?: number; size?: string; type?: string; }>): Promise<MCPResponse> { return this.combat.start_combat(targetId, enemies); }
   public async next_turn(autoResolveEnemies?: boolean): Promise<MCPResponse> { return this.combat.next_turn(autoResolveEnemies); }
@@ -130,11 +131,11 @@ export class MockMCPServer {
   public syncInitiativeConditions(): void { this.combat.syncInitiativeConditions(); }
   public initializeDeathSaves(character: Character) { this.combat.initializeDeathSaves(character); }
 
-  
+
   public async upsert_quest(title: string, description: string, status: 'active' | 'completed' | 'failed', reputationChanges?: Array<{ faction: string; delta: number }>): Promise<MCPResponse> { return this.content.upsert_quest(title, description, status, reputationChanges); }
   public async log_lore(title: string, content: string, category: string): Promise<MCPResponse> { return this.content.log_lore(title, content, category); }
 
-  
+
   public async move_to(location_name: string, description?: string, targetId?: string, skillCheck?: { skill_name?: string; difficulty?: number; onSuccess?: unknown }, route?: string, pace?: string): Promise<MCPResponse> { return this.travel.move_to(location_name, description, targetId, skillCheck, route, pace); }
   public async narrate_turn(narration: string, timePassed?: number): Promise<MCPResponse> { return this.travel.narrate_turn(narration, timePassed); }
   public setAtmosphere(url: string) { this.travel.setAtmosphere(url); }
@@ -146,7 +147,7 @@ export class MockMCPServer {
   public async long_rest(narration?: string, autoAdvanceTime?: boolean): Promise<MCPResponse> { return this.travel.long_rest(narration, autoAdvanceTime); }
   public async short_rest(targetId?: string, narration?: string, autoAdvanceTime?: boolean): Promise<MCPResponse> { return this.travel.short_rest(targetId, narration, autoAdvanceTime); }
 
-  
+
   public async cast_spell(characterId: string, spellId: string, slotLevel?: number, targets?: string[], targetSaveResults?: Record<string, boolean>, reaction?: boolean): Promise<MCPResponse> { return this.spells.cast_spell(characterId, spellId, slotLevel, targets, targetSaveResults, reaction); }
   public async resolve_dot_damage(spellId: string, targetId: string, casterId?: string): Promise<MCPResponse> { return this.spells.resolve_dot_damage(spellId, targetId, casterId); }
   public async cast_ritual(characterId: string, spellId: string): Promise<MCPResponse> { return this.spells.cast_ritual(characterId, spellId); }
@@ -154,7 +155,7 @@ export class MockMCPServer {
   public async manage_spellbook(characterId: string, action: 'learn' | 'prepare' | 'unprepare' | 'forget', spellId: string): Promise<MCPResponse> { return this.spells.manage_spellbook(characterId, action, spellId); }
   public async use_resource(characterId: string, resourceId: string, targetId?: string, amount?: number): Promise<MCPResponse> { return this.spells.use_resource(characterId, resourceId, targetId, amount); }
 
-  
+
   public async summon_creature(casterId: string, template: string, count: number = 1): Promise<MCPResponse> {
     const char = this.party.getTarget(casterId);
     if (!char) return fail('Caster not found.');
@@ -231,7 +232,7 @@ export class MockMCPServer {
     };
   }
 
-  
+
   /** Routes an LLM tool call by name to the appropriate sub-service, dispatching across 29 cases (28 tools + unknown default). */
   public async executeToolCall(name: string, args: Record<string, unknown>): Promise<MCPResponse> {
     if (isDebugMode) {
@@ -242,7 +243,7 @@ export class MockMCPServer {
       switch (name) {
         case 'roll_dice':
           res = await this.travel.roll_dice(
-            Number(args.sides) || 20, Number(args.count) || 1, Number(args.modifier) || 0,
+            Number(args.sides ?? 20), Number(args.count ?? 1), Number(args.modifier ?? 0),
             args.target_ac !== undefined ? Number(args.target_ac) : undefined,
             args.target_name as string | undefined, args.roll_label as string | undefined,
             args.isDamageRoll as boolean | undefined, args.isOffHand as boolean | undefined,
@@ -261,25 +262,25 @@ export class MockMCPServer {
         case 'move_to':
           res = await this.travel.move_to(String(args.location_name || 'Unknown'), String(args.description || ''), args.targetId as string | undefined, args.skillCheck as unknown as { skill_name?: string; difficulty?: number; onSuccess?: unknown }, args.route as string | undefined, args.pace as string | undefined); break;
         case 'check_skill':
-          res = await this.travel.check_skill(String(args.skill_name || ''), Number(args.difficulty || 10), args.targetId as string, args.onSuccess as Record<string, unknown>); break;
+          res = await this.travel.check_skill(String(args.skill_name || ''), Number(args.difficulty ?? 10), args.targetId as string, args.onSuccess as Record<string, unknown>); break;
         case 'inflict_damage':
-          res = await this.inventory.inflict_damage(Number(args.amount || 0), (args.targetId || args.target_name) as string, args.damageType as string); break;
+          res = await this.inventory.inflict_damage(Number(args.amount ?? 0), (args.targetId || args.target_name) as string, args.damageType as string); break;
         case 'adjust_currency':
-          res = await this.inventory.adjust_currency(Number(args.gp || 0), Number(args.sp || 0), Number(args.cp || 0), args.targetId as string); break;
+          res = await this.inventory.adjust_currency(Number(args.gp ?? 0), Number(args.sp ?? 0), Number(args.cp ?? 0), args.targetId as string); break;
         case 'update_inventory':
-          res = await this.inventory.update_inventory(String(args.item_name || ''), String(args.action || 'add') as 'add' | 'remove' | 'edit', Number(args.quantity || 1), args.new_name as string | undefined, args.targetId as string, args.type as unknown as InventoryItem['type'], args.rarity as unknown as InventoryItem['rarity'], args.description as string, args.stats as unknown as InventoryItem['stats'], args.equipped as boolean, args.cost_gp as number | undefined, args.cost_sp as number | undefined, args.cost_cp as number | undefined, args.autoDeductMarketPrice as boolean | undefined, args.craft as boolean | undefined); break;
+          res = await this.inventory.update_inventory(String(args.item_name || ''), String(args.action || 'add') as 'add' | 'remove' | 'edit', Number(args.quantity ?? 1), args.new_name as string | undefined, args.targetId as string, args.type as unknown as InventoryItem['type'], args.rarity as unknown as InventoryItem['rarity'], args.description as string, args.stats as unknown as InventoryItem['stats'], args.equipped as boolean, args.cost_gp as number | undefined, args.cost_sp as number | undefined, args.cost_cp as number | undefined, args.autoDeductMarketPrice as boolean | undefined, args.craft as boolean | undefined); break;
         case 'upsert_quest':
           res = await this.content.upsert_quest(String(args.title || ''), String(args.description || ''), String(args.status || 'active') as 'active' | 'completed' | 'failed', args.reputationChanges as unknown as Array<{ faction: string; delta: number }>); break;
         case 'log_lore':
           res = await this.content.log_lore(String(args.title || ''), String(args.content || ''), String(args.category || 'History')); break;
         case 'make_save':
-          res = await this.combat.make_save(String(args.targetId || ''), String(args.stat || 'dex'), Number(args.dc || 10)); break;
+          res = await this.combat.make_save(String(args.targetId || ''), String(args.stat || 'dex'), Number(args.dc ?? 10)); break;
         case 'roll_death_save':
           res = await this.combat.roll_death_save(String(args.targetId || '')); break;
         case 'award_experience':
-          res = await this.progression.awardExperience(Number(args.amount || 0), args.targetId as string); break;
+          res = await this.progression.awardExperience(Number(args.amount ?? 0), args.targetId as string); break;
         case 'level_up':
-          res = this.progression.allocateStatPoints((args.stats || {}) as unknown as Partial<Record<keyof Character['stats'], number>>, args.targetId as string, (args.skills || {}) as Record<string, number>, Number(args.hpDeviation || 0)); break;
+          res = this.progression.allocateStatPoints((args.stats || {}) as unknown as Partial<Record<keyof Character['stats'], number>>, args.targetId as string, (args.skills || {}) as Record<string, number>, Number(args.hpDeviation ?? 0)); break;
         case 'long_rest':
           res = await this.travel.long_rest(args.narration as string | undefined, args.autoAdvanceTime as boolean | undefined); break;
         case 'short_rest':
@@ -289,20 +290,20 @@ export class MockMCPServer {
           if (targetsList.length === 0 && (args.targetId || args.target_name)) {
             targetsList = [String(args.targetId || args.target_name)];
           }
-          res = await this.spells.cast_spell(String(args.characterId || args.casterId || ''), String(args.spellId || ''), Number(args.slotLevel || 0), targetsList, args.targetSaveResults as Record<string, boolean> | undefined, args.reaction as boolean | undefined); break;
+          res = await this.spells.cast_spell(String(args.characterId || args.casterId || ''), String(args.spellId || ''), Number(args.slotLevel ?? 0), targetsList, args.targetSaveResults as Record<string, boolean> | undefined, args.reaction as boolean | undefined); break;
         }
         case 'spell_effect':
-          res = await this.spells.spell_effect(String(args.mode || 'counter') as 'counter' | 'dispel', String(args.casterId || ''), Number(args.targetSpellLevel || 3), args.targetId as string); break;
+          res = await this.spells.spell_effect(String(args.mode || 'counter') as 'counter' | 'dispel', String(args.casterId || ''), Number(args.targetSpellLevel ?? 3), args.targetId as string); break;
         case 'manage_spellbook':
           res = await this.spells.manage_spellbook(String(args.characterId || args.targetId || ''), String(args.action || 'learn') as 'learn' | 'prepare' | 'unprepare' | 'forget', String(args.spellId || '')); break;
         case 'use_resource':
           res = await this.spells.use_resource(String(args.characterId || args.targetId || ''), String(args.resourceId || ''), args.targetId as string, args.amount as number); break;
         case 'summon_creature':
-          res = await this.summon_creature(String(args.casterId || ''), String(args.creatureName || args.template || ''), Number(args.count || 1)); break;
+          res = await this.summon_creature(String(args.casterId || ''), String(args.creatureName || args.template || ''), Number(args.count ?? 1)); break;
         case 'teleport_creature':
-          res = await this.teleport_creature(String(args.characterId || args.targetId || ''), String(args.destination || ''), Number(args.range || 30)); break;
+          res = await this.teleport_creature(String(args.characterId || args.targetId || ''), String(args.destination || ''), Number(args.range ?? 30)); break;
         case 'polymorph_creature':
-          res = await this.polymorph_creature(String(args.characterId || args.targetId || ''), String(args.newForm || args.beastForm || 'wolf'), Number(args.duration || 60)); break;
+          res = await this.polymorph_creature(String(args.characterId || args.targetId || ''), String(args.newForm || args.beastForm || 'wolf'), Number(args.duration ?? 60)); break;
         case 'cast_ritual':
           res = await this.spells.cast_ritual(String(args.characterId || args.casterId || ''), String(args.spellId || '')); break;
         case 'narrate_turn':
@@ -315,7 +316,7 @@ export class MockMCPServer {
           } else if (isDebugMode) {
             console.log('[narrate_turn] No suggestions in args');
           }
-          res = await this.travel.narrate_turn(String(args.narration || ''), Number(args.timePassed || 0)); break;
+          res = await this.travel.narrate_turn(String(args.narration || ''), Number(args.timePassed ?? 0)); break;
         default:
           res = fail(`Unknown tool: ${name}`);
       }

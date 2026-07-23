@@ -167,19 +167,19 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
           ? state.party.find((c: Character) => c.id === target_name || c.name.toLowerCase() === target_name.toLowerCase()) ||
             state.combat?.enemies.find((e: Enemy) => e.id === target_name || e.name.toLowerCase() === target_name.toLowerCase())
           : undefined;
-        let hasAdvantage2 = false, hasDisadvantage2 = false;
+        let hasAdvantage = false, hasDisadvantage = false;
         if (attacker) {
           const ae = getConditionEffects(attacker);
-          if (ae.advantageOnAttacks) hasAdvantage2 = true;
-          if (ae.disadvantageOnAttacks) hasDisadvantage2 = true;
+          if (ae.advantageOnAttacks) hasAdvantage = true;
+          if (ae.disadvantageOnAttacks) hasDisadvantage = true;
         }
         if (targetObj) {
           const te = getConditionEffects(targetObj);
-          if (te.attacksAgainstHaveAdvantage) hasAdvantage2 = true;
+          if (te.attacksAgainstHaveAdvantage) hasAdvantage = true;
         }
-        const secondRoll3 = cryptoRoll(20);
-        const advResult = resolveAdvantage(results[0], secondRoll3, hasAdvantage2, hasDisadvantage2);
-        if (advResult.hadAdvantage || advResult.hadDisadvantage) {
+        const secondRoll = cryptoRoll(20);
+        const resolved = resolveAdvantage(results[0], secondRoll, hasAdvantage, hasDisadvantage);
+        if (resolved.hadAdvantage || resolved.hadDisadvantage) {
           results[0] = advResult.roll;
           const newRawTotal = results.reduce((a: number, b: number) => a + b, 0);
           const ohb = attacker && isOffHand ? getOffHandAbilityModifier(attacker) : 0;
@@ -382,7 +382,7 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
 
         if (encounters.length > 0) logs.push(`Encounters during travel: ${encounters.join(', ')}`);
 
-        
+
         const travelLastRestVal = (state.lastLongRestTime != null && state.lastLongRestTime >= 0)
           ? state.lastLongRestTime
           : (state.gameTime ?? 0);
@@ -463,7 +463,7 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
         const baseHours = Math.floor(Math.max(0, ((state.gameTime ?? 0) - lastRest - 480)) / 60);
         const hoursAwake = Math.max(0, baseHours);
 
-        
+
         if (hoursAwake >= 12 && hoursAwake < 16 && !state._tiredWarningFired) {
           logs.push("The party is growing road-weary. They should look for a place to make camp soon.");
           state._tiredWarningFired = true;
@@ -542,7 +542,7 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
             }
           }
 
-          
+
           if (char.raging && !state.combat?.isActive && safeTimePassed > 0) {
             char.raging = false;
             if (char.subclassId === 'berserker') {
@@ -603,8 +603,8 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
         const remaining = 960 - elapsed;
         return fail(`Only ${Math.floor(elapsed / 60)}h since your last rest. You need ${Math.ceil(remaining / 60)}h more.`);
       }
-      
-      
+
+
       for (const char of state.party) {
         if (char.raging) {
           char.raging = false;
@@ -615,7 +615,7 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
         }
       }
 
-      
+
       state._tiredWarningFired = false;
 
       for (const char of state.party) {

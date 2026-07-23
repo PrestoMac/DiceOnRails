@@ -160,12 +160,12 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
         targets = [characterId];
       }
 
-      
+
       if (spellDef && spellDef.level > 0 && (!slotLevel || slotLevel < spellDef.level)) {
         slotLevel = spellDef.level;
       }
 
-      
+
       if (char.class === 'warlock' && spellDef && spellDef.level > 0) {
         const maxPactLevel = getMaxPactSlotLevel(char);
         if (slotLevel > maxPactLevel) {

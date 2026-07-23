@@ -1817,7 +1817,7 @@ describe('MockMCPServer', () => {
           enemies: [],
         },
       });
-      
+
       server.combat.syncInitiativeConditions();
       const gs = server.getFullState();
       expect(gs.combat).toBeDefined();
@@ -1832,18 +1832,16 @@ describe('MockMCPServer', () => {
     });
 
     it('is cleared after restoreSnapshot', () => {
-      
-      server.lastCurrencyAdjustment = { targetId: 'hero-1', amount: 50, timestamp: Date.now() };
+      server.adjust_currency(50, 0, 0, 'hero-1');
+      expect(server.lastCurrencyAdjustment).not.toBeNull();
       server.restoreSnapshot(makeServerState());
-      
       expect(server.lastCurrencyAdjustment).toBeNull();
     });
 
     it('is cleared on reset', () => {
-      
-      server.lastCurrencyAdjustment = { targetId: 'hero-1', amount: 50, timestamp: Date.now() };
+      server.adjust_currency(50, 0, 0, 'hero-1');
+      expect(server.lastCurrencyAdjustment).not.toBeNull();
       server.reset();
-      
       expect(server.lastCurrencyAdjustment).toBeNull();
     });
   });
@@ -1888,7 +1886,7 @@ const roundTripped = deepClone(char.conditions);
       expect(condition.onRemove).toBeDefined();
       expect(condition.onRemove).not.toBeUndefined();
 
-      
+
       const effect = condition.onRemove as unknown as { kind: string; value: number };
       expect(effect.kind).toBe('acBonus');
       expect(effect.value).toBe(5);
@@ -2029,7 +2027,7 @@ const roundTripped = deepClone(char.conditions);
   describe('exhaustion tracking', () => {
     it('applies exhaustion after 16 hours awake', async () => {
       server.setCharacter(makeCharacter());
-      
+
       const state = server.getFullState();
       state.lastLongRestTime = 0;
       state.gameTime = 1440;
@@ -2090,7 +2088,7 @@ const roundTripped = deepClone(char.conditions);
       const state0 = server.getFullState();
       if (!state0.combat) throw new Error('Expected combat to be active');
       const combat = state0.combat;
-      
+
       const enemyIdx = combat.initiative.findIndex(e => e.type === 'enemy');
       if (enemyIdx >= 0) {
         combat.turnIndex = enemyIdx;

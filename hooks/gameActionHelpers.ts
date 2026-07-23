@@ -87,14 +87,14 @@ function parseDamageRollDetails(details?: string): { sides: number; count: numbe
   let sides = 20;
   let count = 0;
   const results: number[] = [];
-  
+
   while ((match = regex.exec(details)) !== null) {
     sides = parseInt(match[2], 10);
     const rolls = match[3].split('+').map(n => parseInt(n.trim(), 10)).filter(n => !isNaN(n));
     count += rolls.length;
     results.push(...rolls);
   }
-  
+
   if (results.length === 0) return null;
   return { sides, count, results };
 }

@@ -90,9 +90,8 @@ describe('useGameState', () => {
     expect(result.current.campaignName).toBe('Test Camp');
   });
 
-  it('loadGameData shows alert on error', async () => {
-    const alertMock = vi.fn();
-    vi.stubGlobal('alert', alertMock);
+  it('loadGameData logs error on load failure', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockLoadGame.mockResolvedValue({ data: null, error: 'Load failed' });
 
     const { result } = renderHook(() => useGameState(undefined));
@@ -101,8 +100,8 @@ describe('useGameState', () => {
       await result.current.loadGameData('user-1', 'camp-1');
     });
 
-    expect(alertMock).toHaveBeenCalledWith(expect.stringContaining('Load failed'));
-    vi.unstubAllGlobals();
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Load failed'));
+    errorSpy.mockRestore();
   });
 
   it('loadGameData advances first-time anonymous users to START_MODE when no save exists', async () => {

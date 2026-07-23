@@ -64,10 +64,10 @@ export interface GameState {
     total: number;
   };
   ctx?: ContextMetadata;
-  gameTime?: number;             
-  lastLongRestTime?: number;     
-  _tiredWarningFired?: boolean;  
-  factionReputations?: Record<string, number>; 
+  gameTime?: number;
+  lastLongRestTime?: number;
+  _tiredWarningFired?: boolean;
+  factionReputations?: Record<string, number>;
   /** Optional LLM-generated suggested next actions, cached per turn. */
   lastSuggestions?: string[];
 }

@@ -137,7 +137,7 @@ describe('runAgentLoop', () => {
 
     const result = await runAgentLoop([], 'Roll a die.');
 
-    
+
     expect(result.toolMessages).toHaveLength(1);
     expect(result.toolMessages[0].text).toContain('roll_dice');
     expect(mockFetch).toHaveBeenCalledTimes(2);
@@ -153,7 +153,7 @@ describe('runAgentLoop', () => {
 
     const result = await runAgentLoop([], 'Check the room.');
 
-    
+
     expect(result.toolMessages).toHaveLength(2);
     expect(mockFetch).toHaveBeenCalledTimes(2);
   });
@@ -183,7 +183,7 @@ describe('runAgentLoop', () => {
 
     const result = await runAgentLoop([], 'Do something.');
 
-    
+
     expect(result.toolMessages).toHaveLength(1);
     expect(result.iterationCount).toBe(3);
   });
@@ -256,7 +256,7 @@ describe('runAgentLoop', () => {
     const result = await runAgentLoop([], 'Advance turn.');
 
     expect(result.iterationCount).toBe(1);
-    
+
     expect(result.toolMessages).toHaveLength(1);
     expect(result.toolMessages[0].text).toContain('next_turn');
   });

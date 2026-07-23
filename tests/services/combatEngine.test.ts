@@ -72,7 +72,7 @@ describe('addEnemyToCombat', () => {
     expect(cs.initiative).toHaveLength(3);
     expect(cs.initiative[0].id).toBe('p1');
     expect(cs.initiative[1].id).toMatch(/^enemy-/);
-    
+
     expect(cs.initiative[1].initiative).toBe(12);
     expect(cs.initiative[2].id).toBe('e1');
   });

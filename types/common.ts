@@ -104,4 +104,6 @@ export interface MCPResponse {
   success: boolean;
   data: Record<string, unknown>;
   message?: string;
+  /** Stable machine-readable failure code; present only on failure responses when applicable. */
+  errorCode?: string;
 }

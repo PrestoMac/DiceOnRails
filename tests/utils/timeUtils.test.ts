@@ -50,7 +50,7 @@ describe('timeUtils', () => {
 
     it('handles negative values correctly', () => {
       expect(getTimePeriod(-1)).toBe('night');
-      
+
       expect(getTimePeriod(-360)).toBe('dusk');
     });
   });
@@ -64,21 +64,21 @@ describe('timeUtils', () => {
     });
 
     it('formats morning time correctly', () => {
-      const result = formatGameTime(480); 
+      const result = formatGameTime(480);
       expect(result.day).toBe(1);
       expect(result.time).toBe('8:00 AM');
       expect(result.period).toBe('morning');
     });
 
     it('formats afternoon time correctly', () => {
-      const result = formatGameTime(810); 
+      const result = formatGameTime(810);
       expect(result.day).toBe(1);
       expect(result.time).toBe('1:30 PM');
       expect(result.period).toBe('afternoon');
     });
 
     it('formats evening time correctly', () => {
-      const result = formatGameTime(1140); 
+      const result = formatGameTime(1140);
       expect(result.day).toBe(1);
       expect(result.time).toBe('7:00 PM');
       expect(result.period).toBe('dusk');
@@ -92,7 +92,7 @@ describe('timeUtils', () => {
     });
 
     it('handles large gameTime values', () => {
-      const result = formatGameTime(1440 * 10 + 600); 
+      const result = formatGameTime(1440 * 10 + 600);
       expect(result.day).toBe(11);
       expect(result.time).toBe('10:00 AM');
       expect(result.period).toBe('morning');
@@ -113,7 +113,7 @@ describe('timeUtils', () => {
     });
 
     it('pads single-digit minutes', () => {
-      const result = formatGameTime(61); 
+      const result = formatGameTime(61);
       expect(result.time).toBe('1:01 AM');
     });
 

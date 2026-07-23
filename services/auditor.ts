@@ -358,7 +358,7 @@ const AUDIT_RULES: AuditRule[] = [
   {
     name: 'last-long-rest-valid',
     check: (state) => {
-      if (state.lastLongRestTime == null) return ok('last-long-rest-valid'); 
+      if (state.lastLongRestTime == null) return ok('last-long-rest-valid');
       if (typeof state.lastLongRestTime !== 'number' || isNaN(state.lastLongRestTime)) {
         return fail('last-long-rest-valid', 'lastLongRestTime was NaN — reset to -960');
       }

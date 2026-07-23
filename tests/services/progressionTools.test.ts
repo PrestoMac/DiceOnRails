@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { MockMCPServer } from '../../services/mcpService';
 import { makeCharacter, makeBarbarian, makeDragonborn } from '../helpers/characters';
+import { createTestServer } from '../helpers/testServer';
 
 vi.mock('../../utils/random', () => ({
   cryptoRoll: vi.fn(),
@@ -16,9 +17,7 @@ describe('progressionTools', () => {
   let server: MockMCPServer;
 
   beforeEach(() => {
-    vi.clearAllMocks();
-    vi.mocked(cryptoRoll).mockReset();
-    server = new MockMCPServer();
+    server = createTestServer();
   });
 
   describe('award_experience', () => {

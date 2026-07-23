@@ -40,7 +40,7 @@ export const useGameState = (userId: string | undefined) => {
             const { data, error } = await storageService.loadGame(uid, campaignId);
 
             if (error) {
-                alert("Failed to load game: " + error);
+                console.error("Failed to load game: " + error);
                 return;
             }
 

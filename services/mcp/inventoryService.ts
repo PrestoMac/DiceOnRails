@@ -1,5 +1,5 @@
 import { Character, Currency, GameState, MCPResponse, InventoryItem } from '../../types';
-import { fail, fuzzyMatchEntity } from './_shared';
+import { fail, fuzzyMatchEntity, ErrorCodes } from './_shared';
 import { isDebugMode } from '../../utils/debug';
 import { getHeavyArmorMasterReduction } from '../featsService';
 import { breakConcentration as engineBreakConcentration } from '../spellcastingEngine';
@@ -39,6 +39,8 @@ export interface InventoryDeps {
   getTarget: (id?: string) => Character | undefined;
   supabase: { from: (table: string) => { select: (...args: string[]) => { ilike: (col: string, val: string) => { maybeSingle: () => Promise<{ data: Record<string, unknown> | null; error: unknown }> } } } };
   lookupSRDItem: (name: string) => Record<string, unknown> | undefined;
+  initializeDeathSaves: (character: Character) => void;
+  updateInitiativeDeathStatus: (id: string, isDead: boolean) => void;
 }
 
 /** Service interface for managing inventory, currency, and damage. */
@@ -61,26 +63,6 @@ export function createInventoryService(state: GameState, deps: InventoryDeps): I
 
   function _now(): number {
     return Date.now();
-  }
-
-
-
-  function initializeDeathSaves(character: Character): void {
-    if (!character.deathSaves) {
-      character.deathSaves = { successes: 0, failures: 0, isStable: false };
-    }
-  }
-
-  function updateInitiativeDeathStatus(id: string, isDead: boolean): void {
-    if (!state.combat?.isActive) return;
-    const entry = state.combat.initiative.find(e => e.id === id);
-    if (entry) {
-      entry.isDead = isDead;
-    }
-    if (isDead) {
-      const enemy = state.combat.enemies.find(e => e.id === id);
-      if (enemy) enemy.isDead = true;
-    }
   }
 
   return {
@@ -152,7 +134,7 @@ export function createInventoryService(state: GameState, deps: InventoryDeps): I
     async inflict_damage(amount, targetId, damageType, options) {
       const safeAmount = Math.max(0, Number(amount) || 0);
 
-      if (state.combat?.enemies?.length > 0) {
+      if ((state.combat?.enemies?.length ?? 0) > 0) {
         const enemy = state.combat.enemies.find(e => fuzzyMatchEntity(e, targetId || ''));
         if (enemy && enemy.isDead) {
           return fail(`${enemy.name} is already defeated.`);
@@ -174,7 +156,7 @@ export function createInventoryService(state: GameState, deps: InventoryDeps): I
 
           if (newHp === 0) {
             enemy.isDead = true;
-            updateInitiativeDeathStatus(enemy.id, true);
+            deps.updateInitiativeDeathStatus(enemy.id, true);
             const msg = `${enemy.name} took ${dmg} damage${damageType ? ' (' + damageType + ')' : ''}. ${enemy.name} is defeated!`;
             state.sessionLogs.push(msg);
             return {
@@ -203,7 +185,7 @@ export function createInventoryService(state: GameState, deps: InventoryDeps): I
         } else {
           hint = ' Combat is active but this target was not found. Check the target name matches an enemy or party member exactly.';
         }
-        return fail(`Target "${targetId}" not found in party or combat.${hint}`);
+        return fail(`Target "${targetId}" not found in party or combat.${hint}`, ErrorCodes.NOT_FOUND);
       }
 
       let effectiveDmg = safeAmount;
@@ -221,12 +203,12 @@ export function createInventoryService(state: GameState, deps: InventoryDeps): I
       target.hp.current = newHp;
 
       if (newHp === 0 && current > 0) {
-        initializeDeathSaves(target);
+        deps.initializeDeathSaves(target);
         if (target.concentrationSpellId) engineBreakConcentration(target, 'incapacitated');
       } else if (newHp === 0 && current === 0 && target.deathSaves) {
         target.deathSaves.failures++;
         if (target.deathSaves.failures >= 3) {
-          updateInitiativeDeathStatus(target.id, true);
+          deps.updateInitiativeDeathStatus(target.id, true);
         }
       }
       const displayedDmg = options?.skipTargetDerivedReductions ? safeAmount : effectiveDmg;
@@ -288,7 +270,9 @@ export function createInventoryService(state: GameState, deps: InventoryDeps): I
               if (parsed) { actualCostGp = parsed.gp; actualCostSp = parsed.sp; actualCostCp = parsed.cp; }
             }
           }
-        } catch { /* lookupSRDItem may throw if item not found */ }
+        } catch (e) {
+          if (isDebugMode) console.warn('[DB] SRD item lookup failed:', e);
+        }
       }
 
       if (actualCostGp || actualCostSp || actualCostCp) {

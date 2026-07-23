@@ -54,7 +54,7 @@ interface Scenario {
 }
 
 const SCENARIOS: Scenario[] = [
-  
+
   { id: 1, name: 'Instant action', prompt: 'I look around the tavern.', expectedTool: 'narrate_turn', expectedTimeEffect: '0 min' },
   { id: 2, name: 'Short wait', prompt: 'I sit down and wait for a few minutes.', expectedTool: 'narrate_turn', expectedTimeEffect: '1-5 min' },
   { id: 3, name: 'Conversation', prompt: 'I chat with the bartender about local rumors.', expectedTool: 'narrate_turn', expectedTimeEffect: '5-15 min' },
@@ -63,73 +63,73 @@ const SCENARIOS: Scenario[] = [
   { id: 6, name: 'Rest request', prompt: 'I want to take a short rest.', expectedTool: 'short_rest', expectedTimeEffect: '60 min' },
   { id: 7, name: 'Sleep request', prompt: 'I set up camp and go to sleep for the night.', expectedTool: 'long_rest', expectedTimeEffect: '480 min' },
 
-  
+
   { id: 8, name: 'Simple move', prompt: 'I walk to the blacksmith.', expectedTool: 'move_to', expectedTimeEffect: '0-5 min' },
   { id: 9, name: 'Move with search', prompt: 'I go to the library and look for a specific book.', expectedTool: 'move_to', expectedTimeEffect: '5-15 min' },
   { id: 10, name: 'Long journey', prompt: 'I travel to Waterdeep on the high road.', expectedTool: 'move_to', expectedTimeEffect: '240+ min' },
 
-  
+
   { id: 11, name: 'Fight then wait', prompt: 'I attack the goblin with my sword.', expectedTool: 'player_attack', expectedTimeEffect: '0 min (combat round)' },
   { id: 12, name: 'Combat round', prompt: 'It\'s my turn in combat. I attack the nearest enemy.', expectedTool: 'player_attack', expectedTimeEffect: '0 min (combat round)' },
   { id: 13, name: 'Defeated enemy', prompt: 'The goblin is dead. What do I do next?', expectedTool: 'narrate_turn', expectedTimeEffect: '0-5 min' },
 
-  
+
   { id: 14, name: 'Instant spell', prompt: 'I cast firebolt at the goblin.', expectedTool: 'cast_spell', expectedTimeEffect: '0 min (action)' },
   { id: 15, name: 'Concentration spell', prompt: 'I cast bless on myself.', expectedTool: 'cast_spell', expectedTimeEffect: '0 min (concentration started)' },
   { id: 16, name: 'Ritual cast', prompt: 'I cast detect magic as a ritual.', expectedTool: 'cast_ritual', expectedTimeEffect: '10 min' },
 
-  
+
   { id: 17, name: 'Investigate', prompt: 'I carefully investigate the strange markings on the wall.', expectedTool: 'narrate_turn', expectedTimeEffect: '5-10 min' },
   { id: 18, name: 'Pick lock', prompt: 'I try to pick the lock on the chest.', expectedTool: 'check_skill', expectedTimeEffect: '0-5 min' },
   { id: 19, name: 'Hide', prompt: 'I hide in the shadows and wait.', expectedTool: 'narrate_turn', expectedTimeEffect: '1-5 min' },
   { id: 20, name: 'Long rest denied', prompt: 'I want to take a long rest.', expectedTool: 'long_rest', expectedTimeEffect: '480 min or rejected' },
 
-  
+
   { id: 21, name: 'Talk to NPC', prompt: 'I ask the merchant about his wares.', expectedTool: 'narrate_turn', expectedTimeEffect: '5-10 min' },
   { id: 22, name: 'Threaten NPC', prompt: 'I draw my sword and threaten the shopkeeper.', expectedTool: 'narrate_turn', expectedTimeEffect: '0-5 min' },
   { id: 23, name: 'Negotiate', prompt: 'I try to haggle for a better price on the armor.', expectedTool: 'check_skill', expectedTimeEffect: '5-10 min' },
   { id: 24, name: 'Sing', prompt: 'I perform a song at the tavern.', expectedTool: 'narrate_turn', expectedTimeEffect: '5-15 min' },
 
-  
+
   { id: 25, name: 'Equip weapon', prompt: 'I equip my longsword.', expectedTool: 'update_inventory', expectedTimeEffect: '0 min (free action)' },
   { id: 26, name: 'Use potion', prompt: 'I drink a potion of healing.', expectedTool: 'use_resource', expectedTimeEffect: '0 min (action)' },
   { id: 27, name: 'Buy item', prompt: 'I buy a torch from the merchant.', expectedTool: 'adjust_currency', expectedTimeEffect: '0-5 min' },
 
-  
+
   { id: 28, name: 'Hurry', prompt: 'I rush through the dungeon as fast as I can.', expectedTool: 'narrate_turn', expectedTimeEffect: '1-5 min' },
   { id: 29, name: 'Take time', prompt: 'I take my time and carefully examine everything.', expectedTool: 'narrate_turn', expectedTimeEffect: '10-30 min' },
   { id: 30, name: 'Wait for night', prompt: 'I wait until darkness falls before moving.', expectedTool: 'narrate_turn', expectedTimeEffect: '60-180 min' },
 
-  
+
   { id: 31, name: 'Downed ally', prompt: 'My friend is dying! I try to stabilize them.', expectedTool: 'roll_death_save', expectedTimeEffect: '0 min (reaction)' },
   { id: 32, name: 'Heal downed', prompt: 'I cast cure wounds on my unconscious friend.', expectedTool: 'cast_spell', expectedTimeEffect: '0 min (action)' },
 
-  
+
   { id: 33, name: 'No action', prompt: 'What do I see?', expectedTool: 'narrate_turn', expectedTimeEffect: '0 min' },
   { id: 34, name: 'Ambiguous', prompt: 'I do something.', expectedTool: 'narrate_turn', expectedTimeEffect: '0-5 min' },
   { id: 35, name: 'Complex', prompt: 'I move to the door, check for traps, then open it.', expectedTool: 'move_to', expectedTimeEffect: '5-15 min' },
 
-  
+
   { id: 36, name: 'Short rest healing', prompt: 'I\'m hurt. I take a short rest to recover.', expectedTool: 'short_rest', expectedTimeEffect: '60 min' },
   { id: 37, name: 'Spend hit dice', prompt: 'I spend a hit die to heal during a short rest.', expectedTool: 'short_rest', expectedTimeEffect: '60 min' },
   { id: 38, name: 'Recover slots', prompt: 'I rest until my spell slots recover.', expectedTool: 'long_rest', expectedTimeEffect: '480 min' },
 
-  
+
   { id: 39, name: 'Move + search', prompt: 'I go to the library and search for a book about dragons.', expectedTool: 'move_to', expectedTimeEffect: '5-15 min' },
   { id: 40, name: 'Talk + move', prompt: 'After chatting with the bartender, I head to my room.', expectedTool: 'narrate_turn', expectedTimeEffect: '5-15 min' },
 
-  
+
   { id: 41, name: 'Maintain concentration', prompt: 'I\'m concentrating on bless. I move forward carefully.', expectedTool: 'narrate_turn', expectedTimeEffect: '0-5 min' },
   { id: 42, name: 'Break concentration', prompt: 'I drop my concentration on bless and cast firebolt instead.', expectedTool: 'cast_spell', expectedTimeEffect: '0 min' },
 
-  
+
   { id: 43, name: 'Wild shape', prompt: 'I use my wild shape to become a wolf.', expectedTool: 'polymorph_creature', expectedTimeEffect: '0 min (transformation started)' },
   { id: 44, name: 'Transformed wait', prompt: 'I\'m in wolf form. I wait and observe the camp.', expectedTool: 'narrate_turn', expectedTimeEffect: '5-10 min' },
 
-  
+
   { id: 45, name: 'Summon creature', prompt: 'I cast conjure animals to summon a wolf.', expectedTool: 'cast_spell', expectedTimeEffect: '0 min (summon appears)' },
 
-  
+
   { id: 46, name: 'Full turn cycle', prompt: 'I attack the goblin, then end my turn.', expectedTool: 'player_attack', expectedTimeEffect: '0 min (combat)' },
   { id: 47, name: 'Explore then rest', prompt: 'I search the room, then set up camp for a long rest.', expectedTool: 'narrate_turn', expectedTimeEffect: '480 min' },
   { id: 48, name: 'Travel then rest', prompt: 'I travel to the next town and rest there.', expectedTool: 'move_to', expectedTimeEffect: '240+ min' },
@@ -187,16 +187,16 @@ async function runScenario(scenario: Scenario, server: MockMCPServer): Promise<S
   };
 
   try {
-    
+
     const char = server.getFullState().party[0];
     result.concentrationBefore = char?.concentrationSpellId ?? null;
     result.transformationBefore = !!char?.runtime?.transformationState;
 
-    
+
     lastRequestBody = null;
     lastResponseData = null;
 
-    
+
     const history: Message[] = [{
       id: `user-${Date.now()}`,
       role: MessageRole.USER,
@@ -204,7 +204,7 @@ async function runScenario(scenario: Scenario, server: MockMCPServer): Promise<S
       timestamp: Date.now(),
     }];
 
-    
+
     const agentResult = await runAgentLoop(
       history,
       'You are in a tavern. The time is morning.',
@@ -214,7 +214,7 @@ async function runScenario(scenario: Scenario, server: MockMCPServer): Promise<S
       { maxIters: 5, requestEndNarration: true }
     );
 
-    
+
     if (lastRequestBody) {
       const msgs = (lastRequestBody.messages || []) as Array<Record<string, unknown>>;
       const userMsg = msgs.find((m) => m.role === 'user' && typeof m.content === 'string' && m.content.includes(scenario.prompt));
@@ -232,7 +232,7 @@ async function runScenario(scenario: Scenario, server: MockMCPServer): Promise<S
       });
     }
 
-    
+
     if (lastResponseData) {
       const choices = (lastResponseData.choices || []) as Array<Record<string, unknown>>;
       const choice = choices[0] as Record<string, unknown> | undefined;
@@ -262,12 +262,12 @@ async function runScenario(scenario: Scenario, server: MockMCPServer): Promise<S
       });
     }
 
-    
+
     for (const toolMsg of agentResult.toolMessages) {
       result.engineResponseSummary += toolMsg.text.substring(0, 200) + ' | ';
     }
 
-    
+
     result.gameTimeAfter = server.getFullState().gameTime ?? 0;
     result.timePassed = result.gameTimeAfter - result.gameTimeBefore;
 
@@ -275,7 +275,7 @@ async function runScenario(scenario: Scenario, server: MockMCPServer): Promise<S
     result.concentrationAfter = charAfter?.concentrationSpellId ?? null;
     result.transformationAfter = !!charAfter?.runtime?.transformationState;
 
-    
+
     if (result.timePassed > 0) {
       result.effects.push(`gameTime advanced by ${result.timePassed} min (${result.gameTimeBefore} → ${result.gameTimeAfter})`);
     }
@@ -294,7 +294,7 @@ async function runScenario(scenario: Scenario, server: MockMCPServer): Promise<S
       result.conditionChanges.push(`active conditions: ${condIds.join(', ')}`);
     }
 
-    
+
     result.narrationReturned = agentResult.inlineNarration || '';
 
   } catch (e: unknown) {
@@ -328,12 +328,12 @@ async function main() {
 
     const batchResults = await Promise.all(
       batch.map(async (scenario) => {
-        
+
         mcpServer.reset();
         const hero = makeCharacter({ id: 'hero-1', name: 'Valerius' });
         mcpServer.joinParty(hero);
 
-        
+
         if (scenario.setup) {
           scenario.setup(mcpServer);
         }
@@ -345,7 +345,7 @@ async function main() {
 
     results.push(...batchResults);
 
-    
+
     for (const r of batchResults) {
       const status = r.error ? '❌' : '✅';
       const time = r.timePassed > 0 ? `+${r.timePassed}min` : '0min';
@@ -355,7 +355,7 @@ async function main() {
     console.log('');
   }
 
-  
+
   console.log('\n═══════════════════════════════════════════════════════════════');
   console.log('  DETAILED REPORT — Every LLM Request/Response Cycle');
   console.log('═══════════════════════════════════════════════════════════════\n');
@@ -393,7 +393,7 @@ async function main() {
     console.log(`└──────────────────────────────────────────────────\n`);
   }
 
-  
+
   const totalScenarios = results.length;
   const successful = results.filter(r => !r.error).length;
   const failed = results.filter(r => !!r.error).length;

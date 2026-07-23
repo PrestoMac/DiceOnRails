@@ -265,7 +265,7 @@ export function recalculateResourcePools(character: Character): ResourcePool[] {
       if (feat.level <= level && feat.kind === 'resource' && feat.grantsResource) {
         let max = 1;
         let resetOn: 'short' | 'long' = 'long';
-        
+
         if (feat.grantsResource === 'ki') {
           max = level;
           resetOn = 'short';
@@ -309,7 +309,7 @@ export function recalculateResourcePools(character: Character): ResourcePool[] {
           else if (level >= 13) max = 2;
           else max = 1;
         }
-        
+
         resources.push({
           id: feat.grantsResource,
           name: feat.name,

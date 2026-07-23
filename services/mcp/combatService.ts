@@ -1,6 +1,6 @@
 import { Character, Enemy, EnemyAttack, GameState, InitiativeEntry, MCPResponse } from '../../types';
 import { cryptoRoll } from '../../utils/random';
-import { fail, fuzzyMatchEntity, generateId } from './_shared';
+import { fail, fuzzyMatchEntity, generateId, ErrorCodes } from './_shared';
 import { lookupMonster } from '../../utils/monsters';
 import { getMod, getProficiencyBonus, calculateAc, getClassDef } from '../classEngine';
 import { getConditionEffects, isIncapacitated, isUnconscious, removeCondition, tickConditions, tickConditionsByTime, rollSaveAgainstCondition, getExhaustionPenalty } from '../conditionEngine';
@@ -340,7 +340,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
           this.syncInitiativeConditions();
 
           if (saveMessages.length > 0) {
-            (currentEntry as unknown as { _saveMessages: string[] })._saveMessages = saveMessages;
+            currentEntry.saveMessages = saveMessages;
           }
         }
       }
@@ -496,9 +496,9 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       }
 
       const next = combat.initiative[nextIdx];
-      const saveMsgs = (currentEntry as unknown as { _saveMessages?: string[] })?._saveMessages;
+      const saveMsgs = currentEntry?.saveMessages;
       const saveText = saveMsgs && saveMsgs.length > 0 ? '\n\n' + saveMsgs.join('\n') : '';
-      delete (currentEntry as unknown as { _saveMessages?: string[] })?._saveMessages;
+      if (currentEntry) delete currentEntry.saveMessages;
       return {
         success: true,
         data: { combat },
@@ -534,7 +534,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
 
       const enemy = state.combat.enemies.find(e => fuzzyMatchEntity(e, enemyId));
       if (!enemy) {
-        return fail(`Enemy ${enemyId} not found in combat.`);
+        return fail(`Enemy ${enemyId} not found in combat.`, ErrorCodes.NOT_FOUND);
       }
       if (enemy.isDead) {
         return fail(`${enemy.name} is already defeated.`);
@@ -576,8 +576,8 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
         const te = getConditionEffects(target);
         if (te.attacksAgainstHaveAdvantage) hasAdvantage = true;
       }
-      const secondRoll2 = cryptoRoll(20);
-      const resolved = resolveAdvantage(atkRoll, secondRoll2, hasAdvantage, hasDisadvantage);
+      const secondRoll = cryptoRoll(20);
+      const resolved = resolveAdvantage(atkRoll, secondRoll, hasAdvantage, hasDisadvantage);
       atkRoll = resolved.roll;
 
       const roll = atkRoll;
@@ -818,10 +818,10 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
 
     async player_attack(attackerId, weaponName, targetId, isOffHand, isSneakAttack, sharpshooter, greatWeaponMaster) {
       const attacker = deps.getTarget(attackerId);
-      if (!attacker) return fail(`Attacker "${attackerId}" not found.`);
+      if (!attacker) return fail(`Attacker "${attackerId}" not found.`, ErrorCodes.NOT_FOUND);
 
       const enemy = state.combat?.enemies.find(e => fuzzyMatchEntity(e, targetId));
-      if (!enemy) return fail(`Target "${targetId}" not found in combat.`);
+      if (!enemy) return fail(`Target "${targetId}" not found in combat.`, ErrorCodes.NOT_FOUND);
       if (enemy.isDead) return fail(`${enemy.name} is already defeated.`);
 
       const weaponItem = attacker.inventory.find(i =>

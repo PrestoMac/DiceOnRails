@@ -167,7 +167,7 @@ describe('travelService — narrate_turn', () => {
       state.party.push(char);
       state.combat = { isActive: false, round: 1, turnIndex: 0, initiative: [], enemies: [] };
       await service.narrate_turn('Time passes.', 1);
-      
+
       expect(char.conditions[0].duration).toBe(40);
     });
 
@@ -281,9 +281,9 @@ describe('travelService — narrate_turn', () => {
       state.party.push(char);
       state.lastLongRestTime = 0;
       state.gameTime = 0;
-      
-      
-      
+
+
+
       await service.narrate_turn('Long time.', 1440);
       expect(char.conditions?.some(c => c.id === 'exhaustion-1')).toBe(true);
     });
@@ -357,8 +357,8 @@ describe('travelService — long_rest', () => {
   it('updates lastLongRestTime', async () => {
     state.party.push(makeChar());
     await service.long_rest('Resting.', true);
-    
-    
+
+
     expect(state.lastLongRestTime).toBe(0);
     expect(state.gameTime).toBe(480);
   });
@@ -396,7 +396,7 @@ describe('travelService — long_rest', () => {
     state.party.push(char);
     await service.long_rest('Resting.', true);
     expect(char.conditions.some(c => c.id === 'blinded')).toBe(false);
-    
+
     expect(char.conditions.some(c => c.id === 'blessed')).toBe(true);
   });
 });

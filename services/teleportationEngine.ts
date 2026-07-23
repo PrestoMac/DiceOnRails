@@ -49,14 +49,14 @@ export function teleport(
   familiarity: 'clear' | 'moderate' | 'poor' | 'none' = 'clear'
 ): TeleportResult {
   const mishapChance = familiarity === 'none' ? 33 : familiarity === 'poor' ? 13 : 0;
-  
+
   if (Math.random() * 100 < mishapChance) {
     return {
       success: true,
       message: `${character.name} arrives at their destination but approximately ${Math.floor(Math.random() * 100) + 1}% off course due to a teleportation mishap.`
     };
   }
-  
+
   return {
     success: true,
     message: `${character.name} teleports successfully to their destination.`

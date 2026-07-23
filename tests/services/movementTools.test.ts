@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MockMCPServer } from '../../services/mcpService';
 import { makeCharacter } from '../helpers/characters';
+import { createTestServer } from '../helpers/testServer';
 
 vi.mock('../../utils/random', () => ({
   cryptoRoll: vi.fn(),
@@ -28,9 +29,7 @@ describe('check_skill', () => {
   let server: MockMCPServer;
 
   beforeEach(() => {
-    vi.clearAllMocks();
-    vi.mocked(cryptoRoll).mockReset();
-    server = new MockMCPServer();
+    server = createTestServer();
   });
 
   it('succeeds against DC 10 with sufficient bonus', async () => {
@@ -122,9 +121,7 @@ describe('move_to', () => {
   let server: MockMCPServer;
 
   beforeEach(() => {
-    vi.clearAllMocks();
-    vi.mocked(cryptoRoll).mockReset();
-    server = new MockMCPServer();
+    server = createTestServer();
   });
 
   it('simple move changes party location', async () => {
@@ -155,12 +152,12 @@ describe('move_to', () => {
     server.joinParty(char);
     await server.long_rest();
 
-    
+
     const slowResult = await server.move_to('Neverwinter', '', undefined, undefined, 'neverwinter-woods-trail', 'slow');
     expect(slowResult.success).toBe(false);
     expect(slowResult.message).toContain('exhaustion');
 
-    
+
     const fastResult = await server.move_to('Neverwinter', '', undefined, undefined, 'neverwinter-woods-trail', 'fast');
     expect(fastResult.success).toBe(true);
     expect(fastResult.data?.travelMinutes).toBeGreaterThan(0);

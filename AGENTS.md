@@ -18,7 +18,7 @@
 
 ## Known bugs
 
-All previously tracked bugs (C1-C9, H1-H10, M1-M8, L1-L9) have been fixed. See `ARCHITECTURE.md` for engine mechanics and edge cases.
+All previously tracked bugs (C1-C9, H1-H10, M1-M8, L1-L9) have been fixed. The 15 production-readiness fixes from `fixthis.md` have also been applied: `saveMessages` typed on `InitiativeEntry`, noop setter removed, empty catch logged, `alert()` → `console.error`, numbered variables renamed, duplicate death-save functions consolidated, `errorCode` field on `MCPResponse`, optional-chaining normalized, trailing whitespace lint rule added, `||` → `??` for numeric defaults, `ensureGameStateFields` confirmed in `loadState`, mock setup centralized via `createTestServer()` helper, `characterCreationService` tests added, and `fuzzyMatchEntity` refined to word-boundary matching. See `ARCHITECTURE.md` for engine mechanics and edge cases.
 
 ## Architecture
 - **Entry**: `index.html` → `index.tsx` → `App.tsx`. The root returns `<SetupWizard />` unconditionally when `VITE_SETUP_MODE=true`, else `<SplashScreen>` then provider stack.
@@ -101,12 +101,12 @@ All previously tracked bugs (C1-C9, H1-H10, M1-M8, L1-L9) have been fixed. See `
 - **Never mock `mcpService` when testing tool functions** — create a fresh `MockMCPServer` instance in `beforeEach`. Only mock `cryptoRoll` (random), `supabaseClient`, and `debug`.
 - **Dynamic imports for mocked modules**: `const { cryptoRoll } = await import('../../utils/random')` must come AFTER `vi.mock(...)`. All test tool files follow this pattern.
 - **Async vs sync**: all MCP tool methods (`add_enemy`, `start_combat`, `cast_spell`, `check_skill`) are `async`. `getFullState`, `getTarget`, `joinParty`, `awardExperience` are sync.
-- **Reset mocks in `beforeEach`**: `vi.clearAllMocks(); vi.mocked(cryptoRoll).mockReset(); server = new MockMCPServer()`.
+- **Reset mocks in `beforeEach`**: `vi.clearAllMocks(); vi.mocked(cryptoRoll).mockReset(); server = new MockMCPServer()`. Can be replaced by `createTestServer()` (from `tests/helpers/testServer.ts`) — same logic, one call.
 - **Sequence random values**: chain `.mockReturnValueOnce(v1).mockReturnValueOnce(v2)` — last call may need `.mockReturnValue(vDefault)`.
 - **Live tests** (`tests/live/`): the top-level `0X_*_live.test.ts` files (tier-3, run via `tsx tests/live/run_all.ts`) use a custom `runLiveTest` helper that prints `PASS`/`FAIL` and drives a real `MockMCPServer` with real randomness — but they still `import { expect } from 'vitest'` for assertions. The `tests/live/scenarios/*.test.ts` subdirectory **is** picked up by the default `npm test` run (the vitest exclude pattern is `tests/live/*_live.test.ts` — direct children only, NOT the `scenarios/` subfolder); those scenario files use full vitest (`describe`/`it`/`expect`/`vi`) and DO call `vi.mock('../../../utils/random', ...)` to stub `cryptoRoll`.
 - **Hook tests**: use `renderHook` + `act` from `@testing-library/react`. Import dynamically after mocks.
 - **Component tests**: need full mocks for `supabaseClient`, `audioService`, `authService`, `debug`.
-- Test factories: `makeCharacter(overrides?)`, `makeWizard()`, `makeCleric()`, `makeEnemy()`, `makeCombatState()`, `makeGameState()`, `createTestRunner()`, `createMockAgentLoop()`, `createMockMCPServer()`, `mockRandom()`.
+- Test factories: `makeCharacter(overrides?)`, `makeWizard()`, `makeCleric()`, `makeEnemy()`, `makeCombatState()`, `makeGameState()`, `createTestRunner()`, `createMockAgentLoop()`, `createMockMCPServer()`, `mockRandom()`, `createTestServer()`.
 - `no-explicit-any` and `non-null-assertion` are **errors** in tests (warnings elsewhere). Test files also enforce `vitest/expect-expect` and strict `testing-library/*` rules.
 
 ## ESLint
@@ -123,7 +123,7 @@ All previously tracked bugs (C1-C9, H1-H10, M1-M8, L1-L9) have been fixed. See `
 - **`ensureCharacterFields()` is duplicated verbatim in 2 services** (stateService, travelService). Not shared. Modify all copies.
 - **`inflict_damage` lives in `InventoryService`**, not `CombatService`. Both CombatService and SpellcastingService depend on it. All damage in the system flows through one function.
 - **Transactions**: deep-clone via `JSON.parse(JSON.stringify(...))`. 3-tier: transaction (in-flight rollback), rewind point (full state+messages per turn), emergency snapshot (crash recovery).
-- **Duplicate currency detection**: `adjust_currency` is suppressed within 500ms for same target+amount. Cleared on `restoreSnapshot`.
+- **Duplicate currency detection**: `adjust_currency` is suppressed within 500ms for same target+amount. Cleared on `restoreSnapshot` and `reset`.
 
 ### Engine mechanics
 - **Exhaustion** (levels 1-6): applied as flat `d20Modifier: -level` on ALL d20 rolls (attacks, saves, checks, death saves) and `speedPenaltyFt: -(level * 5)`. Does NOT affect damage dice.
@@ -185,7 +185,7 @@ All previously tracked bugs (C1-C9, H1-H10, M1-M8, L1-L9) have been fixed. See `
 - Setup mode is detected TWICE: `preflight.js` sets env var, `vite.config.ts` re-verifies by reading `.env`. Config wins.
 - Build chunking: 4 vendor chunks (`vendor-react`, `vendor-supabase`, `vendor-vercel`, `vendor-ui`). Everything else in default chunk.
 - Vitest `include` is `tests/**/*.test.{ts,tsx}` (not alongside source). `css: true` processes CSS imports. `globals: true` makes `describe`/`it`/`expect` available without imports.
-- **Untested services**: `characterCreationService.ts` (complex 8-step builder), `services/llm/contextManager.ts`, `services/llm/narration.ts`, `services/mcp/partyService.ts`, `services/supabaseClient.ts` have no direct test coverage. Be cautious editing them.
+- **Untested services**: `services/llm/contextManager.ts`, `services/llm/narration.ts`, `services/mcp/partyService.ts`, `services/supabaseClient.ts` have no direct test coverage. Be cautious editing them.
 
 ## Type system invariants
 - `Character.stats` is always `{ str, dex, con, int, wis, cha }` — exactly 6 keys. Same for `Enemy.stats?`.

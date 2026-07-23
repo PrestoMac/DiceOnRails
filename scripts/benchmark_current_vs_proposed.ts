@@ -299,7 +299,7 @@ const SCENARIOS: Scenario[] = [
       char.experienceToNextLevel = 900;
       char.unusedStatPoints = 2;
       char.unusedSkillPoints = 2;
-      
+
       char.knownSpells = ['bless', 'cure-wounds'];
       char.preparedSpells = ['bless'];
       s.setCharacter(char);
@@ -502,7 +502,7 @@ function proposedExecTool(s: MockMCPServer, name: string, args: Record<string, u
     case 'next_turn':
       return s.next_turn();
     case 'end_combat': {
-      
+
       return (async () => {
         const r1 = await s.end_combat();
         let xpResult = { success: true, data: {}, message: '' };
@@ -517,7 +517,7 @@ function proposedExecTool(s: MockMCPServer, name: string, args: Record<string, u
       })();
     }
     case 'player_attack': {
-      
+
       return (async () => {
         const r1 = await s.player_attack(
           String(args.attackerId || ''), String(args.weaponName || ''), String(args.targetId || ''),
@@ -525,13 +525,13 @@ function proposedExecTool(s: MockMCPServer, name: string, args: Record<string, u
           args.sharpshooter as boolean, args.greatWeaponMaster as boolean,
         );
         let extra = '';
-        
+
         const stateAfter = s.getFullState();
         if (stateAfter.combat?.isActive && args.advanceTurn !== false) {
           const nt = await s.next_turn();
           extra += nt.message + ' ';
         }
-        
+
         if (r1.data?.enemyDefeated && args.onKill?.awardExperience?.amount) {
           const xp = await s.awardExperience(Number(args.onKill.awardExperience.amount));
           extra += xp.message;
@@ -546,7 +546,7 @@ function proposedExecTool(s: MockMCPServer, name: string, args: Record<string, u
       })();
     }
     case 'cast_spell': {
-      
+
       return (async () => {
         let targets = (args.targets as string[]) || [];
         if (targets.length === 0 && args.targetId) targets = [String(args.targetId)];
@@ -578,7 +578,7 @@ function proposedExecTool(s: MockMCPServer, name: string, args: Record<string, u
       return r.then(result => ({ ...result, data: { ...result.data, narration: args.narration || '' } }));
     }
     case 'take_rest': {
-      
+
       const rt = args.targetId || (s.getFullState().party?.[0]?.name) || 'player-1';
       if (args.duration === 'long') return s.long_rest(args.narration as string, !args.narration);
       return s.short_rest(String(rt), args.narration as string, !args.narration);
@@ -588,7 +588,7 @@ function proposedExecTool(s: MockMCPServer, name: string, args: Record<string, u
         return Promise.resolve({ success: true, data: { warned: true }, message: `Level up called without stat increases. Specify stats like: stats={str:2,con:1}. Character: ${args.targetId}` });
       }
       const r = s.allocateStatPoints((args.stats || {}) as Partial<Record<string, number>>, args.targetId as string, (args.skills || {}) as Record<string, number>, Number(args.hpDeviation || 0));
-      
+
       const results: string[] = [r.message];
       if (args.learnSpells && Array.isArray(args.learnSpells)) {
         for (const spellId of args.learnSpells) {
@@ -674,7 +674,7 @@ async function runHarness(
   const state = server.getFullState();
   const hasCombat = state.combat?.isActive === true;
   const hasLevelUp = state.party?.some((c: Character) => (c.unusedStatPoints ?? 0) > 0 || (c.unusedSkillPoints ?? 0) > 0);
-  
+
   const charSummary = char ? `${char.name} (L${char.level} ${char.class}, HP ${char.hp.current}/${char.hp.max}, location: ${char.location || 'unknown'})` : 'None';
   const partySummary = (state.party || []).map((c: Character) => `${c.name} (L${c.level} ${c.class}, HP ${c.hp.current}/${c.hp.max})`).join(', ');
   let contextStr = `Context: Active player: ${charSummary}. Party: ${partySummary}. World: ${state.worldDescription || ''}.`;
@@ -696,15 +696,15 @@ async function runHarness(
   let iters = 0, invalidCalls = 0;
   let inlineNarrationLen = 0;
 
-  
+
   if (opts.preInjectReminder) {
     const input = scenario.input.toLowerCase();
     const isTrivial = /^(hi|hey|hello|greetings|ok|okay|thanks|thank|yes|no|sure|bye|goodbye)\b/.test(input);
     let reminder: string;
     if (isTrivial) {
-      reminder = ''; 
+      reminder = '';
     } else if (hasCombat) {
-      
+
       if (input.includes('loot') || input.includes('search') || input.includes('bodies') || input.includes('catch breath')) {
         reminder = 'Combat is active but may be ending. Call end_combat(narration="...", xpAward={amount:...}) to end combat and handle loot in one call.';
       } else {
@@ -748,7 +748,7 @@ async function runHarness(
     totalCompletion += resp.completionTokens;
 
     if (!resp.toolCalls || resp.toolCalls.length === 0) {
-      
+
       if (iters === 0) {
         const fallbackMsg = isProposed
           ? (scenario.input.toLowerCase().includes('level') || scenario.input.toLowerCase().includes('stronger')
@@ -761,24 +761,24 @@ async function runHarness(
       break;
     }
 
-    
+
     const hasNarrationTool = resp.toolCalls.some((tc) => tc.name === 'narrate_turn');
     const hasInlineNarration = resp.toolCalls.some((tc) =>
       tc.name !== 'narrate_turn' && (tc.args?.narration || tc.args?.route)
     );
     const isEndOfTurn = hasNarrationTool || hasInlineNarration;
 
-    
+
     const actionCalls = resp.toolCalls.filter((tc) => tc.name !== 'narrate_turn');
     const narrateCall = resp.toolCalls.find((tc) => tc.name === 'narrate_turn');
 
-    
+
     for (const tc of actionCalls) {
       try {
         const result = await execTool(server, tc.name, tc.args);
         executedTools.push({ name: tc.name, args: tc.args, result });
         if (!result.success) invalidCalls++;
-        
+
         if (result.data?.narration) {
           inlineNarrationLen = Math.max(inlineNarrationLen, String(result.data.narration).length);
         }
@@ -788,7 +788,7 @@ async function runHarness(
       }
     }
 
-    
+
     if (narrateCall) {
       try {
         const result = await execTool(server, narrateCall.name, narrateCall.args);
@@ -802,7 +802,7 @@ async function runHarness(
       }
     }
 
-    
+
     const defs = resp.toolCalls.map((tc) => ({ id: tc.id, type: 'function', function: { name: tc.name, arguments: JSON.stringify(tc.args) } }));
     messages.push({ role: 'assistant', content: '', tool_calls: defs });
     for (const tc of resp.toolCalls) {
@@ -817,9 +817,9 @@ async function runHarness(
   }
 
   const called = executedTools.map(t => t.name);
-  
-  
-  
+
+
+
   const equivalentsFor: Record<string, string[]> = {
     'short_rest': ['short_rest', 'take_rest'],
     'long_rest': ['long_rest', 'take_rest'],
@@ -831,21 +831,21 @@ async function runHarness(
     'manage_spellbook': ['manage_spellbook', 'level_up'],
     'add_enemy': ['add_enemy', 'start_combat'],
   };
-  
-  
+
+
   const calledOrEquivalent = new Set<string>();
   for (const toolName of called) {
     calledOrEquivalent.add(toolName);
-    
+
     for (const [key, eqs] of Object.entries(equivalentsFor)) {
       if (eqs.includes(toolName)) {
         calledOrEquivalent.add(key);
       }
     }
   }
-  
+
   const adjustedMissing = scenario.expected.filter(expectedName => {
-    
+
     const eqs = equivalentsFor[expectedName] || [expectedName];
     return !eqs.some((equiv: string) => calledOrEquivalent.has(equiv));
   });
@@ -892,7 +892,7 @@ async function main() {
 
   const startAll = Date.now();
 
-  
+
   const BATCH_SIZE = 5;
   const allResults: { name: string; current: Metrics; proposed: Metrics }[] = [];
 
@@ -904,7 +904,7 @@ async function main() {
     }));
     allResults.push(...flat);
 
-    
+
     for (const r of flat) {
       const cIcon = r.current.pass ? '✅' : (r.current.totalTokens > 0 ? '❌' : '💥');
       const pIcon = r.proposed.pass ? '✅' : (r.proposed.totalTokens > 0 ? '❌' : '💥');
@@ -916,7 +916,7 @@ async function main() {
 
   const totalS = ((Date.now() - startAll) / 1000).toFixed(1);
 
-  
+
   console.log(`\n  All done in ${totalS}s\n`);
   console.log('═'.repeat(145));
   console.log('  📊 CURRENT vs PROPOSED — AGGREGATE COMPARISON');
@@ -947,7 +947,7 @@ async function main() {
   console.log(`  ${'Invalid Tool Calls'.padEnd(30)} ${currentInvalid.toString().padEnd(24)} ${proposedInvalid.toString().padEnd(24)} ${proposedInvalid < currentInvalid ? `-${currentInvalid - proposedInvalid} calls` : `+${proposedInvalid - currentInvalid} calls`}`);
   console.log(`  ${'Total Tokens'.padEnd(30)} ${currentTotalTokens.toString().padEnd(24)} ${proposedTotalTokens.toString().padEnd(24)} ${proposedTotalTokens < currentTotalTokens ? `-${((1 - proposedTotalTokens / currentTotalTokens) * 100).toFixed(0)}%` : `+${((proposedTotalTokens / currentTotalTokens - 1) * 100).toFixed(0)}%`}`);
 
-  
+
   console.log(`\n\n  ${'SCENARIO'.padEnd(28)} ${'CURRENT (pass/iters/tok/ms)'.padEnd(34)} ${'PROPOSED (pass/iters/tok/ms)'.padEnd(34)} ${'Δit   Δtok  Δms'}`);
   console.log('  ' + '─'.repeat(130));
   for (const r of allResults) {

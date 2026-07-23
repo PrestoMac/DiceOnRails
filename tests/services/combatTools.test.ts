@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MockMCPServer } from '../../services/mcpService';
 import { makeCharacter, makeWizard, makeBarbarian } from '../helpers/characters';
+import { createTestServer } from '../helpers/testServer';
 import { extractRollData } from '../../services/llm/narration';
 import type { Character } from '../../types';
 
@@ -40,9 +41,7 @@ describe('combatTools', () => {
   let server: MockMCPServer;
 
   beforeEach(() => {
-    vi.clearAllMocks();
-    vi.mocked(cryptoRoll).mockReset();
-    server = new MockMCPServer();
+    server = createTestServer();
   });
 
   describe('add_enemy', () => {

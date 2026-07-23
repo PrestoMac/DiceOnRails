@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MockMCPServer } from '../../services/mcpService';
 import { makeCharacter } from '../helpers/characters';
+import { createTestServer } from '../helpers/testServer';
 
 vi.mock('../../utils/random', () => ({
   cryptoRoll: vi.fn(),
@@ -38,9 +39,7 @@ describe('savesTools', () => {
   let server: MockMCPServer;
 
   beforeEach(() => {
-    vi.clearAllMocks();
-    vi.mocked(cryptoRoll).mockReset();
-    server = new MockMCPServer();
+    server = createTestServer();
   });
 
   describe('roll_dice', () => {

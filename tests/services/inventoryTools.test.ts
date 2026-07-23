@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { MockMCPServer } from '../../services/mcpService';
 import { makeCharacter } from '../helpers/characters';
+import { createTestServer } from '../helpers/testServer';
 
 vi.mock('../../utils/random', () => ({
   cryptoRoll: vi.fn(),
@@ -28,9 +29,7 @@ describe('update_inventory', () => {
   let server: MockMCPServer;
 
   beforeEach(() => {
-    vi.clearAllMocks();
-    vi.mocked(cryptoRoll).mockReset();
-    server = new MockMCPServer();
+    server = createTestServer();
   });
 
   it('adds an item to inventory', async () => {

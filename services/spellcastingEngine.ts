@@ -177,7 +177,7 @@ export interface CastResult {
     isHit: boolean;
   }>;
   affectedTargets?: Array<{ targetId: string; hpCost: number }>;
-  hasEffect?: boolean;  
+  hasEffect?: boolean;
 }
 
 /** Executes a full spell cast: validates known/prepared state, consumes spell slot, handles concentration, rolls attack/save/damage/healing, and applies scaling. */
@@ -245,23 +245,23 @@ export function castSpell(
     const perBeam: { attackRoll: { d20: number; total: number; isCrit: boolean; isFumble: boolean }; damage: number; isHit: boolean }[] = [];
 
     const casterFx = getConditionEffects(character);
-    
+
     for (let beam = 0; beam < beamCount; beam++) {
-      
+
       const roll1 = cryptoRoll(20);
       const roll2 = cryptoRoll(20);
 
       const casterHasDisadv = casterFx.disadvantageOnAttacks || casterFx.isBlinded;
-      
+
       const targetGrantsAdvantage = (targets[0] as unknown as { _attacksAgainstHaveAdvantage?: boolean })?._attacksAgainstHaveAdvantage === true;
 
       let d20: number;
       if (casterHasDisadv && !targetGrantsAdvantage) {
-        d20 = Math.min(roll1, roll2); 
+        d20 = Math.min(roll1, roll2);
       } else if (targetGrantsAdvantage && !casterHasDisadv) {
-        d20 = Math.max(roll1, roll2); 
+        d20 = Math.max(roll1, roll2);
       } else {
-        d20 = roll1; 
+        d20 = roll1;
       }
 
       const atkTotal = d20 + getSpellAttackBonus(character) - getExhaustionPenalty(character);
@@ -365,7 +365,7 @@ export function castSpell(
         id: t.id,
         hp: entity?.hp?.current ?? NPC_FALLBACK_HP,
         name: entity?.name || t.id,
-        isUnknown: !entity,  
+        isUnknown: !entity,
       };
     })
     .filter(t => t.hp > 0)
@@ -392,7 +392,7 @@ export function castSpell(
   }
 
   if (spell.scaling && slotLevel > spell.level && (spell.damage || spell.healing)) {
-    
+
     const applicableTiers = spell.scaling.filter(s => slotLevel >= s.atSlotLevel);
     const bestScale = applicableTiers[applicableTiers.length - 1];
     if (bestScale) {
@@ -480,7 +480,7 @@ export function breakConcentration(character: Character, reason: 'damaged' | 'vo
     const success = roll >= dc;
     if (success) return { broken: false, roll, d20Roll, modifier, dc, success: true };
     character.concentrationSpellId = undefined;
-    
+
     if (character.conditions && character.conditions.length > 0) {
       const toRemove = character.conditions.filter(c => c.source === spellId);
       for (const cond of toRemove) {
@@ -491,7 +491,7 @@ export function breakConcentration(character: Character, reason: 'damaged' | 'vo
     return { broken: true, roll, d20Roll, modifier, dc, success: false };
   }
   character.concentrationSpellId = undefined;
-  
+
   if (character.conditions && character.conditions.length > 0) {
     const toRemove = character.conditions.filter(c => c.source === spellId);
     for (const cond of toRemove) {

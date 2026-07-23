@@ -64,7 +64,7 @@ export async function generateAtmosphere(
 
         if (contentType && contentType.includes("application/json")) {
             const data = await response.json();
-            
+
             const url = data.data?.[0]?.url || data.images?.[0]?.url || data.url;
             if (!url) throw new Error("ImageRouter returned success but no image URL was found.");
             return url;

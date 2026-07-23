@@ -32,9 +32,9 @@ describe('06_time_system_live', () => {
     server = new MockMCPServer();
   });
 
-  
-  
-  
+
+
+
 
   it('1: narrate_turn(0) does not advance time', async () => {
     const char = makeCharacter();
@@ -112,14 +112,14 @@ describe('06_time_system_live', () => {
     expect(server.getFullState().gameTime).toBe(0);
   });
 
-  
-  
-  
+
+
+
 
   it('11: dawn ambient fires when crossing minute 360', async () => {
     const char = makeCharacter();
     server.joinParty(char);
-    
+
     await server.executeToolCall('narrate_turn', { narration: 'Position.', timePassed: 350 });
     const result = await server.executeToolCall('narrate_turn', { narration: 'Travel.', timePassed: 15 });
     expect(result.message).toContain('dawn');
@@ -154,18 +154,18 @@ describe('06_time_system_live', () => {
   it('15: multiple period crossings emit multiple lines', async () => {
     const char = makeCharacter();
     server.joinParty(char);
-    
+
     await server.executeToolCall('narrate_turn', { narration: 'Position.', timePassed: 350 });
     const dawnResult = await server.executeToolCall('narrate_turn', { narration: 'Dawn.', timePassed: 15 });
     expect(dawnResult.message).toContain('dawn');
-    
+
     const duskResult = await server.executeToolCall('narrate_turn', { narration: 'Dusk.', timePassed: 720 });
     expect(duskResult.message).toContain('twilight');
   });
 
-  
-  
-  
+
+
+
 
   it('16: minute-based condition expires when time passes', async () => {
     const char = makeCharacter();
@@ -188,12 +188,12 @@ describe('06_time_system_live', () => {
     const char = makeCharacter();
     char.conditions = [{ id: 'blinded', source: 'faerie-fire', duration: 100, durationUnit: 'round' }];
     server.joinParty(char);
-    
+
     const state = server.getFullState();
     state.combat = { isActive: false, round: 1, turnIndex: 0, initiative: [], enemies: [] };
     server.loadState(state);
     await server.executeToolCall('narrate_turn', { narration: 'Wait.', timePassed: 1 });
-    
+
     expect(char.conditions[0].duration).toBe(90);
   });
 
@@ -201,7 +201,7 @@ describe('06_time_system_live', () => {
     const char = makeCharacter();
     char.conditions = [{ id: 'blinded', source: 'faerie-fire', duration: 100, durationUnit: 'round' }];
     server.joinParty(char);
-    
+
     const state = server.getFullState();
     state.combat = { isActive: true, round: 1, turnIndex: 0, initiative: [], enemies: [] };
     server.loadState(state);
@@ -267,13 +267,13 @@ describe('06_time_system_live', () => {
     }];
     server.joinParty(char);
       await server.executeToolCall('narrate_turn', { narration: 'Wait.', timePassed: 3 });
-    
+
     expect(char.conditions).toHaveLength(0);
   });
 
-  
-  
-  
+
+
+
 
   it('26: concentration breaks when spell duration exceeded', async () => {
     const char = makeCharacter();
@@ -307,7 +307,7 @@ describe('06_time_system_live', () => {
     char.concentrationSpellId = 'bless';
     char.runtime = { concentrationStartTime: 100, concentrationEffectiveDuration: 5 };
     server.joinParty(char);
-    
+
     server.getFullState().gameTime = 0;
     await server.executeToolCall('narrate_turn', { narration: 'Wait.', timePassed: 106 });
     expect(char.concentrationSpellId).toBeUndefined();
@@ -319,13 +319,13 @@ describe('06_time_system_live', () => {
     char.runtime = { concentrationStartTime: 0, concentrationEffectiveDuration: 5 };
     server.joinParty(char);
     await server.executeToolCall('narrate_turn', { narration: 'Wait.', timePassed: 5 });
-    
+
     expect(char.concentrationSpellId).toBeUndefined();
   });
 
-  
-  
-  
+
+
+
 
   it('31: transformation reverts when duration expires', async () => {
     const char = makeCharacter();
@@ -401,9 +401,9 @@ describe('06_time_system_live', () => {
     expect(result.message).toContain('wore off');
   });
 
-  
-  
-  
+
+
+
 
   it('36: summoned creature expires when duration runs out', async () => {
     const enemy = makeEnemy({ id: 'summon-1', name: 'Zombie', summonDurationRemaining: 2 });
@@ -437,7 +437,7 @@ describe('06_time_system_live', () => {
     state.combat = { isActive: false, round: 1, turnIndex: 0, initiative: [], enemies: [enemy] };
     server.loadState(state);
     await server.executeToolCall('narrate_turn', { narration: 'Wait.', timePassed: 2 });
-    
+
     const updatedState = server.getFullState();
     expect(updatedState.combat?.enemies).toHaveLength(0);
   });
@@ -465,9 +465,9 @@ describe('06_time_system_live', () => {
     expect(updatedState.combat?.enemies).toHaveLength(1);
   });
 
-  
-  
-  
+
+
+
 
   it('41: long_rest restores full HP', async () => {
     const char = makeCharacter({ hp: { current: 10, max: 30 } });
@@ -512,9 +512,9 @@ describe('06_time_system_live', () => {
     expect(char.conditions.some(c => c.id === 'cursed')).toBe(true);
   });
 
-  
-  
-  
+
+
+
 
   it('46: exhaustion not applied within 16 hours', async () => {
     const char = makeCharacter();
@@ -576,12 +576,12 @@ describe('06_time_system_live', () => {
     state.gameTime = 10;
     server.loadState(state);
 
-    
+
     const result = await server.executeToolCall('narrate_turn', { narration: 'Time passes.', timePassed: 3 });
 
     expect(server.getFullState().gameTime).toBe(13);
-    expect(char.concentrationSpellId).toBeUndefined(); 
-    expect(char.conditions).toHaveLength(0); 
+    expect(char.concentrationSpellId).toBeUndefined();
+    expect(char.conditions).toHaveLength(0);
     expect(result.message).toContain('wore off');
   });
 });

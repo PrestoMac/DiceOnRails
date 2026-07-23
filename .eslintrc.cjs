@@ -25,6 +25,7 @@ module.exports = {
     '@typescript-eslint/ban-ts-comment': ['error', { 'ts-ignore': true, 'ts-expect-error': false }],
     '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
     'no-empty': 'warn',
+    'no-trailing-spaces': 'error',
     'no-unused-expressions': 'warn',
     'no-constant-condition': 'warn',
     'prefer-const': 'warn',

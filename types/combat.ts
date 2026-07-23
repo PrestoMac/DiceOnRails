@@ -47,6 +47,7 @@ export interface InitiativeEntry {
   rawRoll?: number;
   modifier?: number;
   conditionsResolvedThisTurn?: boolean;
+  saveMessages?: string[];
 }
 
 /** The full state of an active combat encounter. */

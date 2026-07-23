@@ -102,10 +102,10 @@ export async function runAgentLoop(
   const gameTimeAtStart = state.gameTime ?? 0;
   const contextParts: string[] = [];
 
-  
+
   contextParts.push(`[Dungeon State Context: ${context}]`);
 
-  
+
   if (state.combat?.isActive && state.combat.initiative?.length > 0) {
     const entry = state.combat.initiative[state.combat.turnIndex];
     contextParts.push(`CURRENT TURN: ${entry.name} (${entry.type}) — Round ${state.combat.round}`);
@@ -114,7 +114,7 @@ export async function runAgentLoop(
     ).join(' → ')}`);
   }
 
-  
+
   if (state.combat?.isActive && state.combat.enemies?.length > 0) {
     const alive = state.combat.enemies.filter(e => !e.isDead);
     if (alive.length > 0) {
@@ -126,7 +126,7 @@ export async function runAgentLoop(
     }
   }
 
-  
+
   const effects: string[] = [];
   for (const c of state.party) {
     if (c.concentrationSpellId) {
@@ -262,9 +262,9 @@ export async function runAgentLoop(
       const currentState = mcpServer.getFullState();
       const combat = currentState.combat;
       if (combat && combat.isActive && combat.enemies && combat.enemies.some((e: { isDead: boolean }) => !e.isDead)) {
-        
-        
-        
+
+
+
         const activeEntry = combat.initiative?.[combat.turnIndex];
         if (iter < 5 && activeEntry && activeEntry.type !== 'player') {
           messages.push({
@@ -294,12 +294,12 @@ export async function runAgentLoop(
     );
 
     if (isEndOfTurn) {
-      
+
       const preEndCalls = toolCalls.filter((tc: { name: string }) => tc.name !== 'narrate_turn');
       if (preEndCalls.length > 0) {
         const { results: preEndResults, criticalFailed } = await executeToolBatch(rawToolCalls, preEndCalls, toolMessages, onToolResult);
         if (criticalFailed) criticalToolFailed = true;
-        
+
         if (options?.requestEndNarration && !criticalToolFailed) {
           for (const r of preEndResults) {
             const data = r.result.data as Record<string, unknown> | undefined;
@@ -313,8 +313,8 @@ export async function runAgentLoop(
         }
       }
 
-      
-      
+
+
       const timeAlreadyAdvanced = (mcpServer.getFullState().gameTime ?? 0) > gameTimeAtStart;
       const narrateCall = toolCalls.find((tc: { name: string }) => tc.name === 'narrate_turn');
       if (narrateCall) {
@@ -360,7 +360,7 @@ export async function runAgentLoop(
       messages.push({ role: 'tool', tool_call_id: raw.id, content: JSON.stringify({ tool: toolName, success: result.success, message: result.message, data: result.data }) });
     }
 
-    
+
     const iterTokens = messages.reduce((s: number, m: { content?: string }) => s + estimateTokens(m.content || JSON.stringify(m) || '') + PER_MSG_OVERHEAD, 0)
         + STATIC_OVERHEAD + COMPLETION_RESERVE;
     if (iterTokens > CONTEXT_BUDGET * 0.95) {
@@ -368,20 +368,20 @@ export async function runAgentLoop(
         break;
     }
 
-    
-    
-    
+
+
+
     const nextTurnResult = batchResults.find((r: { mapped: { name: string } }) => r.mapped.name === 'next_turn');
     if (nextTurnResult && nextTurnResult.result.success) {
       break;
     }
   }
 
-  
-  
-  
-  
-  
+
+
+
+
+
   const gameTimeNow = mcpServer.getFullState().gameTime ?? 0;
   const timeAdvancedThisTurn = narrateTurnExecuted || gameTimeNow > gameTimeAtStart;
   if (!timeAdvancedThisTurn) {

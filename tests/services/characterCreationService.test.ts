@@ -1,0 +1,301 @@
+import { describe, it, expect } from 'vitest';
+import { buildCharacterFromWizard } from '../../services/characterCreationService';
+import { WizardState } from '../../components/creation/types';
+import { RACES_BY_ID } from '../../utils/races';
+import { CLASSES_BY_ID } from '../../utils/classes';
+import { ASI_LEVELS, FALLBACK_STARTING_LOCATION } from '../../constants';
+import { calculateXPToNextLevel } from '../../services/progressionService';
+import type { FeatSelection } from '../../types';
+
+const STANDARD_ARRAY = { str: 15, dex: 14, con: 13, int: 12, wis: 10, cha: 8 };
+
+/** Builds a baseline valid WizardState (level-1 human fighter, new campaign) for mutation in tests. */
+function baseWizard(overrides: Partial<WizardState> = {}): WizardState {
+  return {
+    name: 'Aria',
+    level: 1,
+    backstory: '',
+    selectedRace: RACES_BY_ID['human'],
+    selectedClass: CLASSES_BY_ID['fighter'],
+    stats: { ...STANDARD_ARRAY },
+    inventory: [],
+    allocatedSkills: { athletics: 1, perception: 1 },
+    goldPool: 10,
+    selectedSpells: [],
+    selectedCantrips: [],
+    selectedSubclassId: null,
+    asiFeatSlots: [],
+    draconicAncestry: null,
+    halfElfChoice1: null,
+    halfElfChoice2: null,
+    generatedLocations: [],
+    selectedLocation: { name: 'Phandalin', description: 'A small mining town.' },
+    isGeneratingLocs: false,
+    isRerolling: false,
+    ...overrides,
+  };
+}
+
+const mod = (n: number): number => Math.floor((n - 10) / 2);
+
+describe('buildCharacterFromWizard', () => {
+  describe('name validation', () => {
+    it('rejects an empty name with an error and no character', () => {
+      const { character, errors } = buildCharacterFromWizard(baseWizard({ name: '   ' }), { isNewCampaign: true });
+      expect(errors.length).toBe(1);
+      expect(character).toBeNull();
+    });
+
+    it('rejects a missing name', () => {
+      const { character, errors } = buildCharacterFromWizard(baseWizard({ name: '' }), { isNewCampaign: true });
+      expect(errors.length).toBe(1);
+      expect(character).toBeNull();
+    });
+
+    it('accepts a valid name', () => {
+      const { character, errors } = buildCharacterFromWizard(baseWizard({ name: 'Lyra' }), { isNewCampaign: true });
+      expect(errors).toEqual([]);
+      expect(character?.name).toBe('Lyra');
+    });
+  });
+
+  describe('location resolution', () => {
+    it('requires a starting location for a new campaign', () => {
+      const { character, errors } = buildCharacterFromWizard(
+        baseWizard({ selectedLocation: null }),
+        { isNewCampaign: true }
+      );
+      expect(errors.length).toBe(1);
+      expect(character).toBeNull();
+    });
+
+    it('uses the selected location for a new campaign', () => {
+      const { character, errors } = buildCharacterFromWizard(
+        baseWizard({ selectedLocation: { name: 'Neverwinter', description: 'City of Skilled Hands.' } }),
+        { isNewCampaign: true }
+      );
+      expect(errors).toEqual([]);
+      expect(character?.location).toBe('Neverwinter');
+    });
+
+    it('falls back to the provided campaign starting location when not a new campaign', () => {
+      const loc = { name: 'Waterdeep', description: 'The Crown of the North.' };
+      const { character } = buildCharacterFromWizard(
+        baseWizard({ selectedLocation: null }),
+        { isNewCampaign: false, campaignStartingLocation: loc }
+      );
+      expect(character?.location).toBe('Waterdeep');
+    });
+
+    it('falls back to FALLBACK_STARTING_LOCATION when no location is available', () => {
+      const { character } = buildCharacterFromWizard(
+        baseWizard({ selectedLocation: null }),
+        { isNewCampaign: false }
+      );
+      expect(character?.location).toBe(FALLBACK_STARTING_LOCATION.name);
+    });
+
+    it('invokes onSetStartingLocation with the resolved location', () => {
+      const seen = { value: null as null | string };
+      buildCharacterFromWizard(
+        baseWizard(),
+        { isNewCampaign: true, onSetStartingLocation: (l) => { seen.value = l.name; } }
+      );
+      expect(seen.value).toBe('Phandalin');
+    });
+  });
+
+  describe('base stats & racial ASI', () => {
+    it('applies Human +1 to every stat', () => {
+      const { character } = buildCharacterFromWizard(baseWizard(), { isNewCampaign: true });
+      expect(character?.stats).toEqual({ str: 16, dex: 15, con: 14, int: 13, wis: 11, cha: 9 });
+    });
+
+    it('applies Elf +2 dex / +1 int', () => {
+      const { character } = buildCharacterFromWizard(
+        baseWizard({ selectedRace: RACES_BY_ID['elf'] }),
+        { isNewCampaign: true }
+      );
+      expect(character?.stats).toEqual({ str: 15, dex: 16, con: 13, int: 13, wis: 10, cha: 8 });
+    });
+
+    it('applies Half-Elf flexible-2: +2 cha plus two +1 choices', () => {
+      const { character } = buildCharacterFromWizard(
+        baseWizard({
+          selectedRace: RACES_BY_ID['half-elf'],
+          halfElfChoice1: 'con',
+          halfElfChoice2: 'dex',
+        }),
+        { isNewCampaign: true }
+      );
+      // base {15,14,13,12,10,8} + cha 2, con 1, dex 1
+      expect(character?.stats).toEqual({ str: 15, dex: 15, con: 14, int: 12, wis: 10, cha: 10 });
+      expect(character?.halfElfStatChoices).toEqual(['con', 'dex']);
+    });
+
+    it('marks elf & half-elf immune to unconscious, others undefined', () => {
+      const elf = buildCharacterFromWizard(
+        baseWizard({ selectedRace: RACES_BY_ID['elf'] }),
+        { isNewCampaign: true }
+      );
+      expect(elf.character?.conditionsImmunities).toContain('unconscious');
+
+      const human = buildCharacterFromWizard(baseWizard(), { isNewCampaign: true });
+      expect(human.character?.conditionsImmunities).toBeUndefined();
+    });
+  });
+
+  describe('ASI/feat slot indexing', () => {
+    it('maps asiFeatSlots index to ASI_LEVELS (idx 0 -> level 1, idx 1 -> level 4)', () => {
+      const slots: FeatSelection[] = [
+        { level: 1, type: 'feat', featId: 'alert' } as FeatSelection,
+        { level: 4, type: 'asi', statAllocations: { dex: 2 } } as FeatSelection,
+      ];
+      const { character } = buildCharacterFromWizard(
+        baseWizard({ asiFeatSlots: slots }),
+        { isNewCampaign: true }
+      );
+      const feat = character?.featSelections.find((f) => f.type === 'feat');
+      const asi = character?.featSelections.find((f) => f.type === 'asi');
+      expect(feat?.level).toBe(ASI_LEVELS[0]);
+      expect(asi?.level).toBe(ASI_LEVELS[1]);
+      expect(character?.feats).toContain('alert');
+      // Human dex 15 + 2 from the level-4 ASI slot.
+      expect(character?.stats.dex).toBe(17);
+    });
+
+    it('ASI_LEVELS matches the documented progression', () => {
+      expect([...ASI_LEVELS]).toEqual([1, 4, 8, 12, 16, 19]);
+    });
+  });
+
+  describe('resource pool calculation', () => {
+    it('grants Second Wind to a level-1 fighter', () => {
+      const { character } = buildCharacterFromWizard(baseWizard(), { isNewCampaign: true });
+      const ids = character?.resources.map((r) => r.id);
+      expect(ids).toContain('second-wind');
+    });
+
+    it('grants level-1 spell slots to a level-1 wizard', () => {
+      const { character } = buildCharacterFromWizard(
+        baseWizard({
+          selectedClass: CLASSES_BY_ID['wizard'],
+          selectedCantrips: ['fire-bolt'],
+          selectedSpells: ['magic-missile'],
+        }),
+        { isNewCampaign: true }
+      );
+      const ids = character?.resources.map((r) => r.id);
+      expect(ids).toContain('spell-slot-1');
+    });
+  });
+
+  describe('prepared vs known caster asymmetry', () => {
+    const cantrips = ['fire-bolt', 'minor-illusion'];
+    const spells = ['magic-missile', 'shield'];
+
+    it('prepared caster (wizard): knownSpells = cantrips only, preparedSpells = cantrips + spells', () => {
+      const { character } = buildCharacterFromWizard(
+        baseWizard({
+          selectedClass: CLASSES_BY_ID['wizard'],
+          selectedCantrips: cantrips,
+          selectedSpells: spells,
+        }),
+        { isNewCampaign: true }
+      );
+      expect(character?.knownSpells).toEqual(cantrips);
+      expect(character?.preparedSpells).toEqual([...cantrips, ...spells]);
+    });
+
+    it('known caster (sorcerer): knownSpells = cantrips + spells, preparedSpells = cantrips only', () => {
+      const { character } = buildCharacterFromWizard(
+        baseWizard({
+          selectedClass: CLASSES_BY_ID['sorcerer'],
+          selectedCantrips: cantrips,
+          selectedSpells: spells,
+        }),
+        { isNewCampaign: true }
+      );
+      expect(character?.knownSpells).toEqual([...cantrips, ...spells]);
+      expect(character?.preparedSpells).toEqual(cantrips);
+    });
+  });
+
+  describe('final character assembly', () => {
+    it('derives id, hp, currency, hit dice, and XP threshold from the wizard state', () => {
+      const { character } = buildCharacterFromWizard(
+        baseWizard({ goldPool: 12.5 }),
+        { isNewCampaign: true }
+      );
+      expect(character?.id.startsWith('player-')).toBe(true);
+      // Human fighter L1: hpBase 10 + conMod(2) = 12.
+      expect(character?.hp).toEqual({ current: 12, max: 12 });
+      // goldPool 12.5 -> 12 gp, 5 sp.
+      expect(character?.currency).toEqual({ gp: 12, sp: 5, cp: 0 });
+      expect(character?.hitDice).toEqual({ current: 1, max: 1 });
+      expect(character?.unusedStatPoints).toBe(0);
+      expect(character?.experience).toBe(0);
+      expect(character?.experienceToNextLevel).toBe(calculateXPToNextLevel(1));
+    });
+
+    it('scales HP and hit dice with level', () => {
+      const { character } = buildCharacterFromWizard(
+        baseWizard({ level: 3 }),
+        { isNewCampaign: true }
+      );
+      // Human fighter: fs.con = 14, conBonus 1 -> conMod = getMod(15) = 2.
+      // HP = 10 + 2 + (6 + 2) * (3 - 1) = 28.
+      expect(character?.hp).toEqual({ current: 28, max: 28 });
+      expect(character?.hitDice).toEqual({ current: 3, max: 3 });
+      expect(character?.unusedStatPoints).toBe(4);
+    });
+  });
+
+  describe('draconic ancestry', () => {
+    it('resolves ancestry and damage type for a dragonborn', () => {
+      const { character } = buildCharacterFromWizard(
+        baseWizard({ selectedRace: RACES_BY_ID['dragonborn'], draconicAncestry: 'red' }),
+        { isNewCampaign: true }
+      );
+      expect(character?.draconicAncestry).toBe('red');
+      expect(character?.draconicDamageType).toBe('fire');
+    });
+
+    it('leaves ancestry undefined when not chosen', () => {
+      const { character } = buildCharacterFromWizard(
+        baseWizard({ selectedRace: RACES_BY_ID['dragonborn'], draconicAncestry: null }),
+        { isNewCampaign: true }
+      );
+      expect(character?.draconicAncestry).toBeUndefined();
+      expect(character?.draconicDamageType).toBeUndefined();
+    });
+  });
+
+  describe('skills & backstory pass-through', () => {
+    it('carries allocated skills and remaining skill points through', () => {
+      const { character } = buildCharacterFromWizard(
+        baseWizard({ allocatedSkills: { athletics: 1, perception: 1, survival: 1 } }),
+        { isNewCampaign: true, remainingSkillPoints: 4 }
+      );
+      expect(character?.skills).toEqual({ athletics: 1, perception: 1, survival: 1 });
+      expect(character?.unusedSkillPoints).toBe(4);
+    });
+
+    it('stores backstory when provided', () => {
+      const { character } = buildCharacterFromWizard(
+        baseWizard({ backstory: 'Once a street urchin...' }),
+        { isNewCampaign: true }
+      );
+      expect(character?.backstory).toBe('Once a street urchin...');
+    });
+  });
+
+  // Sanity check that the modifier helper matches the engine, guarding the HP expectations above.
+  it('uses the standard ability-modifier formula', () => {
+    expect(mod(8)).toBe(-1);
+    expect(mod(10)).toBe(0);
+    expect(mod(14)).toBe(2);
+    expect(mod(15)).toBe(2);
+    expect(mod(16)).toBe(3);
+  });
+});

@@ -7,7 +7,7 @@ import react from '@vitejs/plugin-react';
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
 
-  
+
   let isSetupMode = process.env.VITE_SETUP_MODE === 'true';
   const envPath = path.resolve(process.cwd(), '.env');
   if (fs.existsSync(envPath)) {
@@ -34,7 +34,7 @@ export default defineConfig(({ mode }) => {
       {
         name: 'configure-setup-server',
         configureServer(server) {
-          
+
           if (isSetupMode) {
             console.log('🔹 Setup mode active. listening for /__setup/save...');
 
@@ -48,8 +48,8 @@ export default defineConfig(({ mode }) => {
                   const body = Buffer.concat(chunks).toString();
                   try {
                     const data = JSON.parse(body);
-                    
-                    
+
+
 
                     let envContent = '';
                     envContent += `VITE_LLM_API_KEY=${data.VITE_LLM_API_KEY || ''}\n`;
@@ -81,7 +81,7 @@ export default defineConfig(({ mode }) => {
     define: {
       'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-      
+
       'import.meta.env.VITE_SETUP_MODE': JSON.stringify(isSetupMode ? 'true' : 'false')
     },
     resolve: {

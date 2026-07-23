@@ -407,14 +407,14 @@ describe('useQueue', () => {
         }),
       });
 
-      
-      
-      
-      
-      
+
+
+
+
+
       act(() => { vi.advanceTimersByTime(1000); });
-      
-      
+
+
       expect(result.current.queueNotification).toBe('New item added to Action Queue!');
 
       act(() => { vi.advanceTimersByTime(1999); });
