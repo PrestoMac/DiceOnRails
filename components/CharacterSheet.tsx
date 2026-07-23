@@ -188,15 +188,15 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ character, onUpdateInve
 
       <div className="space-y-2">
         <div className="flex justify-between text-sm uppercase font-bold tracking-wider"><span>Vitality</span><span className={character.hp.current<5?'text-red-500 animate-pulse':'text-stone-300'}>{character.hp.current} / {character.hp.max} HP</span></div>
-        <Tooltip content="At 0 HP you fall unconscious and begin death saves (3 successes = stable / 3 failures = death). Nat 20 = 2 successes; nat 1 = 2 failures." side="top">
-          <div className="h-4 bg-stone-800 rounded-full overflow-hidden border border-stone-700"><div className={`h-full rounded-full transition-all duration-500 ${hpPercent<30?'bg-red-500':'bg-green-500'}`} style={{width:`${hpPercent}%`}}/></div>
+        <Tooltip content="At 0 HP you fall unconscious and begin death saves (3 successes = stable / 3 failures = death). Nat 20 = 2 successes; nat 1 = 2 failures." side="top" className="w-full">
+          <div className="h-4 w-full bg-stone-800 rounded-full overflow-hidden border border-stone-700"><div className={`h-full rounded-full transition-all duration-500 ${hpPercent<30?'bg-red-500':'bg-green-500'}`} style={{width:`${hpPercent}%`}}/></div>
         </Tooltip>
       </div>
 
-      <Tooltip content={`AC ${totalAc}. Formula: Light armor = 11 + DEX, Medium = 13 + min(DEX, 2), Heavy = fixed. Unarmored = 10 + DEX. Add shield (+2) if equipped.`} side="top">
-        <div className="flex items-center justify-between bg-stone-900/40 border border-stone-850 p-4 rounded-lg">
-          <div className="flex items-center gap-3"><i className="fas fa-shield-halved text-amber-500 text-lg"></i><span className="text-sm uppercase font-bold tracking-wider text-stone-400">Armor Class</span></div>
-          <span className="text-2xl font-bold font-mono text-amber-400">{totalAc}<span className="text-sm font-normal text-stone-500 ml-2">AC</span></span>
+      <Tooltip content={`AC ${totalAc}. Formula: Light armor = 11 + DEX, Medium = 13 + min(DEX, 2), Heavy = fixed. Unarmored = 10 + DEX. Add shield (+2) if equipped.`} side="top" className="w-full">
+        <div className="flex items-center justify-between bg-stone-900/40 border border-stone-850 p-3 rounded-lg">
+          <div className="flex items-center gap-2.5"><i className="fas fa-shield-halved text-amber-500"></i><span className="text-xs uppercase font-bold tracking-wider text-stone-400">Armor Class</span></div>
+          <span className="text-lg font-bold font-mono text-amber-400">{totalAc}<span className="text-[10px] font-normal text-stone-500 ml-1.5">AC</span></span>
         </div>
       </Tooltip>
 
