@@ -49,7 +49,7 @@ export const tools = [
             parameters: {
                 type: 'object',
                 properties: {
-                    narration: { type: 'string', description: '2-4 sentences of vivid, present-tense narration.' },
+                    narration: { type: 'string', description: '3-6 sentences of vivid, present-tense narration covering action, sensory detail, and immediate consequence.' },
                     timePassed: {
                         type: 'integer',
                         description: 'REQUIRED. Minutes this action takes. Always estimate: 1-2=quick action/talk, 5-10=search/conversation, 30+=travel. Use 0 ONLY for truly instant events (a single reaction, a brief line). Every narration moves time forward.'

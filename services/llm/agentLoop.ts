@@ -188,11 +188,9 @@ export async function runAgentLoop(
   let itersCompleted = 0;
   let inlineNarration: string | undefined;
   let suggestions: string[] | undefined;
-  let criticalToolFailed = false;
   let narrateTurnExecuted = false;
 
   for (let iter = 0; iter < MAX_ITERS; iter++) {
-    criticalToolFailed = false;
     itersCompleted = iter + 1;
     const thinkingBody = getThinkingDisabledBody();
     const filteredTools = filterTools(tools, mcpServer.getFullState());
@@ -297,15 +295,14 @@ export async function runAgentLoop(
 
       const preEndCalls = toolCalls.filter((tc: { name: string }) => tc.name !== 'narrate_turn');
       if (preEndCalls.length > 0) {
-        const { results: preEndResults, criticalFailed } = await executeToolBatch(rawToolCalls, preEndCalls, toolMessages, onToolResult);
-        if (criticalFailed) criticalToolFailed = true;
+        const { results: preEndResults, criticalFailed: preEndCritical } = await executeToolBatch(rawToolCalls, preEndCalls, toolMessages, onToolResult);
 
-        if (options?.requestEndNarration && !criticalToolFailed) {
+        if (options?.requestEndNarration && !preEndCritical) {
           for (const r of preEndResults) {
             const data = r.result.data as Record<string, unknown> | undefined;
             const timeResult = data?.timeResult as { narration?: string } | undefined;
             const narrText = String(data?.narration ?? timeResult?.narration ?? '').trim();
-            if (narrText.length >= 50) {
+            if (narrText.length >= 25) {
               inlineNarration = narrText;
               break;
             }
@@ -335,9 +332,9 @@ export async function runAgentLoop(
               timestamp: Date.now(),
             });
           }
-          if (options?.requestEndNarration && narrateResult.success && !criticalToolFailed) {
+          if (options?.requestEndNarration && narrateResult.success) {
             const text = String(narrateResult.data?.narration ?? '').trim();
-            if (text.length >= 50) {
+            if (text.length >= 25) {
               inlineNarration = text;
             }
           }
@@ -351,8 +348,7 @@ export async function runAgentLoop(
       id: tc.id, type: 'function',
       function: { name: tc.function.name, arguments: tc.function.arguments }
     }));
-    const { results: batchResults, criticalFailed: batchCritical } = await executeToolBatch(rawToolCalls, toolCalls, toolMessages, onToolResult);
-    if (batchCritical) criticalToolFailed = true;
+    const { results: batchResults } = await executeToolBatch(rawToolCalls, toolCalls, toolMessages, onToolResult);
 
     messages.push({ role: 'assistant', content: "", tool_calls: toolCallDefs });
     for (const { mapped, raw, result } of batchResults) {

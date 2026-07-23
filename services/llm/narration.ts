@@ -181,13 +181,13 @@ export function generateNarrationStream(history: Message[], context: string, fro
     return { promise, cancel: () => { if (isDebugMode) console.log('[NarrationStream] Cancelled by caller'); controller.abort(); } };
 }
 
-/** System prompt for generating a single-action tight narration (2-3 vivid sentences). */
-export const TIGHT_NARRATION_PROMPT = `You are a fantasy narrator for a 5e-style RPG. The player has just taken a mechanical action (resolved by game tools). In 2-3 vivid sentences, narrate the outcome from the player's perspective. Focus on action, immediate consequence, and sensory detail. Respond in English. Do not call any tools.`;
-/** System prompt for generating a batch-action tight narration (weaving multiple actions into 2-4 sentences). */
-export const TIGHT_NARRATION_BATCH_PROMPT = `You are a fantasy narrator for a 5e-style RPG. The party has just taken a batch of mechanical actions (resolved by game tools). Weave the actions into a single 2-4 sentence narration. Focus on action, immediate consequence, and sensory detail. Respond in English. Do not call any tools.`;
+/** System prompt for generating a single-action tight narration (3-5 vivid sentences). */
+export const TIGHT_NARRATION_PROMPT = `You are a fantasy narrator for a 5e-style RPG. The player has just taken a mechanical action (resolved by game tools). In 3-5 vivid sentences, narrate the outcome from the player's perspective. Focus on action, immediate consequence, and concrete sensory detail. Respond in English. Do not call any tools.`;
+/** System prompt for generating a batch-action tight narration (weaving multiple actions into 4-6 sentences). */
+export const TIGHT_NARRATION_BATCH_PROMPT = `You are a fantasy narrator for a 5e-style RPG. The party has just taken a batch of mechanical actions (resolved by game tools). Weave the actions into a single 4-6 sentence narration. Focus on action, immediate consequence, and concrete sensory detail. Respond in English. Do not call any tools.`;
 
 /**
- * Generates a short, tight narration (2-4 sentences) based on the last user action and tool results.
+ * Generates a short, tight narration (3-6 sentences) based on the last user action and tool results.
  * Falls back to a default string on failure.
  * @param lastUserText - The last user input text.
  * @param toolMessages - Array of tool name and message pairs from recent tool executions.
@@ -203,10 +203,10 @@ export async function generateTightNarration(lastUserText: string, toolMessages:
     }
     const toolSummary = toolMessages.slice(-5).map(t => `[${t.toolName}] ${t.message}`).join('\n');
     const userContent = toolSummary ? `Player action: ${lastUserText}\n\nGame events:\n${toolSummary}\n\nNow narrate the outcome.` : `Player action: ${lastUserText}\n\nNow narrate the outcome.`;
-    const body: Record<string, unknown> = { model, messages: [{ role: 'system', content: isBatch ? TIGHT_NARRATION_BATCH_PROMPT : TIGHT_NARRATION_PROMPT }, { role: 'user', content: userContent }], temperature: 0.7, max_tokens: 500, ...(getThinkingDisabledBody() || {}) };
+    const body: Record<string, unknown> = { model, messages: [{ role: 'system', content: isBatch ? TIGHT_NARRATION_BATCH_PROMPT : TIGHT_NARRATION_PROMPT }, { role: 'user', content: userContent }], temperature: 0.7, max_tokens: 1200, ...(getThinkingDisabledBody() || {}) };
     if (isDebugMode) console.log('[TightNarration] Request', { model, isBatch, toolCount: toolMessages.length, userTextLen: lastUserText.length, url: apiUrl });
     const fetchController = new AbortController();
-    const fetchTimer = setTimeout(() => fetchController.abort(), 15_000);
+    const fetchTimer = setTimeout(() => fetchController.abort(), 25_000);
     const startTime = Date.now();
     let response: Response;
     try {

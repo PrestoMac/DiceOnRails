@@ -15,7 +15,7 @@ export function isLazyNarration(text: string): boolean {
     if (!text) return true;
     const t = text.trim();
     if (t.length < 50 || /^The adventure continues[\s.!?,]*$/i.test(t) || /^(Done|OK|Continuing|Yes|No|Maybe|Sure|Understood|Continue)[\s.!?,]*$/i.test(t) || /^[\s.!?,]+$/.test(t) || /^(You continue|You persist|You carry on|You press on)[\s.!?,]*$/i.test(t)) return true;
-    return t.split(/[.!?]+/).filter(s => s.trim().length > 0).length <= 1 && t.length < 100;
+    return false;
 }
 /** Builds a deterministic fallback narration from the last few tool results when the LLM-generated narration is lazy. */
 export function buildDeterministicNarration(toolSummary: { toolName: string; message: string }[]): string {
@@ -38,10 +38,10 @@ export function getWeaponInfo(c: Character) {
     }
     return { equippedWeapon: eq, weaponName: wn, strMod: sM, dexMod: dM, weaponMod: mod, weaponSides: sides, weaponCount: count, profBonus: getProficiencyBonus(c as unknown as Character) };
 }
-/** Extracts the last 5 tool messages into a summary of tool name and truncated message. */
+/** Extracts the last 10 tool messages into a summary of tool name and truncated message. */
 export function buildToolSummary(toolMessages: Message[]) {
-    return toolMessages.filter(m => m.text.startsWith('[System:')).slice(-5).map(m => ({
-        toolName: m.text.match(/\[System:(\w+)\]/)?.[1] || 'tool', message: m.text.replace(/\[System:\w+\]\s*/, '').slice(0, 200),
+    return toolMessages.filter(m => m.text.startsWith('[System:')).slice(-10).map(m => ({
+        toolName: m.text.match(/\[System:(\w+)\]/)?.[1] || 'tool', message: m.text.replace(/\[System:\w+\]\s*/, '').slice(0, 400),
     }));
 }
 /** Builds a full context string for the LLM including character state, party, combat, world, quests, and lore. */
