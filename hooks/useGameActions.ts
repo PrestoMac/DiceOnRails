@@ -67,7 +67,7 @@ function insertToolCallMessages(
 import React, { useCallback, useRef, useEffect } from 'react';
 import { GameState, Message, MessageRole, AppSettings, Character, AppStage } from '../types';
 import { mcpServer } from '../services/mcpService';
-import { runAgentLoop } from '../services/llm';
+import { runAgentLoop, generateNarration } from '../services/llm';
 import { storageService } from '../services/storageService';
 import { speakText, stopSpeaking } from '../services/audioService';
 import { isDebugMode } from '../utils/debug';
@@ -221,7 +221,23 @@ export const useGameActions = (
             const { narrationText, usedStream } = await resolveNarration(text, toolMessages, inlineNarration, streamingId, false);
             if (firstDeltaAt === null && usedStream) firstDeltaAt = Date.now();
 
-            const modelMsg: Message = { id: streamingId, role: MessageRole.MODEL, text: narrationText || 'The adventure continues...', timestamp: Date.now() };
+            let finalNarration = narrationText;
+            if (!inlineNarration) {
+                console.warn('[Narration] No inline narration from agent loop. Retrying with generateNarration...', { toolCount: toolMessages.length, inlineNarration });
+                try {
+                    const retry = await generateNarration(historyForAPI, buildContextString(myCharacterId), ctxPrep.frozen);
+                    if (retry.text && retry.text.trim().length >= 25) {
+                        finalNarration = retry.text.trim();
+                        if (isDebugMode) console.log('[Narration] Retry succeeded', { len: finalNarration.length });
+                    } else {
+                        console.warn('[Narration] Retry produced empty/short text', { length: retry.text?.length ?? 0, preview: (retry.text ?? '').slice(0, 80) });
+                    }
+                } catch (err) {
+                    console.error('[Narration] Retry failed:', err instanceof Error ? err.message : String(err));
+                }
+            }
+
+            const modelMsg: Message = { id: streamingId, role: MessageRole.MODEL, text: finalNarration || 'The adventure continues...', timestamp: Date.now() };
             setMessages(prev => prev.map(m => m.id === streamingId ? modelMsg : m));
             processingRef.current = false;
 
@@ -290,7 +306,23 @@ export const useGameActions = (
             const { narrationText, usedStream } = await resolveNarration(batchText, result.toolMessages, result.inlineNarration, streamingId, true);
             if (firstDeltaAt === null && usedStream) firstDeltaAt = Date.now();
 
-            const modelMsg: Message = { id: streamingId, role: MessageRole.MODEL, text: narrationText || 'The adventure continues...', timestamp: Date.now() };
+            let finalNarration = narrationText;
+            if (!result.inlineNarration) {
+                console.warn('[Narration] No inline narration from batch agent loop. Retrying with generateNarration...', { toolCount: result.toolMessages.length, inlineNarration: result.inlineNarration });
+                try {
+                    const retry = await generateNarration(historyForAPI, batchContext, batchCtxPrep.frozen);
+                    if (retry.text && retry.text.trim().length >= 25) {
+                        finalNarration = retry.text.trim();
+                        if (isDebugMode) console.log('[Narration] Batch retry succeeded', { len: finalNarration.length });
+                    } else {
+                        console.warn('[Narration] Batch retry produced empty/short text', { length: retry.text?.length ?? 0, preview: (retry.text ?? '').slice(0, 80) });
+                    }
+                } catch (err) {
+                    console.error('[Narration] Batch retry failed:', err instanceof Error ? err.message : String(err));
+                }
+            }
+
+            const modelMsg: Message = { id: streamingId, role: MessageRole.MODEL, text: finalNarration || 'The adventure continues...', timestamp: Date.now() };
             setMessages(prev => prev.map(m => m.id === streamingId ? modelMsg : m));
             processingRef.current = false;
 

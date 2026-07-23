@@ -346,6 +346,16 @@ export async function runAgentLoop(
         inlineNarration = assistantContent;
       }
 
+      if (isDebugMode && !inlineNarration) {
+        console.log('[AgentLoop] Narration empty — diagnostics:', {
+          assistantContentLen: assistantContent?.length ?? 0,
+          assistantContentPreview: (assistantContent ?? '').slice(0, 80),
+          hadNarrateCall: !!narrateCall,
+          timeAlreadyAdvanced,
+          iter: itersCompleted,
+        });
+      }
+
       break;
     }
 
