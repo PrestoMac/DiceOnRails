@@ -11,7 +11,7 @@ interface QuickAction {
   label: string;
   icon: string;
   fillText: string;
-  category: 'spell' | 'weapon' | 'feature' | 'rest' | 'skill' | 'save' | 'item' | 'death';
+  category: 'spell' | 'weapon' | 'feature' | 'rest' | 'skill' | 'item' | 'death';
 }
 
 interface InputAreaProps {
@@ -37,7 +37,6 @@ const CATEGORY_STYLES: Record<string, string> = {
   feature: 'bg-amber-900/40 text-amber-300 border border-amber-800/50 hover:bg-amber-800/50 hover:border-amber-600/50 hover:text-amber-200',
   rest: 'bg-stone-800/60 text-stone-300 border border-stone-700 hover:bg-stone-700/60 hover:border-amber-700 hover:text-amber-400',
   skill: 'bg-emerald-900/40 text-emerald-300 border border-emerald-800/50 hover:bg-emerald-800/50 hover:border-emerald-600/50 hover:text-emerald-200',
-  save: 'bg-blue-900/40 text-blue-300 border border-blue-800/50 hover:bg-blue-800/50 hover:border-blue-600/50 hover:text-blue-200',
   item: 'bg-teal-900/40 text-teal-300 border border-teal-800/50 hover:bg-teal-800/50 hover:border-teal-600/50 hover:text-teal-200',
   death: 'bg-red-950/50 text-red-400 border border-red-900 hover:bg-red-900/50 hover:border-red-700 hover:text-red-300 animate-pulse',
 };
@@ -114,19 +113,6 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onQueueAction, onR
         fillText: `I roll a ${def?.label ?? skillName} check`,
         category: 'skill',
       });
-    }
-
-    // Saves: 2 proficient saving throws
-    if (classDef?.savingThrowProfs) {
-      for (const stat of classDef.savingThrowProfs.slice(0, 2)) {
-        actions.push({
-          id: `save-${stat}`,
-          label: `${stat.toUpperCase()} Save`,
-          icon: 'fa-shield-halved',
-          fillText: `I roll a ${stat.toUpperCase()} saving throw`,
-          category: 'save',
-        });
-      }
     }
 
     // Inventory shortcuts: any potion
