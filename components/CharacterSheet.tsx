@@ -189,14 +189,14 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ character, onUpdateInve
       <div className="space-y-2">
         <div className="flex justify-between text-sm uppercase font-bold tracking-wider"><span>Vitality</span><span className={character.hp.current<5?'text-red-500 animate-pulse':'text-stone-300'}>{character.hp.current} / {character.hp.max} HP</span></div>
         <Tooltip content="At 0 HP you fall unconscious and begin death saves (3 successes = stable / 3 failures = death). Nat 20 = 2 successes; nat 1 = 2 failures." side="top">
-          <div className="h-3 bg-stone-900 rounded-full overflow-hidden border border-stone-800"><div className={`h-full transition-all duration-500 ${hpPercent<30?'bg-red-600':'bg-green-600'}`} style={{width:`${hpPercent}%`}}/></div>
+          <div className="h-4 bg-stone-800 rounded-full overflow-hidden border border-stone-700"><div className={`h-full rounded-full transition-all duration-500 ${hpPercent<30?'bg-red-500':'bg-green-500'}`} style={{width:`${hpPercent}%`}}/></div>
         </Tooltip>
       </div>
 
       <Tooltip content={`AC ${totalAc}. Formula: Light armor = 11 + DEX, Medium = 13 + min(DEX, 2), Heavy = fixed. Unarmored = 10 + DEX. Add shield (+2) if equipped.`} side="top">
-        <div className="flex items-center justify-between bg-stone-900/40 border border-stone-850 p-2.5 rounded-lg">
-          <div className="flex items-center gap-2"><i className="fas fa-shield-halved text-amber-500"></i><span className="text-xs uppercase font-bold tracking-wider text-stone-400">Armor Class</span></div>
-          <span className="text-lg font-bold font-mono text-amber-400">{totalAc} AC</span>
+        <div className="flex items-center justify-between bg-stone-900/40 border border-stone-850 p-4 rounded-lg">
+          <div className="flex items-center gap-3"><i className="fas fa-shield-halved text-amber-500 text-lg"></i><span className="text-sm uppercase font-bold tracking-wider text-stone-400">Armor Class</span></div>
+          <span className="text-2xl font-bold font-mono text-amber-400">{totalAc}<span className="text-sm font-normal text-stone-500 ml-2">AC</span></span>
         </div>
       </Tooltip>
 
@@ -206,14 +206,14 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ character, onUpdateInve
         {((character.unusedStatPoints||0)>0||(character.unusedSkillPoints||0)>0)&&onLevelUp&&<button onClick={()=>onLevelUp(character.id)} className="w-full py-2 bg-amber-700 hover:bg-amber-600 rounded font-bold text-white animate-pulse uppercase tracking-wider text-xs mt-2 transition-all shadow-md shadow-amber-900/20 flex items-center justify-center gap-1.5 border border-amber-600/30"><i className="fas fa-crown text-[10px]"></i>Level Up Available!{character.unusedStatPoints>0&&<span className="bg-amber-900/50 px-1.5 py-0.5 rounded text-[8px] font-mono font-normal">+{character.unusedStatPoints} Stats</span>}{(character.unusedSkillPoints||0)>0&&<span className="bg-amber-950/50 px-1.5 py-0.5 rounded text-[8px] font-mono font-normal">+{character.unusedSkillPoints} Skills</span>}</button>}
       </div>
 
-      <div className="grid grid-cols-3 gap-3">{(Object.entries(character.stats) as [string,number][]).map(([stat,val])=>{
+      <div className="grid grid-cols-3 gap-4">{(Object.entries(character.stats) as [string,number][]).map(([stat,val])=>{
         const info = STAT_INFO[stat];
         return (
           <Tooltip key={stat} content={info ? `${info.label}: ${info.governs}` : stat} side="top" ariaLabel={info?.label}>
-            <div className="bg-stone-900/50 border border-stone-800 p-2 rounded text-center">
-              <div className="text-[10px] uppercase text-stone-500 font-bold">{stat}</div>
-              <div className="text-xl font-bold text-stone-100">{val}</div>
-              <div className="text-[10px] text-amber-600 font-medium">{getMod(val)>=0?'+':''}{getMod(val)}</div>
+            <div className="bg-stone-900/50 border border-stone-800 p-4 rounded-lg text-center">
+              <div className="text-xs uppercase text-stone-500 font-bold mb-1">{stat}</div>
+              <div className="text-2xl font-bold text-stone-100 leading-tight">{val}</div>
+              <div className="text-xs text-amber-600 font-semibold mt-1">{getMod(val)>=0?'+':''}{getMod(val)}</div>
             </div>
           </Tooltip>
         );
