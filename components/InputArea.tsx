@@ -182,7 +182,9 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onQueueAction, onR
         </div>
         <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-stone-700 scrollbar-track-transparent" style={{ scrollbarWidth: 'thin' }}>
           {quickActions.map(action => (
-            <QuickActionBtn key={action.id} action={action} locked={effectivelyLocked} onClick={() => setInput(action.fillText)} />
+            <Tooltip key={action.id} content={action.fillText} side="top">
+              <QuickActionBtn action={action} locked={effectivelyLocked} onClick={() => setInput(action.fillText)} />
+            </Tooltip>
           ))}
           <Tooltip content="Short Rest (1h): spend Hit Dice to recover HP. Refreshes Fighter Second Wind, Warlock pact slots, and other short-rest resources. No automatic HP." side="top">
             <QuickActionBtn action={{ id: 'shortrest', label: 'Short Rest', icon: 'fa-campground', fillText: '/shortrest', category: 'rest' }} locked={effectivelyLocked} onClick={() => setInput('/shortrest')} extraTitle="Pre-fill Short Rest command" />
