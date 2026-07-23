@@ -44,13 +44,17 @@ export interface CombatService {
 
 /** Clears combat-only conditions (duration == null) from a target, preserving minute/permanent durations. Returns the ids removed. */
 function clearEndOfCombatConditions(target: Character | Enemy): string[] {
-  if (!target.conditions?.length) return [];
-  const toRemove = target.conditions.filter(c => c.duration == null);
+  if (!target.conditions || target.conditions.length === 0) return [];
   const removed: string[] = [];
-  for (const cond of toRemove) {
-    removeCondition(target, cond.id, cond.source);
-    removed.push(cond.id);
-  }
+  target.conditions = target.conditions.filter(c => {
+    if (c.duration == null || c.durationUnit === 'round') {
+      if (c.durationUnit === 'round' || c.duration === null) {
+        removed.push(c.id);
+        return false;
+      }
+    }
+    return true;
+  });
   return removed;
 }
 
@@ -514,7 +518,6 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       for (const e of state.combat.enemies) {
         cleared.push(...clearEndOfCombatConditions(e));
       }
-      state.combat.isActive = false;
       state.combat = undefined;
       const clearedMsg = cleared.length ? ` Cleared: ${[...new Set(cleared)].join(', ')}.` : '';
       return {

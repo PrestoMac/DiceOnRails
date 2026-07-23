@@ -301,9 +301,8 @@ export function createInventoryService(state: GameState, deps: InventoryDeps): I
       }
 
       if (action === 'add') {
-        const GARBAGE_NAMES = /^(?:shop|man|woman|person|halfling|dwarf|elf|goblin|me|myself|yourself|out|in|up|down|some|any|of|the|a|an|it|them|this|that|those|these|there|here|someone|anyone|everyone|nobody)$/i;
-        if (GARBAGE_NAMES.test(cleanName)) {
-          return fail(`"${cleanName}" is not a valid item name and was rejected.`);
+        if (cleanName.split(/\s+/).length < 2 && cleanName.length < 6) {
+          return fail(`"${cleanName}" is too generic. Use a more descriptive name (e.g. "iron key" not just "key").`);
         }
 
         if (craft) {

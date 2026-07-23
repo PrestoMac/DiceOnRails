@@ -7,6 +7,7 @@ import { getAlertInitiativeBonus, getResilientSaveBonus, getShieldMasterSaveBonu
 import { ensureDeathSaves } from './characterUtils';
 import { rollDeathSave as diceRollDeathSave } from './diceEngine';
 import { parseDamageDice } from '../utils/dice';
+import { normalizeStat } from '../utils/lookups';
 
 /** Adds a new enemy to the combat state, optionally auto-filling stats from the SRD monster lookup, and rolls initiative if combat is active. */
 export function addEnemyToCombat(args: {
@@ -60,12 +61,39 @@ export function initializeCombat(party: Character[], enemies: Enemy[]): { combat
   return { combatState: { isActive: true, round: 1, turnIndex: 0, initiative: init, enemies }, initiativeOrder: init };
 }
 
+function findNextAliveInitiativeEntry(
+  initiative: InitiativeEntry[],
+  currentIndex: number,
+  party: Character[],
+  enemies: Enemy[]
+): { entry: InitiativeEntry; index: number } | null {
+  const total = initiative.length;
+  let idx = currentIndex;
+  for (let checked = 0; checked < total; checked++) {
+    idx = (idx + 1) % total;
+    const e = initiative[idx];
+    if (!e.isDead && !e.hasActedThisTurn) {
+      const entity =
+        e.type === 'player'
+          ? party.find((p) => p.id === e.id)
+          : enemies.find((en) => en.id === e.id);
+      if (entity && (isIncapacitated(entity) || isUnconscious(entity))) {
+        e.hasActedThisTurn = true;
+        continue;
+      }
+      return { entry: e, index: idx };
+    }
+  }
+  return null;
+}
+
 /** Advances combat to the next turn in initiative order, processing save-vs-condition rolls and condition expiry ticks at round boundaries. */
 export function advanceToNextTurn(cs: CombatState, party: Character[], enemies: Enemy[]): {
   nextEntry: InitiativeEntry | null; roundChanged: boolean; saveMessages: string[]; expiryMessages: string[];
 } {
   const cur = cs.initiative[cs.turnIndex];
-  const saveMsgs: string[] = []; const expiryMsgs: string[] = [];
+  const saveMsgs: string[] = [];
+  const expiryMsgs: string[] = [];
   if (cur) {
     cur.hasActedThisTurn = true;
     const c = cur.type === 'player' ? party.find(p => p.id === cur.id) : enemies.find(e => e.id === cur.id);
@@ -81,16 +109,9 @@ export function advanceToNextTurn(cs: CombatState, party: Character[], enemies: 
       for (const { id, source } of rm) removeCondition(c, id, source);
     }
   }
-  let nextIdx = -1; const total = cs.initiative.length; let idx = cs.turnIndex; let checked = 0;
-  while (checked < total) {
-    idx = (idx + 1) % total; checked++;
-    const e = cs.initiative[idx];
-    if (!e.isDead && !e.hasActedThisTurn) {
-      const skip = e.type === 'player' ? party.find(p => p.id === e.id) : enemies.find(en => en.id === e.id);
-      if (skip && (isIncapacitated(skip) || isUnconscious(skip))) { e.hasActedThisTurn = true; continue; }
-      nextIdx = idx; break;
-    }
-  }
+  let nextIdx = -1;
+  const found = findNextAliveInitiativeEntry(cs.initiative, cs.turnIndex, party, enemies);
+  if (found) nextIdx = found.index;
   let roundChanged = false;
   if (nextIdx === -1) {
     roundChanged = true; cs.round++;
@@ -206,8 +227,7 @@ export function rollDeathSave(ch: Character, cs: CombatState): {
 export function makeSavingThrow(target: Character, stat: string, dc: number): {
   success: boolean; roll: number; total: number; modifier: number; nat20: boolean; nat1: boolean; message: string;
 } {
-  const vs = ['str', 'dex', 'con', 'int', 'wis', 'cha'] as const;
-  const ms = vs.find(s => stat.toLowerCase().includes(s) || s.includes(stat.toLowerCase().trim())) || 'dex';
+  const ms = normalizeStat(stat);
   const sv = (target.stats as Record<string, number>)[ms] || 10; const bm = getMod(sv);
   const rb = getResilientSaveBonus(target, ms as 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha'); const smb = getShieldMasterSaveBonus(target, ms as 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha');
   const tm = bm + rb + smb; const roll = cryptoRoll(20); const total = roll + tm - getExhaustionPenalty(target);

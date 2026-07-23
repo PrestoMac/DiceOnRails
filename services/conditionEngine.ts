@@ -99,7 +99,7 @@ export function tickConditionsByTime(target: Target, minutes: number): string[] 
       continue;
     }
     if (cond.duration != null && cond.durationUnit === 'minute') {
-      cond.duration -= minutes;
+      cond.duration = Math.round((cond.duration - minutes) * 10) / 10;
       if (cond.duration <= 0) {
         expired.push(cond.id);
         executeConditionOnRemove(target, cond);

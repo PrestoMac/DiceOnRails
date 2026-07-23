@@ -762,7 +762,7 @@ describe('MockMCPServer', () => {
     it('rejects garbage item names for add', async () => {
       const result = await server.update_inventory('the', 'add', 1);
       expect(result.success).toBe(false);
-      expect(result.message).toContain('not a valid item name');
+      expect(result.message).toContain('too generic');
     });
 
     it('tries SRD lookup for unknown items', async () => {

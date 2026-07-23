@@ -174,6 +174,7 @@ export async function runAgentLoop(
   let narrateTurnExecuted = false;
 
   for (let iter = 0; iter < MAX_ITERS; iter++) {
+    criticalToolFailed = false;
     itersCompleted = iter + 1;
     const thinkingBody = getThinkingDisabledBody();
     const filteredTools = filterTools(tools, mcpServer.getFullState());
