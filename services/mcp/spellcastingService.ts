@@ -2,7 +2,7 @@ import { Character, GameState, MCPResponse } from '../../types';
 import { cryptoRoll } from '../../utils/random';
 import { fail, fuzzyMatchEntity, generateId } from './_shared';
 import { getMod, getProficiencyBonus, getClassDef, getSpellSaveDc, spendResource as classEngineSpendResource } from '../classEngine';
-import { castSpell as engineCastSpell, learnSpell as engineLearnSpell, prepareSpell as enginePrepareSpell, unprepareSpell as engineUnprepareSpell, canLearnSpell, breakConcentration as engineBreakConcentration } from '../spellcastingEngine';
+import { castSpell as engineCastSpell, learnSpell as engineLearnSpell, prepareSpell as enginePrepareSpell, unprepareSpell as engineUnprepareSpell, canLearnSpell, breakConcentration as engineBreakConcentration, getMaxPactSlotLevel } from '../spellcastingEngine';
 import { SPELLS_BY_ID, parseDuration } from '../../utils/spells';
 import { rollDice } from '../diceEngine';
 import { parseDiceFormula } from '../../utils/dice';
@@ -163,6 +163,14 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
       
       if (spellDef && spellDef.level > 0 && (!slotLevel || slotLevel < spellDef.level)) {
         slotLevel = spellDef.level;
+      }
+
+      
+      if (char.class === 'warlock' && spellDef && spellDef.level > 0) {
+        const maxPactLevel = getMaxPactSlotLevel(char);
+        if (slotLevel > maxPactLevel) {
+          return fail(`${char.name} (Warlock level ${char.level}) can only cast up to level ${maxPactLevel} pact magic slots.`);
+        }
       }
 
       const enrichedTargets = targets.map(id => {

@@ -6,7 +6,20 @@ import { cryptoRoll } from '../utils/random';
 import { SPELLS_BY_ID, parseDuration } from '../utils/spells';
 import { getConditionEffects, getExhaustionPenalty, executeConditionOnRemove } from './conditionEngine';
 
+export function getMaxPactSlotLevel(character: Character): number {
+  if (character.class !== 'warlock') return 0;
+  if (character.level >= 17) return 5;
+  if (character.level >= 11) return 4;
+  if (character.level >= 9) return 3;
+  if (character.level >= 5) return 2;
+  if (character.level >= 3) return 1;
+  return 0;
+}
+
 function findSpellSlot(character: Character, level: number) {
+  if (character.class === 'warlock') {
+    return (character.resources ?? []).find(r => r.id === 'pactMagic');
+  }
   return (character.resources ?? []).find(r => r.id === `spell-slot-${level}`);
 }
 
