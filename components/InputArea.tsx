@@ -11,6 +11,7 @@ interface QuickAction {
   label: string;
   icon: string;
   fillText: string;
+  tooltip?: string;
   category: 'spell' | 'weapon' | 'feature' | 'rest' | 'skill' | 'item' | 'death';
 }
 
@@ -63,11 +64,20 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onQueueAction, onR
     for (const spellId of spellIds) {
       const spell = SPELLS_BY_ID[spellId];
       if (!spell) continue;
+      const levelLabel = spell.level === 0 ? 'Cantrip' : `${spell.level}${spell.level === 1 ? 'st' : spell.level === 2 ? 'nd' : spell.level === 3 ? 'rd' : 'th'}-level`;
+      const damageStr = spell.damage ? `${spell.damage.dice} ${spell.damage.type}` : '';
+      const healStr = spell.healing ? `Heals ${spell.healing}` : '';
+      const saveStr = spell.save ? `DC save ${spell.save.stat.toUpperCase()} (${spell.save.onSuccess})` : '';
+      const atkStr = spell.attackRoll ? 'Spell attack' : '';
+      const concStr = spell.requiresConcentration ? 'Concentration' : '';
+      const extras = [damageStr, healStr, saveStr, atkStr, concStr].filter(Boolean).join(', ');
+      const shortDesc = spell.shortDescription || spell.description;
       actions.push({
         id: `spell-${spellId}`,
         label: spell.name,
         icon: SCHOOL_ICONS[spell.school] || 'fa-hat-wizard',
         fillText: `Cast ${spell.name}`,
+        tooltip: `${spell.name} — ${levelLabel} ${spell.school.charAt(0).toUpperCase() + spell.school.slice(1)}. ${spell.castingTime}, ${spell.range}${extras ? `. ${extras}` : ''}. ${shortDesc.slice(0, 120)}${shortDesc.length > 120 ? '...' : ''}`,
         category: 'spell',
       });
     }
@@ -76,11 +86,14 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onQueueAction, onR
       i => i.equipped && i.type === 'weapon'
     );
     for (const w of equippedWeapons) {
+      const dmg = w.stats?.damage ? `${w.stats.damage} ${w.stats.damageType || ''}` : '';
+      const props = w.stats?.properties?.length ? w.stats.properties.join(', ') : '';
       actions.push({
         id: `weapon-${w.name}`,
         label: w.name,
         icon: 'fa-crosshairs',
         fillText: `Attack with ${w.name}`,
+        tooltip: `${w.name}${dmg ? ` — ${dmg}` : ''}${props ? `. Properties: ${props}` : ''}${w.description ? `. ${w.description.slice(0, 100)}` : ''}`,
         category: 'weapon',
       });
     }
@@ -94,6 +107,7 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onQueueAction, onR
           label: feat.name,
           icon: 'fa-bolt',
           fillText: `Use ${feat.name}`,
+          tooltip: `${feat.name} (Level ${feat.level}, ${feat.kind.replace('-', ' ')}). ${feat.description.slice(0, 150)}${feat.description.length > 150 ? '...' : ''}`,
           category: 'feature',
         });
       }
@@ -111,6 +125,7 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onQueueAction, onR
         label: def?.label ?? skillName,
         icon: 'fa-dice-d20',
         fillText: `I roll a ${def?.label ?? skillName} check`,
+        tooltip: `${def?.label ?? skillName} (${def?.stat?.toUpperCase() || ''}) — ${def?.description ?? ''}`,
         category: 'skill',
       });
     }
@@ -118,11 +133,13 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onQueueAction, onR
     // Inventory shortcuts: any potion
     const potions = (character.inventory || []).filter(i => i.type === 'potion');
     for (const p of potions.slice(0, 3)) {
+      const heal = p.stats?.healing ? `Heals ${p.stats.healing}` : '';
       actions.push({
         id: `item-${p.name}`,
         label: p.name,
         icon: 'fa-flask',
         fillText: `Drink ${p.name}`,
+        tooltip: `${p.name}${heal ? ` — ${heal}` : ''}${p.description ? `. ${p.description.slice(0, 100)}` : ''}`,
         category: 'item',
       });
     }
@@ -134,6 +151,7 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onQueueAction, onR
         label: 'Death Save',
         icon: 'fa-skull',
         fillText: 'I roll a death saving throw',
+        tooltip: 'Roll d20 (no modifier). 10+ = success, 1 = 2 failures, 9 or less = failure. 3 successes = stable, 3 failures = death.',
         category: 'death',
       });
     }
@@ -182,7 +200,7 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onQueueAction, onR
         </div>
         <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-stone-700 scrollbar-track-transparent" style={{ scrollbarWidth: 'thin' }}>
           {quickActions.map(action => (
-            <Tooltip key={action.id} content={action.fillText} side="top">
+            <Tooltip key={action.id} content={action.tooltip} side="top">
               <QuickActionBtn action={action} locked={effectivelyLocked} onClick={() => setInput(action.fillText)} />
             </Tooltip>
           ))}
