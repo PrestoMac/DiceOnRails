@@ -74,7 +74,7 @@ import { isDebugMode } from '../utils/debug';
 import { bumpRewindGeneration } from '../services/rewindGeneration';
 import { isSyncableCampaign, ANONYMOUS_CAMPAIGN_ID } from '../utils/campaign';
 import {
-  isLazyNarration, buildDeterministicNarration, buildToolSummary, cleanSpeak,
+  cleanSpeak,
   dispatchToolRolls, DiceRollFn, buildContextString
 } from './gameActionHelpers';
 import { syncFinishedState as syncStateHelper, prepareContext as prepContext,
@@ -154,19 +154,10 @@ export const useGameActions = (
     const runPipeline_ = () => runPipeline(ctxRef.current, FREEZE_INTERVAL, messagesRef.current, ACTIVE_MSG_WINDOW);
 
     const resolveNarration = async (
-        _userText: string, toolMessages: Message[], inlineNarration: string | undefined,
-        streamingId: string, _isBatch: boolean
+        _userText: string, _toolMessages: Message[], inlineNarration: string | undefined,
+        _streamingId: string, _isBatch: boolean
     ): Promise<{ narrationText: string; usedStream: boolean }> => {
-        let narration = inlineNarration ?? '';
-        if (isLazyNarration(narration)) {
-            if (isDebugMode) console.log('[resolveNarration] inline narration was lazy, using deterministic fallback', { original: narration.slice(0, 100) });
-            const toolSummary = buildToolSummary(toolMessages);
-            narration = buildDeterministicNarration(toolSummary);
-            setMessages(prev => prev.map(m => m.id === streamingId ? { ...m, text: narration } : m));
-        } else {
-            if (isDebugMode) console.log('[resolveNarration] using inline narration', { len: narration.length, preview: narration.slice(0, 100) });
-        }
-        return { narrationText: narration, usedStream: false };
+        return { narrationText: inlineNarration ?? 'The adventure continues...', usedStream: false };
     };
 
     const handleSendMessage = async (text: string, isRetry = false) => {

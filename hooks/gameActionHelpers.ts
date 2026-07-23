@@ -1,4 +1,4 @@
-import { Character, Message } from '../types';
+import { Character } from '../types';
 import { mcpServer } from '../services/mcpService';
 import { getAllFeats } from '../services/featsService';
 import { getClassDef, getSubclassDef, getMod, getProficiencyBonus } from '../services/classEngine';
@@ -10,20 +10,6 @@ import { SPELLS_BY_ID } from '../utils/spells';
 export type DiceRollFn = (data: { characterName: string; skillName?: string; rollType?: string; label?: string; rollResult: number; modifier: number; skillRank?: number; sides?: number; difficulty?: number; success?: boolean; xpGained?: number; isCritical?: boolean; isFumble?: boolean }) => Promise<void>;
 /** Strips markdown bold (**) and bracketed annotations from a string for TTS. */
 export const cleanSpeak = (t: string) => t.replace(/\*\*/g, '').replace(/\[.*?\]/g, '').trim();
-/** Returns true if the narration text is too short, generic, or trivial to use as-is. */
-export function isLazyNarration(text: string): boolean {
-    if (!text) return true;
-    const t = text.trim();
-    if (t.length < 50 || /^The adventure continues[\s.!?,]*$/i.test(t) || /^(Done|OK|Continuing|Yes|No|Maybe|Sure|Understood|Continue)[\s.!?,]*$/i.test(t) || /^[\s.!?,]+$/.test(t) || /^(You continue|You persist|You carry on|You press on)[\s.!?,]*$/i.test(t)) return true;
-    return false;
-}
-/** Builds a deterministic fallback narration from the last few tool results when the LLM-generated narration is lazy. */
-export function buildDeterministicNarration(toolSummary: { toolName: string; message: string }[]): string {
-    const ct = ['roll_dice', 'player_attack', 'inflict_damage', 'next_turn'];
-    const st: Record<string, string> = { start_combat: 'Combat begins.', end_combat: 'Combat ends.' };
-    const moves = toolSummary.map(t => st[t.toolName] ?? (ct.includes(t.toolName) ? t.message : null)).filter((m): m is string => !!m && m.length > 5);
-    return moves.length > 0 ? moves.slice(-3).join(' ') : 'The scene unfolds.';
-}
 /** Extracts equipped weapon details, ability modifiers, and proficiency bonus for a character. */
 export function getWeaponInfo(c: Character) {
     const eq = c.inventory.find(i => i.type === 'weapon' && i.equipped);
@@ -37,12 +23,6 @@ export function getWeaponInfo(c: Character) {
         if (dm) { count = parseInt(dm[1], 10); sides = parseInt(dm[2], 10); }
     }
     return { equippedWeapon: eq, weaponName: wn, strMod: sM, dexMod: dM, weaponMod: mod, weaponSides: sides, weaponCount: count, profBonus: getProficiencyBonus(c as unknown as Character) };
-}
-/** Extracts the last 10 tool messages into a summary of tool name and truncated message. */
-export function buildToolSummary(toolMessages: Message[]) {
-    return toolMessages.filter(m => m.text.startsWith('[System:')).slice(-10).map(m => ({
-        toolName: m.text.match(/\[System:(\w+)\]/)?.[1] || 'tool', message: m.text.replace(/\[System:\w+\]\s*/, '').slice(0, 400),
-    }));
 }
 /** Builds a full context string for the LLM including character state, party, combat, world, quests, and lore. */
 export function buildContextString(myCharacterId: string | null): string {

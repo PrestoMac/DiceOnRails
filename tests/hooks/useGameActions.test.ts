@@ -42,12 +42,10 @@ vi.mock('../../services/mcpService', () => ({
 
 const mockGenerateNarration = vi.fn();
 const mockGenerateNarrationStream = vi.fn();
-const mockGenerateTightNarration = vi.fn();
 const mockRunAgentLoop = vi.fn();
 vi.mock('../../services/llm', () => ({
   generateNarration: (...args: unknown[]) => mockGenerateNarration(...args),
   generateNarrationStream: (...args: unknown[]) => mockGenerateNarrationStream(...args),
-  generateTightNarration: (...args: unknown[]) => mockGenerateTightNarration(...args),
   runAgentLoop: (...args: unknown[]) => mockRunAgentLoop(...args),
   estimateTokens: vi.fn(() => 10),
   compressRawToCheckpoint: vi.fn().mockResolvedValue(''),
@@ -149,7 +147,6 @@ describe('useGameActions', () => {
       promise: Promise.resolve('The adventure continues...'),
       cancel: vi.fn()
     });
-    mockGenerateTightNarration.mockResolvedValue('The adventure continues...');
     mockRunAgentLoop.mockResolvedValue({ toolMessages: [], iterationCount: 0, promptTokens: 0, completionTokens: 0, cachedTokens: 0 });
   });
 
@@ -212,7 +209,6 @@ describe('useGameActions', () => {
       // built from ctxRef via prepContext). We verify the frozen array reflects
       // Campaign B's checkpoint, not Campaign A's empty state.
       mockRunAgentLoop.mockClear();
-      mockGenerateTightNarration.mockClear();
       await act(async () => {
         await result.current.handleSendMessage('I look around');
       });
@@ -252,7 +248,6 @@ describe('useGameActions', () => {
       });
 
       mockRunAgentLoop.mockClear();
-      mockGenerateTightNarration.mockClear();
       await act(async () => {
         await result.current.handleSendMessage('I do something');
       });
@@ -285,7 +280,6 @@ describe('useGameActions', () => {
     expect(setMessages).toHaveBeenCalled();
     expect(setIsLoading).toHaveBeenCalledWith(true);
     expect(mockRunAgentLoop).toHaveBeenCalledTimes(1);
-    expect(mockGenerateTightNarration).toHaveBeenCalledTimes(0);
   });
 
   it('handleSendMessage blocks duplicate processing', async () => {
@@ -299,7 +293,6 @@ describe('useGameActions', () => {
 
     await Promise.all([msgPromise1, msgPromise2]);
     expect(mockRunAgentLoop).toHaveBeenCalledTimes(1);
-    expect(mockGenerateTightNarration).toHaveBeenCalledTimes(0);
   });
 
   it('handleSendMessage syncs campaign state for authenticated users', async () => {

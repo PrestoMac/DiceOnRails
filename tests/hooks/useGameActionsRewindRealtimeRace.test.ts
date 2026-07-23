@@ -20,11 +20,9 @@ vi.mock('../../utils/debug', () => ({
 }));
 
 const mockRunAgentLoop = vi.fn();
-const mockGenerateTightNarration = vi.fn();
 
 vi.mock('../../services/llm', () => ({
   runAgentLoop: (...args: unknown[]) => mockRunAgentLoop(...args),
-  generateTightNarration: (...args: unknown[]) => mockGenerateTightNarration(...args),
   estimateTokens: vi.fn(() => 10),
   compressRawToCheckpoint: vi.fn().mockResolvedValue(''),
   enforceTokenBudget: vi.fn().mockImplementation(({ frozenMessages }: { activeMessages: unknown[]; frozenMessages: unknown[] }) => ({
@@ -106,7 +104,6 @@ describe('useGameActions rewind race — campaign mode + simulated realtime', ()
   beforeEach(async () => {
     vi.clearAllMocks();
     vi.mocked(cryptoRoll).mockReturnValue(10);
-    mockGenerateTightNarration.mockResolvedValue('The fireball erupts!');
     mockRunAgentLoop.mockReset();
     syncedStates.length = 0;
 
