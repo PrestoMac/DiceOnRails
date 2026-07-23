@@ -14,11 +14,11 @@ import {
   resolveAllEnemyTurns,
   checkVictoryConditions,
   useCharacterReaction,
-  updateCombatantDeathStatus,
   getCurrentCombatActor,
   rollDeathSave,
   makeSavingThrow,
 } from '../../services/combatEngine';
+import { updateCombatantDeathStatus } from '../../services/characterUtils';
 
 import { applyCondition } from '../../services/conditionEngine';
 import { makeCharacter } from '../helpers/characters';

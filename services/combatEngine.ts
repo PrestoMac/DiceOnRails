@@ -4,7 +4,8 @@ import { lookupMonster } from '../utils/monsters';
 import { getConditionEffects, isUnconscious, isIncapacitated, removeCondition, tickConditions, rollSaveAgainstCondition, getExhaustionPenalty } from './conditionEngine';
 import { calculateAc, getMod } from './classEngine';
 import { getAlertInitiativeBonus, getResilientSaveBonus, getShieldMasterSaveBonus } from './featsService';
-function ensureDeathSaves(c: Character) { if (!c.deathSaves) c.deathSaves = { successes: 0, failures: 0, isStable: false }; }
+import { ensureDeathSaves, updateCombatantDeathStatus } from './characterUtils';
+import { rollDeathSave as diceRollDeathSave } from './diceEngine';
 
 /** Adds a new enemy to the combat state, optionally auto-filling stats from the SRD monster lookup, and rolls initiative if combat is active. */
 export function addEnemyToCombat(args: {
@@ -186,13 +187,6 @@ export function useCharacterReaction(ch: Character): { success: boolean; message
   return { success: true, message: `${ch.name}'s reaction spent.` };
 }
 
-/** Updates the death status of a combatant in initiative order. When marking dead (isDead=true), also flags the matching enemies-list entry; the enemies-list flag is NOT cleared when reviving (isDead=false) — only the initiative entry is. */
-export function updateCombatantDeathStatus(cs: CombatState, id: string, isDead: boolean): CombatState {
-  const e = cs.initiative.find(x => x.id === id); if (e) e.isDead = isDead;
-  if (isDead) { const en = cs.enemies.find(x => x.id === id); if (en) en.isDead = true; }
-  return cs;
-}
-
 /** Returns the name, type, and ID of the actor whose turn it currently is in combat, or null if combat is inactive. */
 export function getCurrentCombatActor(cs: CombatState): { name: string; type: 'player' | 'enemy'; id: string } | null {
   if (!cs.isActive) return null;
@@ -200,19 +194,11 @@ export function getCurrentCombatActor(cs: CombatState): { name: string; type: 'p
   return e ? { name: e.name, type: e.type, id: e.id } : null;
 }
 
-/** Performs a death save for a character: natural 20 revives with 1 HP, >=10 success, <10 failure; 3 failures marks them as dead. */
+/** Performs a death save for a character: natural 20 revives with 1 HP, >=10 success, <10 failure; 3 failures marks them as dead. Delegates to the canonical diceEngine version. */
 export function rollDeathSave(ch: Character, cs: CombatState): {
   message: string; roll: number; total: number; successes: number; failures: number; isStable: boolean; revived: boolean; died: boolean;
 } {
-  ensureDeathSaves(ch); const s = ch.deathSaves as NonNullable<typeof ch.deathSaves>;
-  if (s.isStable) return { message: `${ch.name} is stable.`, roll: 0, total: 0, successes: s.successes, failures: s.failures, isStable: true, revived: false, died: false };
-  const rawRoll = cryptoRoll(20);
-  const total = rawRoll - getExhaustionPenalty(ch);
-  if (rawRoll === 20) { ch.hp.current = 1; ch.deathSaves = { successes: 0, failures: 0, isStable: false }; updateCombatantDeathStatus(cs, ch.id, false); return { message: `${ch.name} rolls DEATH SAVE: **Natural 20!** Revived with 1 HP!`, roll: rawRoll, total, successes: 0, failures: 0, isStable: false, revived: true, died: false }; }
-  if (total >= 10) { s.successes++; if (s.successes >= 3) s.isStable = true; return { message: `${ch.name} rolls DEATH SAVE: **${rawRoll}** — ${s.successes >= 3 ? '3 successes! Stabilized.' : `Success (${s.successes}/3)`}`, roll: rawRoll, total, successes: s.successes, failures: s.failures, isStable: s.isStable, revived: false, died: false }; }
-  s.failures++; const dead = s.failures >= 3;
-  if (dead) updateCombatantDeathStatus(cs, ch.id, true);
-  return { message: `${ch.name} rolls DEATH SAVE: **${rawRoll}** — ${dead ? `3 failures! **${ch.name} has died.**` : `Failure (${s.failures}/3)`}`, roll: rawRoll, total, successes: s.successes, failures: s.failures, isStable: false, revived: false, died: dead };
+  return diceRollDeathSave(ch, cs);
 }
 
 /** Makes a saving throw for a target against a given DC, accounting for Resilient and Shield Master feat bonuses. */

@@ -5,11 +5,13 @@ import { SKILLS_LIST } from '../../constants';
 import { isDebugMode } from '../../utils/debug';
 import { getMod, getClassDef, recoverResources as classEngineRecoverResources } from '../classEngine';
 import { awardExperience } from '../progressionService';
-import { getConditionEffects, applyCondition, tickConditionsByTime, tickConditionsByRounds, hasCondition, getExhaustionPenalty } from '../conditionEngine';
+import { getConditionEffects, applyCondition, tickConditionsByTime, tickConditionsByRounds, hasCondition, getExhaustionPenalty, executeConditionOnRemove } from '../conditionEngine';
 import { getTimePeriod, AMBIENT_LINES } from '../../utils/timeUtils';
 import { SPELLS_BY_ID } from '../../utils/spells';
 import { breakConcentration as engineBreakConcentration, checkConcentrationExpiry } from '../spellcastingEngine';
 import { ensureGameStateFields } from './stateService';
+import { ensureAllCharacterFields } from '../characterUtils';
+import { resolveAdvantage } from '../../utils/combatUtils';
 import {
   rerollDamageValueIfApplicable,
   getOffHandAbilityModifier,
@@ -61,36 +63,11 @@ export interface TravelService {
 
 /** Creates a new TravelService instance operating on the given GameState. */
 export function createTravelService(state: GameState, deps: TravelDeps): TravelService {
-  function ensureCharacterFields(): void {
-    for (const char of state.party) {
-      char.hitDice ??= { current: char.level, max: char.level };
-      char.feats ??= [];
-      char.featSelections ??= [];
-      char.featChoices ??= {};
-      char.pendingFeatChoice ??= false;
-      if (char.class) char.class = char.class.toLowerCase();
-      if (char.race) char.race = char.race.toLowerCase();
-      char.resources ??= [];
-      char.knownSpells ??= [];
-      char.preparedSpells ??= [];
-      char.racialTraits ??= [];
-      char.unlockedSubclassFeatures ??= [];
-      char.pendingSubclassFeature ??= false;
-      if (!char.conditionsImmunities && (char.racialTraits || []).includes('fey-ancestry')) {
-        char.conditionsImmunities = ['unconscious'];
-      }
-    }
-  }
-
   function clearNonMinuteConditions(char: Character): string[] {
     if (!char.conditions || char.conditions.length === 0) return [];
     const toRemove = char.conditions.filter(c => c.durationUnit !== 'minute');
     for (const cond of toRemove) {
-      if (cond.onRemove) {
-        if (typeof cond.onRemove === 'function') cond.onRemove(char);
-        else if (cond.onRemove.kind === 'acBonus')
-          char.acBonus = Math.max(0, (char.acBonus || 0) - cond.onRemove.value);
-      }
+      executeConditionOnRemove(char, cond);
     }
     char.conditions = char.conditions.filter(c => c.durationUnit === 'minute');
     return toRemove.map(c => c.id);
@@ -190,26 +167,19 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
           ? state.party.find((c: Character) => c.id === target_name || c.name.toLowerCase() === target_name.toLowerCase()) ||
             state.combat?.enemies.find((e: Enemy) => e.id === target_name || e.name.toLowerCase() === target_name.toLowerCase())
           : undefined;
-        const advResult = (() => {
-          let hasAdvantage = false, hasDisadvantage = false;
-          if (attacker) {
-            const ae = getConditionEffects(attacker);
-            if (ae.advantageOnAttacks) hasAdvantage = true;
-            if (ae.disadvantageOnAttacks) hasDisadvantage = true;
-          }
-          if (targetObj) {
-            const te = getConditionEffects(targetObj);
-            if (te.attacksAgainstHaveAdvantage) hasAdvantage = true;
-          }
-          if (hasAdvantage && hasDisadvantage) { hasAdvantage = false; hasDisadvantage = false; }
-          let roll = results[0];
-          if (hasAdvantage || hasDisadvantage) {
-            const secondRoll = cryptoRoll(20);
-            roll = hasAdvantage ? Math.max(roll, secondRoll) : Math.min(roll, secondRoll);
-          }
-          return { roll, hasAdvantage, hasDisadvantage };
-        })();
-        if (advResult.hasAdvantage || advResult.hasDisadvantage) {
+        let hasAdvantage2 = false, hasDisadvantage2 = false;
+        if (attacker) {
+          const ae = getConditionEffects(attacker);
+          if (ae.advantageOnAttacks) hasAdvantage2 = true;
+          if (ae.disadvantageOnAttacks) hasDisadvantage2 = true;
+        }
+        if (targetObj) {
+          const te = getConditionEffects(targetObj);
+          if (te.attacksAgainstHaveAdvantage) hasAdvantage2 = true;
+        }
+        const secondRoll3 = cryptoRoll(20);
+        const advResult = resolveAdvantage(results[0], secondRoll3, hasAdvantage2, hasDisadvantage2);
+        if (advResult.hadAdvantage || advResult.hadDisadvantage) {
           results[0] = advResult.roll;
           const newRawTotal = results.reduce((a: number, b: number) => a + b, 0);
           const ohb = attacker && isOffHand ? getOffHandAbilityModifier(attacker) : 0;
@@ -626,7 +596,7 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
     async long_rest(narration, autoAdvanceTime) {
       const messages: string[] = [];
       const healResults: Array<{ name: string; class?: string; level: number; hpRestored: number; hpMax: number; hitDieSize: number; hitDicePrev: number; hitDiceNew: number; hitDiceMax: number }> = [];
-      ensureCharacterFields();
+      ensureAllCharacterFields(state.party);
       ensureGameStateFields(state);
       const elapsed = (state.gameTime as number) - (state.lastLongRestTime ?? -960);
       if (elapsed < 960) {
@@ -716,7 +686,7 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
     },
 
     async short_rest(targetId, narration, autoAdvanceTime) {
-      ensureCharacterFields();
+      ensureAllCharacterFields(state.party);
       for (const char of state.party) {
         classEngineRecoverResources(char, 'short');
         for (const slot of char.resources) {

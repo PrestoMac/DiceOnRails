@@ -4,6 +4,16 @@ import { getMod } from './classEngine';
 
 type Target = Character | Enemy;
 
+/** Executes the onRemove handler of a condition if present. */
+export function executeConditionOnRemove(target: Target, condition: ActiveCondition): void {
+  if (!condition.onRemove) return;
+  if (typeof condition.onRemove === 'function') {
+    condition.onRemove(target);
+  } else if (condition.onRemove.kind === 'acBonus') {
+    target.acBonus = Math.max(0, (target.acBonus || 0) - condition.onRemove.value);
+  }
+}
+
 /** Parses the highest exhaustion level from a target's active conditions matching 'exhaustion-N'. */
 export function parseExhaustionLevel(target: Target): number {
   const levels = (target.conditions ?? [])
@@ -43,13 +53,7 @@ export function removeCondition(target: Target, conditionId: string, source?: st
   const before = target.conditions.length;
   for (const c of target.conditions) {
     if (c.id === conditionId && (source === undefined || c.source === source)) {
-      if (c.onRemove) {
-        if (typeof c.onRemove === 'function') {
-          c.onRemove(target);
-        } else if (c.onRemove.kind === 'acBonus') {
-          target.acBonus = Math.max(0, (target.acBonus || 0) - c.onRemove.value);
-        }
-      }
+      executeConditionOnRemove(target, c);
     }
   }
   target.conditions = target.conditions.filter(c =>
@@ -76,13 +80,7 @@ export function tickConditions(target: Target): string[] {
       cond.duration--;
       if (cond.duration <= 0) {
         expired.push(cond.id);
-        if (cond.onRemove) {
-          if (typeof cond.onRemove === 'function') {
-            cond.onRemove(target);
-          } else if (cond.onRemove.kind === 'acBonus') {
-            target.acBonus = Math.max(0, (target.acBonus || 0) - cond.onRemove.value);
-          }
-        }
+        executeConditionOnRemove(target, cond);
         continue;
       }
     }
@@ -106,11 +104,7 @@ export function tickConditionsByTime(target: Target, minutes: number): string[] 
       cond.duration -= minutes;
       if (cond.duration <= 0) {
         expired.push(cond.id);
-        if (cond.onRemove) {
-          if (typeof cond.onRemove === 'function') cond.onRemove(target);
-          else if (cond.onRemove.kind === 'acBonus')
-            target.acBonus = Math.max(0, (target.acBonus || 0) - cond.onRemove.value);
-        }
+        executeConditionOnRemove(target, cond);
         continue;
       }
     }
@@ -136,11 +130,7 @@ export function tickConditionsByRounds(target: Target, rounds: number): string[]
       cond.duration -= rounds;
       if (cond.duration <= 0) {
         expired.push(cond.id);
-        if (cond.onRemove) {
-          if (typeof cond.onRemove === 'function') cond.onRemove(target);
-          else if (cond.onRemove.kind === 'acBonus')
-            target.acBonus = Math.max(0, (target.acBonus || 0) - cond.onRemove.value);
-        }
+        executeConditionOnRemove(target, cond);
         continue;
       }
     }

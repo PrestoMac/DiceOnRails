@@ -1,8 +1,10 @@
 import { cryptoRoll } from '../utils/random';
 import { SKILLS_LIST } from '../constants';
-import type { RollData, Character } from '../types';
+import type { RollData, Character, CombatState } from '../types';
 import { getMod, getProficiencyBonus } from './classEngine';
 import { parseDiceFormula } from '../utils/dice';
+import { getExhaustionPenalty } from './conditionEngine';
+import { ensureDeathSaves, updateCombatantDeathStatus } from './characterUtils';
 
 type StatKey = 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
 
@@ -212,10 +214,9 @@ export function rollSavingThrow(params: {
   return { type: 'save', dieFace: 'd20', dieRoll: roll, modifier: totalMod, total, dc, success: total >= dc, stat: mappedStat.toUpperCase(), label: mappedStat.toUpperCase() };
 }
 
-/** Rolls a death save: natural 20 is a critical success, >=10 is a success, <10 is a failure (natural 1 is critical failure). */
-export function rollDeathSave(): RollData {
+/** Simple death save roll returning RollData for UI display. */
+export function rollDeathSaveRoll(): RollData {
   const roll = cryptoRoll(20);
-
   if (roll === 20) {
     return { type: 'death_save', dieFace: 'd20', dieRoll: roll, modifier: 0, total: roll, success: true, isCritical: true, isFumble: false, label: 'Death Save' };
   }
@@ -223,6 +224,34 @@ export function rollDeathSave(): RollData {
     return { type: 'death_save', dieFace: 'd20', dieRoll: roll, modifier: 0, total: roll, success: true, isCritical: false, isFumble: false, label: 'Death Save' };
   }
   return { type: 'death_save', dieFace: 'd20', dieRoll: roll, modifier: 0, total: roll, success: false, isCritical: false, isFumble: roll === 1, label: 'Death Save' };
+}
+
+export function rollDeathSave(ch: Character, cs?: CombatState): {
+  message: string; roll: number; total: number; successes: number;
+  failures: number; isStable: boolean; revived: boolean; died: boolean;
+} {
+  ensureDeathSaves(ch);
+  const s = ch.deathSaves as NonNullable<typeof ch.deathSaves>;
+  if (s.isStable) {
+    return { message: `${ch.name} is stable.`, roll: 0, total: 0, successes: s.successes, failures: s.failures, isStable: true, revived: false, died: false };
+  }
+  const rawRoll = cryptoRoll(20);
+  const total = rawRoll - getExhaustionPenalty(ch);
+  if (rawRoll === 20) {
+    ch.hp.current = 1;
+    ch.deathSaves = { successes: 0, failures: 0, isStable: false };
+    if (cs) updateCombatantDeathStatus(cs, ch.id, false);
+    return { message: `${ch.name} rolls DEATH SAVE: **Natural 20!** Revived with 1 HP!`, roll: rawRoll, total, successes: 0, failures: 0, isStable: false, revived: true, died: false };
+  }
+  if (total >= 10) {
+    s.successes++;
+    if (s.successes >= 3) s.isStable = true;
+    return { message: `${ch.name} rolls DEATH SAVE: **${rawRoll}** — ${s.successes >= 3 ? '3 successes! Stabilized.' : `Success (${s.successes}/3)`}`, roll: rawRoll, total, successes: s.successes, failures: s.failures, isStable: s.isStable, revived: false, died: false };
+  }
+  s.failures++;
+  const dead = s.failures >= 3;
+  if (dead && cs) updateCombatantDeathStatus(cs, ch.id, true);
+  return { message: `${ch.name} rolls DEATH SAVE: **${rawRoll}** — ${dead ? `3 failures! **${ch.name} has died.**` : `Failure (${s.failures}/3)`}`, roll: rawRoll, total, successes: s.successes, failures: s.failures, isStable: false, revived: false, died: dead };
 }
 
 const VALID_STATS: StatKey[] = ['str', 'dex', 'con', 'int', 'wis', 'cha'];

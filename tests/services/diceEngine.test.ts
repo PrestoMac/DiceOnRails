@@ -12,7 +12,7 @@ import {
   rollDamage,
   rollSkillCheck,
   rollSavingThrow,
-  rollDeathSave,
+  rollDeathSaveRoll,
 } from '../../services/diceEngine';
 
 const defaultStats = { str: 16, dex: 14, con: 14, int: 8, wis: 12, cha: 10 };
@@ -600,10 +600,10 @@ describe('rollSavingThrow', () => {
   });
 });
 
-describe('rollDeathSave', () => {
+describe('rollDeathSaveRoll', () => {
   it('nat20 returns critical success', () => {
     mockCryptoRoll.mockReturnValue(20);
-    const result = rollDeathSave();
+    const result = rollDeathSaveRoll();
     expect(result.success).toBe(true);
     expect(result.isCritical).toBe(true);
     expect(result.isFumble).toBe(false);
@@ -611,7 +611,7 @@ describe('rollDeathSave', () => {
 
   it('roll 10 returns success', () => {
     mockCryptoRoll.mockReturnValue(10);
-    const result = rollDeathSave();
+    const result = rollDeathSaveRoll();
     expect(result.success).toBe(true);
     expect(result.isCritical).toBe(false);
     expect(result.isFumble).toBe(false);
@@ -619,7 +619,7 @@ describe('rollDeathSave', () => {
 
   it('roll 19 returns success', () => {
     mockCryptoRoll.mockReturnValue(19);
-    const result = rollDeathSave();
+    const result = rollDeathSaveRoll();
     expect(result.success).toBe(true);
     expect(result.isCritical).toBe(false);
     expect(result.isFumble).toBe(false);
@@ -627,7 +627,7 @@ describe('rollDeathSave', () => {
 
   it('roll 9 returns failure', () => {
     mockCryptoRoll.mockReturnValue(9);
-    const result = rollDeathSave();
+    const result = rollDeathSaveRoll();
     expect(result.success).toBe(false);
     expect(result.isCritical).toBe(false);
     expect(result.isFumble).toBe(false);
@@ -635,7 +635,7 @@ describe('rollDeathSave', () => {
 
   it('roll 2 returns failure', () => {
     mockCryptoRoll.mockReturnValue(2);
-    const result = rollDeathSave();
+    const result = rollDeathSaveRoll();
     expect(result.success).toBe(false);
     expect(result.isCritical).toBe(false);
     expect(result.isFumble).toBe(false);
@@ -643,7 +643,7 @@ describe('rollDeathSave', () => {
 
   it('nat1 returns fumble', () => {
     mockCryptoRoll.mockReturnValue(1);
-    const result = rollDeathSave();
+    const result = rollDeathSaveRoll();
     expect(result.success).toBe(false);
     expect(result.isCritical).toBe(false);
     expect(result.isFumble).toBe(true);

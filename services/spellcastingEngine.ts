@@ -4,7 +4,7 @@ import { rollDice } from './diceEngine';
 import { parseDiceFormula } from '../utils/dice';
 import { cryptoRoll } from '../utils/random';
 import { SPELLS_BY_ID, parseDuration } from '../utils/spells';
-import { getConditionEffects, getExhaustionPenalty } from './conditionEngine';
+import { getConditionEffects, getExhaustionPenalty, executeConditionOnRemove } from './conditionEngine';
 
 function findSpellSlot(character: Character, level: number) {
   return (character.resources ?? []).find(r => r.id === `spell-slot-${level}`);
@@ -473,13 +473,7 @@ export function breakConcentration(character: Character, reason: 'damaged' | 'vo
       for (const cond of toRemove) {
         const idx = character.conditions.indexOf(cond);
         if (idx !== -1) {
-          if (cond.onRemove) {
-            if (typeof cond.onRemove === 'function') {
-              cond.onRemove(character);
-            } else if (cond.onRemove.kind === 'acBonus') {
-              character.acBonus = Math.max(0, (character.acBonus || 0) - cond.onRemove.value);
-            }
-          }
+          executeConditionOnRemove(character, cond);
           character.conditions.splice(idx, 1);
         }
       }
@@ -493,13 +487,7 @@ export function breakConcentration(character: Character, reason: 'damaged' | 'vo
     for (const cond of toRemove) {
       const idx = character.conditions.indexOf(cond);
       if (idx !== -1) {
-        if (cond.onRemove) {
-          if (typeof cond.onRemove === 'function') {
-            cond.onRemove(character);
-          } else if (cond.onRemove.kind === 'acBonus') {
-            character.acBonus = Math.max(0, (character.acBonus || 0) - cond.onRemove.value);
-          }
-        }
+        executeConditionOnRemove(character, cond);
         character.conditions.splice(idx, 1);
       }
     }

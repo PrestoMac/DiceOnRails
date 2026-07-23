@@ -10,8 +10,9 @@ import {
   getResilientSaveBonus,
   getShieldMasterSaveBonus,
 } from '../featsService';
-import { rollDice } from '../diceEngine';
+import { rollDice, rollDeathSave } from '../diceEngine';
 import { parseDiceFormula } from '../../utils/dice';
+import { resolveAdvantage } from '../../utils/combatUtils';
 import { breakConcentration as engineBreakConcentration, checkConcentrationExpiry } from '../spellcastingEngine';
 
 /** Dependencies required by the CombatService. */
@@ -101,12 +102,9 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
         const te = getConditionEffects(target);
         if (te.attacksAgainstHaveAdvantage) hasAdvantage = true;
       }
-      if (hasAdvantage && hasDisadvantage) { hasAdvantage = false; hasDisadvantage = false; }
-      if (hasAdvantage || hasDisadvantage) {
-        const secondRoll = cryptoRoll(20);
-        roll = hasAdvantage ? Math.max(roll, secondRoll) : Math.min(roll, secondRoll);
-      }
-      return { roll, hasAdvantage, hasDisadvantage };
+      const secondRoll = cryptoRoll(20);
+      const resolved = resolveAdvantage(roll, secondRoll, hasAdvantage, hasDisadvantage);
+      return { roll: resolved.roll, hasAdvantage: resolved.hadAdvantage, hasDisadvantage: resolved.hadDisadvantage };
     },
 
     updateInitiativeDeathStatus(id: string, isDead: boolean): void {
@@ -575,11 +573,9 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
         const te = getConditionEffects(target);
         if (te.attacksAgainstHaveAdvantage) hasAdvantage = true;
       }
-      if (hasAdvantage && hasDisadvantage) { hasAdvantage = false; hasDisadvantage = false; }
-      if (hasAdvantage || hasDisadvantage) {
-        const secondRoll = cryptoRoll(20);
-        atkRoll = hasAdvantage ? Math.max(atkRoll, secondRoll) : Math.min(atkRoll, secondRoll);
-      }
+      const secondRoll2 = cryptoRoll(20);
+      const resolved = resolveAdvantage(atkRoll, secondRoll2, hasAdvantage, hasDisadvantage);
+      atkRoll = resolved.roll;
 
       const roll = atkRoll;
       const attackRoll = roll + attack.toHit - getExhaustionPenalty(enemy);
@@ -712,40 +708,10 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       if (!target) return fail("Target character not found.");
       if (target.hp.current > 0) return fail(`${target.name} is not dying.`);
 
-      initializeDeathSaves(target);
-      const saves = target.deathSaves as NonNullable<typeof target.deathSaves>;
+      const combatState = state.combat?.isActive ? state.combat : undefined;
+      const result = rollDeathSave(target, combatState);
 
-      if (saves.isStable) {
-        return { success: true, data: { deathSaves: saves }, message: `${target.name} is stable.` };
-      }
-
-      const roll = cryptoRoll(20);
-      let msg = '';
-
-      if (roll === 20) {
-        target.hp.current = 1;
-        target.deathSaves = { successes: 0, failures: 0, isStable: false };
-        this.updateInitiativeDeathStatus(target.id, false);
-        msg = `${target.name} rolls a DEATH SAVE: **Natural 20!** Revived with 1 HP!`;
-      } else if (roll >= 10) {
-        saves.successes++;
-        if (saves.successes >= 3) {
-          saves.isStable = true;
-          msg = `${target.name} rolls a DEATH SAVE: **${roll}** — 3 successes! Stabilized at 0 HP.`;
-        } else {
-          msg = `${target.name} rolls a DEATH SAVE: **${roll}** — Success (${saves.successes}/3)`;
-        }
-      } else {
-        saves.failures++;
-        if (saves.failures >= 3) {
-          this.updateInitiativeDeathStatus(target.id, true);
-          msg = `${target.name} rolls a DEATH SAVE: **${roll}** — 3 failures! **${target.name} has died.**`;
-        } else {
-          msg = `${target.name} rolls a DEATH SAVE: **${roll}** — Failure (${saves.failures}/3)`;
-        }
-      }
-
-      return { success: true, data: { deathSaves: saves, roll }, message: msg };
+      return { success: true, data: { deathSaves: target.deathSaves, roll: result.roll }, message: result.message };
     },
 
     async resolveEnemyTurn() {

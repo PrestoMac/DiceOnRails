@@ -1,4 +1,5 @@
 import { GameState, Message } from '../../types';
+import { ensureAllCharacterFields } from '../characterUtils';
 
 
 
@@ -43,27 +44,6 @@ export function createStateService(state: GameState): StateService {
   let _snapshot: GameState | undefined;
   let rewindPoint: { gameState: GameState; messages: Message[] } | null = null;
   let emergencySnapshot: GameState | null = null;
-  function ensureCharacterFields(): void {
-    for (const char of state.party) {
-      char.hitDice ??= { current: char.level, max: char.level };
-      char.feats ??= [];
-      char.featSelections ??= [];
-      char.featChoices ??= {};
-      char.pendingFeatChoice ??= false;
-      if (char.class) char.class = char.class.toLowerCase();
-      if (char.race) char.race = char.race.toLowerCase();
-      char.resources ??= [];
-      char.knownSpells ??= [];
-      char.preparedSpells ??= [];
-      char.racialTraits ??= [];
-      char.unlockedSubclassFeatures ??= [];
-      char.pendingSubclassFeature ??= false;
-      if (!char.conditionsImmunities && (char.racialTraits || []).includes('fey-ancestry')) {
-        char.conditionsImmunities = ['unconscious'];
-      }
-    }
-  }
-
   function ensureLocalGameStateFields(): void {
     ensureGameStateFields(state);
   }
@@ -90,7 +70,7 @@ export function createStateService(state: GameState): StateService {
       if (!('lastSuggestions' in savedState)) {
         state.lastSuggestions = undefined;
       }
-      ensureCharacterFields();
+      ensureAllCharacterFields(state.party);
       ensureLocalGameStateFields();
       state.startingLocation ??= undefined;
     },
@@ -179,7 +159,7 @@ export function createStateService(state: GameState): StateService {
       emergencySnapshot = null;
     },
 
-    ensureCharacterFields,
+    ensureCharacterFields: () => ensureAllCharacterFields(state.party),
     ensureGameStateFields: ensureLocalGameStateFields,
   };
 }
