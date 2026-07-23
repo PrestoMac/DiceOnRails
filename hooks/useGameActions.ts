@@ -43,13 +43,12 @@ function insertToolCallMessages(
       i++;
     }
     if (batch.length > 0) {
-      const toolCalls = batch
-        .filter((m) => m.toolCallId)
-        .map((m) => ({
-          id: m.toolCallId!,
-          name: 'tool_call',
-          arguments: '{}',
-        }));
+      const toolCalls: Array<{ id: string; name: string; arguments: string }> = [];
+      for (const m of batch) {
+        if (m.toolCallId) {
+          toolCalls.push({ id: m.toolCallId, name: 'tool_call', arguments: '{}' });
+        }
+      }
       if (toolCalls.length > 0) {
         result.push({
           id: `${syntheticModelId}-tc-${i}`,

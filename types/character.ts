@@ -1,5 +1,3 @@
-import type { Enemy } from './combat';
-
 /** Represents an item in a character's inventory, including equipment and consumables. */
 export interface InventoryItem {
   name: string;
@@ -215,8 +213,7 @@ export interface Character {
   feats?: string[];
   pendingFeatChoice?: boolean;
   featSelections?: FeatSelection[];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  featChoices?: Record<string, Record<string, any>>;
+  featChoices?: Record<string, Record<string, unknown>>;
   subclassId?: string;
   resources?: ResourcePool[];
   knownSpells?: string[];

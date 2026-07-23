@@ -4,7 +4,7 @@ import { lookupMonster } from '../utils/monsters';
 import { getConditionEffects, isUnconscious, isIncapacitated, removeCondition, tickConditions, rollSaveAgainstCondition, getExhaustionPenalty } from './conditionEngine';
 import { calculateAc, getMod } from './classEngine';
 import { getAlertInitiativeBonus, getResilientSaveBonus, getShieldMasterSaveBonus } from './featsService';
-import { ensureDeathSaves, updateCombatantDeathStatus } from './characterUtils';
+import { ensureDeathSaves } from './characterUtils';
 import { rollDeathSave as diceRollDeathSave } from './diceEngine';
 import { parseDamageDice } from '../utils/dice';
 

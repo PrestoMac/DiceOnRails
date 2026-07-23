@@ -20,8 +20,8 @@ module.exports = {
     react: { version: 'detect' },
   },
   rules: {
-    '@typescript-eslint/no-explicit-any': 'warn',
-    '@typescript-eslint/no-non-null-assertion': 'warn',
+    '@typescript-eslint/no-explicit-any': 'error',
+    '@typescript-eslint/no-non-null-assertion': 'error',
     '@typescript-eslint/ban-ts-comment': ['error', { 'ts-ignore': true, 'ts-expect-error': false }],
     '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
     'no-empty': 'warn',
@@ -35,8 +35,6 @@ module.exports = {
     {
       files: ['tests/**/*.{ts,tsx}'],
       rules: {
-        '@typescript-eslint/no-explicit-any': 'error',
-        '@typescript-eslint/no-non-null-assertion': 'error',
         'vitest/expect-expect': ['error', { assertFunctionNames: ['expect', 'assert'] }],
         'testing-library/no-node-access': 'error',
         'testing-library/no-container': 'error',
