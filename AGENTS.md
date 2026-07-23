@@ -16,10 +16,6 @@
 ## CI
 **Not currently configured.** No `.github/workflows/` directory exists in the repo — references to `.github/workflows/test.yml` are aspirational. Run `npm run lint` and `npm run test:ci` locally before pushing.
 
-## Known bugs
-
-All previously tracked bugs (C1-C9, H1-H10, M1-M8, L1-L9) have been fixed. The 15 production-readiness fixes from `fixthis.md` have also been applied: `saveMessages` typed on `InitiativeEntry`, noop setter removed, empty catch logged, `alert()` → `console.error`, numbered variables renamed, duplicate death-save functions consolidated, `errorCode` field on `MCPResponse`, optional-chaining normalized, trailing whitespace lint rule added, `||` → `??` for numeric defaults, `ensureGameStateFields` confirmed in `loadState`, mock setup centralized via `createTestServer()` helper, `characterCreationService` tests added, and `fuzzyMatchEntity` refined to word-boundary matching. See `ARCHITECTURE.md` for engine mechanics and edge cases.
-
 ## Architecture
 - **Entry**: `index.html` → `index.tsx` → `App.tsx`. The root returns `<SetupWizard />` unconditionally when `VITE_SETUP_MODE=true`, else `<SplashScreen>` then provider stack.
 - **Provider order (must be preserved)**: `AuthProvider > UIProvider > GameProvider > ProgressionProvider > CampaignProvider > ActionsProvider`. Each consumes contexts above it.
