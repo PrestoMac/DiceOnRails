@@ -54,7 +54,7 @@ Before the 5 features, build two reusable primitives they all depend on.
 ### 0B. Shared `<DetailModal>` and extracted detail content
 
 - **Extract**: `SpellDetailModal` from inline code at `SpellsStep.tsx:113-162` → new file `components/modals/SpellDetailModal.tsx`. Needed by both feature #3 (live sheet) and feature #1 (Compendium spell browser).
-- **Extract**: `CONDITION_INFO` from `sheet/ConditionsDisplay.tsx:10-27` and the inline exhaustion block from `CharacterSheet.tsx:327-346` → new `data/conditionInfo.ts`. **Add exhaustion entries** (currently missing — see `bugs.md` C4/C5 for why this matters).
+- **Extract**: `CONDITION_INFO` from `sheet/ConditionsDisplay.tsx:10-27` and the inline exhaustion block from `CharacterSheet.tsx:327-346` → new `data/conditionInfo.ts`. **Add exhaustion entries** (currently missing — see exhaustion mechanics in `ARCHITECTURE.md` for context).
 - **New file**: `data/referenceConstants.ts` — exports `STAT_INFO`, `SKILL_INFO`, `DERIVED_STAT_INFO`, `EXHAUSTION_INFO`, `REST_INFO`, `DEATH_SAVE_INFO`, `CURRENCY_INFO`. Pure data, no JSX.
 
 ### Tests

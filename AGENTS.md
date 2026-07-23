@@ -16,8 +16,9 @@
 ## CI
 **Not currently configured.** No `.github/workflows/` directory exists in the repo — references to `.github/workflows/test.yml` are aspirational. Run `npm run lint` and `npm run test:ci` locally before pushing.
 
-## Known bugs (`bugs.md`)
-36 tracked issues (9 Critical, 10 High, 8 Medium, 9 Low). Critical: `spell_effect` (C1) is a no-op stub — never removes conditions/breaks concentration. Fresh concentration (C2) breaks immediately on first time tick. Tool results (C3) are orphaned in LLM history — `tool_calls` field not stored in `Message` type. Long Rest (C4/C5) wipes ALL exhaustion (should be 1 level) and clears exhaustion on 0-HP chars. `end_combat` (C6) leaves Stunned/Paralyzed/Prone forever. Concentration (C7) never breaks on unconscious. `handleExecuteBatch` (C8) calls `rollbackTransaction()` without `beginTransaction()`. Read `bugs.md` for full list.
+## Known bugs
+
+All previously tracked bugs (C1-C9, H1-H10, M1-M8, L1-L9) have been fixed. See `ARCHITECTURE.md` for engine mechanics and edge cases.
 
 ## Architecture
 - **Entry**: `index.html` → `index.tsx` → `App.tsx`. The root returns `<SetupWizard />` unconditionally when `VITE_SETUP_MODE=true`, else `<SplashScreen>` then provider stack.
