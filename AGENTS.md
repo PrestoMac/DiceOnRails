@@ -21,7 +21,7 @@
 - **Provider order (must be preserved)**: `AuthProvider > UIProvider > GameProvider > ProgressionProvider > CampaignProvider > ActionsProvider`. Each consumes contexts above it.
 - **State**: No external lib (no Redux/Zustand). 6 React Contexts, each backed by a custom hook. `GameContext` composes `useGameState` + `useQueue` — queue functions are spread directly into GameContext, not a separate context.
 - **Engine**: `MockMCPServer` (`services/mcpService.ts`) is the single canonical source of truth for `GameState`. Never mutate `gameState` directly — always go through `mcpServer.executeToolCall` or its typed wrappers.
-- **Sub-services**: `services/mcp/` — DI-style factories (`createXService(state, deps?)`) closing over shared state. 8 sub-services wired in `mcpService.ts:45-73`. All share the same mutable `state: GameState` reference. Cross-service deps use 4 interfaces: `InventoryDeps`, `CombatDeps`, `SpellcastingDeps`, `TravelDeps`. The `getTarget` function is always `this.party.getTarget`.
+- **Sub-services**: `services/mcp/` — DI-style factories (`createXService(state, deps?)`) closing over shared state. 8 sub-services wired in `mcpService.ts:45-75`. All share the same mutable `state: GameState` reference. Cross-service deps use 4 interfaces: `InventoryDeps`, `CombatDeps`, `SpellcastingDeps`, `TravelDeps`. The `getTarget` function is always `this.party.getTarget`.
 - **Deep clone**: `JSON.parse(JSON.stringify(...))` is the universal pattern for state snapshots, rewinds, and transactions (~20 uses). No `structuredClone`, no immutable lib.
 - **Path alias**: `@/*` → repo root (not `src/`). Both `tsconfig.json` and `vite.config.ts` agree.
 
@@ -41,14 +41,14 @@
 - **Tool calls are batched**: all tool calls from one LLM response run in **parallel** via `Promise.all`, then sorted by `id.localeCompare` for deterministic ordering.
 - **End-of-turn detection**: `narrate_turn`, `long_rest`/`short_rest` (when called with `narration` **or** `autoAdvanceTime: true`), `move_to` (with `route`). When detected: pre-narration tools execute first, then `narrate_turn` (skipped if time already advanced by a rest/move), then loop breaks.
 - **`next_turn` causes immediate loop break** — the LLM cannot follow `next_turn` with `narrate_turn` in a later iteration. `narrate_turn` must be called before or simultaneously with `next_turn`.
-- **Synthetic `narrate_turn(timePassed=0)` appended at loop end** if no time-advancing tool was called (`agentLoop.ts:353-361`). This ensures conditions/DoTs/concentration always tick. The check is gated by `if (!timeAdvancedThisTurn)` — it is conditional, not unconditional.
+- **Synthetic `narrate_turn(timePassed=0)` appended at loop end** if no time-advancing tool was called (`agentLoop.ts:385-390`). This ensures conditions/DoTs/concentration always tick. The check is gated by `if (!timeAdvancedThisTurn)` — it is conditional, not unconditional.
 - **No-tool-call retries**: iter 0 → "You MUST call at least one tool". Iters 1-4 in combat (non-player turn only) → "call `next_turn`". Otherwise break.
 - **Post-loop guarantee**: if no `narrate_turn` / rest / move-with-route fired, a synthetic `narrate_turn(narration='', timePassed=0)` is enforced so DoTs/conditions tick.
 - **Critical tool failure** (`cast_spell`, `inflict_damage`, `roll_dice`, `player_attack`) sets `criticalToolFailed`, suppressing inline narration even if >= 50 chars.
 - **Token budget checked AFTER batch execution**, not before — can't prevent an iteration from exceeding budget.
 
 ### Tool system
-**28 tool schemas** (29 dispatch cases, 1 default) in `executeToolCall` (`mcpService.ts:236-330`, switch at `:242-321`):
+**28 tool schemas** (29 dispatch cases, 1 default) in `executeToolCall` (`mcpService.ts:237-334`, switch at `:243-322`):
 `check_skill` and `move_to` support **onSuccess chaining** via `ON_SUCCESS_PROPERTIES` shared schema — can auto-fire `awardCurrency`, `logLore`, `upsertQuest`, `updateInventory` in the same call.
 | Tool | Sub-service | Notes |
 |------|-------------|-------|
@@ -103,32 +103,32 @@
 - **Hook tests**: use `renderHook` + `act` from `@testing-library/react`. Import dynamically after mocks.
 - **Component tests**: need full mocks for `supabaseClient`, `audioService`, `authService`, `debug`.
 - Test factories: `makeCharacter(overrides?)`, `makeWizard()`, `makeCleric()`, `makeEnemy()`, `makeCombatState()`, `makeGameState()`, `createTestRunner()`, `createMockAgentLoop()`, `createMockMCPServer()`, `mockRandom()`, `createTestServer()`.
-- `no-explicit-any` and `non-null-assertion` are **errors** in tests (warnings elsewhere). Test files also enforce `vitest/expect-expect` and strict `testing-library/*` rules.
+- `no-explicit-any` and `non-null-assertion` are **errors everywhere** (set globally in `.eslintrc.cjs`, not just in tests). Test files additionally enforce `vitest/expect-expect` and strict `testing-library/*` rules.
 
 ## ESLint
-- Most rules warn. `ban-ts-comment` errors (allows `ts-expect-error`, bans `ts-ignore`).
-- Test override: `any` and `!` are errors; enables `vitest/expect-expect`, `testing-library/*` rules (no-node-access, no-container, no-await-sync-queries are errors; prefer-find-by is warn).
+- Globally error-level: `no-explicit-any`, `no-non-null-assertion`, `ban-ts-comment` (allows `ts-expect-error`, bans `ts-ignore`), `no-trailing-spaces`. Most other rules warn.
+- Test override (`tests/**`): enables `vitest/expect-expect` and `testing-library/*` rules (no-node-access, no-container, no-await-sync-queries are errors; prefer-find-by is warn). It does **not** re-set `any`/`!` severity — those are already errors globally.
 
 ## Key conventions
 
 ### State
 - Campaign ID `'anonymous'` is the sentinel for local-only play (no Supabase sync). All persistence methods check this.
-- The ONLY way game time advances: `narrate_turn`, `long_rest`, `short_rest`, `move_to` (with narration/route). A synthetic no-op `narrate_turn(timePassed=0)` is appended at loop end if no time-advancing tool ran (gated by `if (!timeAdvancedThisTurn)` at `agentLoop.ts:353-361`) so DoTs/conditions always tick.
+- The ONLY way game time advances: `narrate_turn`, `long_rest`, `short_rest`, `move_to` (with narration/route). A synthetic no-op `narrate_turn(timePassed=0)` is appended at loop end if no time-advancing tool ran (gated by `if (!timeAdvancedThisTurn)` at `agentLoop.ts:385-390`) so DoTs/conditions always tick.
 - Never call `inflict_damage` after `player_attack` or `cast_spell` — those tools handle damage atomically.
 - Spells never use `roll_dice`; spell attack rolls and damage are inside `cast_spell`.
-- **`ensureCharacterFields()` is duplicated verbatim in 2 services** (stateService, travelService). Not shared. Modify all copies.
+- **`ensureCharacterFields()` / `ensureAllCharacterFields()` live in ONE place**: `services/characterUtils.ts`. Both `stateService` and `travelService` import it from there (not duplicated). `StateService.ensureCharacterFields()` delegates to `ensureAllCharacterFields(state.party)`.
 - **`inflict_damage` lives in `InventoryService`**, not `CombatService`. Both CombatService and SpellcastingService depend on it. All damage in the system flows through one function.
 - **Transactions**: deep-clone via `JSON.parse(JSON.stringify(...))`. 3-tier: transaction (in-flight rollback), rewind point (full state+messages per turn), emergency snapshot (crash recovery).
 - **Duplicate currency detection**: `adjust_currency` is suppressed within 500ms for same target+amount. Cleared on `restoreSnapshot` and `reset`.
 
 ### Engine mechanics
 - **Exhaustion** (levels 1-6): applied as flat `d20Modifier: -level` on ALL d20 rolls (attacks, saves, checks, death saves) and `speedPenaltyFt: -(level * 5)`. Does NOT affect damage dice.
-- **Two independent death save systems**: `combatEngine.rollDeathSave()` and `diceEngine.rollDeathSave()` are NOT in sync. `combatEngine` applies exhaustion but MISSES `getDeathSaveBonus()` (Durable feat). `diceEngine` has the raw logic but is never called by the combat engine.
+- **Single canonical death save path**: `combatEngine.rollDeathSave()` is now a thin wrapper that delegates to `diceEngine.rollDeathSave()` (the two are unified, no longer independent). Exhaustion is applied via `getExhaustionPenalty()` inside `diceEngine`. **Caveat**: `getDeathSaveBonus()` (Durable / Resilient-CON feat, `featsService.ts:196`) is defined and re-exported but **never called** by either path — the Durable death-save bonus is currently dead code.
 - **Enemy attacks bypass `inflictDamageOnTarget`** — `resolveEnemySingleAttack` deals damage directly, skipping resistances/immunities/vulnerabilities/HAM/tempHP on targets.
 - **Spell damage for save-based spells rolled independently per target** — each Fireball target gets its own damage roll.
 - **Minute-duration conditions are skipped by round-based `tickConditions()`** — only `tickConditionsByTime()` handles them.
 - **Conditions from concentration spells are tied by `source: spellId`** — when `breakConcentration` fires, ALL conditions with matching source are removed. Without `source`, conditions become orphans.
-- **`isIncapsulated` typo** (conditionEngine.ts:229) must not be removed — it's an alias for `isIncapacitated` (at `:224`) and may exist in serialized game states.
+- **`isIncapsulated` typo** (conditionEngine.ts:217) must not be removed — it's an alias for `isIncapacitated` (at `:212`) and may exist in serialized game states.
 - **Warlock pact magic** is the only short-rest slot reset. Checked in `recalculateResourcePools`. Warlock uses `pactMagic` (not `spellSlots`) — any code reading `spellSlots` blindly will break for warlocks.
 
 ### Character creation
@@ -163,7 +163,7 @@
 - **`PROGRESSION_SYSTEM_PROMPT`** (`constants.ts:42-83`): XP calibration tables, CR-to-XP, DC-to-XP, solo +25% buff, mandatory concurrent `award_experience` pairing.
 - **`TOOL_MODE_INSTRUCTION`** (`services/llm/prompts/toolModePrompt.ts`, 93 lines): strict combat sequence, quick reference table, 11 feat descriptions, class feature narration, race trait guidance, spell prerequisites, ban on `[System:tool_name]` in narration.
 - **Narration fallback chain**: `generateNarration` (full, non-streaming) → `generateTightNarration` (lightweight, 15s timeout, max 500 tokens) → `buildDeterministicNarration` (templated) → `"The adventure continues..."`.
-- **`extractRollData`** (`narration.ts:13-49`): extracts structured `RollData` from tool results for UI display. Covers `roll_dice`, `check_skill`, `player_attack`, `cast_spell`, `make_save`, `roll_death_save`, `inflict_damage`, `use_resource`.
+- **`extractRollData`** (`narration.ts:19-50`): extracts structured `RollData` from tool results for UI display. Covers `roll_dice`, `check_skill`, `player_attack`, `cast_spell`, `make_save`, `roll_death_save`, `inflict_damage`, `use_resource`.
 
 ## Environment
 - Required: `VITE_LLM_API_KEY`. Others optional. See `.env.example`.

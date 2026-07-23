@@ -86,7 +86,7 @@ DiceOnRails/
 │   │   └── tools/            # OpenAI function-calling tool schemas
 │   ├── mcp/                  # Sub-services consumed by MockMCPServer
 │   └── *.ts                  # Engine + infra services
-├── supabase/migrations/      # SQL schema (campaigns, game_saves, srd_items, monsters)
+├── supabase/migrations/      # SQL schema (campaigns, game_saves, srd_items, srd_monsters)
 ├── tests/                    # Vitest test suite
 │   ├── helpers/              # Test factories & mocks
 │   ├── live/                 # Tier-3+ live LLM scenario tests
@@ -166,7 +166,7 @@ Every context throws if `useXContext` is called outside its provider (`Error: us
 
 ### Two singletons
 
-- **`mcpServer`** — proxy around `MockMCPServer`, defined in `services/mcpService.ts:343` (singleton getter `getMcpServer` at `:338`). Lazy-instantiated, accessed globally.
+- **`mcpServer`** — proxy around `MockMCPServer`, defined in `services/mcpService.ts:344` (singleton getter `getMcpServer` at `:339`). Lazy-instantiated, accessed globally.
 - **`supabase`** — proxy around the Supabase client, defined in `services/supabaseClient.ts:27`. Lazy-instantiated, falls back to placeholder URLs if env is missing.
 
 Both are `Proxy` objects that bind method calls to a lazily-created underlying instance, so importing them never crashes even when misconfigured.
@@ -220,11 +220,11 @@ GameState = {
 | `content` | `contentService.ts` | quests, lore, reputation |
 | `travel` | `travelService.ts` | movement, routes, narration/time, rests, dice, skill checks |
 
-Sub-services are factory functions (`createXService(state, deps?)`) that close over the shared `state` and a small dependency object. The wiring lives in `mcpService.ts:45-73`. This is a lightweight **dependency injection** pattern — combat needs `inflict_damage` from inventory, travel needs `update_inventory`/`adjust_currency` from inventory + `log_lore`/`upsert_quest` from content, etc.
+Sub-services are factory functions (`createXService(state, deps?)`) that close over the shared `state` and a small dependency object. The wiring lives in `mcpService.ts:45-75`. This is a lightweight **dependency injection** pattern — combat needs `inflict_damage` from inventory, travel needs `update_inventory`/`adjust_currency` from inventory + `log_lore`/`upsert_quest` from content, etc.
 
 ### Tool dispatcher
 
-`MockMCPServer.executeToolCall(name, args)` (`mcpService.ts:236-330`, switch at `:242-321`) is the **canonical entry point for all mutations**. It's a switch over ~30 tool names. Every branch:
+`MockMCPServer.executeToolCall(name, args)` (`mcpService.ts:237-334`, switch at `:243-322`) is the **canonical entry point for all mutations**. It's a switch over ~30 tool names. Every branch:
 
 1. Coerces args to the correct types (LLMs send strings; engine needs numbers).
 2. Delegates to the relevant sub-service method.
@@ -305,7 +305,7 @@ A flat array of OpenAI-style `{ type: "function", function: { name, description,
 
 ## 7. The Turn Lifecycle (end-to-end)
 
-The single most important flow to understand. Entry point: `useGameActions.handleSendMessage` in `hooks/useGameActions.ts:147`.
+The single most important flow to understand. Entry point: `useGameActions.handleSendMessage` in `hooks/useGameActions.ts:182`.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -356,7 +356,7 @@ The single most important flow to understand. Entry point: `useGameActions.handl
 
 ### Inside `runAgentLoop`
 
-`services/llm/agentLoop.ts:66` (JSDoc starts at `:55`). A bounded loop (default `MAX_ITERS = 20`) that drives the LLM:
+`services/llm/agentLoop.ts:67` (JSDoc starts at `:56`). A bounded loop (default `MAX_ITERS = 20`) that drives the LLM:
 
 1. **Build the message array:**
    - system: `SYSTEM_INSTRUCTION + PROGRESSION_SYSTEM_PROMPT + TOOL_MODE_INSTRUCTION`
@@ -378,13 +378,13 @@ The single most important flow to understand. Entry point: `useGameActions.handl
    - **Budget guard:** if estimated payload exceeds 95% of `CONTEXT_BUDGET`, break early.
    - **Combat shortcut:** if `next_turn` succeeded, break (turn is over).
 
-3. **Post-loop enforcement:** if no `narrate_turn` / rest / move-with-route fired, synthesize a `narrate_turn(narration='', timePassed=0)` so conditions/DoTs/concentration still tick consistently. The check is gated by `if (!timeAdvancedThisTurn)` at `agentLoop.ts:353-361` — it is conditional, not unconditional.
+3. **Post-loop enforcement:** if no `narrate_turn` / rest / move-with-route fired, synthesize a `narrate_turn(narration='', timePassed=0)` so conditions/DoTs/concentration still tick consistently. The check is gated by `if (!timeAdvancedThisTurn)` at `agentLoop.ts:385-390` — it is conditional, not unconditional.
 
 4. **Return:** `{ toolMessages, iterationCount, promptTokens, completionTokens, cachedTokens, inlineNarration }`.
 
 ### Batched party turns (`handleExecuteBatch`)
 
-`useGameActions.ts:234`. When multiplayer action queue is flushed:
+`useGameActions.ts:272`. When multiplayer action queue is flushed:
 
 - Builds a `[Collaborative Turn]` user message containing every queued entry tagged with player name.
 - Same agent-loop flow but with a `batchContext` that emphasizes "process ALL actions".
@@ -393,7 +393,7 @@ The single most important flow to understand. Entry point: `useGameActions.handl
 
 ### Rewind flow (`handleRewind`)
 
-`useGameActions.ts:333`:
+`useGameActions.ts:373`:
 
 1. If currently processing → bail.
 2. Load the rewind point (state + messages from before the user's last message).
@@ -418,13 +418,13 @@ A custom episodic-memory system so the LLM can remember hours of play without ov
 
 ### Flow
 
-Per turn (`runContextPipeline` in `contextManager.ts:173`):
+Per turn (`runContextPipeline` in `contextManager.ts:174`):
 
 1. Increment `turnCounter`.
 2. Every `FREEZE_INTERVAL = 5` turns → `freezeMessages`: slide messages older than the active window into `frozenRawHistory`, update `frozenMessageCount`.
 3. `compressToCheckpointIfNeeded`: if raw tokens exceed `RAW_CAP` **or** no checkpoints exist yet and raw > 1K → kick off **async** compression (sets `isCompressing`, stores `compressPromise`). On success, the raw history is cleared and the checkpoint pushed onto `episodeCheckpoints`. Failures are logged and swallowed.
 
-Before each turn (`prepareContext` in `contextManager.ts:186`):
+Before each turn (`prepareContext` in `contextManager.ts:187`):
 
 1. Rebuild "frozen messages" array from `episodeCheckpoints` (as `[RECENT SESSION]`) and `frozenRawHistory` (as `[EARLIER EVENTS]`).
 2. `enforceTokenBudget`: while payload > budget, drop oldest checkpoint, then drop raw, then trim the active window from the front.
@@ -436,7 +436,7 @@ Before each turn (`prepareContext` in `contextManager.ts:186`):
 
 ### Persistence
 
-The `ContextState` is serialized into `GameState.ctx` (`ContextMetadata` in `types/game.ts:36`) on every `syncFinishedState` call. On load, `useGameActions`'s `useEffect` at line 74 hydrates `ctxRef.current` from `gameState.ctx`. This means checkpoints survive page reloads and sync to other multiplayer clients.
+The `ContextState` is serialized into `GameState.ctx` (`ContextMetadata` in `types/game.ts:36`) on every `syncFinishedState` call. On load, `useGameActions`'s `useEffect` at line 109 hydrates `ctxRef.current` from `gameState.ctx`. This means checkpoints survive page reloads and sync to other multiplayer clients.
 
 ---
 
@@ -483,6 +483,14 @@ Specialized mechanics for summons (create summoned creatures with CR caps), tele
 ### `auditor.ts`
 
 A data-integrity checker. Runs a battery of rules over `GameState` and reports `AuditResult[]` — checks feats exist in the catalog, race/class IDs are valid, spell IDs resolve, armor proficiencies match class, etc. Most rules also have a `repair` function for auto-fix. Not currently wired into the runtime but available for diagnostics and tests.
+
+### `characterUtils.ts`
+
+Home of `ensureCharacterFields()` / `ensureAllCharacterFields()` — the single shared field-hydration pass that backfills sane defaults whenever a character enters the engine. `stateService` and `travelService` both import it from here (no duplication).
+
+### `rewindGeneration.ts`
+
+A tiny module backing the generation-rewind protocol: a module-level counter (`getRewindGeneration` / `bumpRewindGeneration`) incremented on rewind. `storageService.syncCampaignState` tags every persisted payload with `_rewindGeneration` so remote clients can discard updates older than their local generation.
 
 ### `characterCreationService.ts`
 
@@ -532,7 +540,7 @@ Key methods:
 - **`20240101000000_initial_schema.sql`** — `campaigns(id, host_id, name, game_state JSONB, messages JSONB, created_at)` with public read/insert/update policies and host-only delete. Also creates legacy `game_saves` table.
 - **`20260627000000_add_progression.sql`** — SQL functions (`get_character_xp`, `get_character_level`, `get_character_unused_points`) and the `campaign_party_progression` view for dashboards.
 - **`20260706000000_create_srd_items.sql`** — `srd_items` reference table.
-- **`20260710000000_create_monsters.sql`** — `monsters` reference table.
+- **`20260710000000_create_monsters.sql`** — `srd_monsters` reference table.
 
 The runtime uses static TS catalogs (`data/srdItems.ts`, `data/monsters.ts`) — the SQL tables exist for community tooling / dashboards. The setup wizard (`components/SetupWizard.tsx`) ships the same schema as a string and will execute it via the Supabase REST endpoint if the user pastes their keys during install.
 
@@ -584,7 +592,7 @@ components/wizard/
 
 ### `onComplete` → `handleCharacterCreated`
 
-`useGameActions.ts:299`:
+`useGameActions.ts:339`:
 
 1. Tag character with `ownerId = userId`.
 2. Set `myCharacterId`, `viewingCharacterId`.
@@ -849,8 +857,8 @@ Standard SPA fallback so client-side routes work on refresh.
 
 - Extends `eslint:recommended` + `@typescript-eslint/recommended`.
 - Plugins: `@typescript-eslint`, `vitest`, `testing-library`.
-- Most issues are warnings; `ban-ts-comment` is error (bans `ts-ignore`, allows `ts-expect-error`).
-- Test override: `no-explicit-any` and `no-non-null-assertion` become errors; enables `vitest/expect-expect` and several `testing-library/*` rules.
+- Globally error-level: `no-explicit-any`, `no-non-null-assertion`, `ban-ts-comment` (bans `ts-ignore`, allows `ts-expect-error`), `no-trailing-spaces`. Most other rules warn.
+- Test override (`tests/**`): enables `vitest/expect-expect` and several `testing-library/*` rules (no-node-access, no-container, no-await-sync-queries are errors; prefer-find-by is warn). It does **not** re-set `any`/`!` severity — those are already errors globally.
 
 ---
 

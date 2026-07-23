@@ -218,6 +218,7 @@ Upload `dist/` to any static host (Netlify, Cloudflare Pages, GitHub Pages, S3, 
 | `npm run test:all` | Unit tests + tier-3 live scenarios |
 | `npm run lint` | ESLint over all `.ts` / `.tsx` |
 | `npm run lint:fix` | ESLint with `--fix` |
+| `npm run check:jsonclone` | Counts `JSON.parse(JSON.stringify(...))` deep-clone usages (diagnostic) |
 | `npm run install-app` | Guided CLI installer (`scripts/install.js`) |
 | `npm run prepare` | Sets up Husky pre-commit hooks |
 
