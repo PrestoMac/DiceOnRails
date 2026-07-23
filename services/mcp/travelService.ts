@@ -634,10 +634,6 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
         return fail(`Only ${Math.floor(elapsed / 60)}h since your last rest. You need ${Math.ceil(remaining / 60)}h more.`);
       }
       
-      for (const char of state.party) {
-        if (char.conditions) char.conditions = char.conditions.filter(c => !c.id.startsWith('exhaustion-'));
-      }
-
       
       for (const char of state.party) {
         if (char.raging) {
@@ -666,6 +662,8 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
           messages.push(`${char.name} is unconscious and cannot benefit from the rest.`);
           continue;
         }
+        // Exhaustion clear moved here — only for conscious characters
+        if (char.conditions) char.conditions = char.conditions.filter(c => !c.id.startsWith('exhaustion-'));
         const prevHp = char.hp.current;
         const hpRestored = char.hp.max - prevHp;
         char.hp.current = char.hp.max;

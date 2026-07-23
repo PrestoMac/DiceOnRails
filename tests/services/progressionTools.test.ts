@@ -311,7 +311,7 @@ describe('progressionTools', () => {
       expect(hasCondition(updated, 'exhaustion-3')).toBe(true);
     });
 
-    it('exhaustion-10 death not reversible: apply exhaustion-10 with hp=0 - long rest clears condition but does not heal', async () => {
+    it('exhaustion-10 death not reversible: apply exhaustion-10 with hp=0 - long rest does NOT clear exhaustion on unconscious char', async () => {
       const char = makeCharacter({ hp: { current: 0, max: 12 } });
       const { applyCondition } = await import('../../services/conditionEngine');
       applyCondition(char, { id: 'exhaustion-10', source: 'fatigue', duration: Infinity, durationUnit: 'minute', onRemove: undefined });
@@ -320,7 +320,7 @@ describe('progressionTools', () => {
       const { hasCondition } = await import('../../services/conditionEngine');
       const updated = server.getTarget('hero-1');
       expect(updated).toBeDefined();
-      expect(hasCondition(updated, 'exhaustion-10')).toBe(false);
+      expect(hasCondition(updated, 'exhaustion-10')).toBe(true);
       expect(updated.hp.current).toBe(0);
     });
 

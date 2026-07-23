@@ -29,6 +29,42 @@ function isTrivialInput(text: string): boolean {
 }
 
 
+function insertToolCallMessages(
+  messages: Message[],
+  toolMessages: Message[],
+  syntheticModelId: string
+): Message[] {
+  const result: Message[] = [];
+  let i = 0;
+  while (i < toolMessages.length) {
+    const batch: Message[] = [];
+    while (i < toolMessages.length && toolMessages[i].role === MessageRole.TOOL) {
+      batch.push(toolMessages[i]);
+      i++;
+    }
+    if (batch.length > 0) {
+      const toolCalls = batch
+        .filter((m) => m.toolCallId)
+        .map((m) => ({
+          id: m.toolCallId!,
+          name: 'tool_call',
+          arguments: '{}',
+        }));
+      if (toolCalls.length > 0) {
+        result.push({
+          id: `${syntheticModelId}-tc-${i}`,
+          role: MessageRole.MODEL,
+          text: '',
+          timestamp: Date.now(),
+          toolCalls,
+        });
+      }
+      result.push(...batch);
+    }
+  }
+  return result;
+}
+
 import React, { useCallback, useRef, useEffect } from 'react';
 import { GameState, Message, MessageRole, AppSettings, Character, AppStage } from '../types';
 import { mcpServer } from '../services/mcpService';
@@ -198,7 +234,7 @@ export const useGameActions = (
 
             const streamingId = `model-${Date.now()}`;
             const placeholderMsg: Message = { id: streamingId, role: MessageRole.MODEL, text: '', timestamp: Date.now() };
-            setMessages(prev => [...prev, ...toolMessages, placeholderMsg]);
+            setMessages(prev => [...prev, ...insertToolCallMessages(prev, toolMessages, 'model-synth'), placeholderMsg]);
 
             const { narrationText, usedStream } = await resolveNarration(text, toolMessages, inlineNarration, streamingId, false);
             if (firstDeltaAt === null && usedStream) firstDeltaAt = Date.now();
@@ -207,7 +243,7 @@ export const useGameActions = (
             setMessages(prev => prev.map(m => m.id === streamingId ? modelMsg : m));
             processingRef.current = false;
 
-            const messagesToSync = [...currentMessages, userMsg, ...toolMessages, modelMsg];
+            const messagesToSync = [...currentMessages, userMsg, ...insertToolCallMessages(currentMessages, toolMessages, 'model-synth'), modelMsg];
             syncFinished(messagesToSync, { lastSuggestions: turnSuggestions });
             autoSpeak(modelMsg.text);
             messagesRef.current = messagesToSync;
@@ -240,6 +276,7 @@ export const useGameActions = (
         const currentMessages = messagesRef.current;
         const lockedState = { ...gameState, isProcessing: true, processingUser: "Party" };
         setGameState(lockedState); mcpServer.loadState(lockedState);
+        mcpServer.beginTransaction();
         if (isSyncableCampaign(currentCampaignId)) storageService.syncCampaignState(currentCampaignId, lockedState).catch(e => console.warn('[Sync] failed:', e));
 
         const batchText = "[Collaborative Turn]\n" + gameState.actionQueue.map(item => `[${item.playerName}]: ${item.type === 'dialogue' ? `"${item.text}"` : item.text}`).join("\n");
@@ -261,10 +298,11 @@ export const useGameActions = (
             const historyForAPI = batchCtxPrep.activeMessages;
             if (isDebugMode) console.log('[handleExecuteBatch] calling runAgentLoop', { historyLen: historyForAPI.length, queueSize: gameState.actionQueue?.length });
             const result = await runAgentLoop(historyForAPI, batchContext, batchCtxPrep.frozen, undefined, undefined, { requestEndNarration: true });
+            mcpServer.commitTransaction();
 
             const streamingId = `model-${Date.now()}`;
             const placeholderMsg: Message = { id: streamingId, role: MessageRole.MODEL, text: '', timestamp: Date.now() };
-            setMessages(prev => [...prev, ...result.toolMessages, placeholderMsg]);
+            setMessages(prev => [...prev, ...insertToolCallMessages(prev, result.toolMessages, 'model-synth'), placeholderMsg]);
 
             const { narrationText, usedStream } = await resolveNarration(batchText, result.toolMessages, result.inlineNarration, streamingId, true);
             if (firstDeltaAt === null && usedStream) firstDeltaAt = Date.now();
@@ -273,7 +311,7 @@ export const useGameActions = (
             setMessages(prev => prev.map(m => m.id === streamingId ? modelMsg : m));
             processingRef.current = false;
 
-            const messagesToSync = [...currentMessages, userMsg, ...result.toolMessages, modelMsg];
+            const messagesToSync = [...currentMessages, userMsg, ...insertToolCallMessages(currentMessages, result.toolMessages, 'model-synth'), modelMsg];
             syncFinished(messagesToSync, { actionQueue: [] });
             autoSpeak(modelMsg.text);
             messagesRef.current = messagesToSync;

@@ -74,6 +74,7 @@ export interface Message {
   isToolCall?: boolean;
   toolCallId?: string;
   rollData?: RollData;
+  toolCalls?: Array<{ id: string; name: string; arguments: string }>;
 }
 
 /** An action queued by a player, pending execution. */

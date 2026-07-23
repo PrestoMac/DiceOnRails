@@ -29,16 +29,60 @@ export function resolveLLMConfig(providerConfig?: { provider: LLMProvider; apiKe
  * @returns An array of API-compatible message objects.
  */
 export function mapHistoryToMessages(history: Message[]) {
-    return history.map(msg => ({
-        role: (msg.role === MessageRole.MODEL ? "assistant"
-            : msg.role === MessageRole.SYSTEM ? "system"
-            : msg.role === MessageRole.TOOL ? "tool"
-            : "user") as string,
-        content: (msg.role === MessageRole.USER && msg.senderName && msg.senderName !== "You")
-            ? `[${msg.senderName}]: ${msg.text}`
-            : (msg.text || ""),
-        ...(msg.role === MessageRole.TOOL ? { tool_call_id: msg.toolCallId || msg.id } : {}),
-    }));
+  const result: Array<{
+    role: string;
+    content: string;
+    tool_call_id?: string;
+    tool_calls?: Array<{ id: string; type: string; function: { name: string; arguments: string } }>;
+  }> = [];
+
+  let i = 0;
+  while (i < history.length) {
+    const msg = history[i];
+
+    if (msg.role === MessageRole.TOOL) {
+      // Skip orphan tool messages — they'll be attached to their parent assistant
+      i++;
+      continue;
+    }
+
+    const entry: (typeof result)[number] = {
+      role: (msg.role === MessageRole.MODEL ? 'assistant'
+        : msg.role === MessageRole.SYSTEM ? 'system'
+        : 'user') as string,
+      content:
+        msg.role === MessageRole.USER && msg.senderName && msg.senderName !== 'You'
+          ? `[${msg.senderName}]: ${msg.text}`
+          : msg.text || '',
+    };
+
+    // If this assistant message has tool_calls, emit them and collect the tool results
+    if (msg.role === MessageRole.MODEL && msg.toolCalls && msg.toolCalls.length > 0) {
+      entry.tool_calls = msg.toolCalls.map((tc) => ({
+        id: tc.id,
+        type: 'function',
+        function: { name: tc.name, arguments: tc.arguments },
+      }));
+      result.push(entry);
+
+      // Emit the tool result messages that follow
+      let j = i + 1;
+      while (j < history.length && history[j].role === MessageRole.TOOL) {
+        result.push({
+          role: 'tool',
+          content: history[j].text,
+          tool_call_id: history[j].toolCallId || history[j].id,
+        });
+        j++;
+      }
+      i = j;
+    } else {
+      result.push(entry);
+      i++;
+    }
+  }
+
+  return result;
 }
 
 /**
