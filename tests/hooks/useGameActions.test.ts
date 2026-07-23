@@ -285,7 +285,7 @@ describe('useGameActions', () => {
     expect(setMessages).toHaveBeenCalled();
     expect(setIsLoading).toHaveBeenCalledWith(true);
     expect(mockRunAgentLoop).toHaveBeenCalledTimes(1);
-    expect(mockGenerateTightNarration).toHaveBeenCalledTimes(1);
+    expect(mockGenerateTightNarration).toHaveBeenCalledTimes(0);
   });
 
   it('handleSendMessage blocks duplicate processing', async () => {
@@ -299,7 +299,7 @@ describe('useGameActions', () => {
 
     await Promise.all([msgPromise1, msgPromise2]);
     expect(mockRunAgentLoop).toHaveBeenCalledTimes(1);
-    expect(mockGenerateTightNarration).toHaveBeenCalledTimes(1);
+    expect(mockGenerateTightNarration).toHaveBeenCalledTimes(0);
   });
 
   it('handleSendMessage syncs campaign state for authenticated users', async () => {

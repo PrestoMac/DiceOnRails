@@ -341,6 +341,11 @@ export async function runAgentLoop(
         }
       }
 
+      // Use the LLM's free-form content as the primary narration — it has full context
+      if (assistantContent && assistantContent.length >= 25) {
+        inlineNarration = assistantContent;
+      }
+
       break;
     }
 

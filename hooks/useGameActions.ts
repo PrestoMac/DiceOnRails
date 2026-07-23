@@ -67,7 +67,7 @@ function insertToolCallMessages(
 import React, { useCallback, useRef, useEffect } from 'react';
 import { GameState, Message, MessageRole, AppSettings, Character, AppStage } from '../types';
 import { mcpServer } from '../services/mcpService';
-import { generateTightNarration, runAgentLoop } from '../services/llm';
+import { runAgentLoop } from '../services/llm';
 import { storageService } from '../services/storageService';
 import { speakText, stopSpeaking } from '../services/audioService';
 import { isDebugMode } from '../utils/debug';
@@ -154,29 +154,19 @@ export const useGameActions = (
     const runPipeline_ = () => runPipeline(ctxRef.current, FREEZE_INTERVAL, messagesRef.current, ACTIVE_MSG_WINDOW);
 
     const resolveNarration = async (
-        userText: string, toolMessages: Message[], inlineNarration: string | undefined,
-        streamingId: string, isBatch: boolean
+        _userText: string, toolMessages: Message[], inlineNarration: string | undefined,
+        streamingId: string, _isBatch: boolean
     ): Promise<{ narrationText: string; usedStream: boolean }> => {
         let narration = inlineNarration ?? '';
-        let usedStream = false;
         if (isLazyNarration(narration)) {
-            if (isDebugMode) console.log('[resolveNarration] inline narration was lazy, clearing', { original: narration.slice(0, 100) });
-            narration = '';
-        }
-        if (!narration) {
-            usedStream = true;
+            if (isDebugMode) console.log('[resolveNarration] inline narration was lazy, using deterministic fallback', { original: narration.slice(0, 100) });
             const toolSummary = buildToolSummary(toolMessages);
-            if (isDebugMode) console.log('[resolveNarration] calling generateTightNarration', { isBatch, toolCount: toolMessages.length });
-            narration = await generateTightNarration(userText, toolSummary, isBatch);
-            if (isLazyNarration(narration)) {
-                if (isDebugMode) console.log('[resolveNarration] tight narration was lazy, using deterministic fallback');
-                narration = buildDeterministicNarration(toolSummary);
-            }
+            narration = buildDeterministicNarration(toolSummary);
             setMessages(prev => prev.map(m => m.id === streamingId ? { ...m, text: narration } : m));
         } else {
             if (isDebugMode) console.log('[resolveNarration] using inline narration', { len: narration.length, preview: narration.slice(0, 100) });
         }
-        return { narrationText: narration, usedStream };
+        return { narrationText: narration, usedStream: false };
     };
 
     const handleSendMessage = async (text: string, isRetry = false) => {
