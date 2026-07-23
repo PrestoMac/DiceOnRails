@@ -923,6 +923,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       const dmgResult = await deps.inflict_damage(damageTotal, enemy.id, dmgType);
       if (!dmgResult.success) return dmgResult;
 
+      const xpLine = typeof dmgResult.data?.xpLine === 'string' ? dmgResult.data.xpLine as string : '';
       const critText = isCrit ? ' **CRITICAL HIT!**' : '';
       const offHandText = isOffHand ? ' (off-hand)' : '';
       return {
@@ -931,8 +932,9 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
           ...baseData, isHit: true,
           damage: damageTotal, damageResults, damageDice, damageType: dmgType,
           targetNewHp: enemy.hp.current, targetDefeated: enemy.isDead,
+          xpAwarded: !!xpLine, xpLine,
         },
-        message: `You attack ${enemy.name} with ${weaponName}${offHandText}: **HIT${critText}** (Rolled ${attackRoll} vs AC ${enemyAc}) dealing **${damageTotal}** ${dmgType} damage! ${enemy.name}: ${enemy.hp.current}/${enemy.hp.max} HP.`
+        message: `You attack ${enemy.name} with ${weaponName}${offHandText}: **HIT${critText}** (Rolled ${attackRoll} vs AC ${enemyAc}) dealing **${damageTotal}** ${dmgType} damage! ${enemy.name}: ${enemy.hp.current}/${enemy.hp.max} HP.${xpLine ? ' ' + xpLine : ''}`
       };
     },
   };

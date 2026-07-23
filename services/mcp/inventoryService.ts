@@ -3,6 +3,7 @@ import { fail, fuzzyMatchEntity, ErrorCodes } from './_shared';
 import { isDebugMode } from '../../utils/debug';
 import { getHeavyArmorMasterReduction } from '../featsService';
 import { breakConcentration as engineBreakConcentration } from '../spellcastingEngine';
+import { awardEnemyDefeatXp } from './progressionService';
 
 function parseCost(srdCost: string): { gp: number; sp: number; cp: number } | null {
   if (!srdCost) return null;
@@ -157,11 +158,12 @@ export function createInventoryService(state: GameState, deps: InventoryDeps): I
           if (newHp === 0) {
             enemy.isDead = true;
             deps.updateInitiativeDeathStatus(enemy.id, true);
-            const msg = `${enemy.name} took ${dmg} damage${damageType ? ' (' + damageType + ')' : ''}. ${enemy.name} is defeated!`;
+            const xpLine = awardEnemyDefeatXp(state, enemy);
+            const msg = `${enemy.name} took ${dmg} damage${damageType ? ' (' + damageType + ')' : ''}. ${enemy.name} is defeated!${xpLine ? ' ' + xpLine : ''}`;
             state.sessionLogs.push(msg);
             return {
               success: true,
-              data: { character: enemy.name, previousHp: oldHp, newHp, damage: dmg, enemyDefeated: true, isEnemy: true },
+              data: { character: enemy.name, previousHp: oldHp, newHp, damage: dmg, enemyDefeated: true, isEnemy: true, xpAwarded: !!xpLine, xpLine },
               message: msg
             };
           }

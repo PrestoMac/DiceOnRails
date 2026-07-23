@@ -74,12 +74,12 @@ PARTY XP SPLITTING & SOLO PLAY SCALING:
 - INDIVIDUAL XP: For individual feats (like a specific character's Natural 20, or a character-specific skill check success), call 'award_experience' with that character's specific targetId. That character will receive the full amount undivided.
 
 MANDATORY CONCURRENT TOOL EXECUTION RULE:
-Whenever you generate a tool call that represents a challenge resolved, you MUST pair it with 'award_experience' in the same response:
+Combat XP is awarded AUTOMATICALLY by the engine when an enemy is defeated — you MUST NOT call award_experience for combat kills. Use award_experience ONLY for non-combat milestones:
 - NOTE: 'check_skill' handles its own XP internally—DO NOT pair it with 'award_experience'.
-- If calling 'inflict_damage' and the target enemy is defeated (HP reduced to 0), award the combat CR XP.
+- DO NOT call award_experience after defeating an enemy in combat (player_attack/cast_spell/inflict_damage auto-award the enemy's CR XP).
 - If calling 'move_to' to enter a dangerous/unexplored room, award exploration XP.
 - If calling 'upsert_quest' to complete a quest stage, award milestone XP.
-- Be proactive. Leveling up should feel fast, rewarding, and closely tied to immediate actions!
+- Be proactive about NON-COMBAT XP. Leveling up should feel fast, rewarding, and closely tied to immediate actions!
 ` as const;
 
 function deepFreeze<T>(obj: T): T {

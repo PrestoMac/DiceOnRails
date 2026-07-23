@@ -1,6 +1,52 @@
-import { Character, GameState, MCPResponse, LevelUpSummary } from '../../types';
+import { Character, GameState, MCPResponse, LevelUpSummary, Enemy } from '../../types';
 import { fail } from './_shared';
 import { awardExperience as progAward, applyStatAllocation, getProgressionContext } from '../progressionService';
+
+/**
+ * Auto-awards an enemy's XP to the party on defeat (party-split + solo-buff, mirroring awardExperience).
+ * Idempotent via the enemy.xpAwarded flag — safe to call from every damage path.
+ * @returns A summary line appended to tool result messages, or empty string if already awarded/no XP.
+ */
+export function awardEnemyDefeatXp(state: GameState, enemy: Enemy): string {
+  if (enemy.xpAwarded) return '';
+  const baseXp = Math.max(0, Number(enemy.xp ?? 0));
+  if (baseXp === 0) {
+    enemy.xpAwarded = true;
+    return '';
+  }
+  enemy.xpAwarded = true;
+
+  const partySize = state.party.length;
+  if (partySize === 0) return '';
+
+  let perMember: number;
+  let soloBuff = false;
+  if (partySize === 1) {
+    perMember = Math.round(baseXp * 1.25);
+    soloBuff = true;
+  } else {
+    perMember = Math.max(1, Math.floor(baseXp / partySize));
+  }
+
+  const reports: string[] = [];
+  let anyLevelUp = false;
+  state.party = state.party.map(target => {
+    const result = progAward(target, perMember);
+    if (result.leveledUp && result.levelUpSummary) {
+      anyLevelUp = true;
+      state.sessionLogs.push(`${result.character.name} reached level ${result.levelUpSummary.newLevel}!`);
+      reports.push(`${result.character.name} leveled up to ${result.levelUpSummary.newLevel}!`);
+    } else {
+      reports.push(`${result.character.name} +${perMember} XP`);
+    }
+    return result.character;
+  });
+
+  const prefix = soloBuff
+    ? `Combat XP (auto): ${perMember} XP each (solo +25% buff, base CR ${baseXp}).`
+    : `Combat XP (auto): ${baseXp} XP split ${perMember}/each.`;
+  return `${prefix}${anyLevelUp ? ' LEVEL UP!' : ''} ${reports.join('; ')}`;
+}
 
 /** Service interface for managing character experience, levels, and stat allocations. */
 export interface ProgressionService {

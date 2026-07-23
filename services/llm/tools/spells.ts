@@ -11,11 +11,10 @@ export const tools = [
                     casterId: { type: 'string', description: 'Character casting the spell' },
                     spellId: { type: 'string', description: 'Spell ID (e.g. "fireball")' },
                     slotLevel: { type: 'integer', description: 'Spell slot level to use' },
-                    targets: { type: 'array', items: { type: 'string' }, description: 'Target enemy IDs/names' },
-                    targetId: { type: 'string', description: 'Single target' },
+                    targets: { type: 'array', items: { type: 'string' }, description: 'Target enemy IDs/names. Pass a single-element array for one target.' },
                     reaction: { type: 'boolean', description: 'Optional: Set true to cast this spell as a reaction.' }
                 },
-                required: ['casterId', 'spellId', 'slotLevel']
+                required: ['casterId', 'spellId', 'slotLevels']
             }
         }
     },
@@ -44,7 +43,7 @@ export const tools = [
         type: "function",
         function: {
             name: 'cast_ritual',
-            description: 'Ritual casting takes 10 minutes. Call narrate_turn(timePassed=10) separately to advance time.',
+            description: 'Ritual casting takes 10 minutes. Time advances automatically (no separate narrate_turn needed).',
             parameters: {
                 type: 'object',
                 properties: {

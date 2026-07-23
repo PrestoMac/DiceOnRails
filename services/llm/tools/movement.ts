@@ -1,4 +1,4 @@
-import { ON_SUCCESS_PROPERTIES } from './shared';
+import { ON_SUCCESS_PROPERTIES, END_OF_TURN_PROPERTIES } from './shared';
 
 /** Tool definitions for movement and narration: moving to locations and ending turns with narration. */
 export const tools = [
@@ -35,7 +35,8 @@ export const tools = [
                         type: 'string',
                         enum: ['slow', 'normal', 'fast'],
                         description: 'Optional: Travel pace (default: normal).'
-                    }
+                    },
+                    ...END_OF_TURN_PROPERTIES
                 },
                 required: ['location_name']
             }

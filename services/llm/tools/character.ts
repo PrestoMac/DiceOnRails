@@ -1,4 +1,4 @@
-import { ON_SUCCESS_PROPERTIES } from './shared';
+import { ON_SUCCESS_PROPERTIES, BRANCH_NARRATION_PROPERTIES } from './shared';
 
 /** Tool definitions for character-related actions: rolling dice, skill checks, saving throws, death saves, leveling up, and using class resources. */
 export const tools = [
@@ -12,12 +12,7 @@ export const tools = [
                 properties: {
                     sides: { type: 'integer', description: 'Number of sides (20 for checks, 4-12 for damage dice)' },
                     count: { type: 'integer', description: 'Number of dice to roll' },
-                    modifier: { type: 'integer', description: 'Modifier to add' },
-                    target_ac: { type: 'integer', description: 'Optional backward compatibility target AC' },
-                    target_name: { type: 'string', description: 'Optional backward compatibility target name' },
-                    isOffHand: { type: 'boolean', description: 'Optional backward compatibility isOffHand flag' },
-                    weaponName: { type: 'string', description: 'Optional backward compatibility weapon name' },
-                    attackerId: { type: 'string', description: 'Optional backward compatibility attacker ID' }
+                    modifier: { type: 'integer', description: 'Modifier to add' }
                 },
                 required: ['sides']
             }
@@ -38,7 +33,8 @@ export const tools = [
                         type: 'object',
                         description: 'Optional: Actions auto-fired when the check succeeds. Eliminates the need for a separate tool call.',
                         properties: { ...ON_SUCCESS_PROPERTIES }
-                    }
+                    },
+                    ...BRANCH_NARRATION_PROPERTIES
                 },
                 required: ['skill_name', 'difficulty']
             }
@@ -54,7 +50,8 @@ export const tools = [
                 properties: {
                     targetId: { type: 'string', description: 'Character or enemy ID/name making the save' },
                     stat: { type: 'string', description: 'Ability: strength, dexterity, constitution, intelligence, wisdom, or charisma' },
-                    dc: { type: 'integer', description: 'Difficulty Class of the save' }
+                    dc: { type: 'integer', description: 'Difficulty Class of the save' },
+                    ...BRANCH_NARRATION_PROPERTIES
                 },
                 required: ['targetId', 'stat', 'dc']
             }
@@ -99,6 +96,16 @@ export const tools = [
                     hpDeviation: {
                         type: 'integer',
                         description: 'HP roll adjustment from the class hit die (0 = average, positive = rolled high, negative = rolled low).'
+                    },
+                    learnSpells: {
+                        type: 'array',
+                        items: { type: 'string' },
+                        description: 'Optional: spell IDs to learn for known casters (Bard/Sorcerer/Warlock/Ranger) on level up. Chained automatically — no separate manage_spellbook call needed.'
+                    },
+                    prepareSpells: {
+                        type: 'array',
+                        items: { type: 'string' },
+                        description: 'Optional: spell IDs to add to the daily prepared list (Cleric/Druid/Wizard/Paladin) on level up. Chained automatically.'
                     }
                 },
                 required: ['targetId']

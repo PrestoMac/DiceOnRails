@@ -61,9 +61,7 @@ export const tools = [
                 properties: {
                     attackerId: { type: 'string', description: 'Player name or ID making the attack' },
                     weaponName: { type: 'string', description: 'Weapon name (e.g. "Longsword")' },
-                    targetId: { type: 'string', description: 'Target enemy name or ID. Either targetId, target_name, or target is accepted.' },
-                    target_name: { type: 'string', description: 'Alternative to targetId: target enemy name. Backward-compat alias.' },
-                    target: { type: 'string', description: 'Alternative to targetId: target enemy name. Backward-compat alias.' },
+                    targetId: { type: 'string', description: 'Target enemy name or ID' },
                     isOffHand: { type: 'boolean', description: 'Set true for off-hand bonus attack.' },
                     isSneakAttack: { type: 'boolean', description: 'Set true for Rogue Sneak Attack.' },
                     sharpshooter: { type: 'boolean', description: 'Use Sharpshooter feat: -5 to hit, +10 damage.' },

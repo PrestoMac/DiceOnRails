@@ -232,6 +232,44 @@ export class MockMCPServer {
     };
   }
 
+  /**
+   * Finalizes a turn by advancing game time + appending narration, collapsing an
+   * action+narrate_turn pair into a single tool call. Deterministic tools pass
+   * `narration`/`timePassed`; binary dice tools pass `narrationOnSuccess`/
+   * `narrationOnFailure` and the engine selects the branch from the result's own
+   * roll outcome (zero-hallucination). Only honored OUT of combat. No-op otherwise.
+   */
+  private async maybeFinalizeTurn(args: Record<string, unknown>, baseResult: MCPResponse): Promise<MCPResponse> {
+    if (this.state.combat?.isActive) return baseResult;
+
+    const hasInlineNarration = typeof args.narration === 'string' && (args.narration as string).trim() !== '';
+    const hasTimePassed = args.timePassed !== undefined && args.timePassed !== null;
+    const hasBranches = typeof args.narrationOnSuccess === 'string' || typeof args.narrationOnFailure === 'string';
+
+    if (!hasInlineNarration && !hasTimePassed && !hasBranches) return baseResult;
+
+    let narrationText = '';
+    if (hasBranches) {
+      const success = Boolean((baseResult.data as Record<string, unknown> | undefined)?.success);
+      narrationText = success
+        ? String(args.narrationOnSuccess ?? '')
+        : String(args.narrationOnFailure ?? '');
+    } else {
+      narrationText = String(args.narration ?? '');
+    }
+
+    const timePassed = Number(args.timePassed ?? 0) || 0;
+    if (!narrationText.trim() && timePassed === 0) return baseResult;
+
+    const narrateResult = await this.travel.narrate_turn(narrationText, timePassed);
+    if (isDebugMode) console.log(`[maybeFinalizeTurn] finalized turn: timePassed=${timePassed}, branch=${hasBranches}, gameTime=${this.state.gameTime}`);
+    return {
+      success: baseResult.success,
+      data: { ...baseResult.data, narration: narrationText, timeResult: narrateResult.data, timePassed },
+      message: baseResult.message + '\n' + narrateResult.message,
+    };
+  }
+
 
   /** Routes an LLM tool call by name to the appropriate sub-service, dispatching across 29 cases (28 tools + unknown default). */
   public async executeToolCall(name: string, args: Record<string, unknown>): Promise<MCPResponse> {
@@ -259,28 +297,66 @@ export class MockMCPServer {
           res = await this.combat.end_combat(); break;
         case 'player_attack':
           res = await this.combat.player_attack(String(args.attackerId || ''), String(args.weaponName || ''), String(args.targetId || args.target_name || args.target || ''), args.isOffHand as boolean | undefined, args.isSneakAttack as boolean | undefined, args.sharpshooter as boolean | undefined, args.greatWeaponMaster as boolean | undefined); break;
-        case 'move_to':
-          res = await this.travel.move_to(String(args.location_name || 'Unknown'), String(args.description || ''), args.targetId as string | undefined, args.skillCheck as unknown as { skill_name?: string; difficulty?: number; onSuccess?: unknown }, args.route as string | undefined, args.pace as string | undefined); break;
+        case 'move_to': {
+          res = await this.travel.move_to(String(args.location_name || 'Unknown'), String(args.description || ''), args.targetId as string | undefined, args.skillCheck as unknown as { skill_name?: string; difficulty?: number; onSuccess?: unknown }, args.route as string | undefined, args.pace as string | undefined);
+          if (!args.route) res = await this.maybeFinalizeTurn(args, res);
+          break;
+        }
         case 'check_skill':
-          res = await this.travel.check_skill(String(args.skill_name || ''), Number(args.difficulty ?? 10), args.targetId as string, args.onSuccess as Record<string, unknown>); break;
+          res = await this.maybeFinalizeTurn(args, await this.travel.check_skill(String(args.skill_name || ''), Number(args.difficulty ?? 10), args.targetId as string, args.onSuccess as Record<string, unknown>)); break;
         case 'inflict_damage':
           res = await this.inventory.inflict_damage(Number(args.amount ?? 0), (args.targetId || args.target_name) as string, args.damageType as string); break;
         case 'adjust_currency':
-          res = await this.inventory.adjust_currency(Number(args.gp ?? 0), Number(args.sp ?? 0), Number(args.cp ?? 0), args.targetId as string); break;
-        case 'update_inventory':
-          res = await this.inventory.update_inventory(String(args.item_name || ''), String(args.action || 'add') as 'add' | 'remove' | 'edit', Number(args.quantity ?? 1), args.new_name as string | undefined, args.targetId as string, args.type as unknown as InventoryItem['type'], args.rarity as unknown as InventoryItem['rarity'], args.description as string, args.stats as unknown as InventoryItem['stats'], args.equipped as boolean, args.cost_gp as number | undefined, args.cost_sp as number | undefined, args.cost_cp as number | undefined, args.autoDeductMarketPrice as boolean | undefined, args.craft as boolean | undefined); break;
+          res = await this.maybeFinalizeTurn(args, await this.inventory.adjust_currency(Number(args.gp ?? 0), Number(args.sp ?? 0), Number(args.cp ?? 0), args.targetId as string)); break;
+        case 'update_inventory': {
+          const batchItems = Array.isArray(args.items) ? args.items as Array<Record<string, unknown>> : [];
+          if (batchItems.length > 0) {
+            const msgs: string[] = [];
+            let anyFail = false;
+            for (const it of batchItems) {
+              const r = await this.inventory.update_inventory(
+                String(it.item_name || ''), String(it.action || 'add') as 'add' | 'remove' | 'edit',
+                Number(it.quantity ?? 1), undefined, args.targetId as string,
+                it.type as unknown as InventoryItem['type'], it.rarity as unknown as InventoryItem['rarity'],
+                it.description as string, it.stats as unknown as InventoryItem['stats'], undefined,
+                undefined, undefined, undefined, undefined, undefined);
+              msgs.push(r.message);
+              if (!r.success) anyFail = true;
+            }
+            res = await this.maybeFinalizeTurn(args, { success: !anyFail, data: { batch: batchItems.length, character: args.targetId }, message: msgs.join('\n') });
+          } else {
+            res = await this.maybeFinalizeTurn(args, await this.inventory.update_inventory(String(args.item_name || ''), String(args.action || 'add') as 'add' | 'remove' | 'edit', Number(args.quantity ?? 1), args.new_name as string | undefined, args.targetId as string, args.type as unknown as InventoryItem['type'], args.rarity as unknown as InventoryItem['rarity'], args.description as string, args.stats as unknown as InventoryItem['stats'], args.equipped as boolean, args.cost_gp as number | undefined, args.cost_sp as number | undefined, args.cost_cp as number | undefined, args.autoDeductMarketPrice as boolean | undefined, args.craft as boolean | undefined));
+          }
+          break;
+        }
         case 'upsert_quest':
-          res = await this.content.upsert_quest(String(args.title || ''), String(args.description || ''), String(args.status || 'active') as 'active' | 'completed' | 'failed', args.reputationChanges as unknown as Array<{ faction: string; delta: number }>); break;
+          res = await this.maybeFinalizeTurn(args, await this.content.upsert_quest(String(args.title || ''), String(args.description || ''), String(args.status || 'active') as 'active' | 'completed' | 'failed', args.reputationChanges as unknown as Array<{ faction: string; delta: number }>)); break;
         case 'log_lore':
-          res = await this.content.log_lore(String(args.title || ''), String(args.content || ''), String(args.category || 'History')); break;
+          res = await this.maybeFinalizeTurn(args, await this.content.log_lore(String(args.title || ''), String(args.content || ''), String(args.category || 'History'))); break;
         case 'make_save':
-          res = await this.combat.make_save(String(args.targetId || ''), String(args.stat || 'dex'), Number(args.dc ?? 10)); break;
+          res = await this.maybeFinalizeTurn(args, await this.combat.make_save(String(args.targetId || ''), String(args.stat || 'dex'), Number(args.dc ?? 10))); break;
         case 'roll_death_save':
           res = await this.combat.roll_death_save(String(args.targetId || '')); break;
         case 'award_experience':
           res = await this.progression.awardExperience(Number(args.amount ?? 0), args.targetId as string); break;
-        case 'level_up':
-          res = this.progression.allocateStatPoints((args.stats || {}) as unknown as Partial<Record<keyof Character['stats'], number>>, args.targetId as string, (args.skills || {}) as Record<string, number>, Number(args.hpDeviation ?? 0)); break;
+        case 'level_up': {
+          const baseRes = this.progression.allocateStatPoints((args.stats || {}) as unknown as Partial<Record<keyof Character['stats'], number>>, args.targetId as string, (args.skills || {}) as Record<string, number>, Number(args.hpDeviation ?? 0));
+          if (!baseRes.success) { res = baseRes; break; }
+          const chained: string[] = [];
+          const targetIdForSpells = String(args.targetId || '');
+          for (const sid of (args.learnSpells as string[] || [])) {
+            const r = await this.spells.manage_spellbook(targetIdForSpells, 'learn', String(sid || ''));
+            chained.push(r.message);
+          }
+          for (const sid of (args.prepareSpells as string[] || [])) {
+            const r = await this.spells.manage_spellbook(targetIdForSpells, 'prepare', String(sid || ''));
+            chained.push(r.message);
+          }
+          res = chained.length > 0
+            ? { success: true, data: { ...baseRes.data, spellsChained: chained.length }, message: baseRes.message + '\n' + chained.join('\n') }
+            : baseRes;
+          break;
+        }
         case 'long_rest':
           res = await this.travel.long_rest(args.narration as string | undefined, args.autoAdvanceTime as boolean | undefined); break;
         case 'short_rest':
@@ -304,8 +380,19 @@ export class MockMCPServer {
           res = await this.teleport_creature(String(args.characterId || args.targetId || ''), String(args.destination || ''), Number(args.range ?? 30)); break;
         case 'polymorph_creature':
           res = await this.polymorph_creature(String(args.characterId || args.targetId || ''), String(args.newForm || args.beastForm || 'wolf'), Number(args.duration ?? 60)); break;
-        case 'cast_ritual':
-          res = await this.spells.cast_ritual(String(args.characterId || args.casterId || ''), String(args.spellId || '')); break;
+        case 'cast_ritual': {
+          const ritualRes = await this.spells.cast_ritual(String(args.characterId || args.casterId || ''), String(args.spellId || ''));
+          if (!this.state.combat?.isActive && ritualRes.success) {
+            const ritualNarration = typeof args.narration === 'string' && (args.narration as string).trim()
+              ? (args.narration as string)
+              : `${String(args.characterId || args.casterId || 'The caster')} completes the ${String(args.spellId || '')} ritual.`;
+            const ritualTime = await this.travel.narrate_turn(ritualNarration, 10);
+            res = { success: true, data: { ...ritualRes.data, ...ritualTime.data, narration: ritualNarration, timeResult: ritualTime.data, timePassed: 10 }, message: ritualRes.message + '\n' + ritualTime.message };
+          } else {
+            res = ritualRes;
+          }
+          break;
+        }
         case 'narrate_turn':
           if (Array.isArray(args.suggestions)) {
             this.state.lastSuggestions = args.suggestions

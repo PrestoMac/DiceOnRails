@@ -5,7 +5,7 @@ import { isDebugMode } from '../../utils/debug';
 import { safeParseJson } from '../../utils/safeJson';
 import { mcpServer } from '../mcpService';
 import { tools, TOOL_MODE_INSTRUCTION } from './tools';
-import { extractRollData } from './narration';
+import { extractRollData, formatToolResult } from './narration';
 import { estimateTokens, PER_MSG_OVERHEAD, STATIC_OVERHEAD, COMPLETION_RESERVE, CONTEXT_BUDGET } from './tokenEstimation';
 import { filterTools } from './toolFilter';
 import { resolveLLMConfig, mapHistoryToMessages } from './llmApiClient';
@@ -284,11 +284,17 @@ export async function runAgentLoop(
       return { id: tc.id, name: tc.function.name, args: parsedArgs };
     });
 
-    const isEndOfTurn = toolCalls.some((tc: { name: string; args?: { narration?: string; autoAdvanceTime?: boolean; route?: string } }) =>
+    const combatActive = mcpServer.getFullState().combat?.isActive === true;
+    const isEndOfTurn = toolCalls.some((tc: { name: string; args?: { narration?: string; autoAdvanceTime?: boolean; route?: string; timePassed?: number; narrationOnSuccess?: string; narrationOnFailure?: string } }) =>
       tc.name === 'narrate_turn' ||
       (tc.name === 'long_rest' && (tc.args?.narration || tc.args?.autoAdvanceTime)) ||
       (tc.name === 'short_rest' && (tc.args?.narration || tc.args?.autoAdvanceTime)) ||
-      (tc.name === 'move_to' && tc.args?.route)
+      (tc.name === 'move_to' && tc.args?.route) ||
+      // Inline finalize: an action tool carrying narration/timePassed (deterministic)
+      // or narrationOnSuccess/narrationOnFailure (binary dice) ends the turn.
+      // The engine selected the branch from its own roll. Gated out of combat,
+      // where turns are driven by next_turn instead.
+      (!combatActive && (tc.args?.narration || tc.args?.timePassed !== undefined || tc.args?.narrationOnSuccess || tc.args?.narrationOnFailure))
     );
 
     if (isEndOfTurn) {
@@ -341,11 +347,6 @@ export async function runAgentLoop(
         }
       }
 
-      // Use the LLM's free-form content as the primary narration — it has full context
-      if (assistantContent && assistantContent.length >= 25) {
-        inlineNarration = assistantContent;
-      }
-
       if (isDebugMode && !inlineNarration) {
         console.log('[AgentLoop] Narration empty — diagnostics:', {
           assistantContentLen: assistantContent?.length ?? 0,
@@ -368,7 +369,7 @@ export async function runAgentLoop(
     messages.push({ role: 'assistant', content: "", tool_calls: toolCallDefs });
     for (const { mapped, raw, result } of batchResults) {
       const toolName = mapped.name || raw.function?.name;
-      messages.push({ role: 'tool', tool_call_id: raw.id, content: JSON.stringify({ tool: toolName, success: result.success, message: result.message, data: result.data }) });
+      messages.push({ role: 'tool', tool_call_id: raw.id, content: formatToolResult(toolName, result) });
     }
 
 

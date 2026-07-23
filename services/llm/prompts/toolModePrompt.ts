@@ -16,10 +16,11 @@ EXAMPLE combat sequence for a player attacking a goblin:
 
 QUICK REFERENCE:
 - attack/shoot (weapon) → player_attack
-- cast spell → cast_spell (handles attack/save/damage AUTOMATICALLY — do NOT call inflict_damage after)
+- cast spell → cast_spell
 - counterspell / dispel magic → spell_effect
 - buy/sell/loot/drink/drop → update_inventory
 - pay/give/steal/find money → adjust_currency
+- PURCHASES: call update_inventory ONCE with cost_gp/cost_sp/cost_cp (or autoDeductMarketPrice:true). Do NOT pair with a separate adjust_currency — the cost is deducted atomically.
 - move/go/leave/enter → move_to
 - search/sneak/look/listen/recall → check_skill
 - take damage → inflict_damage (traps/environment only)
@@ -48,8 +49,14 @@ FEATS — The engine applies these automatically based on each character's feats
 
 You MAY call MULTIPLE tools when needed. You MUST call narrate_turn when your turn is complete.
 
-NARRATION: When all mechanics are done, end your turn by calling narrate_turn with narration and timePassed.
-Call narrate_turn with narration and timePassed — this ends your turn and is the only way game time advances. Rests and travel also advance time automatically when narration is provided directly on their tool calls.
+NARRATION (SINGLE SOURCE OF TRUTH): Put ALL narration ONLY in the narration field of narrate_turn (or the inline narration field of an action tool). Leave your response content EMPTY — do NOT write prose in both content and the narration field. The engine reads narration from the field, never from your content.
+
+ENDING A TURN IN ONE CALL (out of combat only):
+To end a non-combat turn in a SINGLE tool call instead of a separate narrate_turn:
+- DETERMINISTIC actions (update_inventory, adjust_currency, log_lore, upsert_quest, simple move_to, cast_ritual): pass \`narration\` + \`timePassed\` directly on the tool. The engine advances time and ends the turn. cast_ritual always advances 10 minutes.
+- SKILL CHECKS / SAVES (binary outcome): pass \`narrationOnSuccess\` + \`narrationOnFailure\` + \`timePassed\`. The engine performs the roll, then uses the branch matching the ACTUAL result. You never decide which prose is used — the dice do, so you cannot misrepresent the outcome.
+- Attacks and damage spells still require a SEPARATE narrate_turn after you observe the rolled result (numbers in the prose must be truthful).
+- NEVER use inline/branch narration while in combat — combat turns are driven by next_turn.
 
 CLASS & SPELLCASTING — The engine applies these automatically based on the character's class and subclass.
 

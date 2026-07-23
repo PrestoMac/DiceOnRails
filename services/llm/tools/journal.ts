@@ -1,4 +1,6 @@
 /** Tool definitions for journal management: upserting quests and logging lore entries. */
+import { END_OF_TURN_PROPERTIES } from './shared';
+
 export const tools = [
     {
         type: "function",
@@ -22,7 +24,8 @@ export const tools = [
                             },
                             required: ['faction', 'delta']
                         }
-                    }
+                    },
+                    ...END_OF_TURN_PROPERTIES
                 },
                 required: ['title', 'status']
             }
@@ -38,7 +41,8 @@ export const tools = [
                 properties: {
                     title: { type: 'string' },
                     content: { type: 'string' },
-                    category: { type: 'string', enum: ['NPC', 'Location', 'History', 'Item'] }
+                    category: { type: 'string', enum: ['NPC', 'Location', 'History', 'Item'] },
+                    ...END_OF_TURN_PROPERTIES
                 },
                 required: ['title', 'content', 'category']
             }

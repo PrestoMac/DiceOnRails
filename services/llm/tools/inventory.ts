@@ -1,4 +1,6 @@
 /** Tool definitions for inventory and currency management: updating items and adjusting GP/SP/CP. */
+import { END_OF_TURN_PROPERTIES } from './shared';
+
 export const tools = [
     {
         type: "function",
@@ -8,6 +10,22 @@ export const tools = [
             parameters: {
                 type: 'object',
                 properties: {
+                    items: {
+                        type: 'array',
+                        description: 'Optional: batch of items to add in one call (e.g. looting a body). Each entry: {item_name, quantity, type, rarity, description, stats}. Mutually exclusive with item_name.',
+                        items: {
+                            type: 'object',
+                            properties: {
+                                item_name: { type: 'string' },
+                                quantity: { type: 'integer' },
+                                type: { type: 'string', enum: ['weapon', 'armor', 'potion', 'shield', 'gear', 'other'] },
+                                rarity: { type: 'string', enum: ['common', 'uncommon', 'rare', 'very rare', 'legendary'] },
+                                description: { type: 'string' },
+                                stats: { type: 'object' }
+                            },
+                            required: ['item_name']
+                        }
+                    },
                     item_name: { type: 'string' },
                     action: { type: 'string', enum: ['add', 'remove', 'edit'] },
                     quantity: { type: 'integer' },
@@ -34,9 +52,10 @@ export const tools = [
                     cost_sp: { type: 'integer', description: 'Optional: Silver pieces to auto-deduct.' },
                     cost_cp: { type: 'integer', description: 'Optional: Copper pieces to auto-deduct.' },
                     autoDeductMarketPrice: { type: 'boolean', description: 'Optional: If true, look up SRD price and deduct.' },
-                    craft: { type: 'boolean', description: 'Optional: Set true to craft from ingredients.' }
+                    craft: { type: 'boolean', description: 'Optional: Set true to craft from ingredients.' },
+                    ...END_OF_TURN_PROPERTIES
                 },
-                required: ['item_name', 'action']
+                required: []
             }
         }
     },
@@ -51,7 +70,8 @@ export const tools = [
                     gp: { type: 'integer', description: 'Gold pieces to add' },
                     sp: { type: 'integer', description: 'Silver pieces to add' },
                     cp: { type: 'integer', description: 'Copper pieces to add' },
-                    targetId: { type: 'string' }
+                    targetId: { type: 'string' },
+                    ...END_OF_TURN_PROPERTIES
                 },
                 required: []
             }

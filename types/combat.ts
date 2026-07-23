@@ -22,6 +22,7 @@ export interface Enemy {
   cr?: number;
   xp?: number;
   isDead: boolean;
+  xpAwarded?: boolean;
   specialAbilities?: string[];
   damageResistances?: string[];
   damageImmunities?: string[];
