@@ -9,6 +9,7 @@ import { mcpServer } from '../services/mcpService';
 
 interface ActionsContextValue {
   handleSendMessage: (text: string, isRetry?: boolean) => Promise<void>;
+  handleUndo: () => Promise<void>;
   handleRewind: () => Promise<void>;
   handleExecuteBatch: () => Promise<void>;
   handleCharacterCreated: (character: Character) => void;

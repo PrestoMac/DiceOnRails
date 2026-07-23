@@ -169,6 +169,7 @@ describe('useGameActions', () => {
     expect(result.current.handleSendMessage).toBeDefined();
     expect(result.current.handleExecuteBatch).toBeDefined();
     expect(result.current.handleCharacterCreated).toBeDefined();
+    expect(result.current.handleUndo).toBeDefined();
     expect(result.current.handleRewind).toBeDefined();
     expect(result.current.resetContextState).toBeDefined();
   });
@@ -614,6 +615,66 @@ describe('useGameActions', () => {
     expect(mcpServerMock.restoreSnapshot).toHaveBeenCalled();
     expect(mcpServerMock.clearRewindPoint).toHaveBeenCalled();
     expect(mcpServerMock.loadEmergencySnapshot).toHaveBeenCalled();
+  });
+
+  describe('handleUndo (pure undo — restores without re-sending)', () => {
+    afterEach(() => {
+      defaultProps.isNewCampaign = false;
+    });
+
+    it('handleUndo Branch B restores the snapshot but does NOT reprocess the message', async () => {
+      const snapshot = {
+        gameState: makeBaseState(),
+        messages: [
+          { id: 'user-msg', role: MessageRole.USER, text: 'I attack the goblin', timestamp: 0 },
+        ],
+      };
+      mcpServerMock.loadRewindPoint.mockReturnValue(snapshot);
+      mcpServerMock.getFullState.mockReturnValue(makeBaseState());
+
+      const { result } = render();
+
+      await act(async () => {
+        await result.current.handleUndo();
+      });
+
+      expect(mcpServerMock.restoreSnapshot).toHaveBeenCalledWith(snapshot.gameState);
+      expect(mcpServerMock.clearRewindPoint).toHaveBeenCalled();
+      // The defining guarantee of pure undo: no retry, so the agent loop never runs.
+      expect(mockRunAgentLoop).not.toHaveBeenCalled();
+    });
+
+    it('handleUndo Branch A restores from emergency snapshot without reprocessing', async () => {
+      const baseState = makeBaseState();
+      mcpServerMock.loadRewindPoint.mockReturnValue(null);
+      mcpServerMock.loadEmergencySnapshot.mockReturnValue(deepClone(baseState));
+      mcpServerMock.getFullState.mockReturnValue(baseState);
+      defaultProps.messages = [{ id: 'user-msg', role: MessageRole.USER, text: 'I search the room', timestamp: 0 }];
+
+      const { result } = render();
+
+      await act(async () => {
+        await result.current.handleUndo();
+      });
+
+      expect(mcpServerMock.restoreSnapshot).toHaveBeenCalled();
+      expect(mockRunAgentLoop).not.toHaveBeenCalled();
+    });
+
+    it('handleUndo returns early when no snapshot and no user message', async () => {
+      mcpServerMock.loadRewindPoint.mockReturnValue(null);
+      mcpServerMock.loadEmergencySnapshot.mockReturnValue(null);
+      defaultProps.messages = [];
+
+      const { result } = render();
+
+      await act(async () => {
+        await result.current.handleUndo();
+      });
+
+      expect(mcpServerMock.restoreSnapshot).not.toHaveBeenCalled();
+      expect(mockRunAgentLoop).not.toHaveBeenCalled();
+    });
   });
 
   it('handleExecuteBatch returns early when queue is empty', async () => {

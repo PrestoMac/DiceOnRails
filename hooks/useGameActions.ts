@@ -351,12 +351,16 @@ export const useGameActions = (
     const handleSendMessageRef = useRef(handleSendMessage);
     handleSendMessageRef.current = handleSendMessage;
 
-    const handleRewind = useCallback(async () => {
+    // Restores game state, messages, and LLM context to before the most recent
+    // user turn. Shared by handleUndo (pure undo) and handleRewind (undo + retry).
+    // Returns the original user text so the caller can optionally re-send it, or
+    // null when nothing was restored (busy / no last user message).
+    const restoreToBeforeLastTurn = useCallback(async (): Promise<string | null> => {
         stopSpeaking();
         onCloseLevelUp?.();
         if (processingRef.current) {
-            if (isDebugMode) console.warn('[handleRewind] already processing, skipping');
-            return;
+            if (isDebugMode) console.warn('[rewind] already processing, skipping');
+            return null;
         }
         // Bump the rewind generation BEFORE restoring. Any in-flight Supabase
         // realtime updates written with an older generation will be rejected by
@@ -364,13 +368,13 @@ export const useGameActions = (
         // the restored state during the retry window.
         bumpRewindGeneration();
         const snapshot = mcpServer.loadRewindPoint();
-        if (isDebugMode) console.log('[handleRewind] snapshot:', !!snapshot, 'processingRef:', processingRef.current);
+        if (isDebugMode) console.log('[rewind] snapshot:', !!snapshot, 'processingRef:', processingRef.current);
 
         if (!snapshot) {
             const emergencySnap = mcpServer.loadEmergencySnapshot();
             const currentMsgs = messagesRef.current;
             const lastUserMsg = [...currentMsgs].reverse().find(m => m.role === MessageRole.USER);
-            if (!lastUserMsg) return;
+            if (!lastUserMsg) return null;
             const lastUserIdx = currentMsgs.map(m => m.id).lastIndexOf(lastUserMsg.id);
             const restoredMessages = currentMsgs.slice(0, lastUserIdx);
             setMessages(restoredMessages);
@@ -402,9 +406,8 @@ export const useGameActions = (
             setViewingCharacterId(myCharacterId);
             mcpServer.clearRewindPoint();
             mcpServer.clearEmergencySnapshot();
-            if (isDebugMode) console.log('[handleRewind] no snapshot, retrying last message', { text: lastUserMsg.text.slice(0, 80) });
-            setTimeout(() => handleSendMessageRef.current(lastUserMsg.text, true), 100);
-            return;
+            if (isDebugMode) console.log('[rewind] no snapshot, restored to before last message', { text: lastUserMsg.text.slice(0, 80) });
+            return lastUserMsg.text;
         }
 
         const userMessage = snapshot.messages[snapshot.messages.length - 1];
@@ -437,11 +440,24 @@ export const useGameActions = (
         }
         setViewingCharacterId(myCharacterId);
         mcpServer.clearRewindPoint();
-        if (originalText) {
-            if (isDebugMode) console.log('[handleRewind] retrying with snapshot', { text: originalText.slice(0, 80) });
-            setTimeout(() => handleSendMessageRef.current(originalText, true), 100);
-        }
+        if (isDebugMode) console.log('[rewind] restored with snapshot', { text: originalText.slice(0, 80) });
+        return originalText || null;
     }, [currentCampaignId, setMessages, setGameState, setIsLoading]);
 
-    return { handleSendMessage, handleExecuteBatch, handleCharacterCreated, handleRewind, resetContextState };
+    // Pure undo: reverts the last turn and stops. No re-send, so quests/lore/loot
+    // granted that turn actually disappear instead of being re-applied by a retry.
+    const handleUndo = useCallback(async () => {
+        await restoreToBeforeLastTurn();
+    }, [restoreToBeforeLastTurn]);
+
+    // Retry: reverts the last turn, then immediately re-processes the same input.
+    const handleRewind = useCallback(async () => {
+        const text = await restoreToBeforeLastTurn();
+        if (text) {
+            if (isDebugMode) console.log('[handleRewind] retrying', { text: text.slice(0, 80) });
+            setTimeout(() => handleSendMessageRef.current(text, true), 100);
+        }
+    }, [restoreToBeforeLastTurn]);
+
+    return { handleSendMessage, handleExecuteBatch, handleCharacterCreated, handleUndo, handleRewind, resetContextState };
 };

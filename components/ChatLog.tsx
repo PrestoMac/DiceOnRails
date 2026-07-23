@@ -141,6 +141,7 @@ interface ChatLogProps {
   messages: Message[];
   settings: AppSettings;
   onRewind?: () => void;
+  onUndo?: () => void;
   isProcessing?: boolean;
   onExpandAtmosphere?: () => void;
   atmosphereUrl?: string | null;
@@ -179,7 +180,7 @@ const EXPORT_BTN_CLASS = 'w-full flex items-center gap-3 px-4 py-2.5 text-sm tex
 const EXPORT_ICON_CLASS = 'text-xs w-5 text-center text-stone-500';
 
 /** Renders the scrollable message history with search, filter, export, speech playback, rewind, and roll-highlighting cards. */
-const ChatLog: React.FC<ChatLogProps> = ({ messages, settings, onRewind, isProcessing, onExpandAtmosphere, atmosphereUrl, scrollRef: externalScrollRef, onScrollChange, disableInternalScroll, onPrefillInput, showWelcomeChips, suggestions, onPickSuggestion, onDismissSuggestion }) => {
+const ChatLog: React.FC<ChatLogProps> = ({ messages, settings, onRewind, onUndo, isProcessing, onExpandAtmosphere, atmosphereUrl, scrollRef: externalScrollRef, onScrollChange, disableInternalScroll, onPrefillInput, showWelcomeChips, suggestions, onPickSuggestion, onDismissSuggestion }) => {
   const internalScrollRef = useRef<HTMLDivElement>(null);
   const scrollRef = externalScrollRef || internalScrollRef;
   const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
@@ -191,6 +192,7 @@ const ChatLog: React.FC<ChatLogProps> = ({ messages, settings, onRewind, isProce
   const [exportToast, setExportToast] = useState<string | null>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const lastUserMessageId = [...messages].reverse().find(m => m.role === MessageRole.USER)?.id;
 
   useEffect(() => {
     let cancelled = false;
@@ -440,7 +442,10 @@ const ChatLog: React.FC<ChatLogProps> = ({ messages, settings, onRewind, isProce
             <div className="flex items-center gap-2 mt-2 px-1">
               {msg.senderName && <span className="text-[10px] font-bold uppercase tracking-widest text-amber-600/80">{msg.senderName}</span>}
               <span className="text-[10px] uppercase tracking-tighter text-stone-700">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-              {msg.role === MessageRole.USER && msg.id === [...messages].reverse().find(m => m.role === MessageRole.USER)?.id && onRewind && <button onClick={e => { e.stopPropagation(); onRewind(); }} disabled={isProcessing} className={`ml-1 p-1.5 rounded-full transition-all duration-300 ${isProcessing ? 'text-stone-700 cursor-not-allowed' : 'text-stone-500 hover:text-amber-400 hover:bg-stone-800/60'}`} title="Retry — rewinds game state and reprocesses"><i className="fas fa-redo text-[10px]"></i></button>}
+              {msg.role === MessageRole.USER && msg.id === lastUserMessageId && (onUndo || onRewind) && <>
+                {onUndo && <button onClick={e => { e.stopPropagation(); onUndo(); }} disabled={isProcessing} className={`ml-1 p-1.5 rounded-full transition-all duration-300 ${isProcessing ? 'text-stone-700 cursor-not-allowed' : 'text-stone-500 hover:text-amber-400 hover:bg-stone-800/60'}`} title="Undo — revert last turn"><i className="fas fa-undo text-[10px]"></i></button>}
+                {onRewind && <button onClick={e => { e.stopPropagation(); onRewind(); }} disabled={isProcessing} className={`ml-1 p-1.5 rounded-full transition-all duration-300 ${isProcessing ? 'text-stone-700 cursor-not-allowed' : 'text-stone-500 hover:text-amber-400 hover:bg-stone-800/60'}`} title="Retry — reverts game state and reprocesses"><i className="fas fa-redo text-[10px]"></i></button>}
+              </>}
             </div>
           </div>
           );

@@ -29,7 +29,7 @@ const DesktopLayout: React.FC = () => {
     handleEnqueueAction, handleRemoveQueueItem, handleUpdateQueueItem,
     handleReorderQueue, syncState,
   } = useGameContext();
-  const { handleSendMessage, handleRewind, handleExecuteBatch, handleResolveEnemyTurn } = useActionsContext();
+  const { handleSendMessage, handleUndo, handleRewind, handleExecuteBatch, handleResolveEnemyTurn } = useActionsContext();
   const {
     showLevelUpModal, levelUpCharacter, selectedAllocations, remainingPoints,
     previewHp, allocationError, handleOpenLevelUp, handleCloseLevelUp,
@@ -150,6 +150,7 @@ const DesktopLayout: React.FC = () => {
           messages={messages}
           settings={settings}
           onRewind={handleRewind}
+          onUndo={handleUndo}
           isProcessing={isLoading}
           onExpandAtmosphere={() => setIsAtmosphereExpanded(true)}
           atmosphereUrl={gameState.currentAtmosphereUrl}
