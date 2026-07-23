@@ -376,4 +376,50 @@ describe('runAgentLoop', () => {
     const sysMsg = body.messages.find((m: { role: string }) => m.role === 'system');
     expect(sysMsg.content).not.toContain('SUGGESTED ACTIONS');
   });
+
+  it('inline-finalized check_skill: extracts suggestions + ends turn in one iteration', async () => {
+    // Both branches carry the same marker so the assertion holds regardless of the roll.
+    const NARR = 'UNIQUENARRTOKEN The guard reacts to your words with visible emotion.';
+    mockFetch.mockResolvedValueOnce(makeLLMResponse('', [
+      { name: 'check_skill', args: {
+          skill_name: 'persuasion', difficulty: 15, targetId: 'hero-1',
+          narrationOnSuccess: NARR, narrationOnFailure: NARR, timePassed: 5,
+          suggestions: ['I bribe the guard', 'I walk away'],
+      } },
+    ]));
+
+    const result = await runAgentLoop(
+      [{ id: 'u1', role: MessageRole.USER, text: 'I persuade the guard', timestamp: 0 }],
+      'Tavern',
+      undefined, undefined, undefined,
+      { requestEndNarration: true, enableSuggestions: true },
+    );
+
+    expect(result.iterationCount).toBe(1);
+    expect(result.suggestions).toEqual(['I bribe the guard', 'I walk away']);
+    expect(result.inlineNarration).toBe(NARR);
+  });
+
+  it('inline-finalized tool keeps narration OUT of the system log message (no duplication)', async () => {
+    const NARR = 'DUPECHECKTOKEN vivid narration that must not leak into the system log.';
+    mockFetch.mockResolvedValueOnce(makeLLMResponse('', [
+      { name: 'check_skill', args: {
+          skill_name: 'persuasion', difficulty: 15, targetId: 'hero-1',
+          narrationOnSuccess: NARR, narrationOnFailure: NARR, timePassed: 3,
+      } },
+    ]));
+
+    const result = await runAgentLoop(
+      [{ id: 'u1', role: MessageRole.USER, text: 'I persuade the guard', timestamp: 0 }],
+      'Tavern',
+      undefined, undefined, undefined,
+      { requestEndNarration: true },
+    );
+
+    // Narration reaches the bubble...
+    expect(result.inlineNarration).toBe(NARR);
+    // ...but none of the tool/system log messages contain the narration prose.
+    const leaked = result.toolMessages.find(m => m.text.includes('DUPECHECKTOKEN'));
+    expect(leaked).toBeUndefined();
+  });
 });

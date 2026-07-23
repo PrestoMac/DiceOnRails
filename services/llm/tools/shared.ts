@@ -52,7 +52,13 @@ export const ENEMY_PROPERTIES = {
  */
 export const END_OF_TURN_PROPERTIES = {
     narration: { type: 'string', description: 'Optional ending narration. If provided, this action ends the turn (out of combat only).' },
-    timePassed: { type: 'integer', description: 'Optional: minutes to advance when ending the turn. Use 0 for an instant action with narration.' }
+    timePassed: { type: 'integer', description: 'Optional: minutes to advance when ending the turn. Use 0 for an instant action with narration.' },
+    suggestions: {
+        type: 'array',
+        items: { type: 'string' },
+        maxItems: 3,
+        description: 'Optional: 2-3 suggested next actions in first person (e.g. "I search the room").'
+    }
 };
 
 /**
@@ -64,5 +70,11 @@ export const END_OF_TURN_PROPERTIES = {
 export const BRANCH_NARRATION_PROPERTIES = {
     narrationOnSuccess: { type: 'string', description: 'Narration used if the check/save succeeds. The engine picks this branch from the roll.' },
     narrationOnFailure: { type: 'string', description: 'Narration used if the check/save fails. The engine picks this branch from the roll.' },
-    timePassed: { type: 'integer', description: 'Minutes to advance regardless of outcome (applies once a branch is selected).' }
+    timePassed: { type: 'integer', description: 'Minutes to advance regardless of outcome (applies once a branch is selected).' },
+    suggestions: {
+        type: 'array',
+        items: { type: 'string' },
+        maxItems: 3,
+        description: 'Optional: 2-3 suggested next actions in first person (e.g. "I attack the guard").'
+    }
 };

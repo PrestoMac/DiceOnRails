@@ -314,6 +314,20 @@ export async function runAgentLoop(
             }
           }
         }
+
+        // Inline-finalized tools carry suggestions on their own args (there is no
+        // separate narrate_turn to read them from). Pull them from the pre-end calls.
+        if ((!suggestions || suggestions.length === 0)) {
+          for (const r of preEndResults) {
+            const sugg = (r.mapped.args as Record<string, unknown> | undefined)?.suggestions;
+            if (Array.isArray(sugg) && sugg.length > 0) {
+              suggestions = (sugg as unknown[])
+                .filter((s: unknown): s is string => typeof s === 'string' && s.trim().length > 0)
+                .slice(0, 3);
+              if (suggestions.length > 0) break;
+            }
+          }
+        }
       }
 
 

@@ -263,10 +263,16 @@ export class MockMCPServer {
 
     const narrateResult = await this.travel.narrate_turn(narrationText, timePassed);
     if (isDebugMode) console.log(`[maybeFinalizeTurn] finalized turn: timePassed=${timePassed}, branch=${hasBranches}, gameTime=${this.state.gameTime}`);
+    // IMPORTANT: the narration prose must NOT be appended to `message` — the tool result
+    // becomes a visible [System:<tool>] chat log, which would duplicate the narration bubble.
+    // Narration lives ONLY in data.narration (the agent loop routes it to inlineNarration).
+    // Time-advancement logs (exhaustion, condition expiry, etc.) ARE surfaced here.
+    const narrData = narrateResult.data as { logs?: unknown } | undefined;
+    const timeLogs = Array.isArray(narrData?.logs) ? narrData.logs as string[] : [];
     return {
       success: baseResult.success,
       data: { ...baseResult.data, narration: narrationText, timeResult: narrateResult.data, timePassed },
-      message: baseResult.message + '\n' + narrateResult.message,
+      message: timeLogs.length > 0 ? baseResult.message + '\n' + timeLogs.join('\n') : baseResult.message,
     };
   }
 
@@ -387,7 +393,9 @@ export class MockMCPServer {
               ? (args.narration as string)
               : `${String(args.characterId || args.casterId || 'The caster')} completes the ${String(args.spellId || '')} ritual.`;
             const ritualTime = await this.travel.narrate_turn(ritualNarration, 10);
-            res = { success: true, data: { ...ritualRes.data, ...ritualTime.data, narration: ritualNarration, timeResult: ritualTime.data, timePassed: 10 }, message: ritualRes.message + '\n' + ritualTime.message };
+            const ritualData = ritualTime.data as { logs?: unknown } | undefined;
+            const ritualLogs = Array.isArray(ritualData?.logs) ? ritualData.logs as string[] : [];
+            res = { success: true, data: { ...ritualRes.data, ...ritualTime.data, narration: ritualNarration, timeResult: ritualTime.data, timePassed: 10 }, message: ritualLogs.length > 0 ? ritualRes.message + '\n' + ritualLogs.join('\n') : ritualRes.message };
           } else {
             res = ritualRes;
           }
