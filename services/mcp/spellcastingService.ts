@@ -151,7 +151,7 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
       }
 
       const classDef = getClassDef(char.class);
-      const spellDef = SPELLS_BY_ID[spellId.toLowerCase()];
+      const spellDef = SPELLS_BY_ID[spellId.toLowerCase().replace(/\s+/g, '-')];
 
       const isSelfTargetSpell =
         spellDef?.range === 'Self' ||

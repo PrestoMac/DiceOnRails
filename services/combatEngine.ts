@@ -1,7 +1,7 @@
 import { Character, Enemy, EnemyAttack, InitiativeEntry, CombatState } from '../types';
 import { cryptoRoll } from '../utils/random';
 import { lookupMonster } from '../utils/monsters';
-import { getConditionEffects, isUnconscious, isIncapacitated, removeCondition, tickConditions, rollSaveAgainstCondition, getExhaustionPenalty } from './conditionEngine';
+import { getConditionEffects, isUnconscious, isIncapacitated, removeCondition, tickConditions, tickConditionsByTime, rollSaveAgainstCondition, getExhaustionPenalty } from './conditionEngine';
 import { calculateAc, getMod } from './classEngine';
 import { getAlertInitiativeBonus, getResilientSaveBonus, getShieldMasterSaveBonus } from './featsService';
 import { ensureDeathSaves } from './characterUtils';
@@ -119,7 +119,10 @@ export function advanceToNextTurn(cs: CombatState, party: Character[], enemies: 
     for (const e of cs.initiative) {
       if (e.isDead) continue;
       const c = e.type === 'player' ? party.find(p => p.id === e.id) : enemies.find(en => en.id === e.id);
-      if (c) for (const cid of tickConditions(c)) expiryMsgs.push(`**${c.name}**'s ${cid} condition wore off.`);
+      if (c) {
+        for (const cid of tickConditions(c)) expiryMsgs.push(`**${c.name}**'s ${cid} condition wore off.`);
+        for (const cid of tickConditionsByTime(c, 0.1)) expiryMsgs.push(`**${c.name}**'s ${cid} condition wore off.`);
+      }
     }
     cs.turnIndex = 0; nextIdx = 0;
   } else { cs.turnIndex = nextIdx; }

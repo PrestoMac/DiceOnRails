@@ -13,7 +13,10 @@ export function filterTools(tools: Array<{ function: { name: string } }>, state:
     (c.unusedStatPoints ?? 0) > 0 || (c.unusedSkillPoints ?? 0) > 0
   );
   const partyAtFull = state.party.every(c =>
-    c.hp.current >= c.hp.max && c.hitDice.current >= c.hitDice.max
+    c.hp.current >= c.hp.max &&
+    c.hitDice.current >= c.hitDice.max &&
+    !(c.conditions ?? []).some(cond => cond.id.startsWith('exhaustion-')) &&
+    !(c.resources ?? []).some(r => r.current < r.max)
   );
   const hasCaster = state.party.some(c =>
     (c.knownSpells?.length ?? 0) > 0 || (c.preparedSpells?.length ?? 0) > 0

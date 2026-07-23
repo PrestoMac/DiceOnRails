@@ -221,11 +221,13 @@ export const useGameActions = (
                 if (isDebugMode) console.log('[handleSendMessage] trivial input, skipping agent loop', { text: text.slice(0, 80) });
             } else {
                 if (isDebugMode) console.log('[handleSendMessage] calling runAgentLoop', { historyLen: historyForAPI.length, contextLen: buildContextString(myCharacterId).length });
+                mcpServer.beginTransaction();
                 const result = await runAgentLoop(historyForAPI, buildContextString(myCharacterId), ctxPrep.frozen,
                     async (toolName, args, toolResult) => {
                         await dispatchToolRolls(toolName, args, toolResult, onTriggerDiceRoll, currentState, myCharacterId);
                         if (toolName === 'move_to' && settings.enableAtmosphere) performAtmosphereUpdate(args.location_name as string, args.description as string | undefined, settings);
                     }, undefined, { requestEndNarration: true, enableSuggestions: !!settings.enableSuggestions });
+                mcpServer.commitTransaction();
                 toolMessages = result.toolMessages;
                 inlineNarration = result.inlineNarration;
                 turnSuggestions = result.suggestions || [];
@@ -255,6 +257,7 @@ export const useGameActions = (
             }
         } catch (err) {
             if (isDebugMode) console.error("[DEBUG handleSendMessage] Critical failure:", err);
+            mcpServer.rollbackTransaction();
             processingRef.current = false;
             if (isSyncableCampaign(currentCampaignId)) {
                 const finalState = { ...mcpServer.getFullState(), isProcessing: false, processingUser: undefined };
@@ -274,8 +277,8 @@ export const useGameActions = (
         setIsLoading(true);
         const currentMessages = messagesRef.current;
         const lockedState = { ...gameState, isProcessing: true, processingUser: "Party" };
-        setGameState(lockedState); mcpServer.loadState(lockedState);
         mcpServer.beginTransaction();
+        setGameState(lockedState); mcpServer.loadState(lockedState);
         if (isSyncableCampaign(currentCampaignId)) storageService.syncCampaignState(currentCampaignId, lockedState).catch(e => console.warn('[Sync] failed:', e));
 
         const batchText = "[Collaborative Turn]\n" + gameState.actionQueue.map(item => `[${item.playerName}]: ${item.type === 'dialogue' ? `"${item.text}"` : item.text}`).join("\n");

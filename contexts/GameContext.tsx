@@ -21,8 +21,8 @@ interface GameContextValue {
   loadGameData: (userId?: string, campaignId?: string) => Promise<void>;
   saveGameData: () => Promise<void>;
   resetGame: () => void;
-  handleUpdateInventory: (charId: string, items: InventoryItem[]) => void;
-  handleUpdateCurrency: (charId: string, currency: Currency) => void;
+  handleUpdateInventory: (items: InventoryItem[], charId?: string) => void;
+  handleUpdateCurrency: (currency: Currency, charId?: string) => void;
   performAtmosphereUpdate: (locationName: string, locationDescription: string | undefined, currentSettings: AppSettings) => Promise<boolean>;
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   setIsLoading: (loading: boolean) => void;

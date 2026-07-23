@@ -484,12 +484,9 @@ export function breakConcentration(character: Character, reason: 'damaged' | 'vo
     if (character.conditions && character.conditions.length > 0) {
       const toRemove = character.conditions.filter(c => c.source === spellId);
       for (const cond of toRemove) {
-        const idx = character.conditions.indexOf(cond);
-        if (idx !== -1) {
-          executeConditionOnRemove(character, cond);
-          character.conditions.splice(idx, 1);
-        }
+        executeConditionOnRemove(character, cond);
       }
+      character.conditions = character.conditions.filter(c => c.source !== spellId);
     }
     return { broken: true, roll, d20Roll, modifier, dc, success: false };
   }
@@ -498,12 +495,9 @@ export function breakConcentration(character: Character, reason: 'damaged' | 'vo
   if (character.conditions && character.conditions.length > 0) {
     const toRemove = character.conditions.filter(c => c.source === spellId);
     for (const cond of toRemove) {
-      const idx = character.conditions.indexOf(cond);
-      if (idx !== -1) {
-        executeConditionOnRemove(character, cond);
-        character.conditions.splice(idx, 1);
-      }
+      executeConditionOnRemove(character, cond);
     }
+    character.conditions = character.conditions.filter(c => c.source !== spellId);
   }
   return { broken: true };
 }

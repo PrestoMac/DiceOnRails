@@ -518,7 +518,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       for (const e of state.combat.enemies) {
         cleared.push(...clearEndOfCombatConditions(e));
       }
-      state.combat = undefined;
+      delete (state as { combat?: unknown }).combat;
       const clearedMsg = cleared.length ? ` Cleared: ${[...new Set(cleared)].join(', ')}.` : '';
       return {
         success: true,

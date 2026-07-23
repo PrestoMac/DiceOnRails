@@ -161,14 +161,14 @@ export const useGameState = (userId: string | undefined) => {
         }
     }, [currentCampaignId, stage]);
 
-    const handleUpdateInventory = (newInventory: InventoryItem[]) => {
-        mcpServer.updateInventoryDirectly(newInventory);
+    const handleUpdateInventory = (newInventory: InventoryItem[], charId?: string) => {
+        mcpServer.updateInventoryDirectly(newInventory, charId);
         syncState();
         syncCampaignState().catch(e => console.warn('[Sync] failed:', e));
     };
 
-    const handleUpdateCurrency = (newCurrency: Currency) => {
-        mcpServer.updateCurrencyDirectly(newCurrency);
+    const handleUpdateCurrency = (newCurrency: Currency, charId?: string) => {
+        mcpServer.updateCurrencyDirectly(newCurrency, charId);
         syncState();
         syncCampaignState().catch(e => console.warn('[Sync] failed:', e));
     };

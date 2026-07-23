@@ -38,10 +38,10 @@ export function applyCondition(target: Target, condition: ActiveCondition): bool
   if (!target.conditions) target.conditions = [];
   const existing = target.conditions.find(c => c.id === condition.id && c.source === condition.source);
   if (existing) {
-    existing.duration = condition.duration;
+    Object.assign(existing, condition, { id: existing.id, source: existing.source });
     return true;
   }
-  target.conditions.push(condition);
+  target.conditions = [...target.conditions, condition];
   return true;
 }
 

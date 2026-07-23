@@ -9,6 +9,7 @@ import { extractRollData } from './narration';
 import { estimateTokens, PER_MSG_OVERHEAD, STATIC_OVERHEAD, COMPLETION_RESERVE, CONTEXT_BUDGET } from './tokenEstimation';
 import { filterTools } from './toolFilter';
 import { resolveLLMConfig, mapHistoryToMessages } from './llmApiClient';
+import { CONDITION_INFO } from '../../data/conditionInfo';
 
 const CRITICAL_TOOLS = new Set(['cast_spell', 'inflict_damage', 'roll_dice', 'player_attack']);
 
@@ -98,6 +99,7 @@ export async function runAgentLoop(
     content: `${SYSTEM_INSTRUCTION}\n\n${PROGRESSION_SYSTEM_PROMPT}${options?.enableSuggestions ? '\n15. SUGGESTED ACTIONS: When ending a turn with narrate_turn, ALWAYS include 2-3 short suggested next actions in the suggestions field. Each must be ≤60 chars, in first person from the player\'s perspective (e.g. "I attack the goblin with my longsword", "I order a drink and sit down"). This is mandatory.\n' : ''}\n\n=== TOOL MODE ===\n${TOOL_MODE_INSTRUCTION}`
   };
   const state = mcpServer.getFullState();
+  const gameTimeAtStart = state.gameTime ?? 0;
   const contextParts: string[] = [];
 
   
@@ -138,11 +140,27 @@ export async function runAgentLoop(
       }`);
     }
     if (c.conditions?.length) {
-      effects.push(`${c.name} has: ${c.conditions.map(cond => cond.id).join(', ')}`);
+      effects.push(`${c.name} has: ${c.conditions.map(cond => {
+        const info = CONDITION_INFO[cond.id];
+        const name = info ? cond.id.replace(/-/g, ' ') : cond.id;
+        const dur = cond.duration > 0 ? ` (${cond.duration}${(cond.durationUnit ?? 'round')[0]})` : '';
+        return `${name}${dur}`;
+      }).join(', ')}`);
     }
     if (c.raging) {
       effects.push(`${c.name} is raging`);
     }
+    if (c.tempHp && c.tempHp > 0) {
+      effects.push(`${c.name} has ${c.tempHp} temp HP`);
+    }
+    if (c.runtime?.transformationState) {
+      effects.push(`${c.name} is transformed (${c.runtime.transformationState.duration ?? 0} min left)`);
+    }
+  }
+  if (state.combat?.activeDoTs?.length) {
+    effects.push('Active DoTs: ' + state.combat.activeDoTs.map(dot =>
+      `${dot.spellId} on [${dot.targetIds.join(', ')}] (${dot.damageFormula})`
+    ).join('; '));
   }
   if (effects.length > 0) {
     contextParts.push('ACTIVE EFFECTS: ' + effects.join(' | '));
@@ -241,8 +259,8 @@ export async function runAgentLoop(
         messages.push({ role: 'user', content: 'You MUST call at least one tool. Determine the correct tool and call it now.' });
         continue;
       }
-      const state = mcpServer.getFullState();
-      const combat = state.combat;
+      const currentState = mcpServer.getFullState();
+      const combat = currentState.combat;
       if (combat && combat.isActive && combat.enemies && combat.enemies.some((e: { isDead: boolean }) => !e.isDead)) {
         
         
@@ -258,9 +276,15 @@ export async function runAgentLoop(
       }
       break;
     }
-    const toolCalls = rawToolCalls.map((tc: { id: string; function: { name: string; arguments: string } }) => ({
-      id: tc.id, name: tc.function.name, args: JSON.parse(tc.function.arguments),
-    }));
+    const toolCalls = rawToolCalls.map((tc: { id: string; function: { name: string; arguments: string } }) => {
+      let parsedArgs: Record<string, unknown> = {};
+      try {
+        parsedArgs = JSON.parse(tc.function.arguments);
+      } catch {
+        if (isDebugMode) console.warn(`[AgentLoop] Malformed JSON in tool call ${tc.function.name} (${tc.id}), using empty args`);
+      }
+      return { id: tc.id, name: tc.function.name, args: parsedArgs };
+    });
 
     const isEndOfTurn = toolCalls.some((tc: { name: string; args?: { narration?: string; autoAdvanceTime?: boolean; route?: string } }) =>
       tc.name === 'narrate_turn' ||
@@ -273,20 +297,27 @@ export async function runAgentLoop(
       
       const preEndCalls = toolCalls.filter((tc: { name: string }) => tc.name !== 'narrate_turn');
       if (preEndCalls.length > 0) {
-        const { criticalFailed } = await executeToolBatch(rawToolCalls, preEndCalls, toolMessages, onToolResult);
+        const { results: preEndResults, criticalFailed } = await executeToolBatch(rawToolCalls, preEndCalls, toolMessages, onToolResult);
         if (criticalFailed) criticalToolFailed = true;
+        
+        if (options?.requestEndNarration && !criticalToolFailed) {
+          for (const r of preEndResults) {
+            const data = r.result.data as Record<string, unknown> | undefined;
+            const timeResult = data?.timeResult as { narration?: string } | undefined;
+            const narrText = String(data?.narration ?? timeResult?.narration ?? '').trim();
+            if (narrText.length >= 50) {
+              inlineNarration = narrText;
+              break;
+            }
+          }
+        }
       }
 
       
       
-      
+      const timeAlreadyAdvanced = (mcpServer.getFullState().gameTime ?? 0) > gameTimeAtStart;
       const narrateCall = toolCalls.find((tc: { name: string }) => tc.name === 'narrate_turn');
       if (narrateCall) {
-        const timeAlreadyAdvanced = preEndCalls.some((tc: { name: string; args?: { narration?: string; autoAdvanceTime?: boolean; route?: string } }) =>
-          (tc.name === 'long_rest' && (tc.args?.narration || tc.args?.autoAdvanceTime)) ||
-          (tc.name === 'short_rest' && (tc.args?.narration || tc.args?.autoAdvanceTime)) ||
-          (tc.name === 'move_to' && tc.args?.route)
-        );
         if (!timeAlreadyAdvanced) {
           const narrateResult = await mcpServer.executeToolCall('narrate_turn', narrateCall.args);
           narrateTurnExecuted = true;
@@ -351,11 +382,8 @@ export async function runAgentLoop(
   
   
   
-  const timeAdvancedThisTurn = narrateTurnExecuted || toolMessages.some(m => {
-    const text = m.text || '';
-    return text.startsWith('[System:long_rest]') ||
-      text.startsWith('[System:short_rest]');
-  });
+  const gameTimeNow = mcpServer.getFullState().gameTime ?? 0;
+  const timeAdvancedThisTurn = narrateTurnExecuted || gameTimeNow > gameTimeAtStart;
   if (!timeAdvancedThisTurn) {
     await mcpServer.executeToolCall('narrate_turn', { narration: '', timePassed: 0 });
     if (isDebugMode) console.log('[AgentLoop] Enforcement: auto-called narrate_turn(timePassed=0) — no time advanced this turn');

@@ -42,7 +42,7 @@ function formatConditionDuration(c: ActiveCondition): string {
 
 interface CharacterSheetProps {
   character: Character;
-  onUpdateInventory: (inv: InventoryItem[]) => void;
+  onUpdateInventory: (inv: InventoryItem[], charId?: string) => void;
   onLevelUp?: (characterId: string) => void;
   onSendMessage?: (text: string) => void;
   onTriggerDiceRoll?: (rollData: Record<string, unknown>) => Promise<void>;
@@ -118,7 +118,7 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ character, onUpdateInve
     if (!item) return;
     ['weapon','armor','shield'].forEach(t => { if (item.type === t && !item.equipped) newInv.forEach(i => { if (i.type === t) i.equipped = false; }); });
     newInv[idx] = {...item, equipped: !item.equipped};
-    onUpdateInventory(newInv);
+    onUpdateInventory(newInv, character.id);
   };
 
   const equippedArmorItem = character.inventory.find(i => i.equipped && i.type === 'armor') || null;
@@ -269,7 +269,7 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ character, onUpdateInve
         <h3 className="text-xs uppercase font-bold text-stone-400 tracking-widest border-b border-stone-850 pb-1 text-left">Spellcasting</h3>
         <div className="flex flex-wrap gap-1.5">
           {activeResources.filter(r => r.id.startsWith('spell-slot-')).map(slot => {
-            const level = slot.id.slice(-1);
+            const level = parseInt(slot.id.replace('spell-slot-', ''), 10);
             return <div key={slot.id} className="bg-stone-950/30 border border-stone-850 rounded px-2 py-1 text-[10px] flex items-center gap-1.5">
               <span className="text-stone-500">L{level}</span>
               {Array.from({length: slot.max}).map((_, i) => (
@@ -432,7 +432,7 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ character, onUpdateInve
                     <span className="flex-1">{item.name}{item.equipped&&<span className="ml-2 text-[8px] uppercase font-bold px-1.5 py-0.5 bg-amber-950/40 text-amber-400 border border-amber-800/30 rounded">Equipped</span>}</span>
                     <div className="flex items-center gap-1.5 ml-2">
                       {(item.type==='weapon'||item.type==='armor'||item.type==='shield')&&<button onClick={e=>{e.stopPropagation();handleToggleEquip(idx);}} className={`px-2 py-0.5 rounded text-[9px] font-bold border transition-all flex items-center gap-1 shrink-0 ${item.equipped?'bg-amber-900/30 border-amber-800/50 text-amber-400 hover:bg-amber-900/50':'bg-stone-850 border-stone-800 hover:bg-stone-800 text-stone-400 hover:text-stone-300'}`}><i className={`fas ${item.type==='weapon'?'fa-crosshairs':(item.equipped?'fa-shield-halved':'fa-shield')} text-[8px]`}></i>{item.equipped?'Equipped':'Equip'}</button>}
-                      {item.type==='potion'&&<button onClick={e=>{e.stopPropagation();const hf=item.stats?.healing||'2d4+2',roll=rollDiceFormula(hf),ah=roll.total;if(onTriggerDiceRoll)onTriggerDiceRoll({characterName:character.name,rollType:'damage',label:`${item.name} Healing`,rollResult:roll.results.reduce((a,b)=>a+b,0),modifier:+(hf.match(/(\d+)$/)||[0,0])[1],sides:+(hf.match(/d(\d+)/)||[0,4])[1]});const nhp=Math.min(character.hp.max,character.hp.current+ah);character.hp.current=nhp;const ni=[...character.inventory];if (ni[idx].quantity > 1) { ni[idx] = { ...ni[idx], quantity: ni[idx].quantity - 1 }; } else { ni.splice(idx, 1); } onUpdateInventory(ni); if (onSendMessage) onSendMessage(`[Use Potion] ${character.name} drinks ${item.name}!\\n• Healing: **+${ah}** HP restored (${hf})\\n• Vitality: **${nhp} / ${character.hp.max}** HP.`);}} className="px-2 py-0.5 bg-stone-850 hover:bg-stone-800 text-green-500 rounded text-[9px] font-bold border border-stone-800 hover:border-green-900/50 transition-all flex items-center gap-1 shrink-0"><i className="fas fa-flask text-[8px]"></i> Drink</button>}
+                      {item.type==='potion'&&<button onClick={e=>{e.stopPropagation();const hf=item.stats?.healing||'2d4+2',roll=rollDiceFormula(hf),ah=roll.total;if(onTriggerDiceRoll)onTriggerDiceRoll({characterName:character.name,rollType:'damage',label:`${item.name} Healing`,rollResult:roll.results.reduce((a,b)=>a+b,0),modifier:+(hf.match(/(\d+)$/)||[0,0])[1],sides:+(hf.match(/d(\d+)/)||[0,4])[1]});const nhp=Math.min(character.hp.max,character.hp.current+ah);character.hp.current=nhp;const ni=[...character.inventory];if (ni[idx].quantity > 1) { ni[idx] = { ...ni[idx], quantity: ni[idx].quantity - 1 }; } else { ni.splice(idx, 1); } onUpdateInventory(ni, character.id); if (onSendMessage) onSendMessage(`[Use Potion] ${character.name} drinks ${item.name}!\\n• Healing: **+${ah}** HP restored (${hf})\\n• Vitality: **${nhp} / ${character.hp.max}** HP.`);}} className="px-2 py-0.5 bg-stone-850 hover:bg-stone-800 text-green-500 rounded text-[9px] font-bold border border-stone-800 hover:border-green-900/50 transition-all flex items-center gap-1 shrink-0"><i className="fas fa-flask text-[8px]"></i> Drink</button>}
                       <span className="text-stone-500 text-[10px] font-mono px-1.5 py-0.5 bg-stone-900/60 rounded border border-stone-850 shrink-0">x{item.quantity}</span>
                     </div>
                   </div>

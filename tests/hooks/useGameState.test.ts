@@ -195,7 +195,7 @@ describe('useGameState', () => {
       result.current.handleUpdateInventory(newInv);
     });
 
-    expect(mockUpdateInventoryDirectly).toHaveBeenCalledWith(newInv);
+    expect(mockUpdateInventoryDirectly).toHaveBeenCalledWith(newInv, undefined);
     expect(mockGetFullState).toHaveBeenCalled();
   });
 
@@ -244,7 +244,7 @@ describe('useGameState', () => {
       result.current.handleUpdateCurrency(newCurrency);
     });
 
-    expect(mockUpdateCurrencyDirectly).toHaveBeenCalledWith(newCurrency);
+    expect(mockUpdateCurrencyDirectly).toHaveBeenCalledWith(newCurrency, undefined);
     expect(mockGetFullState).toHaveBeenCalled();
   });
 
