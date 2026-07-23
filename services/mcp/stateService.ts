@@ -1,5 +1,6 @@
 import { GameState, Message } from '../../types';
 import { ensureAllCharacterFields } from '../characterUtils';
+import { deepClone } from '../../utils/clone';
 
 
 
@@ -106,12 +107,12 @@ export function createStateService(state: GameState): StateService {
     getFullState(): GameState { return { ...state }; },
 
     beginTransaction(): void {
-      _snapshot = JSON.parse(JSON.stringify(state));
+      _snapshot = deepClone(state);
     },
 
     rollbackTransaction(): void {
       if (_snapshot) {
-        Object.assign(state, JSON.parse(JSON.stringify(_snapshot)));
+        Object.assign(state, deepClone(_snapshot));
         _snapshot = undefined;
       }
     },
@@ -121,25 +122,25 @@ export function createStateService(state: GameState): StateService {
     },
 
     captureRewindSnapshot(): GameState | undefined {
-      return _snapshot ? JSON.parse(JSON.stringify(_snapshot)) : undefined;
+      return _snapshot ? deepClone(_snapshot) : undefined;
     },
 
     restoreSnapshot(snapshot: GameState): void {
-      Object.assign(state, JSON.parse(JSON.stringify(snapshot)));
+      Object.assign(state, deepClone(snapshot));
       _snapshot = undefined;
     },
 
     saveRewindPoint(gameState: GameState, messages: Message[]): void {
       rewindPoint = {
-        gameState: JSON.parse(JSON.stringify(gameState)),
-        messages: JSON.parse(JSON.stringify(messages))
+        gameState: deepClone(gameState),
+        messages: deepClone(messages)
       };
     },
 
     loadRewindPoint(): { gameState: GameState; messages: Message[] } | null {
       return rewindPoint ? {
-        gameState: JSON.parse(JSON.stringify(rewindPoint.gameState)),
-        messages: JSON.parse(JSON.stringify(rewindPoint.messages))
+        gameState: deepClone(rewindPoint.gameState),
+        messages: deepClone(rewindPoint.messages)
       } : null;
     },
 
@@ -148,11 +149,11 @@ export function createStateService(state: GameState): StateService {
     },
 
     saveEmergencySnapshot(s: GameState): void {
-      emergencySnapshot = JSON.parse(JSON.stringify(s));
+      emergencySnapshot = deepClone(s);
     },
 
     loadEmergencySnapshot(): GameState | null {
-      return emergencySnapshot ? JSON.parse(JSON.stringify(emergencySnapshot)) : null;
+      return emergencySnapshot ? deepClone(emergencySnapshot) : null;
     },
 
     clearEmergencySnapshot(): void {

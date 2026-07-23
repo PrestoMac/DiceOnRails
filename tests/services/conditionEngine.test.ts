@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { deepClone } from '../../utils/clone';
 import {
     applyCondition,
     removeCondition,
@@ -160,12 +161,12 @@ describe('conditionEngine', () => {
             expect(char.conditions).toHaveLength(1);
         });
 
-        it('calls onRemove callback when expired', () => {
-            const onRemove = vi.fn();
+        it('calls onRemove RemoveEffect when expired', () => {
             const char = makeCharacter();
-            applyCondition(char, { id: 'shield-ac', source: 'shield', duration: 1, onRemove });
+            char.acBonus = 2;
+            applyCondition(char, { id: 'shield-ac', source: 'shield', duration: 1, onRemove: { kind: 'acBonus', value: 2 } });
             tickConditions(char);
-            expect(onRemove).toHaveBeenCalledWith(char);
+            expect(char.acBonus).toBe(0);
         });
     });
 
@@ -320,7 +321,7 @@ describe('conditionEngine', () => {
             expect(char.conditions).toHaveLength(1);
             const cond = char.conditions[0];
 
-            const roundTripped = JSON.parse(JSON.stringify(cond));
+            const roundTripped = deepClone(cond);
             expect(roundTripped.onRemove).toEqual({ kind: 'acBonus', value: 5 });
 
             tickConditions(char);
@@ -329,19 +330,18 @@ describe('conditionEngine', () => {
             expect(char.acBonus).toBe(0);
         });
 
-        it('tickConditions backward compatible with function onRemove', () => {
-            const onRemove = vi.fn();
+        it('tickConditions backward compatible with onRemove RemoveEffect', () => {
             char.acBonus = 5;
             applyCondition(char, {
                 id: 'test-cond',
                 source: 'test',
                 duration: 1,
-                onRemove,
+                onRemove: { kind: 'acBonus', value: 5 },
             });
 
             tickConditions(char);
 
-            expect(onRemove).toHaveBeenCalledWith(char);
+            expect(char.acBonus).toBe(0);
             expect(char.conditions).toHaveLength(0);
         });
 
@@ -363,19 +363,18 @@ describe('conditionEngine', () => {
             expect(char.acBonus).toBe(0);
         });
 
-        it('removeCondition calls function onRemove before removal', () => {
-            const onRemove = vi.fn();
+        it('removeCondition calls onRemove RemoveEffect before removal', () => {
             char.acBonus = 5;
             applyCondition(char, {
                 id: 'test-cond',
                 source: 'test',
                 duration: Infinity,
-                onRemove,
+                onRemove: { kind: 'acBonus', value: 5 },
             });
 
             removeCondition(char, 'test-cond', 'test');
 
-            expect(onRemove).toHaveBeenCalledWith(char);
+            expect(char.acBonus).toBe(0);
             expect(char.conditions).toHaveLength(0);
         });
 
@@ -432,12 +431,12 @@ describe('conditionEngine', () => {
             expect(char.conditions).toHaveLength(0);
         });
 
-        it('calls onRemove function when expired', () => {
-            const onRemove = vi.fn();
+        it('calls onRemove RemoveEffect when expired (minutes)', () => {
             const char = makeCharacter();
-            applyCondition(char, { id: 'shield-ac', source: 'shield', duration: 1, durationUnit: 'minute', onRemove });
+            char.acBonus = 5;
+            applyCondition(char, { id: 'shield-ac', source: 'shield', duration: 1, durationUnit: 'minute', onRemove: { kind: 'acBonus', value: 5 } });
             tickConditionsByTime(char, 1);
-            expect(onRemove).toHaveBeenCalledWith(char);
+            expect(char.acBonus).toBe(0);
             expect(char.conditions).toHaveLength(0);
         });
 
@@ -527,12 +526,12 @@ describe('conditionEngine', () => {
             expect(char.conditions[0].duration).toBe(3);
         });
 
-        it('calls onRemove when expired', () => {
-            const onRemove = vi.fn();
+        it('calls onRemove RemoveEffect when expired (rounds)', () => {
             const char = makeCharacter();
-            applyCondition(char, { id: 'test-cond', source: 'test', duration: 1, durationUnit: 'round', onRemove });
+            char.acBonus = 3;
+            applyCondition(char, { id: 'test-cond', source: 'test', duration: 1, durationUnit: 'round', onRemove: { kind: 'acBonus', value: 3 } });
             tickConditionsByRounds(char, 1);
-            expect(onRemove).toHaveBeenCalledWith(char);
+            expect(char.acBonus).toBe(0);
             expect(char.conditions).toHaveLength(0);
         });
 
@@ -614,7 +613,7 @@ describe('conditionEngine', () => {
         it('permanent sentinel (-1) survives JSON round-trip', () => {
             const char = makeCharacter();
             applyCondition(char, { id: 'exhaustion-1', source: 'fatigue', duration: -1, durationUnit: 'permanent' });
-            const roundtripped = JSON.parse(JSON.stringify(char)) as Character;
+            const roundtripped = deepClone(char) as Character;
             expect(roundtripped.conditions).toHaveLength(1);
             const cond = roundtripped.conditions?.[0];
             expect(cond?.duration).toBe(-1);

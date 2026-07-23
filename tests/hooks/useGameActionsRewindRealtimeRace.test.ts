@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { useState } from 'react';
 import { renderHook, act } from '@testing-library/react';
 import { GameState, Message, MessageRole } from '../../types';
+import { deepClone } from '../../utils/clone';
 
 vi.mock('../../utils/random', () => ({
   cryptoRoll: vi.fn(() => 10),
@@ -148,7 +149,7 @@ describe('useGameActions rewind race — campaign mode + simulated realtime', ()
       const res = await originalImpl.apply(this as never, args as never[]);
       // After the FIRST turn's cast_spell, capture state for later replay.
       if (postTurn1State === null) {
-        postTurn1State = JSON.parse(JSON.stringify(mcpServer.getFullState()));
+        postTurn1State = deepClone(mcpServer.getFullState());
       }
       return res;
     });

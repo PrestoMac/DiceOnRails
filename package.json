@@ -13,6 +13,7 @@
     "test:ci": "vitest run --bail=1 --reporter=verbose",
     "lint": "eslint . --ext .ts,.tsx",
     "lint:fix": "eslint . --ext .ts,.tsx --fix",
+    "check:jsonclone": "rg -n 'JSON\\.parse\\(JSON\\.stringify\\(' --type ts || echo '0 matches'",
     "test:watch": "vitest",
     "test:live": "vitest run tests/live/",
     "test:live:tier3": "npx tsx tests/live/run_all.ts",

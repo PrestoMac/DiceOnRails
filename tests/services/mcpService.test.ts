@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { MockMCPServer } from '../../services/mcpService';
 import { Character, GameState, InventoryItem, CombatState, Enemy } from '../../types';
+import { deepClone } from '../../utils/clone';
 
 vi.mock('../../utils/random', () => ({
   cryptoRoll: vi.fn(),
@@ -1790,17 +1791,18 @@ describe('MockMCPServer', () => {
     });
 
     it('long_rest clears conditions and calls onRemove', async () => {
-      const onRemove = vi.fn();
       const char = makeCharacter();
-      char.conditions = [{ id: 'blinded', source: 'faerie-fire', duration: 5, onRemove }];
+      const acBonus = 2;
+      char.acBonus = acBonus;
+      char.conditions = [{ id: 'haste', source: 'spell', duration: 5, onRemove: { kind: 'acBonus', value: acBonus } }];
       server.loadState({
         party: [char],
         worldDescription: 'test', sessionLogs: [], quests: [], lore: [], actionQueue: [],
       });
       const result = await server.long_rest();
       expect(result.success).toBe(true);
-      expect(onRemove).toHaveBeenCalledWith(char);
       expect(char.conditions).toEqual([]);
+      expect(char.acBonus).toBe(0);
     });
 
     it('syncInitiativeConditions populates activeConditions on entries', () => {
@@ -1862,8 +1864,8 @@ describe('MockMCPServer', () => {
         onRemove: { kind: 'acBonus', value: 5 }
       }];
 
-      const roundTripped = JSON.parse(JSON.stringify(char.conditions));
-      expect(roundTripped[0].onRemove).toEqual({ kind: 'acBonus', value: 5 });
+const roundTripped = deepClone(char.conditions);
+        expect(roundTripped[0].onRemove).toEqual({ kind: 'acBonus', value: 5 });
     });
 
     it('Shield spell condition uses RemoveEffect that survives JSON', () => {

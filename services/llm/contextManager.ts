@@ -1,5 +1,6 @@
 import { Message, MessageRole, GameState } from '../../types';
 import { mcpServer } from '../mcpService';
+import { deepClone } from '../../utils/clone';
 import { getEnv } from '../../utils/envHelper';
 import { estimateTokens, computePayloadTokens, CONTEXT_BUDGET, STATIC_OVERHEAD, OVERHEAD_CONTEXT, PER_MSG_OVERHEAD, COMPLETION_RESERVE, RAW_CAP } from './tokenEstimation';
 import { compressRawToCheckpoint } from './atmosphere';
@@ -212,6 +213,6 @@ export function syncFinishedState(ctx: ContextState, mts: Message[], ms: typeof 
     ctxMeta.frozenMessageCount = ctx.frozenMessageCount;
     ctxMeta.turnCounter = ctx.turnCounter;
     ctxMeta.generation = ctx.generation;
-    const fs = JSON.parse(JSON.stringify({ ...ms.getFullState(), isProcessing: false, processingUser: undefined, ctx: ctxMeta, ...extras }));
+    const fs = deepClone({ ...ms.getFullState(), isProcessing: false, processingUser: undefined, ctx: ctxMeta, ...extras });
     ms.loadState(fs); sg(fs); return fs;
 }

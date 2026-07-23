@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { MockMCPServer } from '../../../services/mcpService';
+import { deepClone } from '../../../utils/clone';
 import { makeWizard, makeCleric } from '../../helpers/characters';
 
 vi.mock('../../../utils/random', () => ({
@@ -155,7 +156,7 @@ describe('07_buff_durations', () => {
     expect(beforeIds).toContain('mage-armor-ac');
     expect(beforeIds).toContain('exhaustion-2');
 
-    const serialized = JSON.parse(JSON.stringify(server.getFullState()));
+    const serialized = deepClone(server.getFullState());
     const newServer = new MockMCPServer();
     newServer.loadState(serialized as ReturnType<typeof server.getFullState>);
 

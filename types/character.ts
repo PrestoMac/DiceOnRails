@@ -142,7 +142,7 @@ export interface ActiveCondition {
   saveEnd?: SaveStat;
   saveDC?: number;
   onFailedSave?: 'none' | 'half';
-  onRemove?: ((target: Character | Enemy) => void) | RemoveEffect;
+  onRemove?: RemoveEffect;
 }
 
 /** An ability score used for saving throws. */

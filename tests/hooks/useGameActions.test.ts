@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { AppStage, CombatState, GameState, MessageRole } from '../../types';
+import { deepClone } from '../../utils/clone';
 
 vi.mock('../../utils/random', () => ({
   cryptoRoll: vi.fn(() => 10),
@@ -413,7 +414,7 @@ describe('useGameActions', () => {
     ];
 
     mcpServerMock.loadRewindPoint.mockReturnValue(null);
-    mcpServerMock.loadEmergencySnapshot.mockReturnValue(JSON.parse(JSON.stringify(baseState)));
+    mcpServerMock.loadEmergencySnapshot.mockReturnValue(deepClone(baseState));
     mcpServerMock.getFullState.mockReturnValue(baseState);
 
     defaultProps.messages = [{ id: 'user-msg', role: MessageRole.USER, text: 'Test action', timestamp: 0 }];
@@ -462,7 +463,7 @@ describe('useGameActions', () => {
     baseState.combat = combatState;
 
     const snapshot = {
-      gameState: JSON.parse(JSON.stringify(baseState)),
+      gameState: deepClone(baseState),
       messages: [
         { id: 'user-msg', role: MessageRole.USER, text: 'Attack goblin', timestamp: 0 },
       ],
@@ -499,7 +500,7 @@ describe('useGameActions', () => {
     baseState.party[0].raging = true;
 
     const snapshot = {
-      gameState: JSON.parse(JSON.stringify(baseState)),
+      gameState: deepClone(baseState),
       messages: [
         { id: 'user-msg', role: MessageRole.USER, text: 'Test action', timestamp: 0 },
       ],
@@ -596,7 +597,7 @@ describe('useGameActions', () => {
   it('handleRewind Branch A uses messagesRef instead of stale messages closure', async () => {
     const baseState = makeBaseState();
     mcpServerMock.loadRewindPoint.mockReturnValue(null);
-    mcpServerMock.loadEmergencySnapshot.mockReturnValue(JSON.parse(JSON.stringify(baseState)));
+    mcpServerMock.loadEmergencySnapshot.mockReturnValue(deepClone(baseState));
     mcpServerMock.getFullState.mockReturnValue(baseState);
 
     const messages = [

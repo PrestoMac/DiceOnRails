@@ -7,9 +7,7 @@ type Target = Character | Enemy;
 /** Executes the onRemove handler of a condition if present. */
 export function executeConditionOnRemove(target: Target, condition: ActiveCondition): void {
   if (!condition.onRemove) return;
-  if (typeof condition.onRemove === 'function') {
-    condition.onRemove(target);
-  } else if (condition.onRemove.kind === 'acBonus') {
+  if (condition.onRemove.kind === 'acBonus') {
     target.acBonus = Math.max(0, (target.acBonus || 0) - condition.onRemove.value);
   }
 }
