@@ -133,15 +133,28 @@ describe('buildCharacterFromWizard', () => {
       expect(character?.halfElfStatChoices).toEqual(['con', 'dex']);
     });
 
-    it('marks elf & half-elf immune to unconscious, others undefined', () => {
+    it('marks elf & half-elf immune to sleep (Fey Ancestry), others undefined', () => {
       const elf = buildCharacterFromWizard(
         baseWizard({ selectedRace: RACES_BY_ID['elf'] }),
         { isNewCampaign: true }
       );
-      expect(elf.character?.conditionsImmunities).toContain('unconscious');
+      expect(elf.character?.conditionsImmunities).toContain('sleep');
+      expect(elf.character?.conditionsImmunities).not.toContain('unconscious');
 
       const human = buildCharacterFromWizard(baseWizard(), { isNewCampaign: true });
       expect(human.character?.conditionsImmunities).toBeUndefined();
+    });
+
+    it('R1: does not double-count racial CON in HP (dwarf fighter L1)', () => {
+      const { character } = buildCharacterFromWizard(
+        baseWizard({ selectedRace: RACES_BY_ID['dwarf'] }),
+        { isNewCampaign: true }
+      );
+      // Dwarf +2 CON: standard-array con 13 -> 15 -> mod +2. Fighter hpBase 10 -> 10 + 2 = 12.
+      // (Pre-fix the racial CON was added a second time into the modifier, yielding 13.)
+      expect(character?.stats.con).toBe(15);
+      expect(character?.hp.max).toBe(12);
+      expect(character?.hp.current).toBe(12);
     });
   });
 

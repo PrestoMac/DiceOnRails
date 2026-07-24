@@ -343,7 +343,8 @@ export function castSpell(
     result.healing = rollDice(count, sides) + abilityMod + flatBonus;
   } else if (spell.autoHit && spell.damage && targets.length > 0) {
     const { count, sides, flatBonus } = parseDice(spell.damage.dice);
-    const darts = spell.dartCount || 1;
+    // SRD Magic Missile: one additional dart per slot level above the spell's level.
+    const darts = (spell.dartCount || 1) + Math.max(0, slotLevel - spell.level);
     let damage = 0;
     for (let d = 0; d < darts; d++) {
       damage += rollDice(count, sides) + flatBonus;
@@ -398,12 +399,33 @@ export function castSpell(
     if (bestScale) {
       if (bestScale.damageDice) {
         const { count, sides } = parseDice(bestScale.damageDice);
-        if (result.damage) result.damage.total += rollDice(count, sides);
+        if (result.damage) {
+          // SRD: save spells roll damage independently per target, so the upcast
+          // dice are rolled fresh for each target. Recompute total from perTarget
+          // to keep the summary consistent. Non-perTarget spells add once to total.
+          if (result.damage.perTarget) {
+            for (const pt of result.damage.perTarget) pt.damage += rollDice(count, sides);
+            result.damage.total = result.damage.perTarget.reduce((s, t) => s + t.damage, 0);
+          } else {
+            result.damage.total += rollDice(count, sides);
+          }
+        }
       } else if (bestScale.bonusDice) {
         const { count, sides } = parseDice(bestScale.bonusDice);
-        let bonus = rollDice(count, sides);
-        if (wasCrit) bonus *= 2;
-        if (result.damage) result.damage.total += bonus;
+        if (result.damage) {
+          if (result.damage.perTarget) {
+            for (const pt of result.damage.perTarget) {
+              let perTargetBonus = rollDice(count, sides);
+              if (wasCrit) perTargetBonus *= 2;
+              pt.damage += perTargetBonus;
+            }
+            result.damage.total = result.damage.perTarget.reduce((s, t) => s + t.damage, 0);
+          } else {
+            let bonus = rollDice(count, sides);
+            if (wasCrit) bonus *= 2;
+            result.damage.total += bonus;
+          }
+        }
       }
       if (spell.healing && bestScale.bonusDice) {
         const { count, sides } = parseDice(bestScale.bonusDice);
@@ -423,7 +445,17 @@ export function castSpell(
       const bonus = base.count * scalingDice;
       const { total: scalingDmg, rolls: scalingRolls } = rollDiceWithDetails(bonus, base.sides);
       if (result.damage) {
-        result.damage.total += scalingDmg;
+        // Save cantrips (Sacred Flame, Acid Splash, Poison Spray) route damage
+        // through perTarget, so the cantrip scaling must be applied per target too.
+        if (result.damage.perTarget) {
+          for (const pt of result.damage.perTarget) {
+            const { total: ptScale } = rollDiceWithDetails(bonus, base.sides);
+            pt.damage += ptScale;
+          }
+          result.damage.total = result.damage.perTarget.reduce((s, t) => s + t.damage, 0);
+        } else {
+          result.damage.total += scalingDmg;
+        }
         const scaleDetail = `scaling: ${bonus}d${base.sides} [${scalingRolls.join('+')}]`;
         if (result.damageRollDetails) {
           result.damageRollDetails += ` + ${scaleDetail}`;

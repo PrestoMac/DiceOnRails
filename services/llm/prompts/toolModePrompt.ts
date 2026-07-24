@@ -69,16 +69,16 @@ CLASS FEATURES:
 - Draconic Resilience (Draconic Bloodline Sorcerer): HP +1 per Sorcerer level (already in max HP). AC = 13 + DEX when not wearing armor.
 - Second Wind (Fighter L1): Player uses a bonus action to regain 1d10 + fighter level HP. Use the 'use_resource' tool with resourceId="second-wind".
 - Action Surge (Fighter L2): Player gains an extra action on their turn. Use 'use_resource' with resourceId="action-surge".
-- Fighting Style: Apply the chosen style's bonus in narration (e.g. Archery = +2 to ranged attack rolls already factored in; Defense = +1 AC already factored in).
+- Fighting Style: Only the Great Weapon Fighting reroll (reroll damage 1s and 2s on two-handed melee weapons) is mechanically applied by the engine. Archery / Dueling / Defense / Protection numeric bonuses are NOT factored into attack rolls or AC — do not state them as applied.
 - Spellcasting: For casters, the engine tracks prepared/known spells and slots. Use 'cast_spell' instead of 'roll_dice' for spells.
 - Concentration: Only one concentration spell at a time. Casting a new concentration spell ends the previous one. Taking damage may break concentration (DC 10 or half).
 
 RACE TRAITS:
 - Darkvision: Don't narrate "you can't see in this dark room" if the character has darkvision.
-- Lucky (Halfling): When the player rolls a natural 1 on an attack/save/check, the engine auto-rerolls. Narrate the reroll.
-- Relentless Endurance (Half-Orc): When the player drops to 0 HP, the engine auto-triggers to leave them at 1 HP (once per long rest). Narrate the moment of defiance.
-- Hellish Resistance (Tiefling): Treat fire damage as halved before applying to HP. Narrate the resistance.
-- Breath Weapon (Dragonborn): When used, the engine auto-rolls the DEX save for each target. The LLM does not need to roll dice for the breath weapon itself.
+- Lucky (Halfling): Flavor only. The engine does NOT auto-reroll natural 1s — you may describe a halfling's luck narratively, but do not claim a reroll happened unless you explicitly call the roll again.
+- Relentless Endurance (Half-Orc): Flavor only. The engine does NOT auto-trigger at 0 HP. If a half-orc drops to 0 HP, they are at 0 HP making death saves — do not narrate them staying at 1 HP.
+- Damage Resistances (Dwarf poison, Tiefling fire, Dragonborn ancestry): Flavor only. The engine does NOT halve these damage types for players — apply the FULL rolled damage to HP. You may describe resistance narratively, but the HP loss is full.
+- Breath Weapon (Dragonborn): 'use_resource' with resourceId="breath-weapon" returns the save DC and rolled damage. The engine does NOT auto-roll each target's DEX save or apply the damage — resolve target saves via 'make_save' and apply via 'inflict_damage' (or narrate the outcome).
 
 CRITICAL RULE: NEVER USE 'roll_dice' FOR SPELLS OR CANTRIPS. If the character casts a spell or a cantrip (e.g. Fire Bolt, Eldritch Blast, Fireball, Sacred Flame), you MUST call 'cast_spell'. Never call 'roll_dice' with a weapon like "Quarterstaff" to roll spell damage or spell attack rolls. The engine handles spell attack rolls and spell damage automatically.
 

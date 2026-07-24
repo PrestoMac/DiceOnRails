@@ -12,7 +12,7 @@ import { applyCondition, removeCondition, getConditionEffects, getExhaustionPena
 export interface SpellcastingDeps {
   getTarget: (id?: string) => Character | undefined;
   inflict_damage: (amount: number, targetId?: string, damageType?: string, options?: { skipTargetDerivedReductions?: boolean }) => Promise<MCPResponse>;
-  make_save: (targetId: string, stat: string, dc: number) => Promise<MCPResponse>;
+  make_save: (targetId: string, stat: string, dc: number, charmSave?: boolean) => Promise<MCPResponse>;
   syncInitiativeConditions: () => void;
 }
 
@@ -234,18 +234,19 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
       if (result.damage?.perTarget?.length && spellDef?.save) {
         const saveDC = result.saveRoll?.dc ?? getSpellSaveDc(char);
         const saveStat = spellDef.save.stat;
-        const halfOnSuccess = result.saveRoll?.halfOnSuccess === true;
+        const onSuccess = spellDef.save.onSuccess;
+        const isCharmSpell = spellDef.condition?.type === 'charmed';
 
         for (const t of result.damage.perTarget) {
           let dmg = t.damage;
           const llmOverride = targetSaveResults?.[t.targetId];
-          if (llmOverride !== undefined) {
-            if (llmOverride && halfOnSuccess) dmg = Math.floor(dmg / 2);
-          } else if (halfOnSuccess) {
-            const saveResult = await deps.make_save(t.targetId, saveStat, saveDC);
-            if (saveResult.success && saveResult.data?.success) {
-              dmg = Math.floor(dmg / 2);
-            }
+          // SRD: a save is always rolled for save-spells. onSuccess 'half' halves
+          // damage on a success; 'none' negates it entirely (0 damage on success).
+          const savePassed = llmOverride !== undefined
+            ? llmOverride === true
+            : (await deps.make_save(t.targetId, saveStat, saveDC, isCharmSpell)).data?.success === true;
+          if (savePassed) {
+            dmg = onSuccess === 'half' ? Math.floor(dmg / 2) : 0;
           }
           const resolvedTargetId = resolvedTargets.find(rt => {
             const cleanId = t.targetId.toLowerCase().trim();
@@ -276,21 +277,21 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
       }
 
       if (result.healing && targets.length > 0) {
+        // Temp-HP spells (e.g. False Life, Armor of Agathys) grant only temporary
+        // hit points — they must NOT also heal real HP.
+        const isTempHpSpell = !!(spellDef?.description?.toLowerCase().includes('temporary hit points') || spellDef?.description?.toLowerCase().includes('temp hp'));
         for (const targetId of targets) {
           const target = deps.getTarget(targetId);
           if (target) {
-            const previousHp = target.hp.current;
-            target.hp.current = Math.min(target.hp.max, target.hp.current + result.healing);
-            if (previousHp === 0 && target.hp.current > 0) {
-              delete target.deathSaves;
-            }
-            if (spellDef?.healing && result.healing) {
-              const isTempHpSpell = spellDef.description?.toLowerCase().includes('temporary hit points') || spellDef.description?.toLowerCase().includes('temp hp');
-              if (isTempHpSpell) {
-                const tempHpAmount = result.healing;
-                if (!target.tempHp || tempHpAmount > target.tempHp) {
-                  target.tempHp = tempHpAmount;
-                }
+            if (isTempHpSpell) {
+              if (!target.tempHp || result.healing > target.tempHp) {
+                target.tempHp = result.healing;
+              }
+            } else {
+              const previousHp = target.hp.current;
+              target.hp.current = Math.min(target.hp.max, target.hp.current + result.healing);
+              if (previousHp === 0 && target.hp.current > 0) {
+                delete target.deathSaves;
               }
             }
           }
@@ -348,6 +349,11 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
       if (spellDef?.condition && targets.length > 0 && !spellDef.hpPoolDice) {
         const appliedConditions: Array<{ targetId: string; targetName: string; conditionId: string }> = [];
 
+        const hasOnCastSave = !!spellDef.save;
+        const saveStat = spellDef.save?.stat;
+        const resolvedSaveDC = result.saveRoll?.dc ?? getSpellSaveDc(char);
+        const isCharmCondition = spellDef.condition.type === 'charmed';
+
         for (const targetId of targets) {
           const targetChar = deps.getTarget(targetId);
           const enemy = state.combat?.enemies.find(e => e.id === targetId || e.name.toLowerCase() === targetId.toLowerCase());
@@ -356,7 +362,19 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
 
           if (!spellDef.condition) continue;
           const condDef = spellDef.condition;
-          const resolvedSaveDC = result.saveRoll?.dc ?? getSpellSaveDc(char);
+
+          // SRD: when the spell defines a save, targets roll it on cast and are
+          // unaffected on a success. (No spell in the catalog has both damage and
+          // a condition, so this never double-rolls with the damage branch.) Honor
+          // an LLM override if provided.
+          if (hasOnCastSave && saveStat) {
+            const llmOverride = targetSaveResults?.[targetId];
+            const savePassed = llmOverride !== undefined
+              ? llmOverride === true
+              : (await deps.make_save(targetId, saveStat, resolvedSaveDC, isCharmCondition)).data?.success === true;
+            if (savePassed) continue;
+          }
+
           const condParsed = spellDef.parsedDuration ?? parseDuration(spellDef.duration);
           const condDurationUnit: 'round' | 'minute' | 'permanent' | undefined =
             condParsed?.unit === 'round' ? 'round'
@@ -483,6 +501,15 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
           const entity = deps.getTarget(t.targetId)
             || state.combat?.enemies.find(e => e.id === t.targetId);
           if (entity) {
+            // Fey Ancestry (elf/half-elf): magic can't put them to sleep. The Sleep
+            // spell's hpPoolCondition is the generic 'unconscious' (wired into the
+            // effects system), so we skip Fey Ancestry targets here rather than via
+            // a broad 'unconscious' immunity (which would wrongly block 0-HP knocks).
+            const hasFeyAncestry = 'racialTraits' in entity && (((entity as Character).racialTraits) || []).includes('fey-ancestry');
+            if (spellDef.id === 'sleep' && hasFeyAncestry) {
+              affectedNames.push(`${entity.name || t.targetId} (unaffected — Fey Ancestry)`);
+              continue;
+            }
             affectedNames.push(entity.name || t.targetId);
             const hpPoolParsed = spellDef.parsedDuration ?? parseDuration(spellDef.duration);
             const hpPoolDurationUnit: 'round' | 'minute' | undefined =

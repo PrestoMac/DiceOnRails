@@ -151,6 +151,37 @@ describe('spellcastingEngine', () => {
       expect(result.damage).toBeDefined();
     });
 
+    it('S1: upcast save-spell dice apply to EACH perTarget entry and recompute total (fireball slot 4)', () => {
+      // default mock: d6=3. base 8d6 = 24; upcast +1d6 = 3 -> 27 per target.
+      const wiz = makeWizard({ resources: [
+        { id: 'spell-slot-1', name: 'L1', current: 4, max: 4, resetOn: 'long', source: 'class', sourceId: 'wizard' },
+        { id: 'spell-slot-2', name: 'L2', current: 3, max: 3, resetOn: 'long', source: 'class', sourceId: 'wizard' },
+        { id: 'spell-slot-3', name: 'L3', current: 2, max: 2, resetOn: 'long', source: 'class', sourceId: 'wizard' },
+        { id: 'spell-slot-4', name: 'L4', current: 1, max: 1, resetOn: 'long', source: 'class', sourceId: 'wizard' },
+      ]});
+      const result = castSpell(wiz, 'fireball', 4, [{ id: 'g1' }, { id: 'g2' }]);
+      expect(result.success).toBe(true);
+      expect(result.damage?.perTarget?.[0].damage).toBe(27);
+      expect(result.damage?.perTarget?.[1].damage).toBe(27);
+      expect(result.damage?.total).toBe(54);
+    });
+
+    it('S2: save cantrips scale per target with character level (sacred flame L5)', () => {
+      // L5 cantrip scaling = +1 die. base 1d8(3) + 1d8(3) = 6 per target.
+      const cleric = makeWizard({ class: 'cleric', level: 5, knownSpells: ['sacred-flame'], preparedSpells: ['sacred-flame'] });
+      const result = castSpell(cleric, 'sacred-flame', 0, [{ id: 'g1' }]);
+      expect(result.success).toBe(true);
+      expect(result.damage?.perTarget?.[0].damage).toBe(6);
+    });
+
+    it('S4: Magic Missile adds darts when upcast (slot 3 -> 5 darts)', () => {
+      // 3 base darts + 2 upcast = 5; each 1d4(3)+1 = 4 -> total 20.
+      const wiz = makeWizard();
+      const result = castSpell(wiz, 'magic-missile', 3, [{ id: 'g1' }]);
+      expect(result.success).toBe(true);
+      expect(result.damage?.total).toBe(20);
+    });
+
     it('cantrip requires known/prepared', () => {
       const result = castSpell(makeWizard({ knownSpells: [], preparedSpells: [] }), 'fire-bolt', 0);
       expect(result.success).toBe(false);

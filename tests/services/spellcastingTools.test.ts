@@ -791,3 +791,121 @@ describe('spell_effect dispel (C1)', () => {
     expect(ids).toContain('blinded');
   });
 });
+
+describe('spell correctness fixes (S3/S6/S7 + Fey Ancestry)', () => {
+  let server: MockMCPServer;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(cryptoRoll).mockReturnValue(10);
+    server = new MockMCPServer();
+  });
+
+  const firstEnemyId = (s: MockMCPServer): string => {
+    const combat = s.getFullState().combat;
+    if (!combat) throw new Error('Expected combat to be defined');
+    return combat.enemies[0].id;
+  };
+  const firstEnemy = (s: MockMCPServer) => {
+    const combat = s.getFullState().combat;
+    if (!combat) throw new Error('Expected combat to be defined');
+    return combat.enemies[0];
+  };
+
+  it('S3: onSuccess:"none" spell negates all damage on a successful save (disintegrate)', async () => {
+    const wizard = makeWizard({
+      level: 11,
+      resources: [{ id: 'spell-slot-6', name: 'L6', current: 1, max: 1, resetOn: 'long', source: 'class', sourceId: 'wizard' }],
+      knownSpells: ['fireball'],
+      preparedSpells: ['fireball', 'disintegrate'],
+    });
+    server.joinParty(wizard);
+    await server.add_enemy('Giant', 15, 200);
+    await server.start_combat();
+    const enemyId = firstEnemyId(server);
+
+    // Force the save to SUCCEED via the LLM override -> 0 damage on a 'none' spell.
+    const r = await server.cast_spell('wizard-1', 'disintegrate', 6, [enemyId], { [enemyId]: true });
+    expect(r.success).toBe(true);
+    expect(firstEnemy(server).hp.current).toBe(200);
+  });
+
+  it('S3: onSuccess:"none" spell deals full damage on a failed save (disintegrate)', async () => {
+    const wizard = makeWizard({
+      level: 11,
+      resources: [{ id: 'spell-slot-6', name: 'L6', current: 1, max: 1, resetOn: 'long', source: 'class', sourceId: 'wizard' }],
+      knownSpells: ['fireball'],
+      preparedSpells: ['fireball', 'disintegrate'],
+    });
+    server.joinParty(wizard);
+    await server.add_enemy('Giant', 15, 200);
+    await server.start_combat();
+    const enemyId = firstEnemyId(server);
+
+    const r = await server.cast_spell('wizard-1', 'disintegrate', 6, [enemyId], { [enemyId]: false });
+    expect(r.success).toBe(true);
+    expect(firstEnemy(server).hp.current).toBeLessThan(200);
+  });
+
+  it('S6: False Life grants temp HP without healing real HP', async () => {
+    const wizard = makeWizard({
+      hp: { current: 10, max: 32 },
+      knownSpells: ['magic-missile', 'shield', 'fireball', 'burning-hands', 'fire-bolt', 'false-life'],
+      preparedSpells: ['magic-missile', 'shield', 'fireball', 'burning-hands', 'fire-bolt', 'false-life'],
+    });
+    server.joinParty(wizard);
+    vi.mocked(cryptoRoll).mockReturnValue(3); // 1d4 = 3 -> 3 + 4 = 7 temp HP
+
+    const r = await server.cast_spell('wizard-1', 'false-life', 1, []);
+    expect(r.success).toBe(true);
+    const updated = server.getTarget('wizard-1') as Character;
+    expect(updated.tempHp).toBe(7);
+    expect(updated.hp.current).toBe(10); // real HP unchanged
+  });
+
+  it('S7: hold-person is negated when the target saves on cast', async () => {
+    const cleric = makeCleric({ preparedSpells: ['cure-wounds', 'bless', 'healing-word', 'shield-of-faith', 'hold-person'] });
+    server.joinParty(cleric);
+    await server.add_enemy('Goblin');
+    await server.start_combat();
+    const enemyId = firstEnemyId(server);
+
+    vi.mocked(cryptoRoll).mockReturnValue(20); // save succeeds
+    const r = await server.cast_spell('cleric-1', 'hold-person', 2, [enemyId]);
+    expect(r.success).toBe(true);
+    expect((firstEnemy(server).conditions || []).some(c => c.id === 'paralyzed')).toBe(false);
+  });
+
+  it('S7: hold-person applies when the target fails the save on cast', async () => {
+    const cleric = makeCleric({ preparedSpells: ['cure-wounds', 'bless', 'healing-word', 'shield-of-faith', 'hold-person'] });
+    server.joinParty(cleric);
+    await server.add_enemy('Goblin');
+    await server.start_combat();
+    const enemyId = firstEnemyId(server);
+
+    vi.mocked(cryptoRoll).mockReturnValue(1); // save fails
+    const r = await server.cast_spell('cleric-1', 'hold-person', 2, [enemyId]);
+    expect(r.success).toBe(true);
+    expect((firstEnemy(server).conditions || []).some(c => c.id === 'paralyzed')).toBe(true);
+  });
+
+  it('R4: Fey Ancestry rolls twice (advantage) on a charm save', async () => {
+    const wizard = makeWizard(); // elf -> racialTraits includes 'fey-ancestry'
+    server.joinParty(wizard);
+    vi.mocked(cryptoRoll).mockReturnValueOnce(5).mockReturnValueOnce(15).mockReturnValue(10);
+
+    const r = await server.make_save('wizard-1', 'wis', 14, true);
+    expect(r.data?.success).toBe(true); // advantage kept 15; +WIS(1) = 16 >= 14
+    expect(r.message).toContain('Fey Ancestry advantage');
+  });
+
+  it('R4: advantage is NOT applied to a non-charm save', async () => {
+    const wizard = makeWizard();
+    server.joinParty(wizard);
+    vi.mocked(cryptoRoll).mockReturnValueOnce(5).mockReturnValue(10);
+
+    const r = await server.make_save('wizard-1', 'wis', 14, false);
+    expect(r.data?.success).toBe(false); // single roll 5 + WIS(1) = 6 < 14
+    expect(r.message).not.toContain('Fey Ancestry');
+  });
+});

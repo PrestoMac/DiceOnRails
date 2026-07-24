@@ -56,8 +56,7 @@ export function buildCharacterFromWizard(
     }
   });
 
-  const finalRaceConBonus = typeof selectedRace.asi === 'object' ? (selectedRace.asi as Record<string, number>).con || 0 : 0;
-  const conMod = getMod(fs.con + finalRaceConBonus);
+  const conMod = getMod(fs.con);
 
   const racialTraits: string[] = [];
   const raceDef = getRaceDef(selectedRace.id);
@@ -80,7 +79,7 @@ export function buildCharacterFromWizard(
       skills: updatedSkills, unusedSkillPoints: remainingSkillPoints || 0,
       feats: collectedFeats, featSelections, featChoices, pendingFeatChoice: false,
       resources, racialTraits,
-      conditionsImmunities: (selectedRace.id === 'elf' || selectedRace.id === 'half-elf') ? ['unconscious'] : undefined,
+      conditionsImmunities: (selectedRace.id === 'elf' || selectedRace.id === 'half-elf') ? ['sleep'] : undefined,
       knownSpells: selectedClass.spellcasting?.prepMode === 'prepared' ? [...selectedCantrips] : [...selectedCantrips, ...selectedSpells],
       preparedSpells: selectedClass.spellcasting?.prepMode === 'prepared' ? [...selectedCantrips, ...selectedSpells] : [...selectedCantrips],
       subclassId: selectedSubclassId || undefined,

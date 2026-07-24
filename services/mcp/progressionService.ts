@@ -201,7 +201,7 @@ export function createProgressionService(state: GameState): ProgressionService {
       target.unlockedSubclassFeatures ??= [];
       target.pendingSubclassFeature ??= false;
       if (!target.conditionsImmunities && (target.racialTraits || []).includes('fey-ancestry')) {
-        target.conditionsImmunities = ['unconscious'];
+        target.conditionsImmunities = ['sleep'];
       }
 
       return {

@@ -28,7 +28,7 @@ export interface CombatService {
   next_turn(autoResolveEnemies?: boolean): Promise<MCPResponse>;
   end_combat(): Promise<MCPResponse>;
   enemy_attack(enemyId: string, targetId?: string, attackIndex?: number): Promise<MCPResponse>;
-  make_save(targetId: string, stat: string, dc: number): Promise<MCPResponse>;
+  make_save(targetId: string, stat: string, dc: number, charmSave?: boolean): Promise<MCPResponse>;
   roll_death_save(targetId?: string): Promise<MCPResponse>;
   getCurrentTurnInfo(): { name: string; type: 'player' | 'enemy'; id: string } | null;
   updateInitiativeDeathStatus(id: string, isDead: boolean): void;
@@ -687,7 +687,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       };
     },
 
-    async make_save(targetId, stat, dc) {
+    async make_save(targetId, stat, dc, charmSave = false) {
       const validStats = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
       const cleanStat = stat.toLowerCase().trim() as string;
       const mappedStat = validStats.find(s => cleanStat.includes(s) || s.includes(cleanStat)) || 'dex';
@@ -712,7 +712,16 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
         const resilientBonus = getResilientSaveBonus(partyTarget, mappedStat as 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha');
         const shieldMasterBonus = getShieldMasterSaveBonus(partyTarget, mappedStat as 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha');
         const totalMod = mod + resilientBonus + shieldMasterBonus;
-        const roll = cryptoRoll(20);
+        // Fey Ancestry (elf/half-elf): advantage on saves against being charmed.
+        const hasFeyAncestry = (partyTarget.racialTraits || []).includes('fey-ancestry');
+        const advantage = charmSave && hasFeyAncestry;
+        let roll = cryptoRoll(20);
+        let advantageNote = '';
+        if (advantage) {
+          const second = cryptoRoll(20);
+          advantageNote = ` [Fey Ancestry advantage: ${roll} vs ${second}]`;
+          roll = Math.max(roll, second);
+        }
         const total = roll + totalMod - getExhaustionPenalty(partyTarget);
         const success = total >= dc;
         const nat20 = roll === 20;
@@ -731,7 +740,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
             resilientBonus, shieldMasterBonus
           },
           message: `${partyTarget.name} ${mappedStat.toUpperCase()} save: ${success ? 'SUCCESS' : 'FAILURE'}` +
-            ` (Rolled ${roll} + ${totalMod}${bonusParts.length ? ' [' + bonusParts.join(', ') + ']' : ''} = ${total} vs DC ${dc})${nat20 ? ' [Natural 20!]' : ''}${nat1 ? ' [Natural 1!]' : ''}`
+            ` (Rolled ${roll} + ${totalMod}${bonusParts.length ? ' [' + bonusParts.join(', ') + ']' : ''} = ${total} vs DC ${dc})${advantageNote}${nat20 ? ' [Natural 20!]' : ''}${nat1 ? ' [Natural 1!]' : ''}`
         };
       }
 

@@ -207,11 +207,11 @@ describe('buildPresetCharacter', () => {
       expect(c.subclassId).toBe('the-fiend');
     });
 
-    it('elf race confers unconscious condition immunity (elf wizard and elf ranger)', () => {
+    it('elf race confers sleep condition immunity (Fey Ancestry) (elf wizard and elf ranger)', () => {
       const wiz = buildPresetCharacter(PRESETS_BY_ID['elf-wizard']);
       const ranger = buildPresetCharacter(PRESETS_BY_ID['elf-ranger']);
-      expect(wiz.conditionsImmunities).toContain('unconscious');
-      expect(ranger.conditionsImmunities).toContain('unconscious');
+      expect(wiz.conditionsImmunities).toContain('sleep');
+      expect(ranger.conditionsImmunities).toContain('sleep');
     });
   });
 

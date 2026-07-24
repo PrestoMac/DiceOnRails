@@ -25,7 +25,9 @@ export function ensureCharacterFields(char: Character): void {
   char.unlockedSubclassFeatures ??= [];
   char.pendingSubclassFeature ??= false;
   if (!char.conditionsImmunities && (char.racialTraits || []).includes('fey-ancestry')) {
-    char.conditionsImmunities = ['unconscious'];
+    // Fey Ancestry: magic can't put elf/half-elf to sleep. (Charm-save advantage
+    // is applied via the charmSave flag on the make_save path.)
+    char.conditionsImmunities = ['sleep'];
   }
 }
 

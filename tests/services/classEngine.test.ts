@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Character } from '../../types';
-import { calculateMaxHp, calculateAc, getProficiencyBonus, getSavingThrowBonus, calculateSpeed, getDarkvisionRange, canEquipArmor, getSpellSaveDc, getSpellAttackBonus, getDamageResistances } from '../../services/classEngine';
+import { calculateMaxHp, calculateAc, getProficiencyBonus, getSavingThrowBonus, calculateSpeed, getDarkvisionRange, canEquipArmor, getSpellSaveDc, getSpellAttackBonus, getDamageResistances, recalculateResourcePools } from '../../services/classEngine';
 import { applyCondition } from '../../services/conditionEngine';
 
 function makeChar(overrides: Partial<Character> = {}): Character {
@@ -142,6 +142,29 @@ describe('classEngine', () => {
     it('Tiefling has fire resistance from hellish-resistance', () => {
       const char = makeChar({ race: 'tiefling', racialTraits: ['hellish-resistance'] });
       expect(getDamageResistances(char)).toContain('fire');
+    });
+  });
+
+  describe('recalculateResourcePools - warlock pact magic (C1)', () => {
+    it('creates a pactMagic resource that recharges on a short rest', () => {
+      const resources = recalculateResourcePools(makeChar({ class: 'warlock', race: 'human', level: 1 }));
+      const pact = resources.find(r => r.id === 'pactMagic');
+      expect(pact).toBeDefined();
+      expect(pact?.resetOn).toBe('short');
+      expect(pact?.max).toBe(1);
+    });
+
+    it('scales pact slot count by warlock level (L1=1, L3=2, L11=3, L17=4)', () => {
+      const cases: Array<[number, number]> = [[1, 1], [3, 2], [11, 3], [17, 4]];
+      for (const [lvl, expected] of cases) {
+        const resources = recalculateResourcePools(makeChar({ class: 'warlock', level: lvl }));
+        expect(resources.find(r => r.id === 'pactMagic')?.max).toBe(expected);
+      }
+    });
+
+    it('does not create standard spell-slot resources for warlock', () => {
+      const resources = recalculateResourcePools(makeChar({ class: 'warlock', level: 5 }));
+      expect(resources.some(r => r.id.startsWith('spell-slot-'))).toBe(false);
     });
   });
 });

@@ -340,6 +340,26 @@ export function recalculateResourcePools(character: Character): ResourcePool[] {
         }
       }
     }
+
+    // Warlock Pact Magic: a single pool of slots that all share the same level and
+    // recharge on a short rest. findSpellSlot()/getMaxPactSlotLevel() key on
+    // 'pactMagic', so creating this resource is what makes the warlock castable.
+    if (classDef.id === 'warlock' && classDef.spellcasting?.pactMagic) {
+      const pm = classDef.spellcasting.pactMagic;
+      const idx = Math.min(level - 1, pm.slots.length - 1);
+      const slotCount = pm.slots[idx] ?? 0;
+      if (slotCount > 0) {
+        resources.push({
+          id: 'pactMagic',
+          name: 'Pact Magic Slot',
+          current: slotCount,
+          max: slotCount,
+          resetOn: 'short',
+          source: 'class',
+          sourceId: 'warlock',
+        });
+      }
+    }
   }
 
   const raceDef = character.race ? getRaceDef(character.race) : undefined;

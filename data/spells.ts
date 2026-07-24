@@ -2278,6 +2278,7 @@ export const SPELLS_CATALOG: SpellDefinition[] = [
     classes: ['cleric'],
     healing: '1d4+yourspellcastingabilitymodifier',
     requiresConcentration: false,
+    scaling: [{ atSlotLevel: 4, bonusDice: '1d4' }, { atSlotLevel: 5, bonusDice: '2d4' }, { atSlotLevel: 6, bonusDice: '3d4' }, { atSlotLevel: 7, bonusDice: '4d4' }, { atSlotLevel: 8, bonusDice: '5d4' }, { atSlotLevel: 9, bonusDice: '6d4' }],
     tags: ['evocation']
   },
   {
@@ -3381,6 +3382,7 @@ export const SPELLS_CATALOG: SpellDefinition[] = [
     classes: ['cleric', 'druid', 'bard'],
     healing: '3d8+yourspellcastingabilitymodifier',
     requiresConcentration: false,
+    scaling: [{ atSlotLevel: 6, bonusDice: '1d8' }, { atSlotLevel: 7, bonusDice: '2d8' }, { atSlotLevel: 8, bonusDice: '3d8' }, { atSlotLevel: 9, bonusDice: '4d8' }],
     tags: ['conjuration']
   },
   {
