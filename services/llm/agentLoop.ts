@@ -388,6 +388,18 @@ export async function runAgentLoop(
             }
           }
         }
+        // Fallback: if no narration was captured from the tool result (e.g.
+        // data.narration came back empty, or time was already advanced so
+        // narrate_turn wasn't re-executed above), use the narration text the LLM
+        // supplied directly in the narrate_turn args. This avoids a slow narration
+        // retry whenever the model already provided the prose.
+        if (!inlineNarration && options?.requestEndNarration) {
+          const argText = sanitizeNarration(String(narrateCall.args?.narration ?? '')).trim();
+          if (argText.length >= 25) {
+            inlineNarration = argText;
+            if (isDebugMode) console.log(`[AgentLoop] Narration captured from narrate_turn args (len=${argText.length})`);
+          }
+        }
       }
 
       // If no inline narration was captured from the narrate_turn/inline-finalize

@@ -28,6 +28,19 @@ function isTrivialInput(text: string): boolean {
   return STRICT_TRIVIAL.some(re => re.test(t));
 }
 
+/**
+ * Hard cap for narration-retry LLM calls. A hung retry (e.g. a gateway that accepts
+ * the connection then stalls on the response body) must never pin `isLoading`
+ * forever and freeze the chat on "The Fates are deciding...". Resolves to
+ * undefined if the call exceeds the budget, letting the deterministic fallback run.
+ */
+const NARRATION_RETRY_TIMEOUT_MS = 45000;
+function withNarrationRetryTimeout<T>(p: Promise<T>): Promise<T | undefined> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<undefined>(resolve => { timer = setTimeout(() => resolve(undefined), NARRATION_RETRY_TIMEOUT_MS); });
+  return Promise.race([p.then(v => v, () => undefined), timeout]).finally(() => { if (timer) clearTimeout(timer); });
+}
+
 
 function insertToolCallMessages(
   messages: Message[],
@@ -226,13 +239,14 @@ export const useGameActions = (
             if (!inlineNarration) {
                 console.warn('[Narration] No inline narration from agent loop. Retrying with generateNarration...', { toolCount: toolMessages.length, inlineNarration });
                 try {
-                    const retry = await generateNarration(historyForAPI, buildContextString(myCharacterId), ctxPrep.frozen);
-                    const cleanRetry = sanitizeNarration(retry.text);
+                    const retry = await withNarrationRetryTimeout(generateNarration(historyForAPI, buildContextString(myCharacterId), ctxPrep.frozen));
+                    const retryText = retry?.text ?? '';
+                    const cleanRetry = sanitizeNarration(retryText);
                     if (cleanRetry.length >= 25) {
                         finalNarration = cleanRetry;
                         if (isDebugMode) console.log('[Narration] Retry succeeded', { len: finalNarration.length });
                     } else {
-                        console.warn('[Narration] Retry produced empty/short/artifact-only text', { length: retry.text?.length ?? 0, preview: (retry.text ?? '').slice(0, 80) });
+                        console.warn('[Narration] Retry produced empty/short/artifact-only text or timed out', { length: retryText.length, preview: retryText.slice(0, 80) });
                     }
                 } catch (err) {
                     console.error('[Narration] Retry failed:', err instanceof Error ? err.message : String(err));
@@ -242,13 +256,14 @@ export const useGameActions = (
             // when both inline narration and the primary retry produced nothing usable.
             if (!inlineNarration && sanitizeNarration(finalNarration).length < 25) {
                 try {
-                    const simple = await generateNarrationSimple(historyForAPI, buildContextString(myCharacterId), ctxPrep.frozen);
-                    const cleanSimple = sanitizeNarration(simple.text);
+                    const simple = await withNarrationRetryTimeout(generateNarrationSimple(historyForAPI, buildContextString(myCharacterId), ctxPrep.frozen));
+                    const simpleText = simple?.text ?? '';
+                    const cleanSimple = sanitizeNarration(simpleText);
                     if (cleanSimple.length >= 25) {
                         finalNarration = cleanSimple;
                         if (isDebugMode) console.log('[Narration] Simple retry succeeded', { len: finalNarration.length });
                     } else if (isDebugMode) {
-                        console.log('[Narration] Simple retry produced no usable text');
+                        console.log('[Narration] Simple retry produced no usable text or timed out');
                     }
                 } catch (err) {
                     console.error('[Narration] Simple retry failed:', err instanceof Error ? err.message : String(err));

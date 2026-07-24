@@ -158,7 +158,10 @@ export const generateNarration = async (history: Message[], context: string, fro
     const fetchTimer = setTimeout(() => fetchController.abort(), 60_000);
     try {
         const response = await fetch(apiUrl, { method: "POST", headers: apiHeaders, body: JSON.stringify(payload), signal: fetchController.signal });
-        clearTimeout(fetchTimer);
+        // NOTE: the abort timer is NOT cleared here — it must stay armed through
+        // response.json() below. A gateway that sends headers then stalls on the
+        // body would otherwise hang response.json() forever (no timeout), pinning
+        // isLoading and freezing the chat. It is cleared in the finally.
         if (isDebugMode) console.log(`[Narration] Response received in ${Date.now() - narrationStart}ms, status=${response.status}`);
         if (!response.ok) { let errMsg = `LLM request failed: ${response.status}`; const errData = await safeParseJson<{ error?: { message?: string } }>(response); if (errData?.error?.message) errMsg = errData.error.message; console.error('[Narration] Request failed', { status: response.status, errMsg }); throw new Error(errMsg); }
         const data = await response.json();
@@ -172,7 +175,8 @@ export const generateNarration = async (history: Message[], context: string, fro
             ? assistantMessage.content
             : (typeof assistantMessage.reasoning_content === 'string' ? assistantMessage.reasoning_content : "");
         return { text: sanitizeNarration(narrationContent) };
-    } catch (error) { clearTimeout(fetchTimer); console.error("LLM Error:", error); console.error('[Narration] generateNarration failed', { elapsed: Date.now() - narrationStart, error }); return { text: "The Narrator is silenced by an unknown force. (Check your API key or model settings.)" }; }
+    } catch (error) { console.error("LLM Error:", error); console.error('[Narration] generateNarration failed', { elapsed: Date.now() - narrationStart, error }); return { text: "The Narrator is silenced by an unknown force. (Check your API key or model settings.)" }; }
+    finally { clearTimeout(fetchTimer); }
 };
 
 /**
