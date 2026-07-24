@@ -40,14 +40,17 @@ describe('generateNarration — reasoning_content fallback', () => {
   beforeEach(() => { vi.clearAllMocks(); });
   afterEach(() => { vi.unstubAllGlobals(); });
 
-  it('uses reasoning_content when content is empty', async () => {
+  it('does NOT use reasoning_content when content is empty (returns empty)', async () => {
+    // Per the no-bleed fix, reasoning_content is never treated as narration — it
+    // is the model's planning/thinking, not prose. An empty content result yields
+    // empty text so the narration tier chain can fall through.
     const reasoning = 'The tavern falls silent as a cloaked stranger enters, their boots clicking against the worn wooden floor.';
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(makeResponse({
       choices: [{ message: { content: '', reasoning_content: reasoning, role: 'assistant' } }],
       usage: { prompt_tokens: 10, completion_tokens: 5 },
     })));
     const result = await generateNarration([], 'ctx', undefined, { provider: 'openai' as LLMProvider, apiKey: 'k' });
-    expect(result.text).toBe(reasoning);
+    expect(result.text).toBe('');
   });
 
   it('prefers content when both content and reasoning_content are present', async () => {
@@ -85,14 +88,14 @@ describe('generateNarrationSimple', () => {
     expect(result.text).toBe(text);
   });
 
-  it('falls back to reasoning_content when content is empty', async () => {
+  it('does NOT fall back to reasoning_content when content is empty (returns empty)', async () => {
     const reasoning = 'The dragon rears back, inhaling deeply before unleashing a torrent of flame across the cavern.';
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(makeResponse({
       choices: [{ message: { content: '', reasoning_content: reasoning, role: 'assistant' } }],
       usage: { prompt_tokens: 10, completion_tokens: 12 },
     })));
     const result = await generateNarrationSimple([], 'ctx', undefined, { provider: 'openai' as LLMProvider, apiKey: 'k' });
-    expect(result.text).toBe(reasoning);
+    expect(result.text).toBe('');
   });
 
   it('returns empty string when API key is missing', async () => {

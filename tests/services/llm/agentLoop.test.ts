@@ -479,10 +479,12 @@ describe('runAgentLoop', () => {
     expect(result.inlineNarration).toBe('The heavy door creaks open. A cold wind rushes in.');
   });
 
-  it('falls back to assistant prose when narrate_turn narration is too short', async () => {
-    // Model emits a rich prose line alongside a narrate_turn whose narration arg
-    // is below the 25-char threshold. The prose must be captured as inlineNarration
-    // instead of dropping to the generic fallback.
+  it('does NOT capture assistant prose emitted alongside tool calls (A2)', async () => {
+    // Model emits a rich prose line in content alongside a narrate_turn whose
+    // narration arg is below the 25-char threshold. Per the A1+A2 fix, prose
+    // emitted alongside tool calls is the model describing what it is about to do,
+    // not in-world narration — it must NOT be captured as inlineNarration. The turn
+    // falls through to the narration tier chain instead.
     const PROSE = 'The goblin shrieks as your blade finds its mark, crumpling into a heap of rags.';
     mockFetch.mockResolvedValueOnce(makeLLMResponse(PROSE, [
       { name: 'narrate_turn', args: { narration: 'short', timePassed: 0 } },
@@ -495,13 +497,16 @@ describe('runAgentLoop', () => {
       { requestEndNarration: true },
     );
 
-    expect(result.inlineNarration).toBe(PROSE);
+    expect(result.inlineNarration).toBeUndefined();
   });
 
-  it('falls back to reasoning_content when content is empty', async () => {
-    // Reasoning model leaves content empty and emits prose in reasoning_content
-    // alongside a narrate_turn whose narration arg is also empty. The prose must
-    // be captured as inlineNarration from the reasoning_content field.
+  it('does NOT capture reasoning_content as narration (A1)', async () => {
+    // Reasoning model leaves content empty and emits its chain-of-thought in
+    // reasoning_content alongside a narrate_turn whose narration arg is also empty.
+    // Per the A1+A2 fix, reasoning_content is never treated as narration — it is
+    // the model's internal thinking (planning, decisions), not in-world prose.
+    // inlineNarration stays undefined so the turn falls through to the narration
+    // tier chain (generateNarration retry -> deterministic -> generic).
     const REASONING = 'A cold draft sweeps through the chamber as the ancient seal breaks apart, dust settling slowly.';
     mockFetch.mockResolvedValueOnce({
       ok: true,
@@ -530,6 +535,6 @@ describe('runAgentLoop', () => {
       { requestEndNarration: true },
     );
 
-    expect(result.inlineNarration).toBe(REASONING);
+    expect(result.inlineNarration).toBeUndefined();
   });
 });

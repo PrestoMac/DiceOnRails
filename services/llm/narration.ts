@@ -170,12 +170,17 @@ export const generateNarration = async (history: Message[], context: string, fro
         const assistantMessage = data.choices[0].message;
         if (isDebugMode && data.usage) { const promptTokens = data.usage.prompt_tokens ?? 0; const completionTokens = data.usage.completion_tokens ?? 0; const totalTokens = data.usage.total_tokens ?? 0; const cachedTokens = data.usage.prompt_tokens_details?.cached_tokens ?? 0; const cacheHitPct = promptTokens > 0 ? ((cachedTokens / promptTokens) * 100).toFixed(1) : '0'; console.log(`[LLM Usage] ${data.model || model} | mode=narration | prompt=${promptTokens} completion=${completionTokens} total=${totalTokens} | cached=${cachedTokens} (${cacheHitPct}% of prompt)`); }
         if (isDebugMode) { console.log(`[Narration] generateNarration done in ${Date.now() - narrationStart}ms, contentLength=${(assistantMessage.content || "").length}`); console.log(`[Narration] Content preview: ${(assistantMessage.content || "").substring(0, 200)}`); }
-        // Reasoning models (e.g. deepseek-v4-flash) sometimes emit narration in
-        // reasoning_content while leaving content empty. Prefer content, then fall
-        // back to reasoning_content so a successful response isn't dropped.
+        // Use content ONLY. For a reasoning model (e.g. deepseek-v4-flash),
+        // reasoning_content on a narration call is the model planning *what* to
+        // narrate (meta: "I should describe the road, mention the time of
+        // day..."), not the narration prose itself. Falling back to it caused
+        // planning/thinking prose to bleed into the chat bubble. An empty content
+        // result yields empty text and falls through the narration tier chain
+        // (simple retry -> deterministic -> generic), which is safer than leaking
+        // chain-of-thought.
         const narrationContent = (typeof assistantMessage.content === 'string' && assistantMessage.content.trim())
             ? assistantMessage.content
-            : (typeof assistantMessage.reasoning_content === 'string' ? assistantMessage.reasoning_content : "");
+            : "";
         return { text: sanitizeNarration(narrationContent) };
     } catch (error) { console.error("LLM Error:", error); console.error('[Narration] generateNarration failed', { elapsed: Date.now() - narrationStart, error }); return { text: "The Narrator is silenced by an unknown force. (Check your API key or model settings.)" }; }
     finally { clearTimeout(fetchTimer); }
@@ -212,10 +217,11 @@ export const generateNarrationSimple = async (history: Message[], context: strin
         if (!response.ok) { const errMsg = `LLM request failed: ${response.status}`; const errData = await safeParseJson<{ error?: { message?: string } }>(response); if (errData?.error?.message) throw new Error(errData.error.message); throw new Error(errMsg); }
         const data = await response.json();
         const msg = data.choices[0].message;
-        // Same reasoning_content fallback as generateNarration.
+        // Content only — reasoning_content is planning meta, not narration prose
+        // (see generateNarration rationale above).
         const c = (typeof msg.content === 'string' && msg.content.trim())
             ? msg.content
-            : (typeof msg.reasoning_content === 'string' ? msg.reasoning_content : "");
+            : "";
         return { text: sanitizeNarration(c) };
     } catch (error) {
         if (isDebugMode) console.error('[Narration] generateNarrationSimple failed:', error instanceof Error ? error.message : String(error));

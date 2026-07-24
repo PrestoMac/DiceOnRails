@@ -15,6 +15,12 @@ import { calculateAc } from '../classEngine';
 import { MULTIPLAYER_PROMPT } from './prompts/multiplayerPrompt';
 
 const CRITICAL_TOOLS = new Set(['cast_spell', 'inflict_damage', 'roll_dice', 'player_attack']);
+// Canonical set of real tool names. Used to drop tool calls whose `function.name`
+// is not a real tool (e.g. the literal "tool_call"/"function" wrapper-tag name
+// some DeepSeek-family models emit on a tool-calling format failure) before they
+// reach executeToolCall's default case and pollute the chat log with
+// "[System:tool_call] Unknown tool: tool_call".
+const VALID_TOOL_NAMES = new Set(tools.map((t: { function: { name: string } }) => t.function.name));
 
 function createToolMessage(toolName: string, result: MCPResponse, toolCallId?: string): Message {
     return {
@@ -268,16 +274,37 @@ export async function runAgentLoop(
     }
 
     const assistantMsg = data.choices[0].message;
-    const rawToolCalls = assistantMsg.tool_calls || [];
+    // Drop tool calls whose function name is not a real tool. Some
+    // DeepSeek-family models, on a tool-calling format failure, emit a structured
+    // call whose function.name is the literal wrapper-tag name ("tool_call",
+    // "function") instead of a real tool. Filtering rawToolCalls at the source
+    // keeps the assistant echo (toolCallDefs), the batch dispatch, and the tool
+    // messages all consistent — no orphaned tool_call_ids, since the
+    // reconstructed assistant message at the end of the loop is built from this
+    // filtered list.
+    const rawToolCalls = (assistantMsg.tool_calls || []).filter((tc: { id?: string; function?: { name?: string } }) => {
+      const n = tc.function?.name;
+      if (!n || !VALID_TOOL_NAMES.has(n)) {
+        if (isDebugMode) console.warn(`[AgentLoop] Dropping tool call with invalid name "${n}" (id=${tc.id ?? '?'}): likely a model tool-calling format failure.`);
+        return false;
+      }
+      return true;
+    });
     const assistantContent = (assistantMsg.content || '').toString().trim();
-    // Reasoning models (e.g. deepseek-v4-flash) sometimes leave `content` empty and
-    // emit prose in `reasoning_content`. Keep a narration candidate that falls back
-    // to reasoning_content for the inlineNarration capture path, while leaving
-    // `assistantContent` (content-only) untouched so the <tool_call>-markup guard
-    // below doesn't misfire on reasoning text.
-    const reasoningContent = (typeof assistantMsg.reasoning_content === 'string' ? assistantMsg.reasoning_content : '').trim();
-    const narrationCandidate = sanitizeNarration(assistantContent || reasoningContent);
-    if (narrationCandidate.length >= 25) lastNarrationCandidate = narrationCandidate;
+    // Narration candidates come from assistant PROSE (content) ONLY — never from
+    // `reasoning_content`. For a reasoning model (e.g. deepseek-v4-flash),
+    // reasoning_content is genuine chain-of-thought (planning, math, decisions
+    // like breaking a multi-leg journey into chunks), not in-world narration
+    // prose. Treating it as narration caused the model's internal travel-planning
+    // to bleed into the chat bubble. Additionally, a candidate is only captured
+    // when the model made NO tool calls this iteration: prose emitted alongside
+    // tool calls is the model describing what it is about to do, not narration.
+    // `assistantContent` (content-only) is left untouched so the <tool_call>-
+    // markup guard below doesn't misfire on reasoning text.
+    const narrationCandidate = sanitizeNarration(assistantContent);
+    if (narrationCandidate.length >= 25 && rawToolCalls.length === 0) {
+      lastNarrationCandidate = narrationCandidate;
+    }
 
     if (isDebugMode) {
       console.log(`[Agent Loop] Iter ${iter + 1}: prompt=${promptT} completion=${completionT} cached=${cachedT} tools=${rawToolCalls.length} contentLen=${assistantContent.length} elapsed=${Date.now() - iterStart}ms`);
@@ -423,13 +450,13 @@ export async function runAgentLoop(
         }
       }
 
-      // If no inline narration was captured from the narrate_turn/inline-finalize
-      // tool results, fall back to the assistant prose emitted alongside the tool
-      // calls in this iteration. Previously this prose was silently dropped.
-      if (!inlineNarration && narrationCandidate.length >= 25) {
-        inlineNarration = narrationCandidate;
-        if (isDebugMode) console.log(`[AgentLoop] Narration captured from assistant prose (len=${narrationCandidate.length})`);
-      }
+      // NOTE: assistant prose emitted alongside tool calls is intentionally NOT
+      // used as a narration fallback here. This isEndOfTurn block always has tool
+      // calls present, and per the A1+A2 fix, prose/reasoning alongside tool calls
+      // is the model describing what it is about to do (or thinking it through),
+      // not in-world narration. The narration must come from the tool result
+      // (data.narration), the narrate_turn args, or the post-loop tiered fallback
+      // (generateNarration retry -> deterministic -> generic).
 
       if (isDebugMode && !inlineNarration) {
         console.log('[AgentLoop] Narration empty — diagnostics:', {

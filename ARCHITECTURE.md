@@ -352,8 +352,9 @@ The single most important flow to understand. Entry point: `useGameActions.handl
   ├─ 9. resolveNarration(text, toolMessages, inlineNarration, …)
   │      - Degenerate stub returning inlineNarration ?? 'The adventure continues...'.
   │        The actual tiered fallback lives directly in handleSendMessage:
-  │        1. inlineNarration from agent loop (now captures assistant prose +
-  │           reasoning_content emitted alongside tool calls).
+   │        1. inlineNarration from agent loop (content-prose / tool-result /
+   │           narrate_turn-args only — NEVER reasoning_content, never prose
+   │           alongside tool calls; see no-bleed rule in AGENTS.md).
   │        2. generateNarration retry (≥25 chars post-sanitize).
   │        3. generateNarrationSimple — minimal-prompt LLM retry at temp 0.9.
   │        4. buildDeterministicNarration — zero-LLM one-liner from rollData.
