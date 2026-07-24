@@ -110,7 +110,7 @@ Create a campaign → choose **Quick Start** (a pre-made hero) or **Custom** cre
 | **Compendium (📖)** | In-app reference browser: glossary, all conditions + exhaustion levels, rules tables, the full spell catalog, and SRD items. Read-only, pulls from the same data the engine uses. |
 | **Combat Tracker** | Slides in during fights — shows initiative order, current turn, HP bars, conditions. |
 | **Atmosphere image** | Generated scene art behind the chat. Click to expand fullscreen. |
-| **Action Queue** (multiplayer) | Queue up actions/dialogue and resolve them as a batched "party turn". |
+| **Action Queue** (multiplayer) | Queue up actions/dialogue and resolve them as a batched "party turn". Only shown when 2+ party members are present. |
 | **Quick Actions** | One-tap buttons for your prepared spells, equipped weapons, class resources, skills, saves, and potions. |
 | **Suggested Actions** (opt-in) | Per-turn LLM-suggested next actions, shown as clickable chips above the input. |
 | **Onboarding tour** | Auto-launches once on first play; replayable from Settings. |

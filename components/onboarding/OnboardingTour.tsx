@@ -4,6 +4,8 @@ export interface OnboardingTourProps {
   active: boolean;
   /** Whether combat is currently active — controls if the combat tracker step shows. */
   combatActive?: boolean;
+  /** Whether 2+ party members are present — controls if the Action Queue step shows. */
+  multiplayer?: boolean;
   /** Called when the user dismisses or completes the tour. */
   onDismiss: () => void;
 }
@@ -71,8 +73,9 @@ function getRect(selector: string): Rect | null {
 }
 
 /** Hand-rolled coachmark overlay with a viewport-sized mask and a hole for the highlighted element. */
-const OnboardingTour: React.FC<OnboardingTourProps> = ({ active, combatActive, onDismiss }) => {
-  const steps = combatActive ? [...BASE_STEPS.slice(0, 5), COMBAT_STEP] : BASE_STEPS;
+const OnboardingTour: React.FC<OnboardingTourProps> = ({ active, combatActive, multiplayer, onDismiss }) => {
+  const visibleSteps = multiplayer ? BASE_STEPS : BASE_STEPS.filter(s => s.selector !== '[data-tour="queue"]');
+  const steps = combatActive ? [...visibleSteps, COMBAT_STEP] : visibleSteps;
   const [idx, setIdx] = useState(0);
   const [rect, setRect] = useState<Rect | null>(null);
   const [dontShowAgain, setDontShowAgain] = useState(false);

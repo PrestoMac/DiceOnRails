@@ -208,6 +208,7 @@ const AppContent: React.FC = () => {
         <OnboardingTour
           active={onboarding.tourActive}
           combatActive={gameState.combat?.isActive}
+          multiplayer={gameState.party.length > 1}
           onDismiss={onboarding.dismissTour}
         />
       )}

@@ -24,6 +24,8 @@ interface InputAreaProps {
   character?: Character | null;
   onScrollToBottom?: () => void;
   showScrollButton?: boolean;
+  /** When true (2+ party members), render the Queue Action/Dialogue buttons. */
+  isMultiplayer?: boolean;
 }
 
 const SCHOOL_ICONS: Record<string, string> = {
@@ -46,7 +48,7 @@ const QUICK_BTN = 'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] 
 const DISABLED_STYLE = 'bg-stone-800/50 text-stone-600 cursor-not-allowed';
 
 /** Chat input area with quick-action buttons (spells, weapons, features, rests), speech-to-text, and queue/submit controls. */
-const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onQueueAction, onResolveEnemyTurn, isLoading, combat, character }) => {
+const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onQueueAction, onResolveEnemyTurn, isLoading, combat, character, isMultiplayer }) => {
   const [input, setInput] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [recognition, setRecognition] = useState<{ continuous: boolean; interimResults: boolean; lang: string; onresult: (e: unknown) => void; onerror: (e: unknown) => void; onend: () => void; start: () => void; abort: () => void } | null>(null);
@@ -224,7 +226,7 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onQueueAction, onR
           <button type="button" onClick={toggleListening} disabled={effectivelyLocked} className={`absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full transition-all ${isListening ? 'text-red-500 bg-red-900/20 animate-pulse shadow-[0_0_10px_rgba(220,38,38,0.3)]' : 'text-stone-500 hover:text-amber-500 hover:bg-stone-800'}`} title={isListening ? "Stop Listening" : "Speak Action"}><i className={`fas ${isListening ? 'fa-microphone' : 'fa-microphone-lines'}`}></i></button>
         </div>
         <div className="flex gap-2 justify-end">
-          {onQueueAction && <>
+          {onQueueAction && isMultiplayer && <>
             <button type="button" onClick={() => handleQueueClick('action')} disabled={effectivelyLocked || !input.trim()} className={`px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-2 ${btnCls(effectivelyLocked || !input.trim())}`} title="Add to queue as Action"><i className="fas fa-plus"></i> Queue Action</button>
             <button type="button" onClick={() => handleQueueClick('dialogue')} disabled={effectivelyLocked || !input.trim()} className={`px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-2 ${btnCls(effectivelyLocked || !input.trim())}`} title="Add to queue as Dialogue"><i className="fas fa-quote-left"></i> Queue Dialogue</button>
           </>}

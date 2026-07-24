@@ -152,6 +152,7 @@ Binary dice tools (`check_skill`, `make_save`) support **branch finalization** v
 - **`buildCharacterFromWizard`** (8-step): name validation → location resolution → base stats → racial ASI → ASI/feat slots → con mod & racial traits → resource pools → assemble final Character.
 
 ### UI
+- **Multiplayer-only UI** (`gameState.party.length > 1`): the Queue Action / Queue Dialogue buttons (`InputArea`, via `isMultiplayer` prop), the `ActionQueuePanel` + its desktop sidebar section / mobile drawer / mobile toggle, and the per-character tab bar (Desktop & Mobile layouts) are all hidden in solo play. The onboarding tour's "Action Queue" step is skipped via `OnboardingTour`'s `multiplayer` prop.
 - **Quick Actions only pre-fill input text**, never send or queue. User must press Enter or click "Act Now"/"Queue Action".
 - **ChatLog dual roll rendering**: structured `msg.rollData` → `<DiceRollCard>` (animated SVG dice). Regex-parsed text → `<RollCard>` (compact badge).
 - **System message text stripping**: `formatMessageText()` removes `[System:identifier]` prefix via `/^\[System:[a-zA-Z0-9_-]+\]\s*/i`.

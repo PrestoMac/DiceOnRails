@@ -73,6 +73,7 @@ const MobileLayout: React.FC = () => {
   }, []);
 
   const charToShow = gameState.party.find((c: Character) => c.id === viewingCharacterId) || gameState.party[0];
+  const isMultiplayer = gameState.party.length > 1;
   const handleBackOrReset = () => userId ? confirm('Return to dashboard?') && setStage(AppStage.DASHBOARD) : confirm('Are you sure you want to reset the game? All progress will be lost.') && resetGame();
   const queueLen = gameState.actionQueue?.length || 0;
   const { recentActivity } = useActivityTracking(gameState, messages, userId);
@@ -110,15 +111,15 @@ const MobileLayout: React.FC = () => {
           >
             <i className="fas fa-arrow-down text-xs"></i>
           </button>
-          {showQueue&&<div className="absolute inset-0 z-30 flex flex-col" style={{top:'0'}}><div className="flex-1 bg-black/40 backdrop-blur-sm" onClick={()=>setShowQueue(false)}></div><div className="h-[70vh] bg-stone-900 border-t border-stone-800 rounded-t-2xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300"><div className="flex items-center justify-between px-4 py-3 border-b border-stone-800 shrink-0"><span className="text-xs uppercase font-bold tracking-widest text-stone-400">Action Queue</span><button onClick={()=>setShowQueue(false)} className="p-1 hover:bg-stone-800 rounded text-stone-500 hover:text-stone-300 transition-colors"><i className="fas fa-chevron-down text-sm"></i></button></div><div className="flex-1 overflow-y-auto p-2"><ActionQueuePanel queue={gameState.actionQueue||[]} userId={userId} onRemove={handleRemoveQueueItem} onUpdate={handleUpdateQueueItem} onReorder={handleReorderQueue} onExecute={handleExecuteBatch} isProcessing={gameState.isProcessing}/></div></div></div>}
-          <div className="p-2 border-t border-stone-800 bg-stone-900 flex gap-2 overflow-x-auto">
+          {isMultiplayer&&showQueue&&<div className="absolute inset-0 z-30 flex flex-col" style={{top:'0'}}><div className="flex-1 bg-black/40 backdrop-blur-sm" onClick={()=>setShowQueue(false)}></div><div className="h-[70vh] bg-stone-900 border-t border-stone-800 rounded-t-2xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300"><div className="flex items-center justify-between px-4 py-3 border-b border-stone-800 shrink-0"><span className="text-xs uppercase font-bold tracking-widest text-stone-400">Action Queue</span><button onClick={()=>setShowQueue(false)} className="p-1 hover:bg-stone-800 rounded text-stone-500 hover:text-stone-300 transition-colors"><i className="fas fa-chevron-down text-sm"></i></button></div><div className="flex-1 overflow-y-auto p-2"><ActionQueuePanel queue={gameState.actionQueue||[]} userId={userId} onRemove={handleRemoveQueueItem} onUpdate={handleUpdateQueueItem} onReorder={handleReorderQueue} onExecute={handleExecuteBatch} isProcessing={gameState.isProcessing}/></div></div></div>}
+          {isMultiplayer && <div className="p-2 border-t border-stone-800 bg-stone-900 flex gap-2 overflow-x-auto">
             <button onClick={()=>setShowQueue(!showQueue)} className={`px-3 py-1 rounded text-[10px] font-bold uppercase tracking-wider whitespace-nowrap border transition-all ${showQueue?'bg-amber-900 border-amber-700 text-amber-100':'bg-stone-800 border-stone-700 text-stone-400'}${queueLen>0?' animate-glow-pulse':''}`}><i className="fas fa-layer-group mr-1"></i> Queue ({queueLen})</button>
-          </div>
+          </div>}
           {charToShow&&!showQueue&&<HpStatusBar character={charToShow} />}
-          {!showQueue&&<InputArea onSendMessage={handleSendMessage} onQueueAction={(t: string, ty: 'action'|'dialogue') => handleEnqueueAction(t, ty)} onResolveEnemyTurn={handleResolveEnemyTurn} isLoading={isLoading||gameState.isProcessing===true} combat={gameState.combat} character={charToShow}/>}
+          {!showQueue&&<InputArea onSendMessage={handleSendMessage} onQueueAction={(t: string, ty: 'action'|'dialogue') => handleEnqueueAction(t, ty)} onResolveEnemyTurn={handleResolveEnemyTurn} isLoading={isLoading||gameState.isProcessing===true} combat={gameState.combat} character={charToShow} isMultiplayer={isMultiplayer}/>}
         </>}
         {mobileTab==='character'&&<div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-          <div className="flex gap-2 overflow-x-auto pb-2 mb-2">{gameState.party.map((char: Character) => <button key={char.id} onClick={() => setViewingCharacterId(char.id)} className={`p-2 rounded text-xs whitespace-nowrap ${viewingCharacterId===char.id?'bg-amber-700 text-white':'bg-stone-800 text-stone-400'}`}>{char.name}{char.id===myCharacterId?' (You)':''}</button>)}</div>
+          {isMultiplayer && <div className="flex gap-2 overflow-x-auto pb-2 mb-2">{gameState.party.map((char: Character) => <button key={char.id} onClick={() => setViewingCharacterId(char.id)} className={`p-2 rounded text-xs whitespace-nowrap ${viewingCharacterId===char.id?'bg-amber-700 text-white':'bg-stone-800 text-stone-400'}`}>{char.name}{char.id===myCharacterId?' (You)':''}</button>)}</div>}
           {charToShow?<CharacterSheet character={charToShow} onUpdateInventory={handleUpdateInventory} onLevelUp={handleOpenLevelUp} onSendMessage={handleSendMessage} onTriggerDiceRoll={handleTriggerDiceRoll}/>:<div className="text-stone-500 text-center mt-10">No characters in party.</div>}
         </div>}
         {mobileTab==='journal'&&<div className="flex-1 overflow-y-auto p-4 custom-scrollbar"><Journal quests={gameState.quests} lore={gameState.lore}/></div>}

@@ -96,6 +96,7 @@ const DesktopLayout: React.FC = () => {
   }, [checkSidebarOverflow, tab]);
 
   const charToShow = gameState.party.find(c => c.id === viewingCharacterId) || gameState.party[0];
+  const isMultiplayer = gameState.party.length > 1;
   const handleBackOrReset = () => userId ? confirm('Return to dashboard?') && setStage(AppStage.DASHBOARD) : confirm('Are you sure you want to reset the game? All progress will be lost.') && resetGame();
 
   return (<>
@@ -106,14 +107,14 @@ const DesktopLayout: React.FC = () => {
       </div>
       <div ref={sidebarScrollRef} className="flex-1 overflow-y-auto custom-scrollbar relative" style={{ padding: `${Math.max(12, sidebarWidth * 0.075)}px`, fontSize: `${fontScale}rem` }}>
         {tab === 'character' ? <div className="flex flex-col h-full">
-          <div className="flex gap-2 overflow-x-auto pb-2 mb-2 shrink-0">{gameState.party.map(char => <button key={char.id} onClick={() => setViewingCharacterId(char.id)} className={`p-2 rounded whitespace-nowrap transition-colors ${viewingCharacterId === char.id ? 'bg-amber-700 text-white' : 'bg-stone-800 text-stone-400 hover:bg-stone-700'}`}>{char.name}{char.id === myCharacterId ? ' (You)' : ''}</button>)}</div>
+          {isMultiplayer && <div className="flex gap-2 overflow-x-auto pb-2 mb-2 shrink-0">{gameState.party.map(char => <button key={char.id} onClick={() => setViewingCharacterId(char.id)} className={`p-2 rounded whitespace-nowrap transition-colors ${viewingCharacterId === char.id ? 'bg-amber-700 text-white' : 'bg-stone-800 text-stone-400 hover:bg-stone-700'}`}>{char.name}{char.id === myCharacterId ? ' (You)' : ''}</button>)}</div>}
           {charToShow ? <CharacterSheet character={charToShow} onUpdateInventory={handleUpdateInventory} onLevelUp={handleOpenLevelUp} onSendMessage={handleSendMessage} onTriggerDiceRoll={handleTriggerDiceRoll} /> : <div className="text-stone-500 text-center mt-10">No characters in party.</div>}
         </div> : <Journal quests={gameState.quests} lore={gameState.lore} />}
         {hasScrollOverflow && <div className="sticky bottom-0 left-0 right-0 h-12 -mt-12 pointer-events-none bg-gradient-to-t from-stone-950/95 via-stone-950/60 to-transparent z-10" />}
       </div>
-      <div className={`border-t border-stone-800 bg-stone-900/40 transition-all duration-300 ${isQueueOpen ? 'h-1/3' : 'h-auto'} flex flex-col`} style={{ fontSize: `${fontScale}rem` }} data-tour="queue">
+      {isMultiplayer && <div className={`border-t border-stone-800 bg-stone-900/40 transition-all duration-300 ${isQueueOpen ? 'h-1/3' : 'h-auto'} flex flex-col`} style={{ fontSize: `${fontScale}rem` }} data-tour="queue">
         <ActionQueuePanel queue={gameState.actionQueue || []} userId={userId} onRemove={handleRemoveQueueItem} onUpdate={handleUpdateQueueItem} onReorder={handleReorderQueue} onExecute={handleExecuteBatch} isProcessing={gameState.isProcessing} isCollapsed={!isQueueOpen} onToggleCollapse={() => setIsQueueOpen(!isQueueOpen)} />
-      </div>
+      </div>}
       {sidebarOpen && <div onMouseDown={handleDragStart} className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-amber-600/40 transition-colors z-30" />}
     </aside>
     <main className="flex-1 flex flex-col relative">
@@ -164,7 +165,7 @@ const DesktopLayout: React.FC = () => {
         />
       </div>
       <div className="relative z-10 shrink-0">
-        <InputArea onSendMessage={handleSendMessage} onQueueAction={handleEnqueueAction} onResolveEnemyTurn={handleResolveEnemyTurn} isLoading={isLoading || gameState.isProcessing} combat={gameState.combat} character={charToShow} />
+        <InputArea onSendMessage={handleSendMessage} onQueueAction={handleEnqueueAction} onResolveEnemyTurn={handleResolveEnemyTurn} isLoading={isLoading || gameState.isProcessing} combat={gameState.combat} character={charToShow} isMultiplayer={isMultiplayer} />
       </div>
     </main>
     {isAtmosphereExpanded && gameState.currentAtmosphereUrl && <div className="fixed inset-0 z-[110] bg-black/95 backdrop-blur-2xl flex flex-col items-center justify-center p-4 md:p-12 animate-in fade-in zoom-in-95 duration-300" onClick={() => setIsAtmosphereExpanded(false)}>
