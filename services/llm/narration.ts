@@ -165,9 +165,103 @@ export const generateNarration = async (history: Message[], context: string, fro
         const assistantMessage = data.choices[0].message;
         if (isDebugMode && data.usage) { const promptTokens = data.usage.prompt_tokens ?? 0; const completionTokens = data.usage.completion_tokens ?? 0; const totalTokens = data.usage.total_tokens ?? 0; const cachedTokens = data.usage.prompt_tokens_details?.cached_tokens ?? 0; const cacheHitPct = promptTokens > 0 ? ((cachedTokens / promptTokens) * 100).toFixed(1) : '0'; console.log(`[LLM Usage] ${data.model || model} | mode=narration | prompt=${promptTokens} completion=${completionTokens} total=${totalTokens} | cached=${cachedTokens} (${cacheHitPct}% of prompt)`); }
         if (isDebugMode) { console.log(`[Narration] generateNarration done in ${Date.now() - narrationStart}ms, contentLength=${(assistantMessage.content || "").length}`); console.log(`[Narration] Content preview: ${(assistantMessage.content || "").substring(0, 200)}`); }
-        return { text: sanitizeNarration(assistantMessage.content || "") };
+        // Reasoning models (e.g. deepseek-v4-flash) sometimes emit narration in
+        // reasoning_content while leaving content empty. Prefer content, then fall
+        // back to reasoning_content so a successful response isn't dropped.
+        const narrationContent = (typeof assistantMessage.content === 'string' && assistantMessage.content.trim())
+            ? assistantMessage.content
+            : (typeof assistantMessage.reasoning_content === 'string' ? assistantMessage.reasoning_content : "");
+        return { text: sanitizeNarration(narrationContent) };
     } catch (error) { clearTimeout(fetchTimer); console.error("LLM Error:", error); console.error('[Narration] generateNarration failed', { elapsed: Date.now() - narrationStart, error }); return { text: "The Narrator is silenced by an unknown force. (Check your API key or model settings.)" }; }
 };
+
+/**
+ * Last-resort LLM narration with a minimal prompt and higher temperature. Intended
+ * for the rare case where both inline narration and the primary generateNarration
+ * retry produced empty/short/artifact-only text. Uses a simpler system prompt to
+ * reduce the surface for another tool-calling-format failure.
+ * @param history - The conversation history messages.
+ * @param context - A string describing the current game state context.
+ * @param frozenMessages - Optional frozen/pinned messages to include.
+ * @param providerConfig - Optional LLM provider configuration override.
+ * @returns An object containing the narration text.
+ */
+export const generateNarrationSimple = async (history: Message[], context: string, frozenMessages?: { role: 'user' | 'system'; content: string }[], providerConfig?: { provider: LLMProvider; apiKey: string; apiBase?: string }): Promise<{ text: string }> => {
+    const { apiKey: finalApiKey, model, apiUrl, apiHeaders } = resolveLLMConfig(providerConfig);
+    if (!finalApiKey) {
+        if (isDebugMode) console.error('[Narration] generateNarrationSimple: No API key');
+        return { text: "" };
+    }
+    const messages = mapHistoryToMessages(history);
+    const systemMessage = { role: "system" as const, content: "You are the narrator of a fantasy RPG. Narrate the most recent action in one or two vivid sentences. Plain prose only. Do NOT call any tools. Do NOT use markdown. Respond in English." };
+    const contextMessage = { role: "user" as const, content: `[Dungeon State Context: ${context}]` };
+    const payload = { model, messages: [systemMessage, ...(frozenMessages || []), ...messages, contextMessage], temperature: 0.9 };
+    if (isDebugMode) console.log('[Narration] generateNarrationSimple request', { model, messageCount: payload.messages.length });
+    const fetchController = new AbortController();
+    const fetchTimer = setTimeout(() => fetchController.abort(new Error('generateNarrationSimple timed out after 60s')), 60_000);
+    try {
+        const response = await fetch(apiUrl, { method: "POST", headers: apiHeaders, body: JSON.stringify(payload), signal: fetchController.signal });
+        if (!response.ok) { const errMsg = `LLM request failed: ${response.status}`; const errData = await safeParseJson<{ error?: { message?: string } }>(response); if (errData?.error?.message) throw new Error(errData.error.message); throw new Error(errMsg); }
+        const data = await response.json();
+        const msg = data.choices[0].message;
+        // Same reasoning_content fallback as generateNarration.
+        const c = (typeof msg.content === 'string' && msg.content.trim())
+            ? msg.content
+            : (typeof msg.reasoning_content === 'string' ? msg.reasoning_content : "");
+        return { text: sanitizeNarration(c) };
+    } catch (error) {
+        if (isDebugMode) console.error('[Narration] generateNarrationSimple failed:', error instanceof Error ? error.message : String(error));
+        return { text: "" };
+    } finally { clearTimeout(fetchTimer); }
+};
+
+/**
+ * Builds a zero-LLM deterministic one-liner from a turn's tool messages. Used as the
+ * final fallback before the generic "The adventure continues..." string so the
+ * narration bubble always carries *some* turn-specific information. Truthful by
+ * construction — derived only from the structured rollData/result messages.
+ * @param toolMessages - The tool result messages produced during the turn.
+ * @returns A short narration string, or "" when nothing useful can be derived.
+ */
+export function buildDeterministicNarration(toolMessages: Message[]): string {
+    if (!Array.isArray(toolMessages) || toolMessages.length === 0) return "";
+    // Walk backwards so we describe the most recent meaningful action first.
+    for (let i = toolMessages.length - 1; i >= 0; i--) {
+        const m = toolMessages[i];
+        const nameMatch = /^\[System:([a-zA-Z_]+)\]\s*/.exec(m.text);
+        const toolName = nameMatch ? nameMatch[1] : "";
+        const rest = nameMatch ? m.text.slice(nameMatch[0].length).trim() : m.text.trim();
+        const roll = Array.isArray(m.rollData) ? m.rollData[0] : m.rollData;
+
+        if (toolName === 'narrate_turn' || toolName === 'next_turn') continue;
+
+        if (toolName === 'player_attack' || toolName === 'inflict_damage') {
+            if (roll) {
+                const dmg = toolMessages
+                    .map(tm => (Array.isArray(tm.rollData) ? tm.rollData : [tm.rollData]))
+                    .flat()
+                    .filter((r): r is RollData => !!r && r.type === 'damage')
+                    .reduce((s, r) => s + (r.total || 0), 0);
+                if (roll.success === false) return `The attack on ${rest.split(' ')[0]} misses.`;
+                if (dmg > 0) return `The strike lands for ${dmg} damage.`;
+                return `The strike lands.`;
+            }
+        } else if (toolName === 'cast_spell') {
+            if (roll && roll.type === 'cast_spell') return `The spell takes effect.`;
+        } else if (toolName === 'check_skill') {
+            if (roll) return roll.success ? `The skill check succeeds.` : `The skill check fails.`;
+        } else if (toolName === 'make_save') {
+            if (roll) return roll.success ? `The saving throw succeeds.` : `The saving throw fails.`;
+        } else if (toolName === 'move_to') {
+            return rest ? `You make your way onward.` : `You travel onward.`;
+        } else if (toolName === 'long_rest' || toolName === 'short_rest') {
+            return `The party takes a moment to recover.`;
+        } else if (toolName === 'update_inventory' || toolName === 'adjust_currency') {
+            return `Your belongings shift.`;
+        }
+    }
+    return "";
+}
 
 /** Callbacks for streaming narration events. */
 export interface NarrationStreamCallbacks {

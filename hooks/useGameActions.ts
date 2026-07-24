@@ -67,7 +67,7 @@ function insertToolCallMessages(
 import React, { useCallback, useRef, useEffect } from 'react';
 import { GameState, Message, MessageRole, AppSettings, Character, AppStage } from '../types';
 import { mcpServer } from '../services/mcpService';
-import { runAgentLoop, generateNarration } from '../services/llm';
+import { runAgentLoop, generateNarration, generateNarrationSimple, buildDeterministicNarration } from '../services/llm';
 import { storageService } from '../services/storageService';
 import { speakText, stopSpeaking } from '../services/audioService';
 import { isDebugMode } from '../utils/debug';
@@ -238,6 +238,32 @@ export const useGameActions = (
                     console.error('[Narration] Retry failed:', err instanceof Error ? err.message : String(err));
                 }
             }
+            // Tier-3: minimal-prompt LLM retry at higher temperature. Fires only
+            // when both inline narration and the primary retry produced nothing usable.
+            if (!inlineNarration && sanitizeNarration(finalNarration).length < 25) {
+                try {
+                    const simple = await generateNarrationSimple(historyForAPI, buildContextString(myCharacterId), ctxPrep.frozen);
+                    const cleanSimple = sanitizeNarration(simple.text);
+                    if (cleanSimple.length >= 25) {
+                        finalNarration = cleanSimple;
+                        if (isDebugMode) console.log('[Narration] Simple retry succeeded', { len: finalNarration.length });
+                    } else if (isDebugMode) {
+                        console.log('[Narration] Simple retry produced no usable text');
+                    }
+                } catch (err) {
+                    console.error('[Narration] Simple retry failed:', err instanceof Error ? err.message : String(err));
+                }
+            }
+            // Tier-4: zero-LLM deterministic one-liner derived from the turn's tool
+            // results. Always truthful (no hallucination), so it beats the generic
+            // "The adventure continues..." whenever any tool produced rollData.
+            if (!inlineNarration && sanitizeNarration(finalNarration).length < 25) {
+                const det = buildDeterministicNarration(toolMessages);
+                if (det) {
+                    finalNarration = det;
+                    if (isDebugMode) console.log('[Narration] Using deterministic fallback', { text: det });
+                }
+            }
 
             // Ultimate chokepoint: no LLM-sourced narration reaches the bubble unsanitized,
             // regardless of source (inlineNarration, generateNarration retry, or streaming).
@@ -325,6 +351,27 @@ export const useGameActions = (
                     }
                 } catch (err) {
                     console.error('[Narration] Batch retry failed:', err instanceof Error ? err.message : String(err));
+                }
+            }
+            // Tier-3: minimal-prompt LLM retry.
+            if (!result.inlineNarration && sanitizeNarration(finalNarration).length < 25) {
+                try {
+                    const simple = await generateNarrationSimple(historyForAPI, batchContext, batchCtxPrep.frozen);
+                    const cleanSimple = sanitizeNarration(simple.text);
+                    if (cleanSimple.length >= 25) {
+                        finalNarration = cleanSimple;
+                        if (isDebugMode) console.log('[Narration] Batch simple retry succeeded', { len: finalNarration.length });
+                    }
+                } catch (err) {
+                    console.error('[Narration] Batch simple retry failed:', err instanceof Error ? err.message : String(err));
+                }
+            }
+            // Tier-4: deterministic fallback from tool results.
+            if (!result.inlineNarration && sanitizeNarration(finalNarration).length < 25) {
+                const det = buildDeterministicNarration(result.toolMessages);
+                if (det) {
+                    finalNarration = det;
+                    if (isDebugMode) console.log('[Narration] Batch using deterministic fallback', { text: det });
                 }
             }
 

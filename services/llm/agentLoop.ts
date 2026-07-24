@@ -191,6 +191,11 @@ export async function runAgentLoop(
   let suggestions: string[] | undefined;
   let narrateTurnExecuted = false;
   let correctiveRetries = 0;
+  // Tracks the most recent assistant prose (or reasoning_content fallback) across
+  // iterations. Used as a last-resort source for inlineNarration when the model
+  // emits prose alongside tool calls but no narrate_turn/inline-finalize narration
+  // is captured from the tool results themselves.
+  let lastNarrationCandidate = '';
 
   for (let iter = 0; iter < MAX_ITERS; iter++) {
     itersCompleted = iter + 1;
@@ -243,6 +248,14 @@ export async function runAgentLoop(
     const assistantMsg = data.choices[0].message;
     const rawToolCalls = assistantMsg.tool_calls || [];
     const assistantContent = (assistantMsg.content || '').toString().trim();
+    // Reasoning models (e.g. deepseek-v4-flash) sometimes leave `content` empty and
+    // emit prose in `reasoning_content`. Keep a narration candidate that falls back
+    // to reasoning_content for the inlineNarration capture path, while leaving
+    // `assistantContent` (content-only) untouched so the <tool_call>-markup guard
+    // below doesn't misfire on reasoning text.
+    const reasoningContent = (typeof assistantMsg.reasoning_content === 'string' ? assistantMsg.reasoning_content : '').trim();
+    const narrationCandidate = sanitizeNarration(assistantContent || reasoningContent);
+    if (narrationCandidate.length >= 25) lastNarrationCandidate = narrationCandidate;
 
     if (isDebugMode) {
       console.log(`[Agent Loop] Iter ${iter + 1}: prompt=${promptT} completion=${completionT} cached=${cachedT} tools=${rawToolCalls.length} contentLen=${assistantContent.length} elapsed=${Date.now() - iterStart}ms`);
@@ -377,6 +390,14 @@ export async function runAgentLoop(
         }
       }
 
+      // If no inline narration was captured from the narrate_turn/inline-finalize
+      // tool results, fall back to the assistant prose emitted alongside the tool
+      // calls in this iteration. Previously this prose was silently dropped.
+      if (!inlineNarration && narrationCandidate.length >= 25) {
+        inlineNarration = narrationCandidate;
+        if (isDebugMode) console.log(`[AgentLoop] Narration captured from assistant prose (len=${narrationCandidate.length})`);
+      }
+
       if (isDebugMode && !inlineNarration) {
         console.log('[AgentLoop] Narration empty — diagnostics:', {
           assistantContentLen: assistantContent?.length ?? 0,
@@ -442,6 +463,14 @@ export async function runAgentLoop(
 
 
 
+
+  // Loop exhausted / budget hit / next_turn break without inline narration:
+  // fall back to the most recent assistant prose captured across iterations so
+  // the turn still carries the model's own words rather than the generic fallback.
+  if (!inlineNarration && lastNarrationCandidate.length >= 25) {
+    inlineNarration = lastNarrationCandidate;
+    if (isDebugMode) console.log(`[AgentLoop] Narration captured from lastNarrationCandidate post-loop (len=${lastNarrationCandidate.length})`);
+  }
 
   const gameTimeNow = mcpServer.getFullState().gameTime ?? 0;
   const timeAdvancedThisTurn = narrateTurnExecuted || gameTimeNow > gameTimeAtStart;

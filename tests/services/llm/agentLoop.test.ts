@@ -478,4 +478,58 @@ describe('runAgentLoop', () => {
     // The bubble receives clean prose; the markup never leaks through.
     expect(result.inlineNarration).toBe('The heavy door creaks open. A cold wind rushes in.');
   });
+
+  it('falls back to assistant prose when narrate_turn narration is too short', async () => {
+    // Model emits a rich prose line alongside a narrate_turn whose narration arg
+    // is below the 25-char threshold. The prose must be captured as inlineNarration
+    // instead of dropping to the generic fallback.
+    const PROSE = 'The goblin shrieks as your blade finds its mark, crumpling into a heap of rags.';
+    mockFetch.mockResolvedValueOnce(makeLLMResponse(PROSE, [
+      { name: 'narrate_turn', args: { narration: 'short', timePassed: 0 } },
+    ]));
+
+    const result = await runAgentLoop(
+      [{ id: 'u1', role: MessageRole.USER, text: 'I attack the goblin', timestamp: 0 }],
+      'Tavern',
+      undefined, undefined, undefined,
+      { requestEndNarration: true },
+    );
+
+    expect(result.inlineNarration).toBe(PROSE);
+  });
+
+  it('falls back to reasoning_content when content is empty', async () => {
+    // Reasoning model leaves content empty and emits prose in reasoning_content
+    // alongside a narrate_turn whose narration arg is also empty. The prose must
+    // be captured as inlineNarration from the reasoning_content field.
+    const REASONING = 'A cold draft sweeps through the chamber as the ancient seal breaks apart, dust settling slowly.';
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({
+        choices: [{
+          message: {
+            content: '',
+            reasoning_content: REASONING,
+            tool_calls: [{
+              id: 'call_reasoning_1',
+              type: 'function',
+              function: { name: 'narrate_turn', arguments: JSON.stringify({ narration: '', timePassed: 0 }) },
+            }],
+            role: 'assistant',
+          },
+        }],
+        usage: { prompt_tokens: 50, completion_tokens: 20, prompt_tokens_details: { cached_tokens: 5 } },
+      }),
+    } as unknown as Response);
+
+    const result = await runAgentLoop(
+      [{ id: 'u1', role: MessageRole.USER, text: 'I break the seal', timestamp: 0 }],
+      'Tavern',
+      undefined, undefined, undefined,
+      { requestEndNarration: true },
+    );
+
+    expect(result.inlineNarration).toBe(REASONING);
+  });
 });

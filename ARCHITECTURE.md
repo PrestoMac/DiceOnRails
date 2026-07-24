@@ -348,12 +348,16 @@ The single most important flow to understand. Entry point: `useGameActions.handl
   ├─ 8. Append toolMessages + a placeholder model message
   │
   ├─ 9. resolveNarration(text, toolMessages, inlineNarration, …)
-  │      - If inlineNarration is set: return it as the bubble narration.
-  │      - Else: retry with generateNarration (single LLM request).
-  │        generateNarration output is sanitized inside the function AND
-  │        at the final modelMsg.text chokepoint in handleSendMessage.
-  │      - If retry produces artifact-only text (sanitized to empty) → skip.
-  │      - Falls back to "The adventure continues..."
+  │      - Degenerate stub returning inlineNarration ?? 'The adventure continues...'.
+  │        The actual tiered fallback lives directly in handleSendMessage:
+  │        1. inlineNarration from agent loop (now captures assistant prose +
+  │           reasoning_content emitted alongside tool calls).
+  │        2. generateNarration retry (≥25 chars post-sanitize).
+  │        3. generateNarrationSimple — minimal-prompt LLM retry at temp 0.9.
+  │        4. buildDeterministicNarration — zero-LLM one-liner from rollData.
+  │        → literal "The adventure continues..." only when no tool data exists.
+  │      All LLM outputs are sanitized inside the function AND at the final
+  │      modelMsg.text chokepoint in handleSendMessage.
   │
   ├─ 10. autoSpeak(modelMsg.text) — TTS if settings.autoSpeak
   │

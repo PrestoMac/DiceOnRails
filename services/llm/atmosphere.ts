@@ -196,7 +196,14 @@ Be thorough. Do not omit details. This checkpoint is the sole record of these tu
     const headers = buildChatCompletionHeaders(effProvider, apiKey);
     const effModel = normalizeModelName(model, apiBase);
 
-    try {
+    // Summaries are long-running (~1000 words of dense output). The default 30s
+    // timeout is too short for slower summarizers and surfaces as
+    // "AbortError: signal is aborted without reason". Use a generous timeout and
+    // retry once on AbortError with an even longer leash before giving up.
+    const PRIMARY_TIMEOUT = 120_000;
+    const RETRY_TIMEOUT = 180_000;
+
+    const attempt = async (timeoutMs: number): Promise<string> => {
         const response = await fetchWithTimeout(url, {
             method: "POST",
             headers,
@@ -209,7 +216,7 @@ Be thorough. Do not omit details. This checkpoint is the sole record of these tu
                 temperature: 0.3,
                 max_tokens: 8000
             })
-        });
+        }, timeoutMs);
 
         if (!response.ok) {
             const errData = await safeParseJson<{ error?: { message?: string } }>(response) || {};
@@ -217,18 +224,40 @@ Be thorough. Do not omit details. This checkpoint is the sole record of these tu
         }
 
         const data = await response.json();
-        const checkpoint = data.choices?.[0]?.message?.content || "";
+        // Reasoning models may emit the summary in reasoning_content while leaving
+        // content empty — fall back to it so a successful compression isn't dropped.
+        const msg = data.choices?.[0]?.message || {};
+        const checkpoint = (typeof msg.content === 'string' && msg.content.trim())
+            ? msg.content
+            : (typeof msg.reasoning_content === 'string' ? msg.reasoning_content : "");
         const finishReason = data.choices?.[0]?.finish_reason;
         const outputTokens = data.usage?.completion_tokens ?? estimateTokens(checkpoint);
         if (!checkpoint || checkpoint.trim().length < 100 || finishReason === 'length') {
-            console.warn(`[Context Pipeline] Checkpoint rejected: len=${checkpoint.length} finish=${finishReason}`);
+            console.warn(`[Context Pipeline] Checkpoint rejected: len=${checkpoint.length} finish=${finishReason} contentEmpty=${!msg.content} usedReasoning=${!!(!msg.content && msg.reasoning_content)}`);
             return "";
         }
         console.log(`[Context Pipeline] Checkpoint: ${estimateTokens(rawText)} raw → ${outputTokens} chk`);
         return checkpoint;
+    };
+
+    try {
+        const first = await attempt(PRIMARY_TIMEOUT);
+        return first;
     } catch (e) {
-        console.error("[Context Pipeline] Checkpoint compression failed:", e);
-        return "";
+        const isAbort = e instanceof DOMException && e.name === 'AbortError';
+        if (!isAbort) {
+            console.error("[Context Pipeline] Checkpoint compression failed:", e);
+            return "";
+        }
+        console.warn(`[Context Pipeline] Checkpoint compression timed out after ${PRIMARY_TIMEOUT}ms; retrying once with ${RETRY_TIMEOUT}ms leash`);
+        try {
+            const retried = await attempt(RETRY_TIMEOUT);
+            if (retried) console.log(`[Context Pipeline] Checkpoint compression succeeded on retry (${RETRY_TIMEOUT}ms)`);
+            return retried;
+        } catch (e2) {
+            console.error(`[Context Pipeline] Checkpoint compression failed after retry:`, e2);
+            return "";
+        }
     }
 }
 

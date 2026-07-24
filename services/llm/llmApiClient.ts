@@ -94,6 +94,6 @@ export function mapHistoryToMessages(history: Message[]) {
  */
 export function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = 30000): Promise<Response> {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const timer = setTimeout(() => controller.abort(new Error(`Request timed out after ${timeoutMs}ms`)), timeoutMs);
     return fetch(url, { ...init, signal: controller.signal }).finally(() => clearTimeout(timer));
 }
