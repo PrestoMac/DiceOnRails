@@ -24,7 +24,13 @@ export const tools = [
                 type: 'object',
                 properties: {
                     narration: { type: 'string', description: 'Optional narration of the rest.' },
-                    autoAdvanceTime: { type: 'boolean', description: 'Optional: Set true to advance time without narration.' }
+                    autoAdvanceTime: { type: 'boolean', description: 'Optional: Set true to advance time without narration.' },
+                    suggestions: {
+                        type: 'array',
+                        items: { type: 'string' },
+                        maxItems: 3,
+                        description: 'Optional: 2-3 suggested next actions in first person (e.g. "I search the campsite").'
+                    }
                 }
             }
         }
@@ -39,7 +45,13 @@ export const tools = [
                 properties: {
                     targetId: { type: 'string' },
                     narration: { type: 'string', description: 'Optional narration of the rest.' },
-                    autoAdvanceTime: { type: 'boolean', description: 'Optional: Set true to advance time without narration.' }
+                    autoAdvanceTime: { type: 'boolean', description: 'Optional: Set true to advance time without narration.' },
+                    suggestions: {
+                        type: 'array',
+                        items: { type: 'string' },
+                        maxItems: 3,
+                        description: 'Optional: 2-3 suggested next actions in first person (e.g. "I search the area").'
+                    }
                 },
                 required: []
             }

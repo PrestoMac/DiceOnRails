@@ -671,10 +671,18 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
           narration || `${state.party.map(c => c.name).join(', ')} complete a long rest.`,
           timePassed
         );
+        // IMPORTANT: the narration prose must NOT be appended to `message` — the tool result
+        // becomes a visible [System:long_rest] chat log, which would duplicate the narration
+        // bubble. Narration lives ONLY in data.narration (the agent loop routes it to
+        // inlineNarration). Time-advancement logs (exhaustion, condition expiry, etc.) and the
+        // per-character heal details ARE surfaced here. Mirrors maybeFinalizeTurn.
+        const narrData = narrateResult.data as { logs?: unknown } | undefined;
+        const timeLogs = Array.isArray(narrData?.logs) ? narrData.logs as string[] : [];
+        const baseMessage = messages.join('\n');
         return {
           success: true,
           data: { longRest: true, ...narrateResult.data },
-          message: messages.join('\n') + '\n' + narrateResult.message
+          message: timeLogs.length > 0 ? baseMessage + '\n' + timeLogs.join('\n') : baseMessage
         };
       }
 
@@ -702,10 +710,16 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
           narration || `${state.party.map(c => c.name).join(', ')} take a short rest.`,
           timePassed
         );
+        // IMPORTANT: the narration prose must NOT be appended to `message` — the tool result
+        // becomes a visible [System:short_rest] chat log, which would duplicate the narration
+        // bubble. Narration lives ONLY in data.narration. Time-advancement logs ARE surfaced
+        // here. Mirrors maybeFinalizeTurn.
+        const narrData = narrateResult.data as { logs?: unknown } | undefined;
+        const timeLogs = Array.isArray(narrData?.logs) ? narrData.logs as string[] : [];
         return {
           success: true,
           data: { shortRest: true, ...narrateResult.data },
-          message: resultMsg + '\n' + narrateResult.message
+          message: timeLogs.length > 0 ? resultMsg + '\n' + timeLogs.join('\n') : resultMsg
         };
       }
 

@@ -399,6 +399,21 @@ describe('travelService — long_rest', () => {
 
     expect(char.conditions.some(c => c.id === 'blessed')).toBe(true);
   });
+
+  it('does not duplicate narration in message (only in data.narration)', async () => {
+    const char = makeChar({ name: 'Aria', hp: { current: 10, max: 30 } });
+    state.party.push(char);
+    const narration = 'The party beds down beneath a canopy of ancient oaks as stars wheel overhead.';
+    const result = await service.long_rest(narration, true);
+    expect(result.success).toBe(true);
+    // Narration prose must NOT appear in message (becomes the [System:long_rest] log) —
+    // it lives only in data.narration (routed to the narration bubble).
+    expect(result.message).not.toContain(narration);
+    // Heal details and the narration are both present where expected.
+    expect(result.message).toContain('HP:');
+    expect(result.message).toContain('Aria');
+    expect(String(result.data?.narration)).toContain(narration);
+  });
 });
 
 describe('travelService — short_rest', () => {
@@ -429,5 +444,16 @@ describe('travelService — short_rest', () => {
     state.party.push(makeChar());
     await service.short_rest(undefined, undefined, false);
     expect(state.gameTime).toBe(0);
+  });
+
+  it('does not duplicate narration in message (only in data.narration)', async () => {
+    state.party.push(makeChar({ name: 'Bram' }));
+    const narration = 'Bram leans against a mossy stone, catching his breath after the skirmish.';
+    const result = await service.short_rest(undefined, narration, true);
+    expect(result.success).toBe(true);
+    // Narration prose must NOT appear in message — only in data.narration.
+    expect(result.message).not.toContain(narration);
+    expect(result.message).toContain('Short rest completed');
+    expect(String(result.data?.narration)).toContain(narration);
   });
 });

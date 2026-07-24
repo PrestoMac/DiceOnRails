@@ -228,11 +228,14 @@ describe('progressionTools', () => {
       expect(cd.current).toBe(cd.max);
     });
 
-    it('narration parameter: narration appears in result message', async () => {
+    it('narration parameter: narration lives in data.narration, not message', async () => {
       server.joinParty(makeCharacter());
       const result = await server.short_rest(undefined, 'The party takes a breather...');
       expect(result.success).toBe(true);
-      expect(result.message).toContain('takes a breather');
+      // Narration must NOT be duplicated into message (the [System:short_rest] log) —
+      // it routes to the narration bubble via data.narration only.
+      expect(result.message).not.toContain('takes a breather');
+      expect(String(result.data?.narration)).toContain('takes a breather');
     });
 
     it('autoAdvanceTime parameter: time advances', async () => {
