@@ -17,7 +17,7 @@ function skillRollData(d: Record<string, unknown>, dc: number, label?: string, e
  * @param result - The MCP response from the tool execution.
  * @returns A RollData object if the tool produces roll data, otherwise undefined.
  */
-export function extractRollData(toolName: string, result: MCPResponse): RollData | undefined {
+export function extractRollData(toolName: string, result: MCPResponse): RollData | RollData[] | undefined {
   const d = result.data || {};
   if (toolName === 'roll_dice') {
     const type: RollData['type'] = d.target_ac ? 'attack' : d.isDamageRoll ? 'damage' : 'skill';
@@ -46,6 +46,38 @@ export function extractRollData(toolName: string, result: MCPResponse): RollData
     if (d.healed != null) { return { type: 'skill', dieFace: 'd10', dieRoll: d.healed ?? 0, modifier: 0, total: d.healed ?? 0, label: 'Second Wind', dieCount: 1, results: [d.healed ?? 0] }; }
     if (d.damage?.total != null) { return { type: 'damage', dieFace: 'd6', dieRoll: d.damage.total ?? 0, modifier: 0, total: d.damage.total ?? 0, label: 'Breath Weapon', dc: d.saveDC, dieCount: 1, results: [d.damage.total ?? 0] }; }
     return undefined;
+  } else if (toolName === 'next_turn') {
+    // Engine-resolved enemy attacks (auto-resolved during initiative). Each entry
+    // produces an attack RollData (and, on a hit, a damage RollData) so every
+    // enemy swing surfaces as its own animated card.
+    const attacks = (d as { attackResults?: unknown }).attackResults as Array<Record<string, unknown>> | undefined;
+    if (!Array.isArray(attacks) || attacks.length === 0) return undefined;
+    const out: RollData[] = [];
+    for (const a of attacks) {
+      const roll = Number(a.roll ?? 0);
+      const attackRoll = Number(a.attackRoll ?? 0);
+      const enemyName = String(a.enemy ?? 'Enemy');
+      const targetName = String(a.target ?? 'Hero');
+      out.push({
+        type: 'attack', dieFace: 'd20', dieRoll: roll,
+        modifier: attackRoll - roll, total: attackRoll,
+        dc: a.targetAc as number | undefined, success: a.isHit as boolean | undefined,
+        isCritical: a.isCritical as boolean | undefined, isFumble: a.isFumble as boolean | undefined,
+        dieCount: 1, results: [roll],
+        label: `${enemyName} → ${targetName}`,
+      });
+      if (a.isHit === true) {
+        const dmgResults = a.damageResults as number[] | undefined;
+        const dmgTotal = Number(a.damage ?? 0);
+        out.push({
+          type: 'damage', dieFace: String(a.damageDice ?? 'dmg'), dieRoll: dmgTotal,
+          modifier: 0, total: dmgTotal, success: true,
+          dieCount: dmgResults?.length ?? 1, results: dmgResults ?? [dmgTotal],
+          label: `${enemyName} → ${targetName}`,
+        });
+      }
+    }
+    return out;
   }
   return undefined;
 }

@@ -415,6 +415,25 @@ export async function runAgentLoop(
 
     const nextTurnResult = batchResults.find((r: { mapped: { name: string } }) => r.mapped.name === 'next_turn');
     if (nextTurnResult && nextTurnResult.result.success) {
+      // Combat turns are driven by next_turn, which carries no narration prose of
+      // its own. The engine attaches a deterministic narration summary (built from
+      // the resolved enemy attack results) plus contextual suggestions, so the
+      // fallback "The adventure continues..." and empty suggestion tray never fire
+      // during combat. LLM-provided narration (via narrate_turn) still wins.
+      const ntData = nextTurnResult.result.data as Record<string, unknown> | undefined;
+      if (!inlineNarration) {
+        const ntNarration = String(ntData?.narration ?? '').trim();
+        if (ntNarration.length >= 25) inlineNarration = ntNarration;
+      }
+      if (!suggestions || suggestions.length === 0) {
+        const ntSuggestions = ntData?.suggestions;
+        if (Array.isArray(ntSuggestions)) {
+          suggestions = (ntSuggestions as unknown[])
+            .filter((s: unknown): s is string => typeof s === 'string' && s.trim().length > 0)
+            .map((s: string) => s.slice(0, 80))
+            .slice(0, 3);
+        }
+      }
       break;
     }
   }

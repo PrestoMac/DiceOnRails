@@ -20,6 +20,7 @@ interface ParsedRoll {
 }
 
 const ATTACK_ROLL_RE = /\((\d+)d(\d+)\s+Roll:\s*(\d+)\s*\+\s*Mod:\s*([+-]?\d+)\)/g;
+const ENEMY_ATTACK_RE = /\(Rolled\s*(\d+)\s*vs\s*AC\s*(\d+)\)/g;
 const SKILL_ROLL_RE = /\[Roll:\s*(\d+),\s*Stat Mod:\s*([+-]?\d+),\s*Skill Rank:\s*\+(\d+)\]/;
 const SKILL_RESULT_RE = /(.+?):\s*(SUCCESS|FAILURE)\s*\(Total\s*(\d+)\s*vs\s*DC\s*(\d+)\)/;
 
@@ -69,6 +70,31 @@ function parseRolls(text: string): ParsedRoll[] {
       dc,
       success,
       raw: attackMatch[0],
+    });
+  }
+
+  // Enemy attack text format: "(Rolled N vs AC M)" — defense-in-depth for
+  // prose-only messages that lack structured rollData.
+  let enemyMatch;
+  ENEMY_ATTACK_RE.lastIndex = 0;
+  while ((enemyMatch = ENEMY_ATTACK_RE.exec(text)) !== null) {
+    const [, rollStr, acStr] = enemyMatch;
+    const dieRoll = parseInt(rollStr);
+    const dc = parseInt(acStr);
+    const totalHits = /\bHIT\b/i.test(text);
+    const totalMiss = /\bMISS\b/i.test(text);
+    const isNat20 = dieRoll === 20;
+    const isNat1 = dieRoll === 1;
+    const success = isNat20 || isNat1 ? !isNat1 : totalHits ? true : totalMiss ? false : undefined;
+    rolls.push({
+      type: 'attack',
+      dieFace: 'd20',
+      dieRoll,
+      modifier: 0,
+      total: dieRoll,
+      dc,
+      success,
+      raw: enemyMatch[0],
     });
   }
 
@@ -430,8 +456,8 @@ const ChatLog: React.FC<ChatLogProps> = ({ messages, settings, onRewind, onUndo,
               {msg.role === MessageRole.TOOL && <div className="flex items-center gap-2 mb-1 text-stone-500 uppercase text-[10px] font-bold tracking-widest border-b border-stone-800/50 pb-1"><i className="fas fa-terminal text-emerald-900"></i> System Log</div>}
               <div className="markdown-content text-stone-300 leading-relaxed"><ReactMarkdown>{formatMessageText(cleanedText || msg.text, msg.role)}</ReactMarkdown></div>
           {msg.rollData ? (
-            <div className="mt-2">
-              <DiceRollCard {...msg.rollData} />
+            <div className={`mt-2 ${(Array.isArray(msg.rollData) ? msg.rollData : [msg.rollData]).length > 1 ? 'flex flex-col gap-2' : ''}`}>
+              {(Array.isArray(msg.rollData) ? msg.rollData : [msg.rollData]).map((rd, i) => <DiceRollCard key={i} {...rd} />)}
             </div>
           ) : rolls.length > 0 ? (
             <div className="flex flex-wrap gap-2 mt-1">

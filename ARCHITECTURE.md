@@ -254,7 +254,7 @@ services/llm/
 ├── index.ts              # Re-exports
 ├── agentLoop.ts          # runAgentLoop — the multi-turn tool-use driver
 ├── llmApiClient.ts       # resolveLLMConfig, mapHistoryToMessages, fetchWithTimeout
-├── narration.ts          # generateNarration, generateNarrationStream, generateTightNarration
+├── narration.ts          # generateNarration, generateNarrationStream, extractRollData, formatToolResult
 ├── atmosphere.ts         # generateAtmosphere (image), generateStartingLocations, compressRawToCheckpoint
 ├── contextManager.ts     # Token-budget enforcement + episode-checkpoint pipeline
 ├── tokenEstimation.ts    # Heuristic length→token estimator + budget constants

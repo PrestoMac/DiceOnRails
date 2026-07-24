@@ -7,7 +7,7 @@ import { SPELLS_BY_ID } from '../utils/spells';
  * Function signature for triggering a dice roll animation/overlay in the UI.
  * @param data - The roll data including character name, roll type, result, modifier, and outcome details.
  */
-export type DiceRollFn = (data: { characterName: string; skillName?: string; rollType?: string; label?: string; rollResult: number; modifier: number; skillRank?: number; sides?: number; difficulty?: number; success?: boolean; xpGained?: number; isCritical?: boolean; isFumble?: boolean }) => Promise<void>;
+export type DiceRollFn = (data: { characterName: string; skillName?: string; rollType?: string; label?: string; rollResult: number; modifier: number; skillRank?: number; sides?: number; difficulty?: number; success?: boolean; xpGained?: number; isCritical?: boolean; isFumble?: boolean; count?: number; results?: number[] }) => Promise<void>;
 /** Strips markdown bold (**) and bracketed annotations from a string for TTS. */
 export const cleanSpeak = (t: string) => t.replace(/\*\*/g, '').replace(/\[.*?\]/g, '').trim();
 /** Extracts equipped weapon details, ability modifiers, and proficiency bonus for a character. */
@@ -116,6 +116,43 @@ export async function dispatchToolRolls(toolName: string, args: Record<string, u
         if (d.healed) await onTriggerDiceRoll({ characterName: 'Unknown', rollType: 'damage', label: 'Second Wind', rollResult: d.healed, modifier: 0, sides: 10, success: true });
     } else if (toolName === 'inflict_damage') {
         if (d.concentrationSave) setTimeout(() => onTriggerDiceRoll({ characterName: d.character || 'Character', rollType: 'save', label: 'CON Save (Concentration)', rollResult: d.concentrationSave.d20Roll, modifier: d.concentrationSave.modifier, sides: 20, difficulty: d.concentrationSave.dc, success: d.concentrationSave.success }), 0);
+    } else if (toolName === 'next_turn') {
+        // Engine auto-resolved enemy attacks during initiative. Fire a modal popup
+        // for each enemy swing, staggered (matching the cast_spell rhythm) so they
+        // don't overlap. Fire-and-forget — does not block the agent loop.
+        const attacks = (d.attackResults as Array<Record<string, unknown>>) || [];
+        attacks.forEach((a, i) => {
+            const enemyName = (a.enemy as string) || 'Enemy';
+            const targetName = (a.target as string) || 'Hero';
+            const rollNum = (a.roll as number) || 0;
+            const attackRollNum = (a.attackRoll as number) || 0;
+            const targetAc = (a.targetAc as number) || 0;
+            const base = i * 3500;
+            setTimeout(() => onTriggerDiceRoll({
+                characterName: enemyName, rollType: 'attack',
+                label: `${enemyName}'s Attack vs ${targetName}`,
+                rollResult: rollNum, modifier: attackRollNum - rollNum,
+                sides: 20, difficulty: targetAc,
+                success: a.isHit as boolean | undefined,
+                isCritical: a.isCritical as boolean | undefined,
+                isFumble: a.isFumble as boolean | undefined,
+            }), base);
+            if (a.isHit === true) {
+                const dmgResults = (a.damageResults as number[]) || [];
+                const dmgTotal = (a.damage as number) || 0;
+                const dm = String(a.damageDice || '').match(/(\d+)d(\d+)/);
+                const sides = dm ? parseInt(dm[2], 10) : 6;
+                const rollResult = dmgResults.length > 0 ? dmgResults.reduce((x, y) => x + y, 0) : dmgTotal;
+                const modifier = dmgTotal - rollResult;
+                setTimeout(() => onTriggerDiceRoll({
+                    characterName: enemyName, rollType: 'damage',
+                    label: `${enemyName} damage to ${targetName}`,
+                    rollResult, modifier, sides,
+                    count: dmgResults.length || 1, results: dmgResults.length > 0 ? dmgResults : [dmgTotal],
+                    success: true,
+                }), base + 3400);
+            }
+        });
     } else if (toolName === 'start_combat') {
         for (const e of (d.combat as Record<string, unknown>).initiative.filter((e: { type: string }) => e.type === 'player')) await onTriggerDiceRoll({ characterName: e.name, rollType: 'initiative', label: 'Initiative', rollResult: e.rawRoll, modifier: e.modifier, difficulty: undefined, success: true, sides: 20, isCritical: e.rawRoll === 20, isFumble: e.rawRoll === 1 });
     }

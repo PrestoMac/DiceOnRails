@@ -42,6 +42,59 @@ export interface CombatService {
   initializeDeathSaves(character: Character): void;
 }
 
+/**
+ * Builds deterministic, zero-hallucination narration prose summarising enemy
+ * actions from their resolved attack results. Returns an empty string when no
+ * attacks were resolved (so the caller/fallback can decide what to show).
+ */
+function buildEnemyActionNarration(attackResults: Record<string, unknown>[]): string {
+  if (!attackResults || attackResults.length === 0) return '';
+  const parts: string[] = [];
+  for (const ar of attackResults) {
+    const enemy = String(ar.enemy ?? 'An enemy');
+    const target = String(ar.target ?? 'a hero');
+    if (ar.isFumble === true) {
+      parts.push(`${enemy} fumbles its attack against ${target}`);
+    } else if (ar.isHit === true) {
+      const crit = ar.isCritical === true ? ' with a critical blow' : '';
+      const dmg = Number(ar.damage ?? 0);
+      parts.push(`${enemy} strikes ${target}${crit}, dealing ${dmg} damage`);
+    } else {
+      parts.push(`${enemy} swings at ${target} and misses`);
+    }
+  }
+  let text = parts.join('; ') + '.';
+  text = text.charAt(0).toUpperCase() + text.slice(1);
+  return text;
+}
+
+/**
+ * Builds contextual combat suggestions from the live party/enemy state.
+ * Used so the suggestion tray is populated during engine-driven enemy turns.
+ */
+function buildCombatSuggestions(state: GameState): string[] {
+  const suggestions: string[] = [];
+  const aliveParty = state.party.filter(c => c.hp.current > 0);
+  const wounded = aliveParty
+    .filter(c => c.hp.current < c.hp.max * 0.5)
+    .sort((a, b) => (a.hp.current / a.hp.max) - (b.hp.current / b.hp.max));
+  if (wounded.length > 0) {
+    suggestions.push(`Heal ${wounded[0].name}`);
+  }
+  const aliveEnemies = state.combat?.enemies.filter(e => !e.isDead) ?? [];
+  if (aliveEnemies.length > 0) {
+    suggestions.push(`Attack the ${aliveEnemies[0].name}`);
+  }
+  const caster = aliveParty.find(c => {
+    const slots = c.resources?.filter(r => r.type === 'spellSlot');
+    return slots?.some(s => s.current > 0);
+  });
+  if (caster) {
+    suggestions.push(`Cast a spell with ${caster.name}`);
+  }
+  return suggestions.slice(0, 3);
+}
+
 /** Clears combat-only conditions (duration == null) from a target, preserving minute/permanent durations. Returns the ids removed. */
 function clearEndOfCombatConditions(target: Character | Enemy): string[] {
   if (!target.conditions || target.conditions.length === 0) return [];
@@ -459,9 +512,11 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
         if (autoResolveEnemies && combat.initiative[0]?.type === 'enemy') {
           const result = await this.resolveAllPendingEnemyTurns();
           const expiryText = expiryMessages.length > 0 ? '\n\n' + expiryMessages.join('\n') : '';
+          const narration = buildEnemyActionNarration(result.attackResults);
+          const suggestions = buildCombatSuggestions(state);
           return {
             success: true,
-            data: { combat: state.combat, newRound: true, ...result },
+            data: { combat: state.combat, newRound: true, narration, suggestions, ...result },
             message: `--- Round ${combat.round} ---\n**${combat.initiative[0].name} starts the round!**${expiryText}\n\n` + result.messages.join('\n')
           };
         }
@@ -488,9 +543,11 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
 
       if (autoResolveEnemies && combat.initiative[combat.turnIndex]?.type === 'enemy') {
         const result = await this.resolveAllPendingEnemyTurns();
+        const narration = buildEnemyActionNarration(result.attackResults);
+        const suggestions = buildCombatSuggestions(state);
         return {
           success: true,
-          data: { combat: state.combat, ...result },
+          data: { combat: state.combat, narration, suggestions, ...result },
           message: result.messages.join('\n')
         };
       }

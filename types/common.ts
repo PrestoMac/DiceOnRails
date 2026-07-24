@@ -73,7 +73,7 @@ export interface Message {
   timestamp: number;
   isToolCall?: boolean;
   toolCallId?: string;
-  rollData?: RollData;
+  rollData?: RollData | RollData[];
   toolCalls?: Array<{ id: string; name: string; arguments: string }>;
 }
 

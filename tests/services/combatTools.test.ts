@@ -453,6 +453,78 @@ describe('combatTools', () => {
     });
   });
 
+  describe('next_turn enemy narration, suggestions & rollData', () => {
+    function loadEnemyTurnCombat(playerHp = { current: 50, max: 50 }) {
+      server.loadState({
+        party: [makeCharacter({ hp: playerHp })],
+        worldDescription: 't', sessionLogs: [], quests: [], lore: [], actionQueue: [],
+        combat: {
+          isActive: true, round: 1, turnIndex: 0,
+          initiative: [
+            { id: 'hero-1', name: 'Valerius', initiative: 18, type: 'player', isDead: false, hasActedThisTurn: true },
+            { id: 'gob-1', name: 'Goblin', initiative: 10, type: 'enemy', isDead: false, hasActedThisTurn: false },
+          ],
+          enemies: [{
+            id: 'gob-1', name: 'Goblin', ac: 12, hp: { current: 7, max: 7 },
+            attacks: [{ name: 'Scimitar', toHit: 4, damageDice: '1d6+2', damageType: 'slashing' }],
+            isDead: false,
+          }],
+        },
+      });
+    }
+
+    it('next_turn result carries engine narration, suggestions and attackResults', async () => {
+      mockRoll(15); // goblin to-hit 15+4=19 vs AC 18 -> HIT; damage 15+2=17
+      loadEnemyTurnCombat();
+      const result = await server.next_turn();
+      expect(result.success).toBe(true);
+      const d = result.data as Record<string, unknown>;
+      expect(typeof d.narration).toBe('string');
+      expect((d.narration as string).length).toBeGreaterThan(0);
+      expect((d.narration as string).toLowerCase()).toContain('goblin');
+      expect(Array.isArray(d.suggestions)).toBe(true);
+      expect((d.suggestions as string[]).length).toBeGreaterThan(0);
+      expect(Array.isArray(d.attackResults)).toBe(true);
+      expect((d.attackResults as unknown[]).length).toBeGreaterThan(0);
+    });
+
+    it('extractRollData(next_turn) returns attack + damage cards array', async () => {
+      mockRoll(15);
+      loadEnemyTurnCombat();
+      const result = await server.next_turn();
+      const rollData = extractRollData('next_turn', result);
+      expect(Array.isArray(rollData)).toBe(true);
+      const cards = rollData as import('../../types').RollData[];
+      const attackCard = cards.find(c => c.type === 'attack');
+      expect(attackCard).toBeDefined();
+      expect(attackCard?.dieFace).toBe('d20');
+      expect(attackCard?.dieRoll).toBe(15);
+      expect(attackCard?.success).toBe(true);
+      const damageCard = cards.find(c => c.type === 'damage');
+      expect(damageCard).toBeDefined();
+      expect(damageCard?.total).toBe(17);
+    });
+
+    it('extractRollData(next_turn) returns undefined when no enemies acted', async () => {
+      // Player-to-player advance: no attackResults
+      server.loadState({
+        party: [makeCharacter()],
+        worldDescription: 't', sessionLogs: [], quests: [], lore: [], actionQueue: [],
+        combat: {
+          isActive: true, round: 1, turnIndex: 0,
+          initiative: [
+            { id: 'hero-1', name: 'Valerius', initiative: 18, type: 'player', isDead: false, hasActedThisTurn: true },
+            { id: 'hero-2', name: 'Lyra', initiative: 10, type: 'player', isDead: false, hasActedThisTurn: false },
+          ],
+          enemies: [],
+        },
+      });
+      const result = await server.next_turn();
+      const rollData = extractRollData('next_turn', result);
+      expect(rollData).toBeUndefined();
+    });
+  });
+
   describe('integration chains', () => {
     it('cast_spell deals damage to enemies via inflict_damage', async () => {
       mockRoll(15);
