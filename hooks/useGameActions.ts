@@ -102,6 +102,7 @@ import {
 } from './gameActionHelpers';
 import { syncFinishedState as syncStateHelper, prepareContext as prepContext,
   runContextPipeline as runPipeline } from '../services/llm/contextManager';
+import { buildSessionId } from '../services/llmClient';
 
 const FREEZE_INTERVAL = 5;
 const ACTIVE_MSG_WINDOW = 20;
@@ -122,6 +123,10 @@ export const useGameActions = (
     const processingRef = useRef(false);
     const messagesRef = useRef<Message[]>(messages);
     messagesRef.current = messages;
+    // Stable session ID for OpenRouter sticky routing. Derived once per campaign so
+    // all LLM calls (agent loop, narration, compression) hit the same provider
+    // endpoint, keeping the KV prompt cache warm across turns.
+    const sessionId = buildSessionId(currentCampaignId);
     const ctxRef = useRef({
         episodeCheckpoints: [] as string[], frozenRawHistory: '' as string,
         frozenRawTokens: 0, frozenMessageCount: 0, turnCounter: 0,
@@ -174,7 +179,7 @@ export const useGameActions = (
         }
     };
 
-    const runPipeline_ = () => runPipeline(ctxRef.current, FREEZE_INTERVAL, messagesRef.current, ACTIVE_MSG_WINDOW);
+    const runPipeline_ = () => runPipeline(ctxRef.current, FREEZE_INTERVAL, messagesRef.current, ACTIVE_MSG_WINDOW, sessionId);
 
     const resolveNarration = async (
         _userText: string, _toolMessages: Message[], inlineNarration: string | undefined,
@@ -230,7 +235,7 @@ export const useGameActions = (
                     async (toolName, args, toolResult) => {
                         await dispatchToolRolls(toolName, args, toolResult, onTriggerDiceRoll, currentState, myCharacterId);
                         if (toolName === 'move_to' && settings.enableAtmosphere) performAtmosphereUpdate(args.location_name as string, args.description as string | undefined, settings);
-                    }, undefined, { requestEndNarration: true, enableSuggestions: !!settings.enableSuggestions });
+                    }, undefined, { requestEndNarration: true, enableSuggestions: !!settings.enableSuggestions, sessionId });
                 mcpServer.commitTransaction();
                 toolMessages = result.toolMessages;
                 inlineNarration = result.inlineNarration;
@@ -248,7 +253,7 @@ export const useGameActions = (
             if (!inlineNarration) {
                 console.warn('[Narration] No inline narration from agent loop. Retrying with generateNarration...', { toolCount: toolMessages.length, inlineNarration });
                 try {
-                    const retry = await withNarrationRetryTimeout(generateNarration(historyForAPI, buildContextString(myCharacterId), ctxPrep.frozen));
+                    const retry = await withNarrationRetryTimeout(generateNarration(historyForAPI, buildContextString(myCharacterId), ctxPrep.frozen, undefined, sessionId));
                     const retryText = retry?.text ?? '';
                     const cleanRetry = sanitizeNarration(retryText);
                     if (cleanRetry.length >= 25) {
@@ -265,7 +270,7 @@ export const useGameActions = (
             // when both inline narration and the primary retry produced nothing usable.
             if (!inlineNarration && sanitizeNarration(finalNarration).length < 25) {
                 try {
-                    const simple = await withNarrationRetryTimeout(generateNarrationSimple(historyForAPI, buildContextString(myCharacterId), ctxPrep.frozen));
+                    const simple = await withNarrationRetryTimeout(generateNarrationSimple(historyForAPI, buildContextString(myCharacterId), ctxPrep.frozen, undefined, sessionId));
                     const simpleText = simple?.text ?? '';
                     const cleanSimple = sanitizeNarration(simpleText);
                     if (cleanSimple.length >= 25) {
@@ -351,7 +356,7 @@ export const useGameActions = (
             const batchCtxPrep = prepContext(ctxRef.current, batchAllMessages, batchContext);
             const historyForAPI = batchCtxPrep.activeMessages;
             if (isDebugMode) console.log('[handleExecuteBatch] calling runAgentLoop', { historyLen: historyForAPI.length, queueSize: gameState.actionQueue?.length });
-            const result = await runAgentLoop(historyForAPI, batchContext, batchCtxPrep.frozen, undefined, undefined, { requestEndNarration: true });
+            const result = await runAgentLoop(historyForAPI, batchContext, batchCtxPrep.frozen, undefined, undefined, { requestEndNarration: true, sessionId });
             mcpServer.commitTransaction();
 
             const streamingId = `model-${Date.now()}`;
@@ -365,7 +370,7 @@ export const useGameActions = (
             if (!result.inlineNarration) {
                 console.warn('[Narration] No inline narration from batch agent loop. Retrying with generateNarration...', { toolCount: result.toolMessages.length, inlineNarration: result.inlineNarration });
                 try {
-                    const retry = await generateNarration(historyForAPI, batchContext, batchCtxPrep.frozen);
+                    const retry = await generateNarration(historyForAPI, batchContext, batchCtxPrep.frozen, undefined, sessionId);
                     const cleanRetry = sanitizeNarration(retry.text);
                     if (cleanRetry.length >= 25) {
                         finalNarration = cleanRetry;
@@ -380,7 +385,7 @@ export const useGameActions = (
             // Tier-3: minimal-prompt LLM retry.
             if (!result.inlineNarration && sanitizeNarration(finalNarration).length < 25) {
                 try {
-                    const simple = await generateNarrationSimple(historyForAPI, batchContext, batchCtxPrep.frozen);
+                    const simple = await generateNarrationSimple(historyForAPI, batchContext, batchCtxPrep.frozen, undefined, sessionId);
                     const cleanSimple = sanitizeNarration(simple.text);
                     if (cleanSimple.length >= 25) {
                         finalNarration = cleanSimple;

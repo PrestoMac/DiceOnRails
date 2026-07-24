@@ -138,10 +138,11 @@ export function formatToolResult(toolName: string, result: MCPResponse): string 
  * @param context - A string describing the current game state context.
  * @param frozenMessages - Optional frozen/pinned messages to include.
  * @param providerConfig - Optional LLM provider configuration override.
+ * @param sessionId - Optional OpenRouter sticky routing session ID for prompt caching.
  * @returns An object containing the narration text.
  */
-export const generateNarration = async (history: Message[], context: string, frozenMessages?: { role: 'user' | 'system'; content: string }[], providerConfig?: { provider: LLMProvider; apiKey: string; apiBase?: string }): Promise<{ text: string }> => {
-    const { apiKey: finalApiKey, model, apiUrl, apiHeaders } = resolveLLMConfig(providerConfig);
+export const generateNarration = async (history: Message[], context: string, frozenMessages?: { role: 'user' | 'system'; content: string }[], providerConfig?: { provider: LLMProvider; apiKey: string; apiBase?: string }, sessionId?: string): Promise<{ text: string }> => {
+    const { apiKey: finalApiKey, model, apiUrl, apiHeaders } = resolveLLMConfig(providerConfig, sessionId);
     if (!finalApiKey) {
         if (isDebugMode) console.error('[Narration] No API key - returning error text');
         return { text: "The mystical energies of the world are fading. (Error: No API key found. Please check your environment variables.)" };
@@ -151,13 +152,14 @@ export const generateNarration = async (history: Message[], context: string, fro
     const systemMessage = { role: "system" as const, content: `${SYSTEM_INSTRUCTION}\n\n${PROGRESSION_SYSTEM_PROMPT}` };
     const contextMessage = { role: "user" as const, content: `[Dungeon State Context: ${context}]` };
     const modeMessage = { role: "user" as const, content: narrationInstruction };
-    const payload = { model, messages: [systemMessage, ...(frozenMessages || []), ...messages, contextMessage, modeMessage], temperature: 0.7 };
-    if (isDebugMode) console.log('[Narration] generateNarration request', { model, messageCount: payload.messages.length, contextLen: context.length, url: apiUrl });
+    const payloadBase: Record<string, unknown> = { model, messages: [systemMessage, ...(frozenMessages || []), ...messages, contextMessage, modeMessage], temperature: 0.7 };
+    if (sessionId) payloadBase.session_id = sessionId;
+    if (isDebugMode) console.log('[Narration] generateNarration request', { model, messageCount: (payloadBase.messages as unknown[]).length, contextLen: context.length, url: apiUrl, sessionId });
     const narrationStart = Date.now();
     const fetchController = new AbortController();
     const fetchTimer = setTimeout(() => fetchController.abort(), 60_000);
     try {
-        const response = await fetch(apiUrl, { method: "POST", headers: apiHeaders, body: JSON.stringify(payload), signal: fetchController.signal });
+        const response = await fetch(apiUrl, { method: "POST", headers: apiHeaders, body: JSON.stringify(payloadBase), signal: fetchController.signal });
         // NOTE: the abort timer is NOT cleared here — it must stay armed through
         // response.json() below. A gateway that sends headers then stalls on the
         // body would otherwise hang response.json() forever (no timeout), pinning
@@ -188,10 +190,11 @@ export const generateNarration = async (history: Message[], context: string, fro
  * @param context - A string describing the current game state context.
  * @param frozenMessages - Optional frozen/pinned messages to include.
  * @param providerConfig - Optional LLM provider configuration override.
+ * @param sessionId - Optional OpenRouter sticky routing session ID for prompt caching.
  * @returns An object containing the narration text.
  */
-export const generateNarrationSimple = async (history: Message[], context: string, frozenMessages?: { role: 'user' | 'system'; content: string }[], providerConfig?: { provider: LLMProvider; apiKey: string; apiBase?: string }): Promise<{ text: string }> => {
-    const { apiKey: finalApiKey, model, apiUrl, apiHeaders } = resolveLLMConfig(providerConfig);
+export const generateNarrationSimple = async (history: Message[], context: string, frozenMessages?: { role: 'user' | 'system'; content: string }[], providerConfig?: { provider: LLMProvider; apiKey: string; apiBase?: string }, sessionId?: string): Promise<{ text: string }> => {
+    const { apiKey: finalApiKey, model, apiUrl, apiHeaders } = resolveLLMConfig(providerConfig, sessionId);
     if (!finalApiKey) {
         if (isDebugMode) console.error('[Narration] generateNarrationSimple: No API key');
         return { text: "" };
@@ -199,12 +202,13 @@ export const generateNarrationSimple = async (history: Message[], context: strin
     const messages = mapHistoryToMessages(history);
     const systemMessage = { role: "system" as const, content: "You are the narrator of a fantasy RPG. Narrate the most recent action in one or two vivid sentences. Plain prose only. Do NOT call any tools. Do NOT use markdown. Respond in English." };
     const contextMessage = { role: "user" as const, content: `[Dungeon State Context: ${context}]` };
-    const payload = { model, messages: [systemMessage, ...(frozenMessages || []), ...messages, contextMessage], temperature: 0.9 };
-    if (isDebugMode) console.log('[Narration] generateNarrationSimple request', { model, messageCount: payload.messages.length });
+    const payloadBase: Record<string, unknown> = { model, messages: [systemMessage, ...(frozenMessages || []), ...messages, contextMessage], temperature: 0.9 };
+    if (sessionId) payloadBase.session_id = sessionId;
+    if (isDebugMode) console.log('[Narration] generateNarrationSimple request', { model, messageCount: (payloadBase.messages as unknown[]).length });
     const fetchController = new AbortController();
     const fetchTimer = setTimeout(() => fetchController.abort(new Error('generateNarrationSimple timed out after 60s')), 60_000);
     try {
-        const response = await fetch(apiUrl, { method: "POST", headers: apiHeaders, body: JSON.stringify(payload), signal: fetchController.signal });
+        const response = await fetch(apiUrl, { method: "POST", headers: apiHeaders, body: JSON.stringify(payloadBase), signal: fetchController.signal });
         if (!response.ok) { const errMsg = `LLM request failed: ${response.status}`; const errData = await safeParseJson<{ error?: { message?: string } }>(response); if (errData?.error?.message) throw new Error(errData.error.message); throw new Error(errMsg); }
         const data = await response.json();
         const msg = data.choices[0].message;

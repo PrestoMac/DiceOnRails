@@ -93,13 +93,15 @@ Make each location feel distinct in architecture, atmosphere, and implied region
  * @param apiKey - The LLM API key.
  * @param provider - Optional LLM provider type.
  * @param apiBase - Optional custom API base URL.
+ * @param sessionId - Optional OpenRouter sticky routing session ID for prompt caching.
  * @returns An array of up to 4 StartingLocation objects.
  */
 export async function generateStartingLocations(
   character: { name: string; race: string; class: string },
   apiKey: string,
   provider?: LLMProvider,
-  apiBase?: string
+  apiBase?: string,
+  sessionId?: string
 ): Promise<StartingLocation[]> {
   const effProvider = resolveProvider(provider, apiBase);
   const url = buildChatCompletionUrl(effProvider, apiBase);
@@ -111,16 +113,19 @@ export async function generateStartingLocations(
     { role: 'user' as const, content: `Generate 4 starting locations for a ${character.race} ${character.class} named ${character.name}.` }
   ];
 
+  const requestBody: Record<string, unknown> = {
+    model,
+    messages,
+    temperature: 1.0,
+    max_tokens: 8000
+  };
+  if (sessionId) requestBody.session_id = sessionId;
+
   try {
     const response = await fetchWithTimeout(url, {
       method: "POST",
       headers,
-      body: JSON.stringify({
-        model,
-        messages,
-        temperature: 1.0,
-        max_tokens: 8000
-      })
+      body: JSON.stringify(requestBody)
     });
 
     if (!response.ok) {
@@ -162,6 +167,7 @@ export async function generateStartingLocations(
  * @param model - The model name to use for compression.
  * @param provider - Optional LLM provider type.
  * @param apiBase - Optional custom API base URL.
+ * @param sessionId - Optional OpenRouter sticky routing session ID for prompt caching.
  * @returns The compressed checkpoint string, or an empty string on failure.
  */
 export async function compressRawToCheckpoint(
@@ -169,7 +175,8 @@ export async function compressRawToCheckpoint(
     apiKey: string,
     model: string,
     provider?: LLMProvider,
-    apiBase?: string
+    apiBase?: string,
+    sessionId?: string
 ): Promise<string> {
     const systemPrompt = `You are a game record archivist. Summarize the following RPG session events into a dense, factual episode checkpoint.
 
@@ -204,18 +211,22 @@ Be thorough. Do not omit details. This checkpoint is the sole record of these tu
     const RETRY_TIMEOUT = 180_000;
 
     const attempt = async (timeoutMs: number): Promise<string> => {
+        const requestBody: Record<string, unknown> = {
+            model: effModel,
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: rawText }
+            ],
+            temperature: 0.3,
+            max_tokens: 8000
+        };
+        // Sticky routing: pin compression calls to the same provider endpoint so
+        // the long archivist system prompt is cached on repeated compressions.
+        if (sessionId) requestBody.session_id = sessionId;
         const response = await fetchWithTimeout(url, {
             method: "POST",
             headers,
-            body: JSON.stringify({
-                model: effModel,
-                messages: [
-                    { role: "system", content: systemPrompt },
-                    { role: "user", content: rawText }
-                ],
-                temperature: 0.3,
-                max_tokens: 8000
-            })
+            body: JSON.stringify(requestBody)
         }, timeoutMs);
 
         if (!response.ok) {

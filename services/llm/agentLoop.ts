@@ -71,7 +71,7 @@ export async function runAgentLoop(
   frozenMessages?: { role: 'user' | 'system'; content: string }[],
   onToolResult?: (toolName: string, args: Record<string, unknown>, result: MCPResponse) => void,
   providerConfig?: { provider: LLMProvider; apiKey: string; apiBase?: string },
-  options?: { requestEndNarration?: boolean; maxIters?: number; signal?: AbortSignal; enableSuggestions?: boolean }
+  options?: { requestEndNarration?: boolean; maxIters?: number; signal?: AbortSignal; enableSuggestions?: boolean; sessionId?: string }
 ): Promise<{
   toolMessages: Message[];
   iterationCount: number;
@@ -81,7 +81,7 @@ export async function runAgentLoop(
   inlineNarration?: string;
   suggestions?: string[];
 }> {
-  const { model, apiUrl, apiHeaders } = resolveLLMConfig(providerConfig);
+  const { model, apiUrl, apiHeaders, sessionId } = resolveLLMConfig(providerConfig, options?.sessionId);
   if (isDebugMode) {
     console.log('[AgentLoop] runAgentLoop entry', {
       historyLen: history.length,
@@ -209,6 +209,9 @@ export async function runAgentLoop(
       }
     }
     const body: Record<string, unknown> = { model, messages, temperature: 0.7, tools: filteredTools, tool_choice: "auto", ...(thinkingBody || {}) };
+    // Inject session_id for OpenRouter sticky routing — pins this turn to the same
+    // provider endpoint as previous turns, keeping the KV prompt cache warm.
+    if (sessionId) body.session_id = sessionId;
     if (isDebugMode) console.log(`[AgentLoop] Iter ${iter + 1}/${MAX_ITERS} starting, messageCount=${messages.length}`, { bodyKeys: Object.keys(body), hasThinking: !!thinkingBody, model, toolCount: filteredTools.length });
 
     const fetchController = new AbortController();
@@ -244,6 +247,10 @@ export async function runAgentLoop(
     totalPrompt += promptT;
     totalCompletion += completionT;
     totalCached += cachedT;
+    if (isDebugMode && promptT > 0) {
+      const hitPct = ((cachedT / promptT) * 100).toFixed(1);
+      console.log(`[AgentLoop] Cache: iter=${iter + 1} cached=${cachedT}/${promptT} tokens (${hitPct}% hit rate)${sessionId ? ` session=${sessionId.slice(0, 24)}...` : ''}`);
+    }
 
     const assistantMsg = data.choices[0].message;
     const rawToolCalls = assistantMsg.tool_calls || [];

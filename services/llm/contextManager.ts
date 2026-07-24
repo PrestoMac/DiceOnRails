@@ -143,8 +143,9 @@ export function freezeMessages(ctx: ContextState, allMessages: Message[], aw: nu
 /**
  * Triggers checkpoint compression if the frozen raw history exceeds the token cap and no compression is already in progress.
  * @param ctx - The current context state (mutated in place).
+ * @param sessionId - Optional OpenRouter sticky routing session ID for prompt caching.
  */
-export function compressToCheckpointIfNeeded(ctx: ContextState): void {
+export function compressToCheckpointIfNeeded(ctx: ContextState, sessionId?: string): void {
     if (ctx.isCompressing || (ctx.frozenRawTokens < RAW_CAP && ctx.episodeCheckpoints.length > 0) || !ctx.frozenRawHistory) return;
     if (ctx.frozenRawTokens < 1000 && ctx.episodeCheckpoints.length === 0) return;
     ctx.isCompressing = true;
@@ -152,7 +153,7 @@ export function compressToCheckpointIfNeeded(ctx: ContextState): void {
     const gen = ctx.generation;
     ctx.compressPromise = (async () => {
         try {
-            const cp = await compressRawToCheckpoint(snapshot, getEnv('VITE_LLM_API_KEY'), getEnv('VITE_SUMMARIZATION_MODEL') || 'xiaomi/mimo-v2.5');
+            const cp = await compressRawToCheckpoint(snapshot, getEnv('VITE_LLM_API_KEY'), getEnv('VITE_SUMMARIZATION_MODEL') || 'xiaomi/mimo-v2.5', undefined, undefined, sessionId);
             if (cp && ctx.generation === gen) {
                 ctx.episodeCheckpoints.push(cp);
                 ctx.frozenRawHistory = '';
@@ -170,11 +171,12 @@ export function compressToCheckpointIfNeeded(ctx: ContextState): void {
  * @param fi - Freeze interval (number of turns between freeze operations).
  * @param am - The full list of active messages.
  * @param aw - The active window size.
+ * @param sessionId - Optional OpenRouter sticky routing session ID for prompt caching during compression.
  */
-export function runContextPipeline(ctx: ContextState, fi: number, am: Message[], aw: number): void {
+export function runContextPipeline(ctx: ContextState, fi: number, am: Message[], aw: number, sessionId?: string): void {
     ctx.turnCounter++;
     if (ctx.turnCounter >= fi) freezeMessages(ctx, am, aw);
-    compressToCheckpointIfNeeded(ctx);
+    compressToCheckpointIfNeeded(ctx, sessionId);
 }
 
 /**

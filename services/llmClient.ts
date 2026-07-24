@@ -76,3 +76,36 @@ export function resolveRequestModel(model: string, apiBase?: string): string {
     if (isDebugMode) console.log('[LLM Client] resolveRequestModel', { model, apiBase, envVar: getEnv("VITE_LLM_API_BASE"), baseUsed: base, result });
     return result;
 }
+
+/**
+ * Builds a stable session ID for OpenRouter's sticky routing feature.
+ *
+ * Sticky routing pins all requests within a logical session to the same provider
+ * endpoint, ensuring the provider-side KV prompt cache stays warm across turns.
+ * Without this, OpenRouter may load-balance each request to a different provider
+ * instance, causing a cold cache miss every turn even for identical prefixes.
+ *
+ * For named campaigns the campaign ID is used directly. For anonymous local play
+ * a random ID is generated once and persisted in localStorage for the browser
+ * session so repeated turns within the same tab still benefit from caching.
+ *
+ * @param campaignId - The current campaign ID, or undefined for anonymous sessions.
+ * @returns A session ID string ≤ 256 chars (OpenRouter's max).
+ */
+export function buildSessionId(campaignId?: string): string {
+    const ANON_KEY = 'dor_anon_session_id';
+    if (!campaignId || campaignId === 'anonymous') {
+        try {
+            const existing = typeof localStorage !== 'undefined' ? localStorage.getItem(ANON_KEY) : null;
+            if (existing) return existing;
+            // Generate a simple random ID without crypto dependency
+            const id = `anon-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+            if (typeof localStorage !== 'undefined') localStorage.setItem(ANON_KEY, id);
+            return id;
+        } catch {
+            return `anon-${Date.now()}`;
+        }
+    }
+    // Named campaign: use campaign ID as-is (UUIDs are ~36 chars, well under limit)
+    return `campaign-${campaignId}`.slice(0, 256);
+}

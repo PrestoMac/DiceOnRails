@@ -1,14 +1,15 @@
 import { Message, MessageRole, LLMProvider } from '../../types';
 import { getEnv } from '../../utils/envHelper';
 import { isDebugMode } from '../../utils/debug';
-import { buildChatCompletionUrl, buildChatCompletionHeaders, resolveProvider, normalizeModelName } from '../llmClient';
+import { buildChatCompletionUrl, buildChatCompletionHeaders, resolveProvider, normalizeModelName, buildSessionId } from '../llmClient';
 
 /**
  * Resolves the LLM configuration from an optional provider config or environment variables.
  * @param providerConfig - Optional provider configuration override.
- * @returns An object containing apiKey, model, apiUrl, and apiHeaders.
+ * @param campaignId - Optional campaign ID used to generate a sticky routing session ID for prompt caching.
+ * @returns An object containing apiKey, model, apiUrl, apiHeaders, and sessionId.
  */
-export function resolveLLMConfig(providerConfig?: { provider: LLMProvider; apiKey: string; apiBase?: string }) {
+export function resolveLLMConfig(providerConfig?: { provider: LLMProvider; apiKey: string; apiBase?: string }, campaignId?: string) {
     const apiKey = providerConfig?.apiKey || getEnv("VITE_LLM_API_KEY");
     const apiBase = providerConfig?.apiBase;
     const provider = resolveProvider(providerConfig?.provider, apiBase);
@@ -16,11 +17,15 @@ export function resolveLLMConfig(providerConfig?: { provider: LLMProvider; apiKe
     const model = normalizeModelName(rawModel, apiBase);
     const apiUrl = buildChatCompletionUrl(provider, apiBase);
     const apiHeaders = buildChatCompletionHeaders(provider, apiKey);
+    // Generate a session ID for OpenRouter sticky routing so all turns in a campaign
+    // hit the same provider endpoint, keeping the provider-side KV cache warm.
+    // For non-OpenRouter providers the field is ignored harmlessly.
+    const sessionId = provider === 'openrouter' ? buildSessionId(campaignId) : undefined;
     if (isDebugMode) {
         const safe = { ...apiHeaders, Authorization: apiHeaders.Authorization ? `Bearer ${apiHeaders.Authorization.slice(0, 16)}...` : 'MISSING' };
-        console.log('[LLMApiClient] resolveLLMConfig', { provider, rawModel, model, apiUrl, headers: safe, hasApiKey: !!apiKey, hasApiBase: !!apiBase });
+        console.log('[LLMApiClient] resolveLLMConfig', { provider, rawModel, model, apiUrl, headers: safe, hasApiKey: !!apiKey, hasApiBase: !!apiBase, sessionId });
     }
-    return { apiKey, model, apiUrl, apiHeaders };
+    return { apiKey, model, apiUrl, apiHeaders, sessionId };
 }
 
 /**
