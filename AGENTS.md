@@ -1,5 +1,8 @@
 # DiceOnRails — Agent Guide
 
+## Pre-commit documentation check
+Before every commit, read `AGENTS.md`, `ARCHITECTURE.md`, and `README.md`, check whether any decisions, conventions, file additions, or architectural changes made during this session are documented. If not, update the relevant sections before committing. This ensures all doc files remain the source of truth alongside the code.
+
 ## Commands
 - `npm run dev` — runs `scripts/preflight.js` (auto-installs deps) then Vite on port 3000
 - `npm test` — `vitest run --bail=1` (stops on first failure; live tests excluded)
