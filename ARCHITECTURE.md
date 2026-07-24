@@ -228,9 +228,12 @@ Sub-services are factory functions (`createXService(state, deps?)`) that close o
 
 1. Coerces args to the correct types (LLMs send strings; engine needs numbers).
 2. Delegates to the relevant sub-service method.
-3. Returns an `MCPResponse = { success: boolean; data: any; message?: string }`.
+3. For certain tools (deterministic actions, binary dice checks), wraps the result through **`maybeFinalizeTurn(args, result)`** — an engine helper that collapses action+narrate_turn into one call. It reads `narration`/`timePassed` (deterministic) or `narrationOnSuccess`/`narrationOnFailure` (branch, selected by the actual roll outcome) from the tool args, calls `narrate_turn` internally, and merges the narration into `data.narration` (for the bubble) while keeping time-advancement logs in the `message` (for the system log). Only honored out of combat (OOC guard).
+4. Returns an `MCPResponse = { success: boolean; data: any; message?: string }`.
 
 This same method is called by the agent loop **and** by the React layer (e.g. `mcpServer.resolveAllPendingEnemyTurns()` from `ActionsContext.handleResolveEnemyTurn`).
+
+Combat XP is auto-awarded on enemy defeat: `inflict_damage` calls `awardEnemyDefeatXp(state, enemy)` which party-splits the enemy's `xp` value (or +25% solo buff) idempotently via the `Enemy.xpAwarded` flag.
 
 ### Transactions, snapshots & rewind
 
@@ -275,15 +278,22 @@ services/llm/
 
 A flat array of OpenAI-style `{ type: "function", function: { name, description, parameters } }` definitions. Aggregated in `tools/index.ts:10`. The `description` of each tool is **the most important cue the LLM gets** for picking the right one — they're written in a punchy, instruction-heavy style ("COMBAT. Adds an enemy combatant. Call this BEFORE start_combat.").
 
+**`shared.ts`** provides three reusable JSON-schema fragments:
+- **`ON_SUCCESS_PROPERTIES`** — chaining block for `check_skill`/`move_to`: auto-fire `awardCurrency`, `logLore`, `upsertQuest`, `updateInventory` on success.
+- **`END_OF_TURN_PROPERTIES`** — optional `narration` + `timePassed` + `suggestions` for deterministic tools (`update_inventory`, `adjust_currency`, `log_lore`, `upsert_quest`, simple `move_to`). When present, the engine calls `narrate_turn` internally and ends the turn in one call (OOC only).
+- **`BRANCH_NARRATION_PROPERTIES`** — optional `narrationOnSuccess` + `narrationOnFailure` + `timePassed` + `suggestions` for binary dice tools (`check_skill`, `make_save`). The engine selects the branch matching the actual roll outcome, so the LLM never decides which prose is used (zero-hallucination).
+
 ### `TOOL_MODE_INSTRUCTION`
 
 `services/llm/prompts/toolModePrompt.ts` — a ~93-line supplement appended to the system prompt during the agent loop. It contains:
 - The strict combat sequence (`start_combat` → `player_attack` → `next_turn` → `narrate_turn`)
 - A "QUICK REFERENCE" table mapping natural-language verbs to tools
+- Guidance for ending a turn in ONE call via inline narration (deterministic) or branch narration (binary dice), with the OOC guard noted
+- Instructions to put ALL narration in the `narration` field (never in `content`), enforcing a single source of truth
 - Class-feature narration guidance (Rage, Sneak Attack, Fighting Style, …)
 - Race-trait narration guidance (Darkvision, Lucky, Hellish Resistance, …)
 - Spell-combat prerequisites ("Enemies must be registered FIRST")
-- An outright ban on writing `[System:tool_name]` patterns in narration
+- An outright ban on writing `[System:tool_name]` patterns or raw `<tool_call>`/`<function>` markup in narration/content; only the structured `tools` parameter may be used
 
 ### `resolveLLMConfig`
 
@@ -331,14 +341,18 @@ The single most important flow to understand. Entry point: `useGameActions.handl
   │
   ├─ 7. runAgentLoop(history, contextString, frozen, onToolResult, opts)
   │      ↓ see "Inside runAgentLoop" below
-  │      Returns: { toolMessages, inlineNarration, usage }
+  │      Returns: { toolMessages, inlineNarration, suggestions, usage }
+  │      inlineNarration may come from nartate_turn, an inline-finalized action tool,
+  │      or a branch (engine-selected by roll). Sanitized at agent-loop return.
   │
   ├─ 8. Append toolMessages + a placeholder model message
   │
   ├─ 9. resolveNarration(text, toolMessages, inlineNarration, …)
-  │      - If agent loop produced ≥50-char narration → use it
-  │      - Else call generateTightNarration (single-shot, max 500 tokens)
-  │      - If even that is lazy → buildDeterministicNarration (templated)
+  │      - If inlineNarration is set: return it as the bubble narration.
+  │      - Else: retry with generateNarration (single LLM request).
+  │        generateNarration output is sanitized inside the function AND
+  │        at the final modelMsg.text chokepoint in handleSendMessage.
+  │      - If retry produces artifact-only text (sanitized to empty) → skip.
   │      - Falls back to "The adventure continues..."
   │
   ├─ 10. autoSpeak(modelMsg.text) — TTS if settings.autoSpeak
@@ -368,19 +382,21 @@ The single most important flow to understand. Entry point: `useGameActions.handl
    - Re-filter tools against current state.
    - POST `/chat/completions` with `tools`, `tool_choice: "auto"`, `temperature: 0.7`, 60s timeout.
    - Add usage tokens to running totals (prompt, completion, cached).
+   - **Tool results sent to LLM:** the function `formatToolResult` (`narration.ts:58-83`) produces a slim per-tool JSON for LLM context (no full `data` blob). This is the single path; `extractRollData` (`narration.ts:19-50`) provides rich data for the UI separately.
    - If no tool calls:
-     - Iteration 0 → push "you MUST call at least one tool" and continue.
+     - Raw `<tool_call>`/`<function>` text detected in content (model format failure) → push a targeted corrective nudge and retry (up to 2×).
+     - Iteration 0 (no raw text) → push "you MUST call at least one tool" and continue.
      - Active combat, current actor is enemy, <5 iters → push "call next_turn".
      - Otherwise break.
-    - **End-of-turn detection:** if any tool call is `narrate_turn`, or a rest/move with narration/autoAdvanceTime/route → execute pre-end calls first, then `narrate_turn`, then break. The narration returned by `narrate_turn` is captured as `inlineNarration` (passed up to `handleSendMessage`).
-   - Otherwise batch-execute all tool calls in parallel via `executeToolBatch`, append `{role: assistant, tool_calls}` + per-tool `{role: tool, tool_call_id}` messages, loop.
-   - **Critical-tool tracking:** `cast_spell`, `inflict_damage`, `roll_dice`, `player_attack` — if any fails, set `criticalToolFailed` so we don't trust inline narration.
-   - **Budget guard:** if estimated payload exceeds 95% of `CONTEXT_BUDGET`, break early.
-   - **Combat shortcut:** if `next_turn` succeeded, break (turn is over).
+   - **End-of-turn detection:** if any tool call is `narrate_turn`, or a rest/move with narration/autoAdvanceTime/route, OR **any action tool carrying `narration`/`timePassed` or `narrationOnSuccess`/`narrationOnFailure` (gated out of combat)** → execute pre-end calls first, extract suggestions from their args, then (if time hasn't already advanced) execute `narrate_turn`, then break. The narration from inline-finalized or branched tools is captured as `inlineNarration` from the tool result's `data.narration` field.
+  - Otherwise batch-execute all tool calls in parallel via `executeToolBatch`, append `{role: assistant, tool_calls}` + per-tool `{role: tool, tool_call_id}` messages, loop.
+  - **Critical-tool tracking:** `cast_spell`, `inflict_damage`, `roll_dice`, `player_attack` — if any fails, set `criticalToolFailed` so we don't trust inline narration.
+  - **Budget guard:** if estimated payload exceeds 95% of `CONTEXT_BUDGET`, break early.
+  - **Combat shortcut:** if `next_turn` succeeded, break (turn is over).
 
-3. **Post-loop enforcement:** if no `narrate_turn` / rest / move-with-route fired, synthesize a `narrate_turn(narration='', timePassed=0)` so conditions/DoTs/concentration still tick consistently. The check is gated by `if (!timeAdvancedThisTurn)` at `agentLoop.ts:385-390` — it is conditional, not unconditional.
+3. **Post-loop enforcement:** if no `narrate_turn` / rest / move-with-route / inline-finalize fired, synthesize a `narrate_turn(narration='', timePassed=0)` so conditions/DoTs/concentration still tick consistently. The check is gated by `if (!timeAdvancedThisTurn)` at `agentLoop.ts:385-390` — it is conditional, not unconditional.
 
-4. **Return:** `{ toolMessages, iterationCount, promptTokens, completionTokens, cachedTokens, inlineNarration }`.
+4. **Return:** `{ toolMessages, iterationCount, promptTokens, completionTokens, cachedTokens, inlineNarration, suggestions }`. `inlineNarration` is sanitized via `sanitizeNarration` at the return point to catch any remaining artifacts.
 
 ### Batched party turns (`handleExecuteBatch`)
 
@@ -475,6 +491,8 @@ The conditions subsystem: 16 standard conditions (blinded, charmed, frightened, 
 ### `progressionService.ts`
 
 XP table lookups, `calculateXPToNextLevel`, `awardExperience` (with multi-level ups, ASI flags, subclass-feature-unlock flags), `applyStatAllocation`, `calculateHPGainForLevelUp`, `getProgressionContext` (string summary for the LLM). Honors the **Solo Adventurer Buff** (+25% XP when party size = 1) and **party-wide XP split** when no `targetId` is supplied.
+
+**`awardEnemyDefeatXp(state, enemy)`** (`mcp/progressionService.ts:10`): a free function called automatically by `inflict_damage` when an enemy drops to 0 HP. Party-splits the enemy's `xp` value (or +25% solo buff), mutates state via engine `awardExperience`, idempotent via the `Enemy.xpAwarded` flag. Covers every kill path: `player_attack`, `cast_spell`, DoTs, enemy attacks.
 
 ### `summoningEngine.ts` / `teleportationEngine.ts` / `transformationEngine.ts`
 
@@ -869,22 +887,25 @@ These are unwritten rules that hold across the codebase. Violate them at your pe
 ### State
 
 - **`mcpServer` is the only source of truth for `GameState`.** React state mirrors it via `syncState()` (`useGameState.ts:26`) which just calls `setGameState(mcpServer.getFullState())`. Never mutate `gameState` directly — always go through `mcpServer`.
-- **All tool execution flows through `mcpServer.executeToolCall`** (or its typed wrappers on `MockMCPServer`). Don't call `combatEngine`/`spellcastingEngine` directly from React.
+- **All tool execution flows through `mcpServer.executeToolCall`** (or its typed wrappers on `MockMCPServer`). Don't call `combatEngine`/`spellcastingEngine` directly from React. `executeToolCall` now wraps certain results through `maybeFinalizeTurn` which collapses action+narrate_turn into one call for inline-finalized tools.
 - **A campaign is "syncable" iff `campaignId != null && campaignId !== 'anonymous'`.** The literal string `'anonymous'` is the sentinel for local-only play.
 - **`isProcessing` is a multiplayer lock.** Always set it before a turn and clear it in a `finally`.
+- **Combat XP is auto-awarded on enemy defeat.** `inflict_damage` calls `awardEnemyDefeatXp` which party-splits the enemy's `xp` value. Visit by `Enemy.xpAwarded` flag. Covers every kill path.
 
 ### Tools
 
-- **`narrate_turn` is the only way game time advances** (except `long_rest`/`short_rest`/`move_to` with narration/route, which advance time inline). The agent loop enforces a no-op `narrate_turn(timePassed=0)` at the end if nothing else advanced time, so conditions/DoTs always tick.
+- **`narrate_turn` is the primary way game time advances**, but deterministic action tools (`update_inventory`, `adjust_currency`, `log_lore`, `upsert_quest`, simple `move_to`) can optionally carry `narration`+`timePassed` to advance time and end the turn in one call (inline finalization). Binary dice tools (`check_skill`, `make_save`) carry `narrationOnSuccess`/`narrationOnFailure` — the engine selects the branch from the roll. `long_rest`/`short_rest`/`move_to` (with route) also advance time inline. The agent loop enforces a no-op `narrate_turn(timePassed=0)` at the end if nothing else advanced time, so conditions/DoTs always tick.
 - **Never call `inflict_damage` after `player_attack` or `cast_spell`** — those tools handle damage atomically. This is repeated loudly in `TOOL_MODE_INSTRUCTION`.
 - **Spells never use `roll_dice`.** Spell attack rolls and damage are inside `cast_spell`.
 - **Critical tools** (`cast_spell`, `inflict_damage`, `roll_dice`, `player_attack`) failing sets `criticalToolFailed`, which suppresses inline narration and forces a separate narration pass.
+- **Inline finalization is OOC-only.** `maybeFinalizeTurn` checks `state.combat?.isActive` — in combat, turns are driven by `next_turn`, never by inline narration.
 
 ### LLM
 
 - **English-only output.** Hardcoded in `SYSTEM_INSTRUCTION`. The narration layer re-asserts it.
-- **Never write `[System:tool_name]` in narration** — those are an internal protocol between engine and LLM. ChatLog strips them from `SYSTEM` messages but renders them raw in narration.
+- **Never write `[System:tool_name]` or raw `<tool_call>`/`<function>` markup in narration** — these are internal protocol between engine and LLM. `sanitizeNarration()` strips them at three layers (engine-side, generateNarration return, and `modelMsg.text` chokepoint). ChatLog strips `[System:…]` prefixes from SYSTEM messages.
 - **Tool calls per iteration are batched and parallel** (`Promise.all` in `executeToolBatch`), but the agent loop respects tool ordering by `tool_call_id` for assistant/tool message pairing.
+- **Tool results sent to the LLM are slim.** `formatToolResult()` produces a compact per-tool JSON (no full `data` blob), reducing per-iteration token growth. The rich `data` is extracted for the UI separately by `extractRollData()`.
 
 ### Context
 
