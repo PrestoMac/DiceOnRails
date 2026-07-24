@@ -39,45 +39,49 @@
 - **`MAX_ITERS = 20`**, 60s timeout per iteration, `temperature: 0.7`, `tool_choice: "auto"`.
 - **Prompt assembly order**: system (SYSTEM_INSTRUCTION + PROGRESSION_SYSTEM_PROMPT + TOOL_MODE_INSTRUCTION) → frozen messages → mapped chat history → context message (combat state, enemies, active effects).
 - **Tool calls are batched**: all tool calls from one LLM response run in **parallel** via `Promise.all`, then sorted by `id.localeCompare` for deterministic ordering.
-- **End-of-turn detection**: `narrate_turn`, `long_rest`/`short_rest` (when called with `narration` **or** `autoAdvanceTime: true`), `move_to` (with `route`). When detected: pre-narration tools execute first, then `narrate_turn` (skipped if time already advanced by a rest/move), then loop breaks.
+- **End-of-turn detection**: `narrate_turn`, `long_rest`/`short_rest` (when called with `narration` **or** `autoAdvanceTime: true`), `move_to` (with `route`), OR **any action tool carrying `narration`/`timePassed` or `narrationOnSuccess`/`narrationOnFailure` (gated out of combat)**. When detected: pre-narration tools execute first, then `narrate_turn` (skipped if time already advanced), then loop breaks.
+- **Inline turn finalization**: deterministic tools (`update_inventory`, `adjust_currency`, `log_lore`, `upsert_quest`, simple `move_to`) can carry `narration`+`timePassed`+`suggestions` to end the turn in one call. Binary dice tools (`check_skill`, `make_save`) can carry `narrationOnSuccess`+`narrationOnFailure`+`timePassed`+`suggestions` — the engine selects the correct branch from the actual roll outcome (zero-hallucination). The engine helper `maybeFinalizeTurn` (`mcpService.ts`) calls `narrate_turn` internally and merges the result. Only honored out of combat (OOC guard). Attacks and damage spells stay 2-call (numbers in prose require post-roll truthfulness).
 - **`next_turn` causes immediate loop break** — the LLM cannot follow `next_turn` with `narrate_turn` in a later iteration. `narrate_turn` must be called before or simultaneously with `next_turn`.
-- **Synthetic `narrate_turn(timePassed=0)` appended at loop end** if no time-advancing tool was called (`agentLoop.ts:385-390`). This ensures conditions/DoTs/concentration always tick. The check is gated by `if (!timeAdvancedThisTurn)` — it is conditional, not unconditional.
-- **No-tool-call retries**: iter 0 → "You MUST call at least one tool". Iters 1-4 in combat (non-player turn only) → "call `next_turn`". Otherwise break.
-- **Post-loop guarantee**: if no `narrate_turn` / rest / move-with-route fired, a synthetic `narrate_turn(narration='', timePassed=0)` is enforced so DoTs/conditions tick.
+- **Synthetic `narrate_turn(timePassed=0)` appended at loop end** if no time-advancing tool was called. This ensures conditions/DoTs/concentration always tick. The check is gated by `if (!timeAdvancedThisTurn)` — it is conditional, not unconditional.
+- **No-tool-call retries**: raw `<tool_call>`/`<function>` text in content (model tool-calling format failure) → up to **2 corrective retries** with a targeted nudge before falling through to standard retries. Iter 0 empty → "You MUST call at least one tool". Iters 1-4 in combat (non-player turn only) → "call `next_turn`". Otherwise break.
+- **Post-loop guarantee**: if no `narrate_turn` / rest / move-with-route / inline-finalize fired, a synthetic `narrate_turn(narration='', timePassed=0)` is enforced so DoTs/conditions tick.
 - **Critical tool failure** (`cast_spell`, `inflict_damage`, `roll_dice`, `player_attack`) sets `criticalToolFailed`, suppressing inline narration even if >= 50 chars.
 - **Token budget checked AFTER batch execution**, not before — can't prevent an iteration from exceeding budget.
+- **Tool results sent to LLM**: the function `formatToolResult` (`narration.ts:58-83`) produces a slim per-tool JSON for LLM context (no full `data` blob). This is the single path; `extractRollData` (`narration.ts:19-50`) provides rich data for the UI separately.
 
 ### Tool system
 **28 tool schemas** (29 dispatch cases, 1 default) in `executeToolCall` (`mcpService.ts:237-334`, switch at `:243-322`):
 `check_skill` and `move_to` support **onSuccess chaining** via `ON_SUCCESS_PROPERTIES` shared schema — can auto-fire `awardCurrency`, `logLore`, `upsertQuest`, `updateInventory` in the same call.
+All deterministic action tools (`update_inventory`, `adjust_currency`, `log_lore`, `upsert_quest`, `move_to`) support **inline finalization** via `END_OF_TURN_PROPERTIES` shared schema — can carry `narration`+`timePassed`+`suggestions` to end the turn in one call.
+Binary dice tools (`check_skill`, `make_save`) support **branch finalization** via `BRANCH_NARRATION_PROPERTIES` — carry `narrationOnSuccess`+`narrationOnFailure`+`timePassed`+`suggestions`; the engine selects the branch from the actual roll (zero-hallucination).
 | Tool | Sub-service | Notes |
 |------|-------------|-------|
-| `roll_dice` | travel | `sides\|\|20, count\|\|1, modifier\|\|0` |
+| `roll_dice` | travel | `sides\|\|20, count\|\|1, modifier\|\|0`. Vestigial attack params removed (model must use `player_attack`). |
 | `add_enemy` | combat | |
 | `start_combat` | combat | |
 | `next_turn` | combat | No args forwarded |
 | `end_combat` | combat | |
-| `player_attack` | combat | |
-| `move_to` | travel | |
-| `check_skill` | travel | `difficulty\|\|10` |
-| `inflict_damage` | inventory | Accepts `targetId` OR `target_name` |
-| `adjust_currency` | inventory | |
-| `update_inventory` | inventory | `action\|\|'add'` |
-| `upsert_quest` | content | |
-| `log_lore` | content | `category\|\|'History'` |
-| `make_save` | combat | `stat\|\|'dex', dc\|\|10` |
+| `player_attack` | combat | Single `targetId` param (aliases removed). Supports `sharpshooter`, `greatWeaponMaster`. Damage/XP awarded atomically. |
+| `move_to` | travel | Supports `END_OF_TURN_PROPERTIES` (simple path only; route path handles time internally). |
+| `check_skill` | travel | `difficulty\|\|10`. Supports `BRANCH_NARRATION_PROPERTIES` and `ON_SUCCESS_PROPERTIES` (auto-XP internal). |
+| `inflict_damage` | inventory | Accepts `targetId` OR `target_name`. On enemy defeat, **auto-awards combat XP** via `awardEnemyDefeatXp`. |
+| `adjust_currency` | inventory | Supports `END_OF_TURN_PROPERTIES`. |
+| `update_inventory` | inventory | `action\|\|'add'`. Supports `END_OF_TURN_PROPERTIES`. Accepts `items[]` array for batch loot in one call. |
+| `upsert_quest` | content | Supports `END_OF_TURN_PROPERTIES`. |
+| `log_lore` | content | `category\|\|'History'`. Supports `END_OF_TURN_PROPERTIES`. |
+| `make_save` | combat | `stat\|\|'dex', dc\|\|10`. Supports `BRANCH_NARRATION_PROPERTIES`. |
 | `roll_death_save` | combat | |
-| `award_experience` | progression | |
-| `level_up` | progression | **Dispatches to `allocateStatPoints`, NOT `level_up`** |
+| `award_experience` | progression | **Combat XP is auto-awarded by the engine on enemy defeat** — the model must NOT call this for kills. Still used for non-combat awards (exploration, quests, roleplay). |
+| `level_up` | progression | Dispatches to `allocateStatPoints`. Also chains `learnSpells[]`/`prepareSpells[]` to `manage_spellbook` automatically. |
 | `long_rest` / `short_rest` | travel | |
-| `cast_spell` | spells | Accepts `characterId` OR `casterId`. Target normalization: if `targets[]` empty but `targetId`/`target_name` exists, wraps into `[targetId]` |
+| `cast_spell` | spells | Accepts `characterId` OR `casterId`. Target normalization: `targets[]` array (single target alias removed from schema but engine dispatch still accepts `targetId`/`target_name` for backward compat). |
 | `spell_effect` | spells | `mode\|\|'counter'` |
 | `manage_spellbook` | spells | Accepts `characterId` OR `targetId` |
 | `use_resource` | spells | Accepts `characterId` OR `targetId`. (Tool schema lives in `tools/character.ts`, but dispatch routes to `spells.use_resource`.) |
-| `summon_creature` | inline | Accepts `creatureName` OR `template` |
-| `teleport_creature` | inline | Accepts `characterId` OR `targetId` |
-| `polymorph_creature` | inline | Accepts `newForm` OR `beastForm` |
-| `cast_ritual` | spells | |
+| `summon_creature` | inline | |
+| `teleport_creature` | inline | |
+| `polymorph_creature` | inline | |
+| `cast_ritual` | spells | **Auto-advances 10 minutes** (no separate `narrate_turn` needed since S3). |
 | `narrate_turn` | travel | |
 
 **ToolFilter** (`services/llm/toolFilter.ts`): always visible: `roll_dice`, `check_skill`, `update_inventory`, `adjust_currency`, `move_to`, `upsert_quest`, `log_lore`, `narrate_turn`, `make_save`, `use_resource`, `roll_death_save`, `cast_spell`, `manage_spellbook`, `spell_effect`, `add_enemy`, `start_combat`, `inflict_damage`. Hidden unless: `state.combat?.isActive` → `next_turn`, `end_combat`, `player_attack`; party has unused stat/skill points → `level_up`; party not at full → `short_rest`, `long_rest`; party has spells → `summon_creature`, `teleport_creature`, `polymorph_creature`, `cast_ritual`; combat NOT active → `award_experience`.
@@ -113,11 +117,12 @@
 
 ### State
 - Campaign ID `'anonymous'` is the sentinel for local-only play (no Supabase sync). All persistence methods check this.
-- The ONLY way game time advances: `narrate_turn`, `long_rest`, `short_rest`, `move_to` (with narration/route). A synthetic no-op `narrate_turn(timePassed=0)` is appended at loop end if no time-advancing tool ran (gated by `if (!timeAdvancedThisTurn)` at `agentLoop.ts:385-390`) so DoTs/conditions always tick.
+- The ONLY way game time advances: `narrate_turn`, `long_rest`, `short_rest`, `move_to` (with narration/route), **or any action tool with inline narration** (`update_inventory`, `adjust_currency`, `log_lore`, `upsert_quest`, `check_skill`, `make_save`). A synthetic no-op `narrate_turn(timePassed=0)` is appended at loop end if no time-advancing tool ran (gated by `if (!timeAdvancedThisTurn)` at `agentLoop.ts:385-390`) so DoTs/conditions always tick.
 - Never call `inflict_damage` after `player_attack` or `cast_spell` — those tools handle damage atomically.
 - Spells never use `roll_dice`; spell attack rolls and damage are inside `cast_spell`.
 - **`ensureCharacterFields()` / `ensureAllCharacterFields()` live in ONE place**: `services/characterUtils.ts`. Both `stateService` and `travelService` import it from there (not duplicated). `StateService.ensureCharacterFields()` delegates to `ensureAllCharacterFields(state.party)`.
 - **`inflict_damage` lives in `InventoryService`**, not `CombatService`. Both CombatService and SpellcastingService depend on it. All damage in the system flows through one function.
+- **Combat XP is auto-awarded on enemy defeat**: `awardEnemyDefeatXp` (`services/mcp/progressionService.ts`) hooks into `inflict_damage` — every kill path (player_attack, cast_spell, DoTs, enemy attacks) awards the enemy's `xp` value (party-split + solo +25% buff) idempotently via the `Enemy.xpAwarded` flag.
 - **Transactions**: deep-clone via `JSON.parse(JSON.stringify(...))`. 3-tier: transaction (in-flight rollback), rewind point (full state+messages per turn), emergency snapshot (crash recovery).
 - **Duplicate currency detection**: `adjust_currency` is suppressed within 500ms for same target+amount. Cleared on `restoreSnapshot` and `reset`.
 
@@ -130,6 +135,9 @@
 - **Conditions from concentration spells are tied by `source: spellId`** — when `breakConcentration` fires, ALL conditions with matching source are removed. Without `source`, conditions become orphans.
 - **`isIncapsulated` typo** (conditionEngine.ts:217) must not be removed — it's an alias for `isIncapacitated` (at `:212`) and may exist in serialized game states.
 - **Warlock pact magic** is the only short-rest slot reset. Checked in `recalculateResourcePools`. Warlock uses `pactMagic` (not `spellSlots`) — any code reading `spellSlots` blindly will break for warlocks.
+- **`sanitizeNarration`** (`utils/textSanitize.ts`): strips `<tool_call>`/`<function>` blocks, ChatML special tokens (`<|im_end|>`, fullwidth variants), and `[System:…]` prefixes from any narration text. Applied at three layers: engine-side (narrate_turn dispatch, maybeFinalizeTurn, cast_ritual), inside generateNarration/generateNarrationStream returns (defense-in-depth), and at the ultimate chokepoint (`finalNarration` → `modelMsg.text` in useGameActions) so no LLM-sourced text reaches the bubble unsanitized.
+- **`maybeFinalizeTurn`** (`mcpService.ts`): engine helper that collapses action+narrate_turn into one call. For deterministic tools, reads `narration`/`timePassed` from args and calls `narrate_turn` internally. For binary dice tools (check_skill, make_save), reads `narrationOnSuccess`/`narrationOnFailure` and selects by the actual roll result. OOC guard: only honored when combat is not active.
+- **`awardEnemyDefeatXp`** (`services/mcp/progressionService.ts`): called automatically by `inflict_damage` when an enemy drops to 0 HP. Party-splits the enemy's `xp` value (or +25% solo buff), mutates state via engine `awardExperience`, guarded by `Enemy.xpAwarded` flag for idempotence.
 
 ### Character creation
 - **Prepared vs Known caster asymmetry**: `buildCharacterFromWizard` sets `knownSpells` = cantrips only for prepared casters (wizard/cleric/druid/paladin), and `preparedSpells` = cantrips + selected spells. Known casters (bard/sorcerer/warlock/ranger) get both in `knownSpells`. The wizard UI only enforces max spells for known casters.
@@ -161,9 +169,10 @@
 ### Agent loop prompts
 - **`SYSTEM_INSTRUCTION`** (`constants.ts:8-39`): 14 numbered rules (mandatory tool usage, currency math, equipped weapon narration, time/durations, English only, etc.)
 - **`PROGRESSION_SYSTEM_PROMPT`** (`constants.ts:42-83`): XP calibration tables, CR-to-XP, DC-to-XP, solo +25% buff, mandatory concurrent `award_experience` pairing.
-- **`TOOL_MODE_INSTRUCTION`** (`services/llm/prompts/toolModePrompt.ts`, 93 lines): strict combat sequence, quick reference table, 11 feat descriptions, class feature narration, race trait guidance, spell prerequisites, ban on `[System:tool_name]` in narration.
+- **`TOOL_MODE_INSTRUCTION`** (`services/llm/prompts/toolModePrompt.ts`, 93 lines): strict combat sequence, quick reference table, 11 feat descriptions, class feature narration, race trait guidance, spell prerequisites, ban on `[System:tool_name]` in narration, plus ban on emitting `<tool_call>`/`<function>` markup in content or narration (only use the structured `tools` parameter).
 - **Narration fallback chain**: `generateNarration` (full, non-streaming) → `generateTightNarration` (lightweight, 15s timeout, max 500 tokens) → `buildDeterministicNarration` (templated) → `"The adventure continues..."`.
 - **`extractRollData`** (`narration.ts:19-50`): extracts structured `RollData` from tool results for UI display. Covers `roll_dice`, `check_skill`, `player_attack`, `cast_spell`, `make_save`, `roll_death_save`, `inflict_damage`, `use_resource`.
+- **`formatToolResult`** (`narration.ts:58-83`): produces a slim per-tool JSON for the LLM context (the `tool` messages fed to each subsequent iteration). This is the single source of truth for what the LLM sees; the full `data` blob is never sent back.
 
 ## Environment
 - Required: `VITE_LLM_API_KEY`. Others optional. See `.env.example`.
@@ -181,7 +190,7 @@
 - Setup mode is detected TWICE: `preflight.js` sets env var, `vite.config.ts` re-verifies by reading `.env`. Config wins.
 - Build chunking: 4 vendor chunks (`vendor-react`, `vendor-supabase`, `vendor-vercel`, `vendor-ui`). Everything else in default chunk.
 - Vitest `include` is `tests/**/*.test.{ts,tsx}` (not alongside source). `css: true` processes CSS imports. `globals: true` makes `describe`/`it`/`expect` available without imports.
-- **Untested services**: `services/llm/contextManager.ts`, `services/llm/narration.ts`, `services/mcp/partyService.ts`, `services/supabaseClient.ts` have no direct test coverage. Be cautious editing them.
+- **Untested services**: `services/llm/contextManager.ts`, `services/mcp/partyService.ts`, `services/supabaseClient.ts` have no direct test coverage. Be cautious editing them.
 
 ## Type system invariants
 - `Character.stats` is always `{ str, dex, con, int, wis, cha }` — exactly 6 keys. Same for `Enemy.stats?`.
