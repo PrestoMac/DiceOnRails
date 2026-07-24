@@ -323,6 +323,8 @@ The single most important flow to understand. Entry point: `useGameActions.handl
 └─────────────────────────────────────────────────────────────────────────────┘
   │
   ├─ 1. Bail if already processing (processingRef / gameState.isProcessing)
+  ├─ 1b. Remote pre-check: if syncable campaign, SELECT isProcessing from Supabase.
+  │      Abort if true. (Fail-open on error; anonymous campaigns skip.)
   ├─ 2. Build userMsg, append to messages
   ├─ 3. Lock the campaign:
   │      - mcpServer.loadState({ ...state, isProcessing: true, processingUser })
@@ -420,7 +422,7 @@ The single most important flow to understand. Entry point: `useGameActions.handl
 1. If currently processing → bail.
 2. Load the rewind point (state + messages from before the user's last message).
 3. If no rewind point → fall back to emergency snapshot, slice messages back to the last user msg, **bump `ctx.generation`** (invalidates in-flight compression), and re-call `handleSendMessage(text, isRetry=true)`.
-4. Otherwise restore the snapshot, restore messages, **bump generation**, sync to Supabase, and re-call retry.
+4. Otherwise restore the snapshot, restore messages, **bump generation**, sync to Supabase, and re-call retry. Before restoring, `restoreToBeforeLastTurn` captures the current `actionQueue` and re-merges any items not in the snapshot after restore — this preserves queue items added by other players during the original batch processing window.
 5. Retry routing: if the restored text starts with `[Collaborative Turn]` AND the engine has queue items (restored from snapshot), re-execute via `handleExecuteBatchRef` (batch retry). Otherwise re-send via `handleSendMessageRef(text, isRetry=true)` (solo retry).
 
 ---
@@ -571,7 +573,9 @@ The runtime uses static TS catalogs (`data/srdItems.ts`, `data/monsters.ts`) —
 
 ### Multiplayer lock
 
-Before any turn, `handleSendMessage` sets `isProcessing: true` and `processingUser: <name>` and writes that to Supabase. Other clients in `useGameState`'s subscription handler (lines 124-159) check `isProcessingRef`: if the local client thinks it's processing and the remote cleared the flag, that's the "unlock" signal; otherwise incoming remote state is applied.
+Before any turn, `handleSendMessage` (and `handleExecuteBatch`) perform a **remote processing pre-check**: for syncable campaigns, they call `storageService.isCampaignProcessing(campaignId)` (a SELECT on Supabase) to verify no other player has started processing since the last realtime sync. If the remote is processing, the turn is aborted. This is fail-open (returns `false` on error). Anonymous campaigns skip the check entirely.
+
+After passing the pre-check, the handler sets `isProcessing: true` and `processingUser: <name>` and writes that to Supabase. Other clients in `useGameState`'s subscription handler (lines 124-159) check `isProcessingRef`: if the local client thinks it's processing and the remote cleared the flag, that's the "unlock" signal; otherwise incoming remote state is applied.
 
 ---
 

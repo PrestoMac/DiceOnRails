@@ -196,6 +196,14 @@ export const useGameActions = (
         if (!isRetry && (gameState.isProcessing || processingRef.current)) return;
         if (isRetry && processingRef.current) return;
 
+        if (isSyncableCampaign(currentCampaignId)) {
+            const remoteProcessing = await storageService.isCampaignProcessing(currentCampaignId);
+            if (remoteProcessing) {
+                if (isDebugMode) console.log('[handleSendMessage] aborted — remote campaign is processing');
+                return;
+            }
+        }
+
         processingRef.current = true;
         mcpServer.setLastSuggestions([]);
         const currentMessages = messagesRef.current;
@@ -329,6 +337,14 @@ export const useGameActions = (
     const handleExecuteBatch = async () => {
         if (!gameState.actionQueue || gameState.actionQueue.length === 0) return;
         if (gameState.isProcessing || processingRef.current) return;
+
+        if (isSyncableCampaign(currentCampaignId)) {
+            const remoteProcessing = await storageService.isCampaignProcessing(currentCampaignId);
+            if (remoteProcessing) {
+                if (isDebugMode) console.log('[handleExecuteBatch] aborted — remote campaign is processing');
+                return;
+            }
+        }
 
         processingRef.current = true;
         setIsLoading(true);
@@ -513,6 +529,7 @@ export const useGameActions = (
         // useGameState's subscription handler, preventing them from overwriting
         // the restored state during the retry window.
         bumpRewindGeneration();
+        const liveQueue = mcpServer.getFullState().actionQueue ?? [];
         const snapshot = mcpServer.loadRewindPoint();
         if (isDebugMode) console.log('[rewind] snapshot:', !!snapshot, 'processingRef:', processingRef.current);
 
@@ -531,6 +548,11 @@ export const useGameActions = (
 
             if (emergencySnap) {
                 mcpServer.restoreSnapshot(emergencySnap);
+                const emergencyQueueIds = new Set((emergencySnap.actionQueue ?? []).map(q => q.id));
+                const preservedFromEmergency = liveQueue.filter(q => !emergencyQueueIds.has(q.id));
+                if (preservedFromEmergency.length > 0) {
+                    mcpServer.loadState({ ...mcpServer.getFullState(), actionQueue: [...(mcpServer.getFullState().actionQueue ?? []), ...preservedFromEmergency] });
+                }
             }
             const gs = mcpServer.getFullState() as unknown as { ctx?: { episodeCheckpoints?: unknown[]; frozenRawHistory?: string; frozenRawTokens?: number; frozenMessageCount?: number; turnCounter?: number } };
             ctxRef.current = {
@@ -566,7 +588,15 @@ export const useGameActions = (
         mcpServer.restoreSnapshot(snapshot.gameState);
         const restoredState = mcpServer.getFullState();
         mcpServer.loadState(restoredState);
-        setMessages(snapshot.messages.slice(0, -1)); setGameState(restoredState);
+
+        const snapshotQueueIds = new Set((snapshot.gameState.actionQueue ?? []).map(q => q.id));
+        const preservedQueueItems = liveQueue.filter(q => !snapshotQueueIds.has(q.id));
+        if (preservedQueueItems.length > 0) {
+            const merged = { ...mcpServer.getFullState(), actionQueue: [...(mcpServer.getFullState().actionQueue ?? []), ...preservedQueueItems] };
+            mcpServer.loadState(merged);
+        }
+
+        setMessages(snapshot.messages.slice(0, -1)); setGameState(mcpServer.getFullState());
         // Sync the ref mirror immediately so a prompt retry captures the rewound
         // list instead of a stale, pre-rewind snapshot.
         messagesRef.current = snapshot.messages.slice(0, -1);

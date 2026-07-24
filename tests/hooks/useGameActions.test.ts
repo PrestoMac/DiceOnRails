@@ -67,6 +67,7 @@ vi.mock('../../services/storageService', () => ({
     createCampaign: vi.fn().mockResolvedValue(undefined),
     saveGame: vi.fn().mockResolvedValue(undefined),
     fetchGameState: vi.fn().mockResolvedValue(null),
+    isCampaignProcessing: vi.fn().mockResolvedValue(false),
   },
 }));
 
@@ -718,5 +719,162 @@ describe('useGameActions', () => {
     });
 
     expect(setIsLoading).toHaveBeenCalledWith(false);
+  });
+
+  describe('rewind queue preservation (multiplayer)', () => {
+    afterEach(() => {
+      defaultProps.currentCampaignId = undefined;
+      defaultProps.userId = undefined;
+    });
+
+    it('handleRewind preserves concurrently-added queue items from other players', async () => {
+      const liveState: GameState = {
+        ...makeBaseState(),
+        actionQueue: [
+          { id: 'B1', playerId: 'p2', playerName: 'Player B', text: 'I heal', type: 'action', timestamp: 0 },
+        ],
+      };
+      const snapshotState: GameState = {
+        ...makeBaseState(),
+        actionQueue: [
+          { id: 'A1', playerId: 'p1', playerName: 'Player A', text: 'I attack', type: 'action', timestamp: 0 },
+          { id: 'A2', playerId: 'p1', playerName: 'Player A', text: 'I move', type: 'action', timestamp: 1 },
+        ],
+      };
+
+      let mockState = liveState;
+      mcpServerMock.getFullState.mockImplementation(() => mockState);
+      mcpServerMock.restoreSnapshot.mockImplementation((snap: GameState) => { mockState = deepClone(snap); });
+      mcpServerMock.loadState.mockImplementation((s: GameState) => { mockState = s; });
+      mcpServerMock.loadRewindPoint.mockReturnValue({
+        gameState: deepClone(snapshotState),
+        messages: [
+          { id: 'batch-msg', role: MessageRole.USER, text: '[Collaborative Turn]\n[A]: I attack\n[A]: I move', timestamp: 0 },
+        ],
+      });
+
+      defaultProps.currentCampaignId = 'camp-mp-1';
+      defaultProps.userId = 'user-1';
+
+      const { result } = render();
+
+      await act(async () => {
+        await result.current.handleUndo();
+      });
+
+      const loadStateCalls = vi.mocked(mcpServerMock.loadState).mock.calls;
+      const mergedCall = loadStateCalls.find(([s]) => {
+        const queue = (s as GameState).actionQueue ?? [];
+        return queue.some(q => q.id === 'B1');
+      });
+      expect(mergedCall).toBeDefined();
+      if (!mergedCall) return;
+      const mergedQueue = (mergedCall[0] as GameState).actionQueue ?? [];
+      expect(mergedQueue.map(q => q.id).sort()).toEqual(['A1', 'A2', 'B1']);
+    });
+
+    it('handleRewind with no concurrent queue items does not add phantom items (solo regression)', async () => {
+      const liveState: GameState = { ...makeBaseState(), actionQueue: [] };
+      const snapshotState: GameState = { ...makeBaseState(), actionQueue: [] };
+
+      let mockState = liveState;
+      mcpServerMock.getFullState.mockImplementation(() => mockState);
+      mcpServerMock.restoreSnapshot.mockImplementation((snap: GameState) => { mockState = deepClone(snap); });
+      mcpServerMock.loadState.mockImplementation((s: GameState) => { mockState = s; });
+      mcpServerMock.loadRewindPoint.mockReturnValue({
+        gameState: deepClone(snapshotState),
+        messages: [
+          { id: 'user-msg', role: MessageRole.USER, text: 'I attack the goblin', timestamp: 0 },
+        ],
+      });
+
+      const { result } = render();
+
+      await act(async () => {
+        await result.current.handleUndo();
+      });
+
+      expect(mockState.actionQueue).toEqual([]);
+    });
+  });
+
+  describe('remote processing pre-check (multiplayer lock guard)', () => {
+    afterEach(() => {
+      defaultProps.currentCampaignId = undefined;
+      defaultProps.userId = undefined;
+      vi.mocked(storageService.isCampaignProcessing).mockResolvedValue(false);
+    });
+
+    it('handleSendMessage aborts when remote campaign is processing', async () => {
+      vi.mocked(storageService.isCampaignProcessing).mockResolvedValue(true);
+      defaultProps.currentCampaignId = 'camp-mp-1';
+      defaultProps.userId = 'user-1';
+
+      const { result } = render();
+
+      await act(async () => {
+        await result.current.handleSendMessage('I attack the goblin');
+      });
+
+      expect(storageService.isCampaignProcessing).toHaveBeenCalledWith('camp-mp-1');
+      expect(mockRunAgentLoop).not.toHaveBeenCalled();
+      expect(setIsLoading).not.toHaveBeenCalled();
+    });
+
+    it('handleSendMessage proceeds when remote campaign is not processing', async () => {
+      vi.mocked(storageService.isCampaignProcessing).mockResolvedValue(false);
+      defaultProps.currentCampaignId = 'camp-mp-1';
+      defaultProps.userId = 'user-1';
+
+      const { result } = render();
+
+      await act(async () => {
+        await result.current.handleSendMessage('I attack the goblin');
+      });
+
+      expect(storageService.isCampaignProcessing).toHaveBeenCalledWith('camp-mp-1');
+      expect(mockRunAgentLoop).toHaveBeenCalled();
+    });
+
+    it('handleSendMessage skips remote check for anonymous campaigns (solo)', async () => {
+      defaultProps.currentCampaignId = 'anonymous';
+
+      const { result } = render();
+
+      await act(async () => {
+        await result.current.handleSendMessage('I attack');
+      });
+
+      expect(storageService.isCampaignProcessing).not.toHaveBeenCalled();
+    });
+
+    it('handleExecuteBatch aborts when remote campaign is processing', async () => {
+      vi.mocked(storageService.isCampaignProcessing).mockResolvedValue(true);
+      defaultProps.currentCampaignId = 'camp-mp-1';
+      defaultProps.userId = 'user-1';
+
+      const stateWithQueue = {
+        ...makeBaseState(),
+        actionQueue: [
+          { id: 'a1', playerId: 'p1', playerName: 'Player', text: 'I attack', type: 'action' as const, timestamp: 0 },
+        ],
+      };
+
+      const { result } = renderHook(() => useGameActions(
+        stateWithQueue, setGameState, [], setMessages,
+        'camp-mp-1', 'user-1', 'hero-1', defaultProps.settings,
+        setIsLoading, onCloseLevelUp, syncState, performAtmosphereUpdate,
+        setStage, setViewingCharacterId, setMyCharacterId,
+        false, undefined, setIsNewCampaign, getSenderName, undefined,
+      ));
+
+      await act(async () => {
+        await result.current.handleExecuteBatch();
+      });
+
+      expect(storageService.isCampaignProcessing).toHaveBeenCalledWith('camp-mp-1');
+      expect(mockRunAgentLoop).not.toHaveBeenCalled();
+      expect(setIsLoading).not.toHaveBeenCalled();
+    });
   });
 });

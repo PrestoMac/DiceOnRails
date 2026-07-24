@@ -50,6 +50,21 @@ export const storageService = {
         }
     },
 
+    /** Checks whether a campaign is currently being processed by another player. Fail-open: returns false on error so a Supabase outage doesn't block gameplay. */
+    async isCampaignProcessing(campaignId: string): Promise<boolean> {
+        try {
+            const { data, error } = await supabase
+                .from(CAMPAIGNS_TABLE)
+                .select('game_state')
+                .eq('id', campaignId)
+                .single();
+            if (error || !data) return false;
+            return (data.game_state as GameState)?.isProcessing === true;
+        } catch {
+            return false;
+        }
+    },
+
     /** Persists game state for a campaign: localStorage for anonymous play, Supabase (coalesced via microtask) for syncable campaigns. */
     syncCampaignState(campaignId: string, gameState: GameState, messages?: Message[]): Promise<void> {
         if (campaignId === ANONYMOUS_CAMPAIGN_ID) {
