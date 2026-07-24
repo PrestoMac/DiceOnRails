@@ -3,6 +3,7 @@ import { SYSTEM_INSTRUCTION, PROGRESSION_SYSTEM_PROMPT } from '../../constants';
 import { getThinkingDisabledBody } from '../../utils/envHelper';
 import { isDebugMode } from '../../utils/debug';
 import { safeParseJson } from '../../utils/safeJson';
+import { sanitizeNarration } from '../../utils/textSanitize';
 import { streamChatCompletion } from '../streamingClient';
 import { resolveLLMConfig, mapHistoryToMessages } from './llmApiClient';
 
@@ -115,7 +116,7 @@ export const generateNarration = async (history: Message[], context: string, fro
         const assistantMessage = data.choices[0].message;
         if (isDebugMode && data.usage) { const promptTokens = data.usage.prompt_tokens ?? 0; const completionTokens = data.usage.completion_tokens ?? 0; const totalTokens = data.usage.total_tokens ?? 0; const cachedTokens = data.usage.prompt_tokens_details?.cached_tokens ?? 0; const cacheHitPct = promptTokens > 0 ? ((cachedTokens / promptTokens) * 100).toFixed(1) : '0'; console.log(`[LLM Usage] ${data.model || model} | mode=narration | prompt=${promptTokens} completion=${completionTokens} total=${totalTokens} | cached=${cachedTokens} (${cacheHitPct}% of prompt)`); }
         if (isDebugMode) { console.log(`[Narration] generateNarration done in ${Date.now() - narrationStart}ms, contentLength=${(assistantMessage.content || "").length}`); console.log(`[Narration] Content preview: ${(assistantMessage.content || "").substring(0, 200)}`); }
-        return { text: assistantMessage.content || "" };
+        return { text: sanitizeNarration(assistantMessage.content || "") };
     } catch (error) { clearTimeout(fetchTimer); console.error("LLM Error:", error); console.error('[Narration] generateNarration failed', { elapsed: Date.now() - narrationStart, error }); return { text: "The Narrator is silenced by an unknown force. (Check your API key or model settings.)" }; }
 };
 
@@ -164,18 +165,19 @@ export function generateNarrationStream(history: Message[], context: string, fro
                 else if (chunk.type === 'error') { if (isDebugMode) console.error('[NarrationStream] Error in stream', chunk.error); callbacks.onError(chunk.error); throw chunk.error; }
             }
             if (isDebugMode) console.log(`[NarrationStream] Stream complete in ${Date.now() - streamStart}ms, ${chunkCount} chunks, ${fullText.length} chars`, usage);
+            fullText = sanitizeNarration(fullText);
             if (!fullText) { fullText = "The adventure continues..."; }
             callbacks.onDone(fullText, usage);
             return fullText;
         } catch (e) {
             if (controller.signal.aborted) {
                 if (isDebugMode) console.log(`[NarrationStream] Aborted after ${Date.now() - streamStart}ms, ${chunkCount} chunks, ${fullText.length} chars`);
-                return fullText;
+                return sanitizeNarration(fullText);
             }
             const err = e instanceof Error ? e : new Error(String(e));
             if (isDebugMode) console.error('[NarrationStream] Failed', { elapsed: Date.now() - streamStart, error: err });
             callbacks.onError(err);
-            return fullText || "The Narrator is silenced by an unknown force.";
+            return sanitizeNarration(fullText) || "The Narrator is silenced by an unknown force.";
         }
     })();
     return { promise, cancel: () => { if (isDebugMode) console.log('[NarrationStream] Cancelled by caller'); controller.abort(); } };

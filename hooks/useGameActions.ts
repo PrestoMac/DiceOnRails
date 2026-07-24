@@ -71,6 +71,7 @@ import { runAgentLoop, generateNarration } from '../services/llm';
 import { storageService } from '../services/storageService';
 import { speakText, stopSpeaking } from '../services/audioService';
 import { isDebugMode } from '../utils/debug';
+import { sanitizeNarration } from '../utils/textSanitize';
 import { bumpRewindGeneration } from '../services/rewindGeneration';
 import { isSyncableCampaign, ANONYMOUS_CAMPAIGN_ID } from '../utils/campaign';
 import {
@@ -226,18 +227,22 @@ export const useGameActions = (
                 console.warn('[Narration] No inline narration from agent loop. Retrying with generateNarration...', { toolCount: toolMessages.length, inlineNarration });
                 try {
                     const retry = await generateNarration(historyForAPI, buildContextString(myCharacterId), ctxPrep.frozen);
-                    if (retry.text && retry.text.trim().length >= 25) {
-                        finalNarration = retry.text.trim();
+                    const cleanRetry = sanitizeNarration(retry.text);
+                    if (cleanRetry.length >= 25) {
+                        finalNarration = cleanRetry;
                         if (isDebugMode) console.log('[Narration] Retry succeeded', { len: finalNarration.length });
                     } else {
-                        console.warn('[Narration] Retry produced empty/short text', { length: retry.text?.length ?? 0, preview: (retry.text ?? '').slice(0, 80) });
+                        console.warn('[Narration] Retry produced empty/short/artifact-only text', { length: retry.text?.length ?? 0, preview: (retry.text ?? '').slice(0, 80) });
                     }
                 } catch (err) {
                     console.error('[Narration] Retry failed:', err instanceof Error ? err.message : String(err));
                 }
             }
 
-            const modelMsg: Message = { id: streamingId, role: MessageRole.MODEL, text: finalNarration || 'The adventure continues...', timestamp: Date.now() };
+            // Ultimate chokepoint: no LLM-sourced narration reaches the bubble unsanitized,
+            // regardless of source (inlineNarration, generateNarration retry, or streaming).
+            const safeNarration = sanitizeNarration(finalNarration);
+            const modelMsg: Message = { id: streamingId, role: MessageRole.MODEL, text: safeNarration || 'The adventure continues...', timestamp: Date.now() };
             setMessages(prev => prev.map(m => m.id === streamingId ? modelMsg : m));
             processingRef.current = false;
 
@@ -311,18 +316,21 @@ export const useGameActions = (
                 console.warn('[Narration] No inline narration from batch agent loop. Retrying with generateNarration...', { toolCount: result.toolMessages.length, inlineNarration: result.inlineNarration });
                 try {
                     const retry = await generateNarration(historyForAPI, batchContext, batchCtxPrep.frozen);
-                    if (retry.text && retry.text.trim().length >= 25) {
-                        finalNarration = retry.text.trim();
+                    const cleanRetry = sanitizeNarration(retry.text);
+                    if (cleanRetry.length >= 25) {
+                        finalNarration = cleanRetry;
                         if (isDebugMode) console.log('[Narration] Batch retry succeeded', { len: finalNarration.length });
                     } else {
-                        console.warn('[Narration] Batch retry produced empty/short text', { length: retry.text?.length ?? 0, preview: (retry.text ?? '').slice(0, 80) });
+                        console.warn('[Narration] Batch retry produced empty/short/artifact-only text', { length: retry.text?.length ?? 0, preview: (retry.text ?? '').slice(0, 80) });
                     }
                 } catch (err) {
                     console.error('[Narration] Batch retry failed:', err instanceof Error ? err.message : String(err));
                 }
             }
 
-            const modelMsg: Message = { id: streamingId, role: MessageRole.MODEL, text: finalNarration || 'The adventure continues...', timestamp: Date.now() };
+            // Ultimate chokepoint: no LLM-sourced narration reaches the bubble unsanitized.
+            const safeNarration = sanitizeNarration(finalNarration);
+            const modelMsg: Message = { id: streamingId, role: MessageRole.MODEL, text: safeNarration || 'The adventure continues...', timestamp: Date.now() };
             setMessages(prev => prev.map(m => m.id === streamingId ? modelMsg : m));
             processingRef.current = false;
 
