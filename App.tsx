@@ -185,6 +185,7 @@ const AppContent: React.FC = () => {
       {showCreateModal && <CampaignModal mode="create" isOpen={true} onConfirm={handleConfirmCreateCampaignWrapped} onCancel={() => setShowCreateModal(false)} />}
       {diceRollData?.isOpen && (
         <DiceRollModal
+          key={diceRollData.id}
           characterName={diceRollData.characterName}
           rollType={diceRollData.rollType ?? 'skill'}
           label={diceRollData.label ?? diceRollData.skillName ?? 'Check'}

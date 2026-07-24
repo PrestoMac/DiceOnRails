@@ -1,8 +1,9 @@
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { AppSettings } from '../types';
 import { useSettings } from '../hooks/useSettings';
 
 interface DiceRollData {
+  id: number;
   isOpen: boolean;
   characterName: string;
   skillName?: string;
@@ -43,6 +44,7 @@ export function UIProvider({ children }: { children: ReactNode }) {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [diceRollData, setDiceRollData] = useState<DiceRollData | null>(null);
   const [isCompendiumOpen, setCompendiumOpen] = useState(false);
+  const rollIdRef = useRef(0);
 
   useEffect(() => {
     const h = () => setIsMobile(window.innerWidth < 768);
@@ -51,7 +53,7 @@ export function UIProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const handleTriggerDiceRoll = useCallback((rollData: Record<string, unknown>) =>
-    new Promise<void>(resolve => setDiceRollData({ isOpen: true, ...rollData, resolver: resolve })), []);
+    new Promise<void>(resolve => setDiceRollData({ id: ++rollIdRef.current, isOpen: true, ...rollData, resolver: resolve })), []);
 
   const clearDiceRoll = useCallback(() => {
     diceRollData?.resolver?.();

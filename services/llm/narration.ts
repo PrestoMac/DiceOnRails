@@ -25,12 +25,29 @@ export function extractRollData(toolName: string, result: MCPResponse): RollData
   } else if (toolName === 'check_skill') {
     return skillRollData(d, d.difficulty, d.character, { skillRank: d.skillRank ?? 0 });
   } else if (toolName === 'player_attack') {
-    return { type: 'attack', dieFace: 'd20', dieRoll: d.roll ?? 0, modifier: (d.attackRoll ?? 0) - (d.roll ?? 0), total: d.attackRoll ?? 0, dc: d.targetAc, success: d.isHit, isCritical: d.isCritical, isFumble: d.isFumble, dieCount: 1, results: [d.roll ?? 0] };
+    const attackCard: RollData = { type: 'attack', dieFace: 'd20', dieRoll: d.roll ?? 0, modifier: (d.attackRoll ?? 0) - (d.roll ?? 0), total: d.attackRoll ?? 0, dc: d.targetAc, success: d.isHit, isCritical: d.isCritical, isFumble: d.isFumble, dieCount: 1, results: [d.roll ?? 0] };
+    if (d.isHit === true && d.damage != null) {
+      const dmgResults = Array.isArray(d.damageResults) ? (d.damageResults as number[]) : [];
+      const dmgSum = dmgResults.length > 0 ? dmgResults.reduce((a, b) => a + b, 0) : 0;
+      const dm = String(d.damageDice ?? '').match(/d(\d+)/);
+      const dmgTotal = Number(d.damage ?? 0);
+      return [attackCard, {
+        type: 'damage', dieFace: dm ? `d${dm[1]}` : 'dmg', dieRoll: dmgSum,
+        modifier: dmgTotal - dmgSum, total: dmgTotal, success: true,
+        dieCount: dmgResults.length || 1, results: dmgResults.length > 0 ? dmgResults : [dmgTotal],
+        label: `${d.attacker ?? 'Player'} → ${d.enemy ?? d.target ?? 'Target'}`,
+      }];
+    }
+    return attackCard;
   } else if (toolName === 'cast_spell') {
     const atkRoll = d.attackRoll;
     if (atkRoll) {
       const spellLabel = d.damage ? 'Spell Attack → ' + d.damage.total + ' ' + (d.damage.type || '') + ' damage' : d.perBeam && d.perBeam.length > 1 ? d.perBeam.map((b: { attackRoll: { total: number }; isHit: boolean; damage: number }, i: number) => `Ray ${i+1}: ${b.attackRoll.total} to hit, ${b.isHit ? `${b.damage} ${d.damage?.type || ''} damage` : 'miss'}`).join(', ') : undefined;
-      return { type: 'cast_spell', dieFace: 'd20', dieRoll: atkRoll.d20, modifier: atkRoll.total - atkRoll.d20, total: atkRoll.total, isCritical: atkRoll.isCrit, isFumble: atkRoll.isFumble, label: spellLabel, dieCount: 1, results: [atkRoll.d20] };
+      const attackCard: RollData = { type: 'cast_spell', dieFace: 'd20', dieRoll: atkRoll.d20, modifier: atkRoll.total - atkRoll.d20, total: atkRoll.total, isCritical: atkRoll.isCrit, isFumble: atkRoll.isFumble, label: spellLabel, dieCount: 1, results: [atkRoll.d20] };
+      if (d.damage && d.damage.total > 0) {
+        return [attackCard, { type: 'cast_spell', dieFace: 'dmg', dieRoll: d.damage.total, modifier: 0, total: d.damage.total, label: `Spell Damage (${d.damage.type || 'damage'})`, dieCount: 1, results: [d.damage.total] }];
+      }
+      return attackCard;
     }
     if (d.damage) { return { type: 'cast_spell', dieFace: 'dmg', dieRoll: d.damage.total, modifier: 0, total: d.damage.total, dieCount: 1, results: [d.damage.total] }; }
     if (d.healing) { return { type: 'cast_spell', dieFace: 'd0', dieRoll: d.healing, modifier: 0, total: d.healing, label: 'Healing', dieCount: 1, results: [d.healing] }; }

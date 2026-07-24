@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MockMCPServer } from '../../services/mcpService';
 import { makeCharacter, makeWizard, makeCleric, makeBarbarian } from '../helpers/characters';
 import { applyCondition, hasCondition } from '../../services/conditionEngine';
+import { extractRollData } from '../../services/llm/narration';
 
 vi.mock('../../utils/random', () => ({
   cryptoRoll: vi.fn(),
@@ -122,6 +123,31 @@ describe('cast_spell', () => {
     expect(slotAfter).toBeDefined();
     if (!slotAfter) throw new Error('Expected spell-slot-1 to exist');
     expect(slotAfter.current).toBe(slotBefore);
+  });
+
+  it('extractRollData(fire-bolt) returns [attack, damage] cards on a spell-attack hit', async () => {
+    vi.mocked(cryptoRoll).mockReturnValue(20); // nat 20 → guaranteed hit + crit
+    const wizard = makeWizard();
+    server.joinParty(wizard);
+    await server.add_enemy('Goblin');
+    await server.start_combat();
+    const state0 = server.getFullState();
+    expect(state0.combat).toBeDefined();
+    const combat0 = state0.combat;
+    if (!combat0) throw new Error('Expected combat to be defined');
+    const enemyId = combat0.enemies[0].id;
+
+    const result = await server.cast_spell('wizard-1', 'fire-bolt', 0, [enemyId]);
+
+    expect(result.success).toBe(true);
+    const rollData = extractRollData('cast_spell', result);
+    expect(Array.isArray(rollData)).toBe(true);
+    const cards = rollData as import('../../types').RollData[];
+    const attackCard = cards.find(c => c.dieFace === 'd20');
+    expect(attackCard).toBeDefined();
+    const damageCard = cards.find(c => c.dieFace === 'dmg');
+    expect(damageCard).toBeDefined();
+    expect(damageCard?.total).toBeGreaterThan(0);
   });
 
   it('unknown spell returns fail', async () => {

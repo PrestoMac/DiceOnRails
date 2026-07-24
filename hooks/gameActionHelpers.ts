@@ -96,6 +96,15 @@ export async function dispatchToolRolls(toolName: string, args: Record<string, u
         const attackRollNum = (d.attackRoll as number | undefined) || 0;
         const targetAc = (d.targetAc as number | undefined) || 0;
         setTimeout(() => onTriggerDiceRoll({ characterName: attackerName, rollType: 'attack', label: `${attackerName}'s Attack vs ${targetName}`, rollResult: rollNum, modifier: attackRollNum - rollNum, sides: 20, difficulty: targetAc, success: d.isHit as boolean | undefined, isCritical: d.isCritical as boolean | undefined, isFumble: d.isFumble as boolean | undefined }), 0);
+        if (d.isHit === true && d.damage != null) {
+            const dmgResults = Array.isArray(d.damageResults) ? (d.damageResults as number[]) : [];
+            const dmgTotal = (d.damage as number) || 0;
+            const dm = String(d.damageDice || '').match(/d(\d+)/);
+            const sides = dm ? parseInt(dm[1], 10) : 6;
+            const rollResult = dmgResults.length > 0 ? dmgResults.reduce((x, y) => x + y, 0) : dmgTotal;
+            const modifier = dmgTotal - rollResult;
+            setTimeout(() => onTriggerDiceRoll({ characterName: attackerName, rollType: 'damage', label: `${attackerName} damage to ${targetName}`, rollResult, modifier, sides, count: dmgResults.length || 1, results: dmgResults.length > 0 ? dmgResults : [dmgTotal], success: true }), 3400);
+        }
     } else if (toolName === 'check_skill') {
         await onTriggerDiceRoll({ characterName: d.character || 'Character', skillName: args.skill_name as string, rollResult: d.roll, modifier: d.modifier, skillRank: d.skillRank, difficulty: d.difficulty, success: d.success, xpGained: d.xpGained });
     } else if (toolName === 'make_save') {
