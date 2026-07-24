@@ -296,6 +296,21 @@ describe('travelService — narrate_turn', () => {
       await service.narrate_turn('Short time.', 600);
       expect(char.conditions?.some(c => c.id.startsWith('exhaustion-'))).toBe(false);
     });
+
+    it('caps travel-fatigue at MAX_SAFE_EXHAUSTION regardless of advance size', async () => {
+      const char = makeChar();
+      state.party.push(char);
+      state.lastLongRestTime = 0;
+      state.gameTime = 0;
+
+      await service.narrate_turn('Two-day march.', 2880);
+
+      const levels = (char.conditions ?? []).filter(c => c.id.startsWith('exhaustion-'));
+      expect(levels.some(c => c.id === 'exhaustion-1')).toBe(true);
+      expect(levels.some(c => c.id === 'exhaustion-2')).toBe(true);
+      expect(levels.some(c => c.id === 'exhaustion-3')).toBe(false);
+      expect(char.hp.current).toBeGreaterThan(0);
+    });
   });
 
   describe('ensureGameStateFields initialization', () => {

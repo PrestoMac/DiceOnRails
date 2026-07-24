@@ -135,34 +135,6 @@ describe('move_to', () => {
     expect(server.getFullState().worldDescription).toBe('A dark cave filled with treasure');
   });
 
-  it('route travel calculates distance and time', async () => {
-    const char = makeCharacter();
-    server.joinParty(char);
-    await server.long_rest();
-
-    const result = await server.move_to('Neverwinter', '', 'hero-1', undefined, 'neverwinter-woods-trail', 'normal');
-
-    expect(result.success).toBe(true);
-    expect(result.data?.travelMinutes).toBeGreaterThan(0);
-    expect(result.data?.newLocation).toBe('Neverwinter');
-  });
-
-  it('different paces affect travel time', async () => {
-    const char = makeCharacter();
-    server.joinParty(char);
-    await server.long_rest();
-
-
-    const slowResult = await server.move_to('Neverwinter', '', undefined, undefined, 'neverwinter-woods-trail', 'slow');
-    expect(slowResult.success).toBe(false);
-    expect(slowResult.message).toContain('exhaustion');
-
-
-    const fastResult = await server.move_to('Neverwinter', '', undefined, undefined, 'neverwinter-woods-trail', 'fast');
-    expect(fastResult.success).toBe(true);
-    expect(fastResult.data?.travelMinutes).toBeGreaterThan(0);
-  });
-
   it('embedded skillCheck fires on non-route move', async () => {
     const char = makeCharacter();
     server.joinParty(char);
@@ -174,27 +146,6 @@ describe('move_to', () => {
     expect(result.success).toBe(true);
     expect(result.message).toContain('Skill');
     expect(char.location).toBe('Ancient Library');
-  });
-
-  it('skillCheck is ignored during route travel', async () => {
-    const char = makeCharacter();
-    server.joinParty(char);
-    await server.long_rest();
-    vi.mocked(cryptoRoll).mockReturnValue(1);
-
-    const skillCheck = { skill_name: 'perception', difficulty: 5, onSuccess: { awardCurrency: { gp: 100 } } };
-    const result = await server.move_to('Neverwinter', '', 'hero-1', skillCheck, 'neverwinter-woods-trail', 'normal');
-
-    expect(result.success).toBe(true);
-  });
-
-  it('invalid route returns fail', async () => {
-    const char = makeCharacter();
-    server.joinParty(char);
-
-    const result = await server.move_to('Nowhere', '', 'hero-1', undefined, 'nonexistent-route', 'normal');
-
-    expect(result.success).toBe(false);
   });
 
   it('moves single party member vs whole party', async () => {
@@ -212,5 +163,33 @@ describe('move_to', () => {
 
     expect(char1.location).toBe('Armory');
     expect(char2.location).toBe('Armory');
+  });
+
+  it('rejects move_to legs longer than 4 hours without moving the party', async () => {
+    const char = makeCharacter();
+    server.joinParty(char);
+    const before = char.location;
+
+    const result = await server.executeToolCall('move_to', {
+      location_name: 'Distant Castle',
+      timePassed: 600,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('4h');
+    expect(char.location).toBe(before);
+  });
+
+  it('allows move_to legs up to 4 hours', async () => {
+    const char = makeCharacter();
+    server.joinParty(char);
+
+    const result = await server.executeToolCall('move_to', {
+      location_name: 'Nearby Village',
+      timePassed: 240,
+    });
+
+    expect(result.success).toBe(true);
+    expect(char.location).toBe('Nearby Village');
   });
 });

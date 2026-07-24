@@ -42,33 +42,4 @@ describe('04_exploration', () => {
     expect(skillResult.data.success).toBeDefined();
   });
 
-  it('route travel: move_to(route=neverwinter-woods-trail, pace=normal) → travel time calculated', async () => {
-    const char = makeCharacter({ id: 'hero-1', name: 'Valerius' });
-    server.joinParty(char);
-    await server.long_rest();
-    vi.mocked(cryptoRoll).mockReturnValue(10);
-    const result = await server.executeToolCall('move_to', {
-      location_name: 'Neverwinter',
-      route: 'neverwinter-woods-trail',
-      pace: 'normal',
-    });
-    expect(result.success).toBe(true);
-    expect(result.data.newLocation).toBe('Neverwinter');
-    expect(result.data.travelMinutes).toBeGreaterThan(0);
-    expect(char.location).toBe('Neverwinter');
-  });
-
-  it('route + encounter: move_to with route triggers combat state on encounter', async () => {
-    const char = makeCharacter({ id: 'hero-1', name: 'Valerius' });
-    server.joinParty(char);
-    vi.mocked(cryptoRoll).mockReturnValue(20);
-    const result = await server.executeToolCall('move_to', {
-      location_name: 'Neverwinter',
-      route: 'neverwinter-woods-trail',
-      pace: 'normal',
-    });
-    expect(result.success).toBe(true);
-    expect(result.data.newLocation).toBe('Neverwinter');
-    expect(char.location).toBe('Neverwinter');
-  });
 });

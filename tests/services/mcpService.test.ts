@@ -2004,16 +2004,6 @@ const roundTripped = deepClone(char.conditions);
     });
   });
 
-  describe('route travel', () => {
-    it('calculates travel time and advances time', async () => {
-      server.setCharacter(makeCharacter());
-      await server.long_rest();
-      const result = await server.move_to('Neverwinter', '', 'hero-1', undefined, 'neverwinter-woods-trail', 'normal');
-      expect(result.success).toBe(true);
-      expect(result.data?.travelMinutes).toBeGreaterThan(0);
-    });
-  });
-
   describe('make_save on enemy targets', () => {
     it('rolls save for an enemy with fallback stats', async () => {
       server.setCharacter(makeCharacter());

@@ -17,26 +17,32 @@ import {
   getOffHandAbilityModifier,
 } from '../featsService';
 
-interface Route {
-  id: string; destination: string; distanceMiles: number;
-  terrain: 'road' | 'forest' | 'mountain' | 'swamp' | 'desert' | 'city';
-  encounterTable: Array<{ name: string; weight: number }>; description: string;
-}
-
-const EXHAUSTION_THRESHOLDS = [16, 18, 20, 22, 24, 26, 28, 30, 32, 34];
-function levelForHours(h: number): number {
+export const EXHAUSTION_THRESHOLDS = [16, 18, 20, 22, 24, 26, 28, 30, 32, 34];
+export function levelForHours(h: number): number {
   for (let i = 0; i < EXHAUSTION_THRESHOLDS.length; i++) {
     if (h < EXHAUSTION_THRESHOLDS[i]) return i;
   }
   return EXHAUSTION_THRESHOLDS.length;
 }
 
-const ROUTES: Record<string, Route> = {
-  'high-road': { id: 'high-road', destination: 'Waterdeep', distanceMiles: 120, terrain: 'road', encounterTable: [{ name: 'bandit', weight: 3 }, { name: 'merchant', weight: 4 }, { name: 'traveling-knight', weight: 2 }], description: 'A well-traveled trade road running along the Sword Coast.' },
-  'neverwinter-woods-trail': { id: 'neverwinter-woods-trail', destination: 'Neverwinter', distanceMiles: 50, terrain: 'forest', encounterTable: [{ name: 'wolf', weight: 4 }, { name: 'bandit', weight: 2 }, { name: 'treant', weight: 1 }], description: 'A winding path through the ancient Neverwinter Woods.' }
-};
+export const MAX_SAFE_EXHAUSTION = 2;
+export const MAX_MOVE_TO_LEG_MINUTES = 240;
 
-function getRoute(id: string): Route | undefined { return ROUTES[id.toLowerCase()]; }
+export interface TimeAdvanceValidation { ok: boolean; message: string; }
+
+export function validateTravelTimeAdvance(
+  toolName: string,
+  timePassed: number,
+): TimeAdvanceValidation {
+  const minutes = Math.max(0, timePassed);
+  if (toolName === 'move_to' && minutes > MAX_MOVE_TO_LEG_MINUTES) {
+    return {
+      ok: false,
+      message: `This journey leg is ${minutes} minutes — longer than the ${MAX_MOVE_TO_LEG_MINUTES}-minute (4h) maximum for a single move. Break the journey into shorter legs (one move_to per leg) and insert long_rest stops along the way.`,
+    };
+  }
+  return { ok: true, message: '' };
+}
 
 /** Dependencies required by the TravelService. */
 export interface TravelDeps {
@@ -49,7 +55,7 @@ export interface TravelDeps {
 
 /** Service interface for movement, narration, rests, dice rolling, and skill checks. */
 export interface TravelService {
-  move_to(location_name: string, description?: string, targetId?: string, skillCheck?: Record<string, unknown>, route?: string, pace?: string): Promise<MCPResponse>;
+  move_to(location_name: string, description?: string, targetId?: string, skillCheck?: Record<string, unknown>): Promise<MCPResponse>;
   narrate_turn(narration: string, timePassed?: number): Promise<MCPResponse>;
   setAtmosphere(url: string): void;
   setStartingLocation(location: { name: string; description: string; introHook?: string; atmosphereUrl?: string }): void;
@@ -353,65 +359,7 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
       };
     },
 
-    async move_to(location_name, description, targetId, skillCheck, route, pace) {
-      if (route) {
-        const routeDef = getRoute(route);
-        if (!routeDef) return fail(`Unknown route: "${route}".`);
-
-        const paceSpeed = pace === 'fast' ? 4 : pace === 'slow' ? 2 : 3;
-        const terrainMod = routeDef.terrain === 'road' ? 1 : routeDef.terrain === 'forest' ? 0.75 : 0.5;
-        const mph = paceSpeed * terrainMod;
-        const travelMinutes = Math.round((routeDef.distanceMiles / mph) * 60);
-
-        const logs: string[] = [];
-        logs.push(`Departing for ${routeDef.destination} via ${route}.`);
-        logs.push(`Distance: ${routeDef.distanceMiles} miles. Estimated travel time: ${Math.floor(travelMinutes / 60)}h ${travelMinutes % 60}m.`);
-
-        const watches = Math.max(1, Math.floor(travelMinutes / 240));
-        const encounters: string[] = [];
-        for (let w = 0; w < watches; w++) {
-          if (cryptoRoll(20) >= 17) {
-            const totalWeight = routeDef.encounterTable.reduce((s, e) => s + e.weight, 0);
-            let roll = cryptoRoll(totalWeight);
-            for (const entry of routeDef.encounterTable) {
-              roll -= entry.weight;
-              if (roll <= 0) { encounters.push(entry.name); break; }
-            }
-          }
-        }
-
-        if (encounters.length > 0) logs.push(`Encounters during travel: ${encounters.join(', ')}`);
-
-
-        const travelLastRestVal = (state.lastLongRestTime != null && state.lastLongRestTime >= 0)
-          ? state.lastLongRestTime
-          : (state.gameTime ?? 0);
-        const currentTravelHours = Math.floor(Math.max(0, ((state.gameTime ?? 0) - travelLastRestVal - 480)) / 60);
-        const projectedGameTime = (state.gameTime ?? 0) + travelMinutes;
-        const projectedTravelHours = Math.floor(Math.max(0, (projectedGameTime - travelLastRestVal - 480)) / 60);
-        const currentTravelLevel = levelForHours(currentTravelHours);
-        const projectedTravelLevel = levelForHours(projectedTravelHours);
-        if (projectedTravelLevel - currentTravelLevel > 2) {
-          return fail(`This ${travelMinutes}-minute route would push exhaustion from level ${currentTravelLevel} to level ${projectedTravelLevel} (${projectedTravelHours}h awake). Choose a closer destination or rest first.`);
-        }
-        if (currentTravelHours < 12 && projectedTravelHours >= 12 && projectedTravelLevel - currentTravelLevel <= 2) {
-          logs.push("This route will leave the party road-weary. Consider resting first.");
-        }
-
-        const narrateResult = await this.narrate_turn(
-          `The party travels along ${route}. ${routeDef.description}`,
-          travelMinutes
-        );
-
-        state.party.forEach(c => c.location = routeDef.destination);
-
-        return {
-          success: true,
-          data: { newLocation: routeDef.destination, travelMinutes, encounters, timeResult: narrateResult.data },
-          message: logs.join('\n') + '\n' + narrateResult.message
-        };
-      }
-
+    async move_to(location_name, description, targetId, skillCheck) {
       if (targetId) {
         const target = state.party.find(c => c.id === targetId);
         if (target) {
@@ -473,7 +421,7 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
           const charOffset = char.racialTraits?.includes('trance') ? lastRest - 240 : lastRest;
           const charHours = Math.max(0, Math.floor(Math.max(0, ((state.gameTime ?? 0) - charOffset - 480)) / 60));
 
-          for (let i = 0; i < EXHAUSTION_THRESHOLDS.length; i++) {
+          for (let i = 0; i < MAX_SAFE_EXHAUSTION; i++) {
             const level = i + 1;
             const threshold = EXHAUSTION_THRESHOLDS[i];
             if (charHours >= threshold && !hasCondition(char, `exhaustion-${level}`)) {
@@ -495,6 +443,9 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
                 logs.push(`${char.name} collapses from exhaustion — dead.`);
               }
             }
+          }
+          if (charHours >= EXHAUSTION_THRESHOLDS[MAX_SAFE_EXHAUSTION]) {
+            logs.push(`${char.name} has reached the maximum safe travel-fatigue (exhaustion ${MAX_SAFE_EXHAUSTION}) and must long_rest before traveling further.`);
           }
         }
 

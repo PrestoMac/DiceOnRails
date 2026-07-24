@@ -118,14 +118,6 @@ describe('questingTools', () => {
     it.each([
       { hoursAwake: 16, level: 1, totalMinutes: 1440 },
       { hoursAwake: 18, level: 2, totalMinutes: 1560 },
-      { hoursAwake: 20, level: 3, totalMinutes: 1680 },
-      { hoursAwake: 22, level: 4, totalMinutes: 1800 },
-      { hoursAwake: 24, level: 5, totalMinutes: 1920 },
-      { hoursAwake: 26, level: 6, totalMinutes: 2040 },
-      { hoursAwake: 28, level: 7, totalMinutes: 2160 },
-      { hoursAwake: 30, level: 8, totalMinutes: 2280 },
-      { hoursAwake: 32, level: 9, totalMinutes: 2400 },
-      { hoursAwake: 34, level: 10, totalMinutes: 2520 },
     ])('applies exhaustion level $level at $hoursAwake hours awake ($totalMinutes min)', async ({ totalMinutes, level }) => {
       server.joinParty(makeCharacter());
       await server.long_rest();
@@ -136,17 +128,21 @@ describe('questingTools', () => {
       expect(hasCondition(updated, `exhaustion-${level}`)).toBe(true);
     });
 
+    it('caps travel-fatigue at MAX_SAFE_EXHAUSTION regardless of awake hours', async () => {
+      server.joinParty(makeCharacter());
+      await server.long_rest();
+      await server.narrate_turn('An epic march...', 2880);
+      const { hasCondition } = await import('../../services/conditionEngine');
+      const updated = server.getTarget();
+      expect(updated).toBeDefined();
+      expect(hasCondition(updated, 'exhaustion-1')).toBe(true);
+      expect(hasCondition(updated, 'exhaustion-2')).toBe(true);
+      expect(hasCondition(updated, 'exhaustion-3')).toBe(false);
+    });
+
     it.each([
       { hoursBefore: 1, totalMinutes: 1439, level: 1 },
       { hoursBefore: 1, totalMinutes: 1559, level: 2 },
-      { hoursBefore: 1, totalMinutes: 1679, level: 3 },
-      { hoursBefore: 1, totalMinutes: 1799, level: 4 },
-      { hoursBefore: 1, totalMinutes: 1919, level: 5 },
-      { hoursBefore: 1, totalMinutes: 2039, level: 6 },
-      { hoursBefore: 1, totalMinutes: 2159, level: 7 },
-      { hoursBefore: 1, totalMinutes: 2279, level: 8 },
-      { hoursBefore: 1, totalMinutes: 2399, level: 9 },
-      { hoursBefore: 1, totalMinutes: 2519, level: 10 },
     ])('does not apply exhaustion level $level at $hoursBefore min before threshold', async ({ totalMinutes, level }) => {
       server.joinParty(makeCharacter());
       await server.long_rest();

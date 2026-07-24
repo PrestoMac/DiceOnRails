@@ -394,13 +394,13 @@ The single most important flow to understand. Entry point: `useGameActions.handl
      - Iteration 0 (no raw text) → push "you MUST call at least one tool" and continue.
      - Active combat, current actor is enemy, <5 iters → push "call next_turn".
      - Otherwise break.
-   - **End-of-turn detection:** if any tool call is `narrate_turn`, or a rest/move with narration/autoAdvanceTime/route, OR **any action tool carrying `narration`/`timePassed` or `narrationOnSuccess`/`narrationOnFailure` (gated out of combat)** → execute pre-end calls first, extract suggestions from their args, then (if time hasn't already advanced) execute `narrate_turn`, then break. The narration from inline-finalized or branched tools is captured as `inlineNarration` from the tool result's `data.narration` field.
+   - **End-of-turn detection:** if any tool call is `narrate_turn`, or a rest/move with narration/autoAdvanceTime, OR **any action tool carrying `narration`/`timePassed` or `narrationOnSuccess`/`narrationOnFailure` (gated out of combat)** → execute pre-end calls first, extract suggestions from their args, then (if time hasn't already advanced) execute `narrate_turn`, then break. The narration from inline-finalized or branched tools is captured as `inlineNarration` from the tool result's `data.narration` field.
   - Otherwise batch-execute all tool calls in parallel via `executeToolBatch`, append `{role: assistant, tool_calls}` + per-tool `{role: tool, tool_call_id}` messages, loop.
   - **Critical-tool tracking:** `cast_spell`, `inflict_damage`, `roll_dice`, `player_attack` — if any fails, set `criticalToolFailed` so we don't trust inline narration.
   - **Budget guard:** if estimated payload exceeds 95% of `CONTEXT_BUDGET`, break early.
   - **Combat shortcut:** if `next_turn` succeeded, break (turn is over).
 
-3. **Post-loop enforcement:** if no `narrate_turn` / rest / move-with-route / inline-finalize fired, synthesize a `narrate_turn(narration='', timePassed=0)` so conditions/DoTs/concentration still tick consistently. The check is gated by `if (!timeAdvancedThisTurn)` at `agentLoop.ts:385-390` — it is conditional, not unconditional.
+3. **Post-loop enforcement:** if no `narrate_turn` / rest / inline-finalize fired, synthesize a `narrate_turn(narration='', timePassed=0)` so conditions/DoTs/concentration still tick consistently. The check is gated by `if (!timeAdvancedThisTurn)` at `agentLoop.ts:385-390` — it is conditional, not unconditional.
 
 4. **Return:** `{ toolMessages, iterationCount, promptTokens, completionTokens, cachedTokens, inlineNarration, suggestions }`. `inlineNarration` is sanitized via `sanitizeNarration` at the return point to catch any remaining artifacts.
 
@@ -914,7 +914,7 @@ These are unwritten rules that hold across the codebase. Violate them at your pe
 
 ### Tools
 
-- **`narrate_turn` is the primary way game time advances**, but deterministic action tools (`update_inventory`, `adjust_currency`, `log_lore`, `upsert_quest`, simple `move_to`) can optionally carry `narration`+`timePassed` to advance time and end the turn in one call (inline finalization). Binary dice tools (`check_skill`, `make_save`) carry `narrationOnSuccess`/`narrationOnFailure` — the engine selects the branch from the roll. `long_rest`/`short_rest`/`move_to` (with route) also advance time inline. The agent loop enforces a no-op `narrate_turn(timePassed=0)` at the end if nothing else advanced time, so conditions/DoTs always tick.
+- **`narrate_turn` is the primary way game time advances**, but deterministic action tools (`update_inventory`, `adjust_currency`, `log_lore`, `upsert_quest`, simple `move_to`) can optionally carry `narration`+`timePassed` to advance time and end the turn in one call (inline finalization). Binary dice tools (`check_skill`, `make_save`) carry `narrationOnSuccess`/`narrationOnFailure` — the engine selects the branch from the roll. `long_rest`/`short_rest`/`move_to` (with inline `narration`/`timePassed`) also advance time inline. The agent loop enforces a no-op `narrate_turn(timePassed=0)` at the end if nothing else advanced time, so conditions/DoTs always tick. **Travel guardrails:** the named-route system is removed; `move_to` legs are capped at 240 min (longer legs rejected pre-dispatch), and the `narrate_turn` exhaustion loop is capped at `MAX_SAFE_EXHAUSTION` (2) so no single advance can kill via travel-fatigue.
 - **Never call `inflict_damage` after `player_attack` or `cast_spell`** — those tools handle damage atomically. This is repeated loudly in `TOOL_MODE_INSTRUCTION`.
 - **Spells never use `roll_dice`.** Spell attack rolls and damage are inside `cast_spell`.
 - **Critical tools** (`cast_spell`, `inflict_damage`, `roll_dice`, `player_attack`) failing sets `criticalToolFailed`, which suppresses inline narration and forces a separate narration pass.

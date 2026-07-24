@@ -125,7 +125,7 @@ Just type naturally — the GM figures out the mechanics.
 - `I try to pick the lock` → `check_skill` rolls Sleight of Hand vs DC
 - `I search the room for traps` → Perception check
 - `I take a long rest` → full heal, hit dice recovered, time advances 8h
-- `I travel to Neverwinter along the high road` → route-based travel with random encounters
+- `I travel to Neverwinter` → `move_to` in short legs (≤4h each) with rest stops; the engine blocks lethal over-exertion
 - `I buy a healing potion` → inventory update + gold deducted
 
 ### Keyboard / UX Shortcuts

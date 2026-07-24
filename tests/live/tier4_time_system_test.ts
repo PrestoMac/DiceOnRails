@@ -66,7 +66,7 @@ const SCENARIOS: Scenario[] = [
 
   { id: 8, name: 'Simple move', prompt: 'I walk to the blacksmith.', expectedTool: 'move_to', expectedTimeEffect: '0-5 min' },
   { id: 9, name: 'Move with search', prompt: 'I go to the library and look for a specific book.', expectedTool: 'move_to', expectedTimeEffect: '5-15 min' },
-  { id: 10, name: 'Long journey', prompt: 'I travel to Waterdeep on the high road.', expectedTool: 'move_to', expectedTimeEffect: '240+ min' },
+  { id: 10, name: 'Long journey', prompt: 'I travel to Waterdeep.', expectedTool: 'move_to', expectedTimeEffect: '≤ 240 min (chunked legs)' },
 
 
   { id: 11, name: 'Fight then wait', prompt: 'I attack the goblin with my sword.', expectedTool: 'player_attack', expectedTimeEffect: '0 min (combat round)' },

@@ -336,11 +336,10 @@ export async function runAgentLoop(
     });
 
     const combatActive = mcpServer.getFullState().combat?.isActive === true;
-    const isEndOfTurn = toolCalls.some((tc: { name: string; args?: { narration?: string; autoAdvanceTime?: boolean; route?: string; timePassed?: number; narrationOnSuccess?: string; narrationOnFailure?: string } }) =>
+    const isEndOfTurn = toolCalls.some((tc: { name: string; args?: { narration?: string; autoAdvanceTime?: boolean; timePassed?: number; narrationOnSuccess?: string; narrationOnFailure?: string } }) =>
       tc.name === 'narrate_turn' ||
       (tc.name === 'long_rest' && (tc.args?.narration || tc.args?.autoAdvanceTime)) ||
       (tc.name === 'short_rest' && (tc.args?.narration || tc.args?.autoAdvanceTime)) ||
-      (tc.name === 'move_to' && tc.args?.route) ||
       // Inline finalize: an action tool carrying narration/timePassed (deterministic)
       // or narrationOnSuccess/narrationOnFailure (binary dice) ends the turn.
       // The engine selected the branch from its own roll. Gated out of combat,

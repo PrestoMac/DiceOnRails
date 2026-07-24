@@ -6,7 +6,7 @@ export const tools = [
         type: "function",
         function: {
             name: 'move_to',
-            description: 'Moves the player to a new location. Supports automatic skill check and route travel.',
+            description: 'Moves the player to a new location. Supports an automatic skill check on arrival. For long journeys, break the trip into multiple move_to legs (each ~4 hours max) with long_rest stops along the way; the engine rejects any leg that would overexert the party.',
             parameters: {
                 type: 'object',
                 properties: {
@@ -26,15 +26,6 @@ export const tools = [
                             }
                         },
                         required: ['skill_name', 'difficulty']
-                    },
-                    route: {
-                        type: 'string',
-                        description: 'Optional: Named route for travel between locations (e.g. high-road, neverwinter-woods-trail).'
-                    },
-                    pace: {
-                        type: 'string',
-                        enum: ['slow', 'normal', 'fast'],
-                        description: 'Optional: Travel pace (default: normal).'
                     },
                     ...END_OF_TURN_PROPERTIES
                 },

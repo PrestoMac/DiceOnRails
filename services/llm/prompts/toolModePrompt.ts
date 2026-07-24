@@ -22,6 +22,7 @@ QUICK REFERENCE:
 - pay/give/steal/find money → adjust_currency
 - PURCHASES: call update_inventory ONCE with cost_gp/cost_sp/cost_cp (or autoDeductMarketPrice:true). Do NOT pair with a separate adjust_currency — the cost is deducted atomically.
 - move/go/leave/enter → move_to
+- LONG JOURNEYS: break multi-hour travel into short move_to legs (≤4h / 240 min of timePassed each) with long_rest stops along the way. The engine rejects longer legs and hard-caps travel-fatigue, so never try to fast-travel a whole day or more in one call — split it and rest when road-weary.
 - search/sneak/look/listen/recall → check_skill
 - take damage → inflict_damage (traps/environment only)
 - accept/complete quest → upsert_quest

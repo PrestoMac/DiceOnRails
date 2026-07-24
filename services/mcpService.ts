@@ -12,7 +12,7 @@ import { createSpellcastingService, SpellcastingService } from './mcp/spellcasti
 import { createProgressionService, ProgressionService } from './mcp/progressionService';
 import { createStateService, StateService } from './mcp/stateService';
 import { createContentService, ContentService } from './mcp/contentService';
-import { createTravelService, TravelService } from './mcp/travelService';
+import { createTravelService, TravelService, validateTravelTimeAdvance } from './mcp/travelService';
 
 export { generateId };
 
@@ -170,7 +170,7 @@ export class MockMCPServer {
   public async log_lore(title: string, content: string, category: string): Promise<MCPResponse> { return this.content.log_lore(title, content, category); }
 
 
-  public async move_to(location_name: string, description?: string, targetId?: string, skillCheck?: { skill_name?: string; difficulty?: number; onSuccess?: unknown }, route?: string, pace?: string): Promise<MCPResponse> { return this.travel.move_to(location_name, description, targetId, skillCheck, route, pace); }
+  public async move_to(location_name: string, description?: string, targetId?: string, skillCheck?: { skill_name?: string; difficulty?: number; onSuccess?: unknown }): Promise<MCPResponse> { return this.travel.move_to(location_name, description, targetId, skillCheck); }
   public async narrate_turn(narration: string, timePassed?: number): Promise<MCPResponse> { return this.travel.narrate_turn(narration, timePassed); }
   public setAtmosphere(url: string) { this.travel.setAtmosphere(url); }
   public setStartingLocation(location: { name: string; description: string; introHook?: string; atmosphereUrl?: string }) { this.travel.setStartingLocation(location); }
@@ -318,6 +318,12 @@ export class MockMCPServer {
       console.log(`[executeToolCall] Executing: ${name} with args:`, args);
     }
     try {
+      if (!this.state.combat?.isActive && typeof args.timePassed === 'number' && args.timePassed > 0) {
+        const validation = validateTravelTimeAdvance(name, args.timePassed);
+        if (!validation.ok) {
+          return { success: false, data: {}, message: validation.message };
+        }
+      }
       let res: MCPResponse;
       switch (name) {
         case 'roll_dice':
@@ -339,8 +345,8 @@ export class MockMCPServer {
         case 'player_attack':
           res = await this.combat.player_attack(String(args.attackerId || ''), String(args.weaponName || ''), String(args.targetId || args.target_name || args.target || ''), args.isOffHand as boolean | undefined, args.isSneakAttack as boolean | undefined, args.sharpshooter as boolean | undefined, args.greatWeaponMaster as boolean | undefined); break;
         case 'move_to': {
-          res = await this.travel.move_to(String(args.location_name || 'Unknown'), String(args.description || ''), args.targetId as string | undefined, args.skillCheck as unknown as { skill_name?: string; difficulty?: number; onSuccess?: unknown }, args.route as string | undefined, args.pace as string | undefined);
-          if (!args.route) res = await this.maybeFinalizeTurn(args, res);
+          res = await this.travel.move_to(String(args.location_name || 'Unknown'), String(args.description || ''), args.targetId as string | undefined, args.skillCheck as unknown as { skill_name?: string; difficulty?: number; onSuccess?: unknown });
+          res = await this.maybeFinalizeTurn(args, res);
           break;
         }
         case 'check_skill':
