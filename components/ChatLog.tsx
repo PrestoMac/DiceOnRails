@@ -53,13 +53,16 @@ function parseRolls(text: string): ParsedRoll[] {
     const dieRoll = parseInt(roll);
     const modifier = parseInt(mod);
     const total = dieRoll + modifier;
-    const totalHits = /\bHIT\b/i.test(text);
-    const totalMiss = /\bMISS\b/i.test(text);
+    const textBefore = text.substring(0, attackMatch.index);
+    const lastHit = textBefore.lastIndexOf('**HIT**');
+    const lastMiss = textBefore.lastIndexOf('**MISS**');
+    const hit = lastHit > lastMiss;
+    const miss = lastMiss > lastHit;
     const isNat20 = dieRoll === 20;
     const isNat1 = dieRoll === 1;
     const acMatch = text.match(/vs\s*AC\s*(\d+)/);
     const dc = acMatch ? parseInt(acMatch[1]) : undefined;
-    const success = isNat20 || isNat1 ? !isNat1 : totalHits ? true : totalMiss ? false : undefined;
+    const success = isNat20 || isNat1 ? !isNat1 : hit ? true : miss ? false : undefined;
 
     rolls.push({
       type: 'attack',
@@ -81,11 +84,14 @@ function parseRolls(text: string): ParsedRoll[] {
     const [, rollStr, acStr] = enemyMatch;
     const dieRoll = parseInt(rollStr);
     const dc = parseInt(acStr);
-    const totalHits = /\bHIT\b/i.test(text);
-    const totalMiss = /\bMISS\b/i.test(text);
+    const textBefore = text.substring(0, enemyMatch.index);
+    const lastHit = textBefore.lastIndexOf('**HIT**');
+    const lastMiss = textBefore.lastIndexOf('**MISS**');
+    const hit = lastHit > lastMiss;
+    const miss = lastMiss > lastHit;
     const isNat20 = dieRoll === 20;
     const isNat1 = dieRoll === 1;
-    const success = isNat20 || isNat1 ? !isNat1 : totalHits ? true : totalMiss ? false : undefined;
+    const success = isNat20 || isNat1 ? !isNat1 : hit ? true : miss ? false : undefined;
     rolls.push({
       type: 'attack',
       dieFace: 'd20',
