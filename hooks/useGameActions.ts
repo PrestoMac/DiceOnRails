@@ -50,6 +50,15 @@ function insertToolCallMessages(
   const result: Message[] = [];
   let i = 0;
   while (i < toolMessages.length) {
+    // Pass non-TOOL messages (e.g. SYSTEM log messages from narrate_turn's ambient
+    // events) straight through. Without this guard, a SYSTEM message would stall the
+    // inner while loop indefinitely since i is never incremented for non-TOOL roles,
+    // causing an infinite loop that freezes the UI on "The Fates are deciding...".
+    if (toolMessages[i].role !== MessageRole.TOOL) {
+      result.push(toolMessages[i]);
+      i++;
+      continue;
+    }
     const batch: Message[] = [];
     while (i < toolMessages.length && toolMessages[i].role === MessageRole.TOOL) {
       batch.push(toolMessages[i]);
