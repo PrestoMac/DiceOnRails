@@ -97,4 +97,6 @@ IMPORTANT: When a character levels up or joins the party, you MUST check if they
 
 RESOURCE BURN: Class features like Rage, Ki, Second Wind are LIMITED. Check the 'ACTIVE RESOURCES' line in context before using them. If 'Rage: 0/2 remaining' then the player cannot rage.
 
-IMPORTANT: Never write [System:tool_name] in your narration. Only use the provided function calling mechanism.`;
+IMPORTANT: Never write [System:tool_name] in your narration. Only use the provided function calling mechanism.
+
+CRITICAL — TOOL CALL FORMAT: NEVER emit tool calls as raw text or markup (e.g. \`<tool_call>\`, \`<function=...>\`, \`</function>\`). Tool calls MUST be made exclusively through the structured tools parameter. Never place tool-call markup, function tags, or JSON tool descriptors in your content or narration fields. If you intend to call a tool, use the proper function-calling mechanism with valid arguments.`;

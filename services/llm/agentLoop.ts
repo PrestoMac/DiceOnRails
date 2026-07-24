@@ -7,6 +7,7 @@ import { mcpServer } from '../mcpService';
 import { tools, TOOL_MODE_INSTRUCTION } from './tools';
 import { extractRollData, formatToolResult } from './narration';
 import { estimateTokens, PER_MSG_OVERHEAD, STATIC_OVERHEAD, COMPLETION_RESERVE, CONTEXT_BUDGET } from './tokenEstimation';
+import { sanitizeNarration } from '../../utils/textSanitize';
 import { filterTools } from './toolFilter';
 import { resolveLLMConfig, mapHistoryToMessages } from './llmApiClient';
 import { CONDITION_INFO } from '../../data/conditionInfo';
@@ -189,6 +190,7 @@ export async function runAgentLoop(
   let inlineNarration: string | undefined;
   let suggestions: string[] | undefined;
   let narrateTurnExecuted = false;
+  let correctiveRetries = 0;
 
   for (let iter = 0; iter < MAX_ITERS; iter++) {
     itersCompleted = iter + 1;
@@ -253,6 +255,20 @@ export async function runAgentLoop(
     }
 
     if (rawToolCalls.length === 0) {
+      // Layer-2 guardrail: the model suffered a tool-calling format failure and emitted
+      // its calls as raw <tool_call>/<function> text instead of using the structured
+      // tool_calls field. Nudge it to re-issue proper structured calls (recovers dropped
+      // calls like award_experience). Up to 2 corrective retries.
+      const rawToolText = /<tool_call>|<function\s*=|<\/function>/i.test(assistantContent);
+      if (rawToolText && correctiveRetries < 2) {
+        correctiveRetries++;
+        if (isDebugMode) console.warn(`[AgentLoop] Raw <tool_call> text detected (iter ${iter + 1}); issuing corrective retry ${correctiveRetries}/2`);
+        messages.push({
+          role: 'user',
+          content: 'You emitted tool calls as raw <tool_call>/<function> text in your content. That is not valid — tool calls MUST use the structured function-calling mechanism (the tools parameter), never markup in text. Re-issue your intended tool calls now, choosing from the provided tool definitions, with proper arguments.',
+        });
+        continue;
+      }
       if (iter === 0) {
         messages.push({ role: 'user', content: 'You MUST call at least one tool. Determine the correct tool and call it now.' });
         continue;
@@ -434,7 +450,7 @@ export async function runAgentLoop(
     promptTokens: totalPrompt,
     completionTokens: totalCompletion,
     cachedTokens: totalCached,
-    inlineNarration,
+    inlineNarration: sanitizeNarration(inlineNarration) || undefined,
     suggestions,
   };
 }

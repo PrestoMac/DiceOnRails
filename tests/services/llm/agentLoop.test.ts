@@ -422,4 +422,60 @@ describe('runAgentLoop', () => {
     const leaked = result.toolMessages.find(m => m.text.includes('DUPECHECKTOKEN'));
     expect(leaked).toBeUndefined();
   });
+
+  it('detects raw <tool_call> text in content and issues a corrective retry', async () => {
+    mockFetch
+      .mockResolvedValueOnce(makeLLMResponse('<tool_call> <function=move_to> </function> </tool_call>'))
+      .mockResolvedValueOnce(makeLLMResponse('', [
+        { name: 'narrate_turn', args: { narration: 'You step into the tavern.', timePassed: 0 } },
+      ]));
+
+    const result = await runAgentLoop(
+      [{ id: 'u1', role: MessageRole.USER, text: 'enter', timestamp: 0 }],
+      'Tavern',
+    );
+
+    expect(result.iterationCount).toBe(2);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    // The 2nd request must carry the corrective nudge.
+    const secondBody = JSON.parse((mockFetch.mock.calls[1][1] as { body: string }).body);
+    const nudge = secondBody.messages.find((m: { role: string; content: string }) =>
+      m.role === 'user' && m.content.includes('raw <tool_call>'));
+    expect(nudge).toBeDefined();
+  });
+
+  it('breaks gracefully after 2 corrective retries still produce raw tool text', async () => {
+    mockFetch
+      .mockResolvedValueOnce(makeLLMResponse('<tool_call><function=x></function></tool_call>'))
+      .mockResolvedValueOnce(makeLLMResponse('<tool_call><function=y></function></tool_call>'))
+      .mockResolvedValueOnce(makeLLMResponse('<tool_call><function=z></function></tool_call>'));
+
+    const result = await runAgentLoop(
+      [{ id: 'u1', role: MessageRole.USER, text: 'go', timestamp: 0 }],
+      'Tavern',
+    );
+
+    // 2 corrective retries (iters 1+2), then a 3rd that breaks (no structured calls, past iter 0).
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+    expect(result.iterationCount).toBe(3);
+  });
+
+  it('sanitizes tool-call markup from a narrate_turn narration argument', async () => {
+    mockFetch.mockResolvedValueOnce(makeLLMResponse('', [
+      { name: 'narrate_turn', args: {
+          narration: 'The heavy door creaks open. <tool_call><function=x></function></tool_call> A cold wind rushes in.',
+          timePassed: 1,
+      } },
+    ]));
+
+    const result = await runAgentLoop(
+      [{ id: 'u1', role: MessageRole.USER, text: 'open the door', timestamp: 0 }],
+      'Tavern',
+      undefined, undefined, undefined,
+      { requestEndNarration: true },
+    );
+
+    // The bubble receives clean prose; the markup never leaks through.
+    expect(result.inlineNarration).toBe('The heavy door creaks open. A cold wind rushes in.');
+  });
 });

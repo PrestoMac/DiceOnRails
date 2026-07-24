@@ -1,6 +1,7 @@
 import { GameState, MCPResponse, Character, Message, EnemyAttack, InventoryItem, Currency, Enemy, InitiativeEntry } from '../types';
 import { isDebugMode } from '../utils/debug';
 import { cryptoRoll } from '../utils/random';
+import { sanitizeNarration } from '../utils/textSanitize';
 import { supabase } from './supabaseClient';
 import { lookupSRDItem } from '../utils/srdItems';
 import { generateId, fail } from './mcp/_shared';
@@ -257,6 +258,7 @@ export class MockMCPServer {
     } else {
       narrationText = String(args.narration ?? '');
     }
+    narrationText = sanitizeNarration(narrationText);
 
     const timePassed = Number(args.timePassed ?? 0) || 0;
     if (!narrationText.trim() && timePassed === 0) return baseResult;
@@ -389,9 +391,10 @@ export class MockMCPServer {
         case 'cast_ritual': {
           const ritualRes = await this.spells.cast_ritual(String(args.characterId || args.casterId || ''), String(args.spellId || ''));
           if (!this.state.combat?.isActive && ritualRes.success) {
-            const ritualNarration = typeof args.narration === 'string' && (args.narration as string).trim()
+            const rawRitualNarration = typeof args.narration === 'string' && (args.narration as string).trim()
               ? (args.narration as string)
               : `${String(args.characterId || args.casterId || 'The caster')} completes the ${String(args.spellId || '')} ritual.`;
+            const ritualNarration = sanitizeNarration(rawRitualNarration) || rawRitualNarration;
             const ritualTime = await this.travel.narrate_turn(ritualNarration, 10);
             const ritualData = ritualTime.data as { logs?: unknown } | undefined;
             const ritualLogs = Array.isArray(ritualData?.logs) ? ritualData.logs as string[] : [];
@@ -411,7 +414,7 @@ export class MockMCPServer {
           } else if (isDebugMode) {
             console.log('[narrate_turn] No suggestions in args');
           }
-          res = await this.travel.narrate_turn(String(args.narration || ''), Number(args.timePassed ?? 0)); break;
+          res = await this.travel.narrate_turn(sanitizeNarration(String(args.narration || '')), Number(args.timePassed ?? 0)); break;
         default:
           res = fail(`Unknown tool: ${name}`);
       }
