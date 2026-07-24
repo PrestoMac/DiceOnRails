@@ -35,6 +35,21 @@ export const storageService = {
         return () => { supabase.removeChannel(channel); };
     },
 
+    /** Fetches the current game_state for a campaign from Supabase. Returns null on error or if not found. Used by batch execution to preserve queue items added by other players during processing. */
+    async fetchGameState(campaignId: string): Promise<GameState | null> {
+        try {
+            const { data, error } = await supabase
+                .from(CAMPAIGNS_TABLE)
+                .select('game_state')
+                .eq('id', campaignId)
+                .single();
+            if (error || !data) return null;
+            return data.game_state as GameState;
+        } catch {
+            return null;
+        }
+    },
+
     /** Persists game state for a campaign: localStorage for anonymous play, Supabase (coalesced via microtask) for syncable campaigns. */
     syncCampaignState(campaignId: string, gameState: GameState, messages?: Message[]): Promise<void> {
         if (campaignId === ANONYMOUS_CAMPAIGN_ID) {

@@ -333,18 +333,20 @@ export const useGameActions = (
         processingRef.current = true;
         setIsLoading(true);
         const currentMessages = messagesRef.current;
+
+        const batchText = "[Collaborative Turn]\n" + gameState.actionQueue.map(item => `[${item.playerName}]: ${item.type === 'dialogue' ? `"${item.text}"` : item.text}`).join("\n");
+        const userMsg: Message = { id: 'batch-' + Date.now(), role: MessageRole.USER, text: batchText, senderName: "Party", timestamp: Date.now() };
+
         const lockedState = { ...gameState, isProcessing: true, processingUser: "Party" };
         mcpServer.beginTransaction();
         setGameState(lockedState); mcpServer.loadState(lockedState);
-        if (isSyncableCampaign(currentCampaignId)) storageService.syncCampaignState(currentCampaignId, lockedState).catch(e => console.warn('[Sync] failed:', e));
+        setMessages(prev => [...prev, userMsg]);
+        if (isSyncableCampaign(currentCampaignId)) storageService.syncCampaignState(currentCampaignId, lockedState, [...currentMessages, userMsg]).catch(e => console.warn('[Sync] failed:', e));
 
-        const batchText = "[Collaborative Turn]\n" + gameState.actionQueue.map(item => `[${item.playerName}]: ${item.type === 'dialogue' ? `"${item.text}"` : item.text}`).join("\n");
         const turnStart = Date.now();
         let firstDeltaAt: number | null = null;
 
         try {
-            const userMsg: Message = { id: 'batch-' + Date.now(), role: MessageRole.USER, text: batchText, senderName: "Party", timestamp: Date.now() };
-            setMessages(prev => [...prev, userMsg]);
             mcpServer.saveRewindPoint(mcpServer.getFullState(), [...currentMessages, userMsg]);
             mcpServer.saveEmergencySnapshot(mcpServer.getFullState());
 
@@ -355,8 +357,13 @@ export const useGameActions = (
             const batchAllMessages = [...currentMessages, userMsg];
             const batchCtxPrep = prepContext(ctxRef.current, batchAllMessages, batchContext);
             const historyForAPI = batchCtxPrep.activeMessages;
+            const batchCurrentState = mcpServer.getFullState();
             if (isDebugMode) console.log('[handleExecuteBatch] calling runAgentLoop', { historyLen: historyForAPI.length, queueSize: gameState.actionQueue?.length });
-            const result = await runAgentLoop(historyForAPI, batchContext, batchCtxPrep.frozen, undefined, undefined, { requestEndNarration: true, sessionId });
+            const result = await runAgentLoop(historyForAPI, batchContext, batchCtxPrep.frozen,
+                async (toolName, args, toolResult) => {
+                    await dispatchToolRolls(toolName, args, toolResult, onTriggerDiceRoll, batchCurrentState, myCharacterId);
+                    if (toolName === 'move_to' && settings.enableAtmosphere) performAtmosphereUpdate(args.location_name as string, args.description as string | undefined, settings);
+                }, undefined, { requestEndNarration: true, enableSuggestions: !!settings.enableSuggestions, sessionId });
             mcpServer.commitTransaction();
 
             const streamingId = `model-${Date.now()}`;
@@ -370,13 +377,14 @@ export const useGameActions = (
             if (!result.inlineNarration) {
                 console.warn('[Narration] No inline narration from batch agent loop. Retrying with generateNarration...', { toolCount: result.toolMessages.length, inlineNarration: result.inlineNarration });
                 try {
-                    const retry = await generateNarration(historyForAPI, batchContext, batchCtxPrep.frozen, undefined, sessionId);
-                    const cleanRetry = sanitizeNarration(retry.text);
+                    const retry = await withNarrationRetryTimeout(generateNarration(historyForAPI, batchContext, batchCtxPrep.frozen, undefined, sessionId));
+                    const retryText = retry?.text ?? '';
+                    const cleanRetry = sanitizeNarration(retryText);
                     if (cleanRetry.length >= 25) {
                         finalNarration = cleanRetry;
                         if (isDebugMode) console.log('[Narration] Batch retry succeeded', { len: finalNarration.length });
                     } else {
-                        console.warn('[Narration] Batch retry produced empty/short/artifact-only text', { length: retry.text?.length ?? 0, preview: (retry.text ?? '').slice(0, 80) });
+                        console.warn('[Narration] Batch retry produced empty/short/artifact-only text', { length: retryText.length, preview: retryText.slice(0, 80) });
                     }
                 } catch (err) {
                     console.error('[Narration] Batch retry failed:', err instanceof Error ? err.message : String(err));
@@ -385,8 +393,9 @@ export const useGameActions = (
             // Tier-3: minimal-prompt LLM retry.
             if (!result.inlineNarration && sanitizeNarration(finalNarration).length < 25) {
                 try {
-                    const simple = await generateNarrationSimple(historyForAPI, batchContext, batchCtxPrep.frozen, undefined, sessionId);
-                    const cleanSimple = sanitizeNarration(simple.text);
+                    const simple = await withNarrationRetryTimeout(generateNarrationSimple(historyForAPI, batchContext, batchCtxPrep.frozen, undefined, sessionId));
+                    const simpleText = simple?.text ?? '';
+                    const cleanSimple = sanitizeNarration(simpleText);
                     if (cleanSimple.length >= 25) {
                         finalNarration = cleanSimple;
                         if (isDebugMode) console.log('[Narration] Batch simple retry succeeded', { len: finalNarration.length });
@@ -408,10 +417,26 @@ export const useGameActions = (
             const safeNarration = sanitizeNarration(finalNarration);
             const modelMsg: Message = { id: streamingId, role: MessageRole.MODEL, text: safeNarration || 'The adventure continues...', timestamp: Date.now() };
             setMessages(prev => prev.map(m => m.id === streamingId ? modelMsg : m));
-            processingRef.current = false;
+
+            const turnSuggestions = result.suggestions || [];
 
             const messagesToSync = [...currentMessages, userMsg, ...insertToolCallMessages(currentMessages, result.toolMessages, 'model-synth'), modelMsg];
-            syncFinished(messagesToSync, { actionQueue: [] });
+
+            let preservedQueue: GameState['actionQueue'] = [];
+            if (isSyncableCampaign(currentCampaignId)) {
+                try {
+                    const remoteState = await storageService.fetchGameState(currentCampaignId);
+                    if (remoteState?.actionQueue) {
+                        const executedIds = new Set((gameState.actionQueue || []).map(q => q.id));
+                        preservedQueue = remoteState.actionQueue.filter(q => !executedIds.has(q.id));
+                    }
+                } catch {
+                    // Fetch failed — proceed with empty queue (original behavior)
+                }
+            }
+
+            processingRef.current = false;
+            syncFinished(messagesToSync, { actionQueue: preservedQueue, lastSuggestions: turnSuggestions });
             autoSpeak(modelMsg.text);
             messagesRef.current = messagesToSync;
             runPipeline_();
@@ -425,11 +450,13 @@ export const useGameActions = (
             if (isDebugMode) console.error("Batch failure:", err);
             mcpServer.rollbackTransaction();
             processingRef.current = false;
-            const finalState = { ...gameState, isProcessing: false };
-            setGameState(finalState);
-            if (isSyncableCampaign(currentCampaignId)) storageService.syncCampaignState(currentCampaignId, finalState).catch(e => console.warn('[Sync] failed:', e));
+            if (isSyncableCampaign(currentCampaignId)) {
+                const finalState = { ...mcpServer.getFullState(), isProcessing: false, processingUser: undefined };
+                mcpServer.loadState(finalState); setGameState(finalState);
+                storageService.syncCampaignState(currentCampaignId, finalState).catch(e => console.warn('[Sync] failed:', e));
+            }
         } finally {
-            setIsLoading(false);
+            setIsLoading(false); syncState();
         }
     };
 
@@ -466,6 +493,9 @@ export const useGameActions = (
 
     const handleSendMessageRef = useRef(handleSendMessage);
     handleSendMessageRef.current = handleSendMessage;
+
+    const handleExecuteBatchRef = useRef(handleExecuteBatch);
+    handleExecuteBatchRef.current = handleExecuteBatch;
 
     // Restores game state, messages, and LLM context to before the most recent
     // user turn. Shared by handleUndo (pure undo) and handleRewind (undo + retry).
@@ -577,7 +607,11 @@ export const useGameActions = (
         const text = await restoreToBeforeLastTurn();
         if (text) {
             if (isDebugMode) console.log('[handleRewind] retrying', { text: text.slice(0, 80) });
-            setTimeout(() => handleSendMessageRef.current(text, true), 100);
+            if (text.startsWith('[Collaborative Turn]') && (mcpServer.getFullState().actionQueue?.length ?? 0) > 0) {
+                setTimeout(() => handleExecuteBatchRef.current(), 100);
+            } else {
+                setTimeout(() => handleSendMessageRef.current(text, true), 100);
+            }
         }
     }, [restoreToBeforeLastTurn]);
 

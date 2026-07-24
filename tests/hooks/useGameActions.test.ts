@@ -66,6 +66,7 @@ vi.mock('../../services/storageService', () => ({
     syncCampaignState: vi.fn().mockResolvedValue(undefined),
     createCampaign: vi.fn().mockResolvedValue(undefined),
     saveGame: vi.fn().mockResolvedValue(undefined),
+    fetchGameState: vi.fn().mockResolvedValue(null),
   },
 }));
 

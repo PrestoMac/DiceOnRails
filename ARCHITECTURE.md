@@ -404,21 +404,24 @@ The single most important flow to understand. Entry point: `useGameActions.handl
 
 ### Batched party turns (`handleExecuteBatch`)
 
-`useGameActions.ts:272`. When multiplayer action queue is flushed:
+`useGameActions.ts:329`. When multiplayer action queue is flushed:
 
-- Builds a `[Collaborative Turn]` user message containing every queued entry tagged with player name.
-- Same agent-loop flow but with a `batchContext` that emphasizes "process ALL actions".
-- Wraps the whole thing in `beginTransaction`/`rollbackTransaction` so a mid-batch failure rolls back cleanly.
-- Clears `actionQueue` on success.
+- Builds a `[Collaborative Turn]` user message containing every queued entry tagged with player name. Message is created and broadcast *before* the lock sync so remote players see what's being processed.
+- Same agent-loop flow as solo, including `dispatchToolRolls` (dice roll animations), `enableSuggestions`, and atmosphere updates on `move_to` — full parity with `handleSendMessage`.
+- Narration retry chain (tiers 2+3) is wrapped in `withNarrationRetryTimeout` (45s `Promise.race`) — same freeze protection as solo.
+- Error handler mirrors solo: reads from `mcpServer.getFullState()` (not stale closure), clears both `isProcessing` and `processingUser`, calls `mcpServer.loadState()` + `syncState()`.
+- Queue preservation: before clearing the queue on success, fetches the latest campaign state from Supabase (`storageService.fetchGameState`) and filters out only the executed item IDs — items added by other players during processing are preserved. Falls back to `[]` on fetch failure.
+- `handleRewind` detects `[Collaborative Turn]` messages and re-executes via `handleExecuteBatchRef` (the queue items are restored by the undo snapshot).
 
 ### Rewind flow (`handleRewind`)
 
-`useGameActions.ts:373`:
+`useGameActions.ts:606`:
 
 1. If currently processing → bail.
 2. Load the rewind point (state + messages from before the user's last message).
 3. If no rewind point → fall back to emergency snapshot, slice messages back to the last user msg, **bump `ctx.generation`** (invalidates in-flight compression), and re-call `handleSendMessage(text, isRetry=true)`.
-4. Otherwise restore the snapshot, restore messages, **bump generation**, sync to Supabase, and re-call `handleSendMessage(originalText, isRetry=true)`.
+4. Otherwise restore the snapshot, restore messages, **bump generation**, sync to Supabase, and re-call retry.
+5. Retry routing: if the restored text starts with `[Collaborative Turn]` AND the engine has queue items (restored from snapshot), re-execute via `handleExecuteBatchRef` (batch retry). Otherwise re-send via `handleSendMessageRef(text, isRetry=true)` (solo retry).
 
 ---
 
