@@ -465,6 +465,9 @@ export const useGameActions = (
             const lastUserIdx = currentMsgs.map(m => m.id).lastIndexOf(lastUserMsg.id);
             const restoredMessages = currentMsgs.slice(0, lastUserIdx);
             setMessages(restoredMessages);
+            // Sync the ref mirror immediately so a prompt retry captures the rewound
+            // list instead of a stale, pre-rewind snapshot.
+            messagesRef.current = restoredMessages;
             processingRef.current = false; setIsLoading(false);
 
             if (emergencySnap) {
@@ -505,6 +508,9 @@ export const useGameActions = (
         const restoredState = mcpServer.getFullState();
         mcpServer.loadState(restoredState);
         setMessages(snapshot.messages.slice(0, -1)); setGameState(restoredState);
+        // Sync the ref mirror immediately so a prompt retry captures the rewound
+        // list instead of a stale, pre-rewind snapshot.
+        messagesRef.current = snapshot.messages.slice(0, -1);
 
         const gs = restoredState as unknown as { ctx?: { episodeCheckpoints?: unknown[]; frozenRawHistory?: string; frozenRawTokens?: number; frozenMessageCount?: number; turnCounter?: number } };
         ctxRef.current = {

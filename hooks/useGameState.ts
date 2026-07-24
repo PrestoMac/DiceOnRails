@@ -23,6 +23,8 @@ export const useGameState = (userId: string | undefined) => {
     const [viewingCharacterId, setViewingCharacterId] = useState<string | null>(null);
 
     const isProcessingRef = useRef(false);
+    // Timestamp the local realtime-lock was engaged, for the self-heal watchdog.
+    const isProcessingLockedAt = useRef<number | null>(null);
 
     const syncState = useCallback(() => {
         setGameState(mcpServer.getFullState());
@@ -49,8 +51,13 @@ export const useGameState = (userId: string | undefined) => {
                 setMessages(data.messages);
 
                 const safeState = data.gameState ?? mcpServer.getFullState();
-                mcpServer.loadState(safeState);
+                // A fresh page load / campaign switch has no turn in flight. Strip any
+                // persisted `isProcessing: true` so the UI never boots into a frozen state.
+                const cleanState = { ...safeState, isProcessing: false, processingUser: undefined };
+                mcpServer.loadState(cleanState);
                 setGameState(mcpServer.getFullState());
+                isProcessingRef.current = false;
+                isProcessingLockedAt.current = null;
 
                 const enrichedState = mcpServer.getFullState();
                 const lastUserIdx = data.messages.map(m => m.id).lastIndexOf(
@@ -147,17 +154,30 @@ export const useGameState = (userId: string | undefined) => {
                         if (isDebugMode) console.log('[DEBUG useGameState] applying remote state, isProcessing:', isProcessing);
                         mcpServer.loadState(remoteState);
                         setGameState(mcpServer.getFullState());
+                        // Only accept remote messages alongside remote state. A heartbeat
+                        // echo during an in-flight turn carries a stale messages snapshot
+                        // and must not clobber the local placeholder/tool messages.
+                        if (remoteMessages) setMessages(remoteMessages);
                         isProcessingRef.current = isProcessing;
+                        isProcessingLockedAt.current = isProcessing ? Date.now() : null;
                     } else {
                         if (isDebugMode) console.log('[DEBUG useGameState] SKIPPING remote state (isProcessingRef still true)');
                     }
                 }
-                if (remoteMessages) {
-                    setMessages(remoteMessages);
-                }
             });
 
-            return () => { if (isDebugMode) console.log('[DEBUG useGameState] unsubscribing'); unsubscribe(); };
+            // Self-heal watchdog: if the realtime lock stays engaged beyond a sane bound
+            // (e.g. the isProcessing:false unlock payload was dropped/rejected), force-clear
+            // it so remote updates resume instead of locking the client out until reload.
+            const WATCHDOG_MS = 180000;
+            const watchdog = setInterval(() => {
+                if (isProcessingRef.current && isProcessingLockedAt.current !== null && Date.now() - isProcessingLockedAt.current > WATCHDOG_MS) {
+                    if (isDebugMode) console.warn('[DEBUG useGameState] isProcessingRef stuck >' + WATCHDOG_MS + 'ms, force-clearing');
+                    isProcessingRef.current = false;
+                    isProcessingLockedAt.current = null;
+                }
+            }, 30000);
+            return () => { if (isDebugMode) console.log('[DEBUG useGameState] unsubscribing'); clearInterval(watchdog); unsubscribe(); };
         }
     }, [currentCampaignId, stage]);
 
