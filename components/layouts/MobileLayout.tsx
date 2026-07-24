@@ -40,9 +40,9 @@ const HpStatusBar: React.FC<{ character: Character }> = ({ character }) => (
 /** Primary mobile layout with 3-tab navigation (adventure/character/journal), queue drawer, and bottom nav bar. */
 const MobileLayout: React.FC = () => {
   const {
-    stage, currentCampaignId, gameState, messages,
+    stage, currentCampaignId, hostId, gameState, messages,
     isLoading, myCharacterId, viewingCharacterId, setViewingCharacterId,
-    setStage, resetGame, handleUpdateInventory,
+    setStage, resetGame, handleUpdateInventory, handleUpdateCharacterFields,
     handleEnqueueAction, handleRemoveQueueItem, handleUpdateQueueItem,
     handleReorderQueue, syncState,
   } = useGameContext();
@@ -120,7 +120,7 @@ const MobileLayout: React.FC = () => {
         </>}
         {mobileTab==='character'&&<div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
           {isMultiplayer && <div className="flex gap-2 overflow-x-auto pb-2 mb-2">{gameState.party.map((char: Character) => <button key={char.id} onClick={() => setViewingCharacterId(char.id)} className={`p-2 rounded text-xs whitespace-nowrap ${viewingCharacterId===char.id?'bg-amber-700 text-white':'bg-stone-800 text-stone-400'}`}>{char.name}{char.id===myCharacterId?' (You)':''}</button>)}</div>}
-          {charToShow?<CharacterSheet character={charToShow} onUpdateInventory={handleUpdateInventory} onLevelUp={handleOpenLevelUp} onSendMessage={handleSendMessage} onTriggerDiceRoll={handleTriggerDiceRoll}/>:<div className="text-stone-500 text-center mt-10">No characters in party.</div>}
+          {charToShow?<CharacterSheet character={charToShow} onUpdateInventory={handleUpdateInventory} onLevelUp={handleOpenLevelUp} onSendMessage={handleSendMessage} onTriggerDiceRoll={handleTriggerDiceRoll} isProcessing={gameState.isProcessing} currentUserId={userId} isHost={!!userId && userId === hostId} onUpdateCharacterFields={handleUpdateCharacterFields}/>:<div className="text-stone-500 text-center mt-10">No characters in party.</div>}
         </div>}
         {mobileTab==='journal'&&<div className="flex-1 overflow-y-auto p-4 custom-scrollbar"><Journal quests={gameState.quests} lore={gameState.lore}/></div>}
       </div>

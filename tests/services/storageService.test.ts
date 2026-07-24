@@ -258,6 +258,28 @@ describe('storageService', () => {
     });
   });
 
+  describe('loadGame with Supabase (authenticated)', () => {
+    it('carries host_id from the campaign row into SavedGameData.hostId', async () => {
+      chainData = {
+        id: 'camp-1', name: 'My Campaign', host_id: 'host-user',
+        game_state: { party: [] }, messages: [], created_at: '2024-01-01T00:00:00Z',
+      };
+
+      const result = await storageService.loadGame('host-user', 'camp-1');
+      expect(result.data?.hostId).toBe('host-user');
+      expect(result.data?.campaignId).toBe('camp-1');
+    });
+
+    it('leaves hostId undefined when the row has no host_id', async () => {
+      chainData = {
+        id: 'camp-2', name: 'No Host', game_state: { party: [] }, messages: [], created_at: '2024-01-01T00:00:00Z',
+      };
+
+      const result = await storageService.loadGame('user-1', 'camp-2');
+      expect(result.data?.hostId).toBeUndefined();
+    });
+  });
+
   describe('saveGame', () => {
     it('saves to localStorage for anonymous users', async () => {
       const data = { version: '1.0', campaignId: 'anon', gameState: {} as unknown as GameState, messages: [], stage: AppStage.PLAY, timestamp: 0 };

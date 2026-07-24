@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { GameState, Message, MessageRole, AppStage, SavedGameData, Currency, InventoryItem } from '../types';
+import { GameState, Message, MessageRole, AppStage, SavedGameData, Currency, InventoryItem, Character } from '../types';
 import { mcpServer } from '../services/mcpService';
 import { storageService } from '../services/storageService';
 import { generateAtmosphere } from '../services/llm';
@@ -17,6 +17,7 @@ export const useGameState = (userId: string | undefined) => {
 
     const [currentCampaignId, setCurrentCampaignId] = useState<string>();
     const [campaignName, setCampaignName] = useState<string>();
+    const [hostId, setHostId] = useState<string | undefined>();
     const [isNewCampaign, setIsNewCampaign] = useState(false);
 
     const [myCharacterId, setMyCharacterId] = useState<string | null>(null);
@@ -48,6 +49,7 @@ export const useGameState = (userId: string | undefined) => {
 
             if (data) {
                 setCampaignName(data.campaignName);
+                setHostId(data.hostId);
                 setMessages(data.messages);
 
                 const safeState = data.gameState ?? mcpServer.getFullState();
@@ -193,6 +195,15 @@ export const useGameState = (userId: string | undefined) => {
         syncCampaignState().catch(e => console.warn('[Sync] failed:', e));
     };
 
+    /** Patches arbitrary character fields (e.g. personal/GM notes) on a character
+     *  by id and syncs. UI-only path (issue 10). Mirrors the inventory/currency
+     *  direct-update handlers. */
+    const handleUpdateCharacterFields = (partial: Partial<Character>, charId?: string) => {
+        mcpServer.updateCharacterFieldsDirectly(partial, charId);
+        syncState();
+        syncCampaignState().catch(e => console.warn('[Sync] failed:', e));
+    };
+
     const performAtmosphereUpdate = async (locationName: string, locationDescription: string | undefined, currentSettings: AppSettings): Promise<boolean> => {
         if (!currentSettings.enableAtmosphere) return false;
 
@@ -226,6 +237,7 @@ export const useGameState = (userId: string | undefined) => {
         isLoading, setIsLoading,
         currentCampaignId, setCurrentCampaignId,
         campaignName, setCampaignName,
+        hostId,
         isNewCampaign, setIsNewCampaign,
         myCharacterId, setMyCharacterId,
         viewingCharacterId, setViewingCharacterId,
@@ -235,6 +247,7 @@ export const useGameState = (userId: string | undefined) => {
         syncState,
         handleUpdateInventory,
         handleUpdateCurrency,
+        handleUpdateCharacterFields,
         performAtmosphereUpdate
     };
 };

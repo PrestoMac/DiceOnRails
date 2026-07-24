@@ -1,5 +1,5 @@
 import { createContext, useContext, ReactNode } from 'react';
-import { GameState, Message, AppStage, Currency, InventoryItem, QueuedAction } from '../types';
+import { GameState, Message, AppStage, Currency, InventoryItem, QueuedAction, Character } from '../types';
 import { useGameState } from '../hooks/useGameState';
 import { useQueue } from '../hooks/useQueue';
 import { useAuthContext } from './AuthContext';
@@ -12,6 +12,8 @@ interface GameContextValue {
   isLoading: boolean;
   currentCampaignId: string | undefined;
   campaignName: string | undefined;
+  /** The campaign host's user id (gates GM-only features). Undefined for anonymous. */
+  hostId: string | undefined;
   isNewCampaign: boolean;
   myCharacterId: string | null;
   viewingCharacterId: string | null;
@@ -23,6 +25,7 @@ interface GameContextValue {
   resetGame: () => void;
   handleUpdateInventory: (items: InventoryItem[], charId?: string) => void;
   handleUpdateCurrency: (currency: Currency, charId?: string) => void;
+  handleUpdateCharacterFields: (partial: Partial<Character>, charId?: string) => void;
   performAtmosphereUpdate: (locationName: string, locationDescription: string | undefined, currentSettings: AppSettings) => Promise<boolean>;
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   setIsLoading: (loading: boolean) => void;

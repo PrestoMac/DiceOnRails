@@ -2097,4 +2097,52 @@ const roundTripped = deepClone(char.conditions);
       }
     });
   });
+
+  describe('multiplayer attribution nudge (executeToolCall)', () => {
+    it('stamps a warning on an actor tool with no id when party has 2+ members', async () => {
+      const hero = makeCharacter({ id: 'hero-1', name: 'Hero' });
+      const ally = makeCharacter({ id: 'hero-2', name: 'Ally' });
+      server.loadState({ ...makeServerState({ party: [hero, ally] }) });
+      // adjust_currency with no targetId → defaults to party[0], should warn.
+      const res = await server.executeToolCall('adjust_currency', { gp: 5 });
+      expect(res.success).toBe(true);
+      expect(res.message).toContain('WARNING: no actor id was provided');
+      expect(res.message).toContain('Hero');
+    });
+
+    it('does NOT stamp a warning when an actor id is provided in multiplayer', async () => {
+      const hero = makeCharacter({ id: 'hero-1', name: 'Hero' });
+      const ally = makeCharacter({ id: 'hero-2', name: 'Ally' });
+      server.loadState({ ...makeServerState({ party: [hero, ally] }) });
+      const res = await server.executeToolCall('adjust_currency', { gp: 5, targetId: 'hero-2' });
+      expect(res.success).toBe(true);
+      expect(res.message).not.toContain('WARNING: no actor id');
+    });
+
+    it('does NOT stamp a warning in solo (party of 1)', async () => {
+      server.loadState(makeServerState());
+      const res = await server.executeToolCall('adjust_currency', { gp: 5 });
+      expect(res.success).toBe(true);
+      expect(res.message).not.toContain('WARNING: no actor id');
+    });
+
+    it('never alters success/failure (warning is append-only)', async () => {
+      const hero = makeCharacter({ id: 'hero-1', name: 'Hero' });
+      const ally = makeCharacter({ id: 'hero-2', name: 'Ally' });
+      server.loadState({ ...makeServerState({ party: [hero, ally] }) });
+      // A failed call (missing item) should still fail and not get a warning stamped.
+      const res = await server.executeToolCall('update_inventory', { item_name: 'Ghost Item', action: 'remove' });
+      expect(res.success).toBe(false);
+      expect(res.message).not.toContain('WARNING: no actor id');
+    });
+
+    it('does NOT warn for award_experience with no targetId (documented party-split)', async () => {
+      const hero = makeCharacter({ id: 'hero-1', name: 'Hero' });
+      const ally = makeCharacter({ id: 'hero-2', name: 'Ally' });
+      server.loadState({ ...makeServerState({ party: [hero, ally] }) });
+      const res = await server.executeToolCall('award_experience', { amount: 100 });
+      expect(res.success).toBe(true);
+      expect(res.message).not.toContain('WARNING: no actor id');
+    });
+  });
 });

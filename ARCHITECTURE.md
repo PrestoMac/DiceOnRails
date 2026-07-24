@@ -382,7 +382,7 @@ The single most important flow to understand. Entry point: `useGameActions.handl
    - system: `SYSTEM_INSTRUCTION + PROGRESSION_SYSTEM_PROMPT + TOOL_MODE_INSTRUCTION`
    - frozen messages (episode checkpoints + raw history, prepended as system entries)
    - mapped chat history (roles translated to `user`/`assistant`/`tool`/`system`)
-   - a context message: live combat state, current turn, enemies, active effects
+   - a context message: live combat state, current turn, enemies, **PARTY summary (computed AC per member)**, active effects
 
 2. **Per iteration:**
    - Re-filter tools against current state.
@@ -406,14 +406,23 @@ The single most important flow to understand. Entry point: `useGameActions.handl
 
 ### Batched party turns (`handleExecuteBatch`)
 
-`useGameActions.ts:329`. When multiplayer action queue is flushed:
+`useGameActions.ts:337`. When multiplayer action queue is flushed:
 
-- Builds a `[Collaborative Turn]` user message containing every queued entry tagged with player name. Message is created and broadcast *before* the lock sync so remote players see what's being processed.
+- Builds a `[Collaborative Turn]` user message containing every queued entry tagged with the character name (`playerName`); the `userId` (auth id) is kept on the queue item for audit but is NOT sent to the LLM. Message is created and broadcast *before* the lock sync so remote players see what's being processed.
+- Builds context via `buildBatchContextString()` (`gameActionHelpers.ts`) which emits `ACTIVE CLASS FEATURES / RESOURCES / SPELLS / FEATS` for **every** party member (not just the active one), so the LLM can attribute spells/resources to the right character. Private `notes`/`gmNotes` are stripped via `withoutPrivateNotes()`.
 - Same agent-loop flow as solo, including `dispatchToolRolls` (dice roll animations), `enableSuggestions`, and atmosphere updates on `move_to` — full parity with `handleSendMessage`.
 - Narration retry chain (tiers 2+3) is wrapped in `withNarrationRetryTimeout` (45s `Promise.race`) — same freeze protection as solo.
+- **Post-batch attribution diagnostic** (`warnIfBatchAttributionIncomplete`): `console.warn`s if any queued character never appeared as a tool-call actor. Pure observability, never blocks.
 - Error handler mirrors solo: reads from `mcpServer.getFullState()` (not stale closure), clears both `isProcessing` and `processingUser`, calls `mcpServer.loadState()` + `syncState()`.
 - Queue preservation: before clearing the queue on success, fetches the latest campaign state from Supabase (`storageService.fetchGameState`) and filters out only the executed item IDs — items added by other players during processing are preserved. Falls back to `[]` on fetch failure.
 - `handleRewind` detects `[Collaborative Turn]` messages and re-executes via `handleExecuteBatchRef` (the queue items are restored by the undo snapshot).
+
+### Multiplayer attribution hardening
+The engine trusts the LLM to pass the correct actor id per tool call, silently defaulting to `party[0]` when omitted. Hardening (all gated on `party.length > 1`, so solo is byte-identical unless noted):
+- **`MULTIPLAYER_PROMPT`** (`services/llm/prompts/multiplayerPrompt.ts`) is injected into the system message only when `party.length > 1`. It makes the attribution contract explicit.
+- **`PARTY:` context line** (`agentLoop.ts`) — `name (hp/max, AC N) [conditions]` per member via `calculateAc`. Additive; also helps solo.
+- **Actor-id warn-stamp** (`mcpService.executeToolCall`) — appends `WARNING: ...` to `result.message` when an actor tool is called with no id in multiplayer. `award_experience`/`long_rest` excluded (party-wide).
+- **`getTarget` ambiguity warning** (`partyService.ts`) — warns on 2+ name matches; resolution order unchanged.
 
 ### Rewind flow (`handleRewind`)
 
@@ -461,7 +470,7 @@ Before each turn (`prepareContext` in `contextManager.ts:187`):
 
 ### Persistence
 
-The `ContextState` is serialized into `GameState.ctx` (`ContextMetadata` in `types/game.ts:36`) on every `syncFinishedState` call. On load, `useGameActions`'s `useEffect` at line 109 hydrates `ctxRef.current` from `gameState.ctx`. This means checkpoints survive page reloads and sync to other multiplayer clients.
+The `ContextState` is serialized into `GameState.ctx` (`ContextMetadata` in `types/game.ts:36`) on every `syncFinishedState` call. On load, `useGameActions`'s `useEffect` hydrates `ctxRef.current` from `gameState.ctx`. This means checkpoints survive page reloads and sync to other multiplayer clients. The same `useEffect` also **re-hydrates from remote** when another player's turn advances `ctx.turnCounter` past the local value (cross-client ctx sync, issue 12) — transient `isCompressing`/`compressPromise` stay local.
 
 ---
 

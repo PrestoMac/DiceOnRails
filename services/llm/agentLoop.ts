@@ -11,6 +11,8 @@ import { sanitizeNarration } from '../../utils/textSanitize';
 import { filterTools } from './toolFilter';
 import { resolveLLMConfig, mapHistoryToMessages } from './llmApiClient';
 import { CONDITION_INFO } from '../../data/conditionInfo';
+import { calculateAc } from '../classEngine';
+import { MULTIPLAYER_PROMPT } from './prompts/multiplayerPrompt';
 
 const CRITICAL_TOOLS = new Set(['cast_spell', 'inflict_damage', 'roll_dice', 'player_attack']);
 
@@ -95,11 +97,11 @@ export async function runAgentLoop(
   }
   const agentLoopStart = Date.now();
 
+  const state = mcpServer.getFullState();
   const systemMessage = {
     role: "system" as const,
-    content: `${SYSTEM_INSTRUCTION}\n\n${PROGRESSION_SYSTEM_PROMPT}${options?.enableSuggestions ? '\n15. SUGGESTED ACTIONS: When ending a turn with narrate_turn, ALWAYS include 2-3 short suggested next actions in the suggestions field. Each must be ≤60 chars, in first person from the player\'s perspective (e.g. "I attack the goblin with my longsword", "I order a drink and sit down"). This is mandatory.\n' : ''}\n\n=== TOOL MODE ===\n${TOOL_MODE_INSTRUCTION}`
+    content: `${SYSTEM_INSTRUCTION}\n\n${PROGRESSION_SYSTEM_PROMPT}${options?.enableSuggestions ? '\n15. SUGGESTED ACTIONS: When ending a turn with narrate_turn, ALWAYS include 2-3 short suggested next actions in the suggestions field. Each must be ≤60 chars, in first person from the player\'s perspective (e.g. "I attack the goblin with my longsword", "I order a drink and sit down"). This is mandatory.\n' : ''}\n\n=== TOOL MODE ===\n${TOOL_MODE_INSTRUCTION}${state.party.length > 1 ? `\n\n${MULTIPLAYER_PROMPT}` : ''}`
   };
-  const state = mcpServer.getFullState();
   const gameTimeAtStart = state.gameTime ?? 0;
   const contextParts: string[] = [];
 
@@ -125,6 +127,19 @@ export async function runAgentLoop(
         }`
       ).join(' | '));
     }
+  }
+
+  // PARTY summary: a clean per-character line with computed AC, mirroring the
+  // ENEMIES line. Previously party members only appeared as raw JSON, forcing
+  // the LLM to guess each member's actual AC (only acBonus was visible). This
+  // is purely additive context — helps solo and multiplayer alike.
+  if (state.party.length > 0) {
+    contextParts.push('PARTY: ' + state.party.map(c => {
+      const equippedArmor = c.inventory.find(i => i.equipped && i.type === 'armor') ?? null;
+      const ac = calculateAc(c, equippedArmor);
+      const conds = c.conditions?.length ? ` [${c.conditions.map(cond => cond.id).join(',')}]` : '';
+      return `${c.name} (${c.hp.current}/${c.hp.max} HP, AC ${ac})${conds}`;
+    }).join(' | '));
   }
 
 

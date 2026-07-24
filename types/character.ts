@@ -244,4 +244,10 @@ export interface Character {
   acMinimum?: number;
   reactionAvailable?: boolean;
   reactionUsedThisTurn?: boolean;
+  /** Personal journal/notes, private-by-convention to the character's owner. Not
+   *  fed into the LLM context. UI renders it only for the owning player. */
+  notes?: string;
+  /** GM/host-only notes. Private-by-convention to the campaign host. Not fed
+   *  into the LLM context. UI renders it only when the viewer is the host. */
+  gmNotes?: string;
 }

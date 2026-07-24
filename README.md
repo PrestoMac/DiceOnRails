@@ -172,6 +172,7 @@ When signed in via Supabase:
 - **They join** by entering the ID at the dashboard.
 - Every action **syncs to Supabase in realtime** — all players see the same narration, dice, and state.
 - The active player's turn **locks the campaign** to prevent race conditions; others can queue actions.
+- Each player has **private character notes** (visible only to your own character's owner); notes are never sent to the GM/LLM.
 - Delete / rename campaigns from the dashboard.
 
 Don't want an account? **Anonymous mode** works fully offline — your save lives in `localStorage`.

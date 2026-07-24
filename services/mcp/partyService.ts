@@ -44,7 +44,15 @@ export function createPartyService(state: GameState): PartyService {
 
     getTarget(id?: string): Character | undefined {
       if (!id) return state.party[0];
-      return state.party.find(c => c.id === id || c.name.toLowerCase() === id.toLowerCase());
+      const lower = id.toLowerCase();
+      // Detect an ambiguous name match (two+ members sharing a name) so we can
+      // surface it, but preserve the original first-match return value exactly so
+      // no existing campaign changes resolution behavior.
+      const nameMatches = state.party.filter(c => c.name.toLowerCase() === lower);
+      if (nameMatches.length > 1 && !state.party.some(c => c.id === id)) {
+        console.warn(`[partyService.getTarget] Ambiguous name "${id}" matches ${nameMatches.length} party members; using first match "${nameMatches[0].name}". Pass a character id to disambiguate.`);
+      }
+      return state.party.find(c => c.id === id || c.name.toLowerCase() === lower);
     },
 
     getResource(uri: string): unknown {

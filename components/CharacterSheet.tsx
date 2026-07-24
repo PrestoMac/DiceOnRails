@@ -15,6 +15,7 @@ import SpellDetailModal from './modals/SpellDetailModal';
 import ItemDetailModal from './modals/ItemDetailModal';
 import ConditionDetailModal from './modals/ConditionDetailModal';
 import Tooltip from './ui/Tooltip';
+import NotesPanel from './NotesPanel';
 
 const BUFF_SOURCES_SET = BUFF_SOURCES;
 
@@ -46,6 +47,15 @@ interface CharacterSheetProps {
   onLevelUp?: (characterId: string) => void;
   onSendMessage?: (text: string) => void;
   onTriggerDiceRoll?: (rollData: Record<string, unknown>) => Promise<void>;
+  /** When true, another player's turn is resolving — inventory/currency edits may
+   *  be overwritten. Purely informational; edits remain enabled (soft warn). */
+  isProcessing?: boolean;
+  /** Current viewer's user id, used to gate personal notes to the character owner. */
+  currentUserId?: string;
+  /** True when the viewer is the campaign host (gates GM notes). Defaults false. */
+  isHost?: boolean;
+  /** Patches arbitrary character fields (notes/gmNotes). UI-only path. */
+  onUpdateCharacterFields?: (partial: Partial<Character>, charId?: string) => void;
 }
 
 const rarityStyle = (rarity?: string) =>
@@ -82,7 +92,7 @@ const FeatureList: React.FC<{ title: string; icon: string; features?: Array<{ id
 };
 
 /** Full character sheet displaying stats, HP, XP, AC, saving throws, skills, inventory, currency, spells, conditions, feats, and resources. */
-const CharacterSheet: React.FC<CharacterSheetProps> = ({ character, onUpdateInventory, onLevelUp, onSendMessage, onTriggerDiceRoll }) => {
+const CharacterSheet: React.FC<CharacterSheetProps> = ({ character, onUpdateInventory, onLevelUp, onSendMessage, onTriggerDiceRoll, isProcessing, currentUserId, isHost, onUpdateCharacterFields }) => {
   const [hoveredItem, setHoveredItem] = useState<InventoryItem|null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x:0, y:0 });
   const [viewingFeat, setViewingFeat] = useState<FeatDefinition | null>(null);
@@ -163,6 +173,12 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ character, onUpdateInve
 
   return (
     <div className="flex flex-col gap-6 fantasy-font">
+      {isProcessing && (
+        <div className="flex items-center gap-2 bg-amber-950/40 border border-amber-800/50 text-amber-300 text-[10px] uppercase tracking-wider font-bold rounded-lg px-3 py-2" role="status">
+          <i className="fas fa-spinner fa-spin text-amber-400"></i>
+          <span>A turn is resolving — inventory edits may be overwritten.</span>
+        </div>
+      )}
       <div className="text-center relative">
         <h2 className="text-3xl font-bold text-amber-500 uppercase tracking-widest">{character.name}</h2>
         <div className="flex items-center justify-center gap-2">
@@ -454,6 +470,15 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ character, onUpdateInve
       <div className="space-y-2 mt-auto"><h3 className="text-lg font-bold border-b border-stone-800 pb-1 text-stone-300 uppercase tracking-tighter">Current Location</h3><p className="text-sm text-stone-400 leading-relaxed italic"><i className="fas fa-map-marker-alt text-red-900 mr-2 opacity-50"></i>{character.location}</p></div>
 
       {renderItemTooltip()}
+      {onUpdateCharacterFields && (
+        <NotesPanel
+          character={character}
+          currentUserId={currentUserId}
+          isHost={isHost}
+          onSaveNotes={(charId, notes) => onUpdateCharacterFields({ notes }, charId)}
+          onSaveGmNotes={(charId, gmNotes) => onUpdateCharacterFields({ gmNotes }, charId)}
+        />
+      )}
       <FeatDetailModal feat={viewingFeat} onClose={() => setViewingFeat(null)} />
       <SpellDetailModal spell={viewingSpell} onClose={() => setViewingSpell(null)} />
       <ItemDetailModal item={viewingItem} onClose={() => setViewingItem(null)} />

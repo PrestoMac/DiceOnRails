@@ -16,6 +16,31 @@ import { createTravelService, TravelService } from './mcp/travelService';
 
 export { generateId };
 
+/**
+ * Actor-bearing tools and the argument key(s) that identify the acting/affected
+ * character. Used by the multiplayer attribution nudge: when the party has more
+ * than one member and the LLM omits every listed key, the action silently
+ * defaults to party[0] (a mis-attribution). We stamp an in-band warning onto the
+ * tool result message so the model self-corrects on subsequent calls. This NEVER
+ * changes success/failure — it only appends text the LLM sees via formatToolResult.
+ *
+ * `award_experience` is intentionally EXCLUDED: omitting its targetId is the
+ * documented party-split behavior. `long_rest` is excluded (party-wide by design).
+ */
+const ACTOR_ID_ARGS: Record<string, string[]> = {
+  player_attack: ['attackerId'],
+  cast_spell: ['characterId', 'casterId'],
+  check_skill: ['targetId'],
+  make_save: ['targetId'],
+  roll_death_save: ['targetId'],
+  use_resource: ['characterId', 'targetId'],
+  update_inventory: ['targetId'],
+  adjust_currency: ['targetId'],
+  short_rest: ['targetId'],
+  manage_spellbook: ['characterId', 'targetId'],
+  level_up: ['targetId'],
+};
+
 /** Central server-class that owns the game state and wires together all sub-services (party, inventory, combat, spells, progression, travel, content, state).
  *  Acts as the single canonical source of truth; all game state mutations must go through this class. */
 export class MockMCPServer {
@@ -82,9 +107,17 @@ export class MockMCPServer {
   public getTarget(id?: string): Character | undefined { return this.party.getTarget(id); }
   public getResource(uri: string): unknown { return this.party.getResource(uri); }
 
-
   public updateInventoryDirectly(newInventory: InventoryItem[], targetId?: string) { this.inventory.updateInventoryDirectly(newInventory, targetId); }
+
   public updateCurrencyDirectly(newCurrency: Currency, targetId?: string) { this.inventory.updateCurrencyDirectly(newCurrency, targetId); }
+
+  /** Patches arbitrary fields on a character (e.g. notes/gmNotes) by id. Mirrors the
+   *  direct-update pattern used for inventory/currency. Used only by the UI sheet,
+   *  never by the LLM tool path. No-op if the target is not found. */
+  public updateCharacterFieldsDirectly(partial: Partial<Character>, targetId?: string) {
+    const target = this.party.getTarget(targetId);
+    if (target) Object.assign(target, partial);
+  }
   public async inflict_damage(amount: number, targetId?: string, damageType?: string): Promise<MCPResponse> { return this.inventory.inflict_damage(amount, targetId, damageType); }
   public async update_inventory(item_name: string, action: 'add' | 'remove' | 'edit', quantity?: number, new_name?: string, targetId?: string, type?: InventoryItem['type'], rarity?: InventoryItem['rarity'], description?: string, stats?: InventoryItem['stats'], equipped?: boolean, cost_gp?: number, cost_sp?: number, cost_cp?: number, autoDeductMarketPrice?: boolean, craft?: boolean): Promise<MCPResponse> { return this.inventory.update_inventory(item_name, action, quantity, new_name, targetId, type, rarity, description, stats, equipped, cost_gp, cost_sp, cost_cp, autoDeductMarketPrice, craft); }
   public async adjust_currency(gp?: number, sp?: number, cp?: number, targetId?: string): Promise<MCPResponse> { return this.inventory.adjust_currency(gp, sp, cp, targetId); }
@@ -420,6 +453,22 @@ export class MockMCPServer {
       }
       if (isDebugMode) {
         console.log(`[executeToolCall] Outcome of ${name}:`, res);
+      }
+      // Multiplayer attribution nudge (issue: silent party[0] default). When the
+      // party has 2+ members and an actor tool was called with no actor id, the
+      // action silently applied to the first party member. Stamp an in-band
+      // warning onto the result message so the LLM self-corrects. No-op in solo
+      // (party.length === 1) and never alters success/failure.
+      const actorKeys = ACTOR_ID_ARGS[name];
+      if (actorKeys && this.state.party.length > 1 && res.success) {
+        const hasActor = actorKeys.some(k => {
+          const v = args[k];
+          return typeof v === 'string' && v.trim() !== '';
+        });
+        if (!hasActor && this.state.party[0]) {
+          const warn = ` | WARNING: no actor id was provided, so this was applied to ${this.state.party[0].name} (the first party member). In a party, ALWAYS pass the correct ${actorKeys.join('/')} (character name or id) so the action is attributed to the right character.`;
+          res = { ...res, message: res.message + warn };
+        }
       }
       return res;
     } catch (e: unknown) {

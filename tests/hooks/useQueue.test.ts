@@ -86,6 +86,7 @@ describe('useQueue', () => {
         actionQueue: [expect.objectContaining({
           id: 'test-uuid',
           playerId: 'anonymous',
+          userId: 'anonymous',
           playerName: 'You',
           text: 'Hello',
           type: 'dialogue',
@@ -132,6 +133,9 @@ describe('useQueue', () => {
       expect(mcpServerMock.loadState).toHaveBeenCalledWith(expect.objectContaining({
         actionQueue: expect.arrayContaining([expect.objectContaining({ text: 'Test' })]),
       }));
+      // userId audit trail reflects the authenticated user (issue 9).
+      const call = vi.mocked(setGameState).mock.calls[0][0];
+      expect(call.actionQueue[0].userId).toBe('user-1');
     });
   });
 
@@ -371,6 +375,31 @@ describe('useQueue', () => {
       });
 
       expect(result.current.queueNotification).toBe('2 new items added to Action Queue!');
+    });
+
+    it('Warns when queuing an action for a downed character (issue 11)', () => {
+      mcpServerMock.getTarget.mockReturnValue({ name: 'Aragorn', hp: { current: 0, max: 10 } });
+      const { rerender, result } = renderHook(
+        ({ gs }: { gs: GameState }) => useQueue(gs, setGameState, undefined, undefined, null),
+        { initialProps: { gs: makeState() } },
+      );
+
+      rerender({ gs: makeState({ actionQueue: [makeQueueItem({ id: 'q-1', type: 'action', playerName: 'Aragorn' })] }) });
+
+      expect(result.current.queueNotification).toContain('downed');
+      expect(result.current.queueNotification).toContain('Aragorn');
+    });
+
+    it('Does NOT warn for dialogue queued for a downed character (roleplay is allowed)', () => {
+      mcpServerMock.getTarget.mockReturnValue({ name: 'Aragorn', hp: { current: 0, max: 10 } });
+      const { rerender, result } = renderHook(
+        ({ gs }: { gs: GameState }) => useQueue(gs, setGameState, undefined, undefined, null),
+        { initialProps: { gs: makeState() } },
+      );
+
+      rerender({ gs: makeState({ actionQueue: [makeQueueItem({ id: 'q-1', type: 'dialogue', playerName: 'Aragorn' })] }) });
+
+      expect(result.current.queueNotification).toBe('New item added to Action Queue!');
     });
 
     it('Auto-clears after 3000ms (boundary test at 2999 and 3000)', () => {

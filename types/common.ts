@@ -82,6 +82,8 @@ export interface QueuedAction {
   id: string;
   playerId: string;
   playerName: string;
+  /** The Supabase user id of the human who queued this action (audit trail). */
+  userId?: string;
   avatarUrl?: string;
   text: string;
   type: 'action' | 'dialogue';
@@ -93,6 +95,9 @@ export interface SavedGameData {
   version: string;
   campaignId: string;
   campaignName?: string;
+  /** The campaign host's user id (from the campaigns row's host_id). Used to gate
+   *  GM-only features (e.g. Character.gmNotes). Undefined for anonymous/local saves. */
+  hostId?: string;
   gameState: Record<string, unknown>;
   messages: Message[];
   stage: AppStage;

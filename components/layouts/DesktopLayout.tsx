@@ -23,9 +23,9 @@ import { mcpServer } from '../../services/mcpService';
 /** Primary desktop layout with resizable sidebar, chat log, input area, and full header controls. */
 const DesktopLayout: React.FC = () => {
   const {
-    stage, currentCampaignId, campaignName, gameState, messages,
+    stage, currentCampaignId, campaignName, hostId, gameState, messages,
     isLoading, myCharacterId, viewingCharacterId, setViewingCharacterId,
-    setStage, resetGame, handleUpdateInventory,
+    setStage, resetGame, handleUpdateInventory, handleUpdateCharacterFields,
     handleEnqueueAction, handleRemoveQueueItem, handleUpdateQueueItem,
     handleReorderQueue, syncState,
   } = useGameContext();
@@ -108,7 +108,7 @@ const DesktopLayout: React.FC = () => {
       <div ref={sidebarScrollRef} className="flex-1 overflow-y-auto custom-scrollbar relative" style={{ padding: `${Math.max(12, sidebarWidth * 0.075)}px`, fontSize: `${fontScale}rem` }}>
         {tab === 'character' ? <div className="flex flex-col h-full">
           {isMultiplayer && <div className="flex gap-2 overflow-x-auto pb-2 mb-2 shrink-0">{gameState.party.map(char => <button key={char.id} onClick={() => setViewingCharacterId(char.id)} className={`p-2 rounded whitespace-nowrap transition-colors ${viewingCharacterId === char.id ? 'bg-amber-700 text-white' : 'bg-stone-800 text-stone-400 hover:bg-stone-700'}`}>{char.name}{char.id === myCharacterId ? ' (You)' : ''}</button>)}</div>}
-          {charToShow ? <CharacterSheet character={charToShow} onUpdateInventory={handleUpdateInventory} onLevelUp={handleOpenLevelUp} onSendMessage={handleSendMessage} onTriggerDiceRoll={handleTriggerDiceRoll} /> : <div className="text-stone-500 text-center mt-10">No characters in party.</div>}
+          {charToShow ? <CharacterSheet character={charToShow} onUpdateInventory={handleUpdateInventory} onLevelUp={handleOpenLevelUp} onSendMessage={handleSendMessage} onTriggerDiceRoll={handleTriggerDiceRoll} isProcessing={gameState.isProcessing} currentUserId={userId} isHost={!!userId && userId === hostId} onUpdateCharacterFields={handleUpdateCharacterFields} /> : <div className="text-stone-500 text-center mt-10">No characters in party.</div>}
         </div> : <Journal quests={gameState.quests} lore={gameState.lore} />}
         {hasScrollOverflow && <div className="sticky bottom-0 left-0 right-0 h-12 -mt-12 pointer-events-none bg-gradient-to-t from-stone-950/95 via-stone-950/60 to-transparent z-10" />}
       </div>

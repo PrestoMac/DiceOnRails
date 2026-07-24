@@ -29,6 +29,68 @@ function isTrivialInput(text: string): boolean {
 }
 
 /**
+ * Actor-bearing tool calls and the argument key that identifies the acting
+ * character for each. Used by the batch attribution diagnostic to determine
+ * which party member each tool call was attributed to.
+ */
+const ACTOR_TOOL_KEYS: Record<string, string[]> = {
+  player_attack: ['attackerId'],
+  cast_spell: ['characterId', 'casterId'],
+  check_skill: ['targetId'],
+  make_save: ['targetId'],
+  roll_death_save: ['targetId'],
+  use_resource: ['characterId', 'targetId'],
+  update_inventory: ['targetId'],
+  adjust_currency: ['targetId'],
+  short_rest: ['targetId'],
+  long_rest: ['targetId'],
+  manage_spellbook: ['characterId', 'targetId'],
+  level_up: ['targetId'],
+  award_experience: ['targetId'],
+};
+
+/**
+ * Post-batch diagnostic: warns (console only) if any party member who queued an
+ * action never appears as the actor of a tool call during the collaborative
+ * turn. Indicates the LLM may have silently dropped or mis-attributed an action.
+ * In solo play the queue is empty so this is a no-op. Never throws or blocks.
+ */
+function warnIfBatchAttributionIncomplete(queue: GameState['actionQueue'], toolMessages: Message[], party: Character[]): void {
+  if (!queue || queue.length === 0 || party.length <= 1) return;
+  const queuedNames = new Set(queue.map(q => q.playerName).filter(Boolean));
+  if (queuedNames.size === 0) return;
+
+  const nameLower = new Map<string, string>();
+  for (const c of party) nameLower.set(c.name.toLowerCase(), c.name);
+
+  const seenActors = new Set<string>();
+  for (const m of toolMessages) {
+    if (!m.toolCalls) continue;
+    for (const tc of m.toolCalls) {
+      const keys = ACTOR_TOOL_KEYS[tc.name];
+      if (!keys) continue;
+      let args: Record<string, unknown> = {};
+      try { args = JSON.parse(tc.arguments || '{}'); } catch { continue; }
+      for (const k of keys) {
+        const v = args[k];
+        if (typeof v === 'string' && v.trim()) {
+          const resolved = nameLower.get(v.toLowerCase()) ?? v;
+          seenActors.add(resolved);
+        }
+      }
+    }
+  }
+
+  const missing: string[] = [];
+  for (const name of queuedNames) {
+    if (!seenActors.has(name)) missing.push(name);
+  }
+  if (missing.length > 0) {
+    console.warn(`[Batch Attribution] ${missing.length} queued player(s) had no attributed tool call this turn: ${missing.join(', ')}. The LLM may have dropped or mis-attributed their action(s).`);
+  }
+}
+
+/**
  * Hard cap for narration-retry LLM calls. A hung retry (e.g. a gateway that accepts
  * the connection then stalls on the response body) must never pin `isLoading`
  * forever and freeze the chat on "The Fates are deciding...". Resolves to
@@ -98,7 +160,7 @@ import { bumpRewindGeneration } from '../services/rewindGeneration';
 import { isSyncableCampaign, ANONYMOUS_CAMPAIGN_ID } from '../utils/campaign';
 import {
   cleanSpeak,
-  dispatchToolRolls, DiceRollFn, buildContextString
+  dispatchToolRolls, DiceRollFn, buildContextString, buildBatchContextString
 } from './gameActionHelpers';
 import { syncFinishedState as syncStateHelper, prepareContext as prepContext,
   runContextPipeline as runPipeline } from '../services/llm/contextManager';
@@ -135,8 +197,9 @@ export const useGameActions = (
     const ctxLoadedRef = useRef(false);
 
     useEffect(() => {
-        if (ctxLoadedRef.current || !gameState) return;
-        const gs = gameState as unknown as { ctx?: { episodeCheckpoints?: unknown[]; frozenRawHistory?: string; frozenRawTokens?: number; frozenMessageCount?: number; turnCounter?: number } };
+        if (!gameState) return;
+        const gs = gameState as unknown as { ctx?: { episodeCheckpoints?: unknown[]; frozenRawHistory?: string; frozenRawTokens?: number; frozenMessageCount?: number; turnCounter?: number; generation?: number } };
+        // Initial one-time hydration from persisted state.
         if (!ctxLoadedRef.current && (gs.ctx?.episodeCheckpoints?.length || gs.ctx?.frozenRawHistory || (gs.ctx?.frozenMessageCount ?? 0) > 0)) {
             const ctx = ctxRef.current;
             ctx.episodeCheckpoints = gs.ctx?.episodeCheckpoints ?? [];
@@ -144,8 +207,32 @@ export const useGameActions = (
             ctx.frozenRawTokens = gs.ctx?.frozenRawTokens ?? 0;
             ctx.frozenMessageCount = gs.ctx?.frozenMessageCount ?? 0;
             ctx.turnCounter = gs.ctx?.turnCounter ?? 0;
+            ctx.generation = gs.ctx?.generation ?? 0;
             ctxLoadedRef.current = true;
             if (isDebugMode) console.log('[Context Restore] loaded from persisted gameState', { checkpoints: ctx.episodeCheckpoints.length, raw: ctx.frozenRawTokens });
+            return;
+        }
+        // Cross-client re-hydration (issue 12): when another player processed a
+        // turn, they advanced ctx.turnCounter and wrote the updated checkpoints/
+        // frozen history to the shared blob. Adopt it so our local LLM context
+        // does not diverge. Safe because: (a) we only adopt when the remote
+        // turnCounter is STRICTLY greater than ours — never clobbering equal or
+        // stale data; (b) during LOCAL processing the realtime handler skips
+        // applying remote state, so this path only fires for genuine remote
+        // advances; (c) transient fields (isCompressing/compressPromise) are left
+        // untouched. Falls back to existing field values when remote omits them.
+        if (ctxLoadedRef.current && gs.ctx) {
+            const remoteTurn = gs.ctx.turnCounter ?? 0;
+            if (remoteTurn > ctxRef.current.turnCounter) {
+                const ctx = ctxRef.current;
+                ctx.episodeCheckpoints = gs.ctx.episodeCheckpoints ?? ctx.episodeCheckpoints;
+                ctx.frozenRawHistory = gs.ctx.frozenRawHistory ?? ctx.frozenRawHistory;
+                ctx.frozenRawTokens = gs.ctx.frozenRawTokens ?? ctx.frozenRawTokens;
+                ctx.frozenMessageCount = gs.ctx.frozenMessageCount ?? ctx.frozenMessageCount;
+                ctx.turnCounter = remoteTurn;
+                ctx.generation = gs.ctx.generation ?? ctx.generation;
+                if (isDebugMode) console.log('[Context Restore] re-hydrated from remote (cross-client)', { remoteTurn, checkpoints: ctx.episodeCheckpoints.length });
+            }
         }
     }, [gameState]);
 
@@ -366,9 +453,11 @@ export const useGameActions = (
             mcpServer.saveRewindPoint(mcpServer.getFullState(), [...currentMessages, userMsg]);
             mcpServer.saveEmergencySnapshot(mcpServer.getFullState());
 
-            const partyContext = JSON.stringify(mcpServer.getFullState().party);
-            const worldData = JSON.stringify(mcpServer.getResource('campaign://world/current_location'));
-            const batchContext = `YOU ARE NARRATING FOR A FULL PARTY. Process ALL actions in the user message. \n\nFULL PARTY STATE: ${partyContext}. \n\nWorld: ${worldData}.`;
+            // Enriched batch context: per-character class features / resources / spells /
+            // feats for EVERY party member (not just the locally-active one), plus the
+            // standard world/time/quest/lore/combat blocks. This matches the solo path's
+            // richness so the LLM can correctly attribute spells & resources in multiplayer.
+            const batchContext = buildBatchContextString();
 
             const batchAllMessages = [...currentMessages, userMsg];
             const batchCtxPrep = prepContext(ctxRef.current, batchAllMessages, batchContext);
@@ -381,6 +470,11 @@ export const useGameActions = (
                     if (toolName === 'move_to' && settings.enableAtmosphere) performAtmosphereUpdate(args.location_name as string, args.description as string | undefined, settings);
                 }, undefined, { requestEndNarration: true, enableSuggestions: !!settings.enableSuggestions, sessionId });
             mcpServer.commitTransaction();
+
+            // Attribution diagnostic (multiplayer observability, no behavior change).
+            // Checks whether every party member who queued an action actually appears as
+            // the actor of at least one tool call. Pure console.warn — never blocks.
+            warnIfBatchAttributionIncomplete(gameState.actionQueue, result.toolMessages, batchCurrentState.party);
 
             const streamingId = `model-${Date.now()}`;
             const placeholderMsg: Message = { id: streamingId, role: MessageRole.MODEL, text: '', timestamp: Date.now() };

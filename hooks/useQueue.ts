@@ -19,9 +19,24 @@ export const useQueue = (
         const currentLength = gameState.actionQueue?.length ?? 0;
         if (currentLength > prevQueueLengthRef.current) {
             const addedCount = currentLength - prevQueueLengthRef.current;
-            setQueueNotification(addedCount > 1
-                ? `${addedCount} new items added to Action Queue!`
-                : "New item added to Action Queue!");
+            // Downed-character soft warn (issue 11): if the most recently queued
+            // item is an ACTION whose character is at 0 HP, surface a heads-up
+            // instead of the generic "new item" toast. Dialogue is always allowed
+            // (roleplay while down is fine). Still allows the enqueue — no blocking.
+            const latest = gameState.actionQueue?.[currentLength - 1];
+            let msg: string | null = null;
+            if (latest && latest.type === 'action') {
+                const char = mcpServer.getTarget(latest.playerName);
+                if (char && char.hp.current <= 0) {
+                    msg = `Note: ${char.name} is downed — this action may not be possible.`;
+                }
+            }
+            if (!msg) {
+                msg = addedCount > 1
+                    ? `${addedCount} new items added to Action Queue!`
+                    : "New item added to Action Queue!";
+            }
+            setQueueNotification(msg);
 
             if (notificationTimerRef.current) {
                 clearTimeout(notificationTimerRef.current);
@@ -57,6 +72,7 @@ export const useQueue = (
         const newItem: QueuedAction = {
             id: crypto.randomUUID(),
             playerId: userId ?? 'anonymous',
+            userId: userId ?? 'anonymous',
             playerName: getSenderName(),
             text,
             type,

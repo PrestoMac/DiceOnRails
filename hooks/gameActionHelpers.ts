@@ -3,6 +3,16 @@ import { mcpServer } from '../services/mcpService';
 import { getAllFeats } from '../services/featsService';
 import { getClassDef, getSubclassDef, getMod, getProficiencyBonus } from '../services/classEngine';
 import { SPELLS_BY_ID } from '../utils/spells';
+
+/**
+ * Returns a shallow copy of a character with the private `notes`/`gmNotes` fields
+ * removed, so they are never serialized into LLM context (issue 10 privacy).
+ * JSON.stringify omits `undefined` values, so setting them to undefined strips them.
+ */
+function withoutPrivateNotes(c: Character): Character {
+    return { ...c, notes: undefined, gmNotes: undefined };
+}
+
 /**
  * Function signature for triggering a dice roll animation/overlay in the UI.
  * @param data - The roll data including character name, roll type, result, modifier, and outcome details.
@@ -24,42 +34,80 @@ export function getWeaponInfo(c: Character) {
     }
     return { equippedWeapon: eq, weaponName: wn, strMod: sM, dexMod: dM, weaponMod: mod, weaponSides: sides, weaponCount: count, profBonus: getProficiencyBonus(c as unknown as Character) };
 }
+/**
+ * Builds the enriched per-character annotation block (ACTIVE CLASS FEATURES,
+ * ACTIVE RESOURCES, SPELLS, ACTIVE FEATS) for a single character. Extracted from
+ * buildContextString so the batch path can enrich EVERY party member, not just the
+ * locally-active one. Returns an empty string when the character has nothing to
+ * annotate (matching the solo path's filter(Boolean) behavior).
+ */
+export function buildCharacterEnrichment(mc: Character): string {
+    if (!mc) return '';
+    const cd = getClassDef(mc.class), sd = mc.subclassId ? getSubclassDef(mc.class, mc.subclassId) : undefined;
+    const parts: string[] = [];
+    const feats = [...(cd?.features || []), ...(sd?.features || [])].filter(f => f.level <= mc.level);
+    if (feats.length > 0) parts.push(`ACTIVE CLASS FEATURES [${feats.map(f => `${f.name} (L${f.level}): ${f.description}`).join(' | ')}]`);
+    const res = (mc.resources || []).filter(r => r.max > 0);
+    if (res.length > 0) parts.push(`ACTIVE RESOURCES [${res.map(r => `${r.name}: ${r.current}/${r.max} (resets on ${r.resetOn} rest)`).join(' | ')}]`);
+    if (cd?.spellcasting) {
+        const sl = (mc.resources || []).filter(r => r.id.startsWith('spell-slot-'));
+        const ss = sl.length > 0 ? `Slots: ${sl.map(s => `L${s.id.slice(-1)}=${s.current}/${s.max}`).join(', ')}` : '';
+        const pm = cd.spellcasting.prepMode;
+        const ids = pm === 'prepared' ? (mc.preparedSpells || []) : (mc.knownSpells || []);
+        const sp = ids.map(id => { const s = SPELLS_BY_ID[id]; if (!s) return id; const p = [`${s.name} (L${s.level}`]; if (s.damage) p.push(`${s.damage.dice} ${s.damage.type}`); if (s.healing) p.push('heal'); if (s.attackRoll) p.push('attack roll'); if (s.save) p.push(`${s.save.stat} save`); if (s.aoe) p.push(`${s.aoe.size}ft ${s.aoe.shape}`); if (s.requiresConcentration) p.push('conc'); if (s.castingTime === 'reaction') p.push('reaction'); if (s.castingTime === 'bonus') p.push('bonus'); if (s.shortDescription) p.push(s.shortDescription); return p.join(', ') + ')'; });
+        const st2 = sp.length > 0 ? `Spells (${pm}): ${sp.join(' | ')}` : '';
+        const conc = mc.concentrationSpellId ? SPELLS_BY_ID[mc.concentrationSpellId] : undefined;
+        const cs = conc ? `Concentrating: ${conc.name}` : '';
+        const as = [ss, st2, cs].filter(Boolean).join(' | ');
+        if (as) parts.push(`SPELLS [${as}]`);
+    }
+    const allF = getAllFeats(mc);
+    if (allF.length > 0) parts.push(`ACTIVE FEATS [${allF.map(f => `${f.name}: ${f.mechanicalEffect}`).join(' | ')}]`);
+    return parts.map(s => `\n\n${s}`).join('');
+}
+
 /** Builds a full context string for the LLM including character state, party, combat, world, quests, and lore. */
 export function buildContextString(myCharacterId: string | null): string {
-    let ac = "Unknown Player (No Character Selected)", af = '', acf = '', ar = '', as = '';
+    let ac = "Unknown Player (No Character Selected)";
+    let activeEnrichment = '';
     if (myCharacterId) {
         const mc = mcpServer.getTarget(myCharacterId);
         if (mc) {
-            ac = JSON.stringify({ ...mc, progression: mcpServer.getCharacterProgression(myCharacterId) });
-            const cd = getClassDef(mc.class), sd = mc.subclassId ? getSubclassDef(mc.class, mc.subclassId) : undefined;
-            const feats = [...(cd?.features || []), ...(sd?.features || [])].filter(f => f.level <= mc.level);
-            if (feats.length > 0) acf = `ACTIVE CLASS FEATURES [${feats.map(f => `${f.name} (L${f.level}): ${f.description}`).join(' | ')}]`;
-            const res = (mc.resources || []).filter(r => r.max > 0);
-            if (res.length > 0) ar = `ACTIVE RESOURCES [${res.map(r => `${r.name}: ${r.current}/${r.max} (resets on ${r.resetOn} rest)`).join(' | ')}]`;
-            if (cd?.spellcasting) {
-                const sl = (mc.resources || []).filter(r => r.id.startsWith('spell-slot-'));
-                const ss = sl.length > 0 ? `Slots: ${sl.map(s => `L${s.id.slice(-1)}=${s.current}/${s.max}`).join(', ')}` : '';
-                const pm = cd.spellcasting.prepMode;
-                const ids = pm === 'prepared' ? (mc.preparedSpells || []) : (mc.knownSpells || []);
-                const sp = ids.map(id => { const s = SPELLS_BY_ID[id]; if (!s) return id; const p = [`${s.name} (L${s.level}`]; if (s.damage) p.push(`${s.damage.dice} ${s.damage.type}`); if (s.healing) p.push('heal'); if (s.attackRoll) p.push('attack roll'); if (s.save) p.push(`${s.save.stat} save`); if (s.aoe) p.push(`${s.aoe.size}ft ${s.aoe.shape}`); if (s.requiresConcentration) p.push('conc'); if (s.castingTime === 'reaction') p.push('reaction'); if (s.castingTime === 'bonus') p.push('bonus'); if (s.shortDescription) p.push(s.shortDescription); return p.join(', ') + ')'; });
-                const st2 = sp.length > 0 ? `Spells (${pm}): ${sp.join(' | ')}` : '';
-                const conc = mc.concentrationSpellId ? SPELLS_BY_ID[mc.concentrationSpellId] : undefined;
-                const cs = conc ? `Concentrating: ${conc.name}` : '';
-                as = [ss, st2, cs].filter(Boolean).join(' | ');
-                if (as) as = `SPELLS [${as}]`;
-            }
-            const allF = getAllFeats(mc);
-            if (allF.length > 0) af = `ACTIVE FEATS [${allF.map(f => `${f.name}: ${f.mechanicalEffect}`).join(' | ')}]`;
+            ac = JSON.stringify({ ...withoutPrivateNotes(mc), progression: mcpServer.getCharacterProgression(myCharacterId) });
+            activeEnrichment = buildCharacterEnrichment(mc);
         }
     }
-    const pc = JSON.stringify(mcpServer.getFullState().party);
+    const pc = JSON.stringify(mcpServer.getFullState().party.map(withoutPrivateNotes));
     const wd = JSON.stringify(mcpServer.getResource('campaign://world/current_location'));
     const td = JSON.stringify(mcpServer.getResource('campaign://world/time'));
     const qd = JSON.stringify(mcpServer.getResource('campaign://journal/quests'));
     const ld = JSON.stringify(mcpServer.getResource('campaign://journal/lore'));
     const cdt = JSON.stringify(mcpServer.getFullState().combat);
-    return `YOU ARE NARRATING FOR ACTIVE PLAYER: ${ac}.${[acf, ar, as, af].filter(Boolean).map(s => `\n\n${s}`).join('')} \n\nFULL PARTY STATE: ${pc}. \n\nCombat State: ${cdt}. \n\nWorld: ${wd}. Active Quests: ${qd}. Lore: ${ld}\n\nTime: ${td}`;
+    return `YOU ARE NARRATING FOR ACTIVE PLAYER: ${ac}.${activeEnrichment} \n\nFULL PARTY STATE: ${pc}. \n\nCombat State: ${cdt}. \n\nWorld: ${wd}. Active Quests: ${qd}. Lore: ${ld}\n\nTime: ${td}`;
 }
+
+/**
+ * Builds a context string for a collaborative (batch) turn. Unlike the solo
+ * buildContextString which enriches only the locally-active character, this
+ * enriches EVERY party member's class features / resources / spells / feats so
+ * the LLM can correctly attribute spells and resources to the right character in
+ * multiplayer. Includes the same world/time/quest/lore/combat blocks as solo.
+ */
+export function buildBatchContextString(): string {
+    const fullState = mcpServer.getFullState();
+    const memberBlocks = fullState.party.map(mc => {
+        const enriched = buildCharacterEnrichment(mc);
+        return `CHARACTER ${mc.name} (id: ${mc.id}): ${JSON.stringify(withoutPrivateNotes(mc))}.${enriched}`;
+    }).join('\n\n');
+    const pc = JSON.stringify(fullState.party.map(withoutPrivateNotes));
+    const wd = JSON.stringify(mcpServer.getResource('campaign://world/current_location'));
+    const td = JSON.stringify(mcpServer.getResource('campaign://world/time'));
+    const qd = JSON.stringify(mcpServer.getResource('campaign://journal/quests'));
+    const ld = JSON.stringify(mcpServer.getResource('campaign://journal/lore'));
+    const cdt = JSON.stringify(fullState.combat);
+    return `YOU ARE NARRATING FOR A FULL PARTY. Process ALL actions in the user message. \n\n${memberBlocks}\n\nFULL PARTY STATE: ${pc}. \n\nCombat State: ${cdt}. \n\nWorld: ${wd}. Active Quests: ${qd}. Lore: ${ld}\n\nTime: ${td}`;
+}
+
 function parseDamageRollDetails(details?: string): { sides: number; count: number; results: number[] } | null {
   if (!details) return null;
   const regex = /(\d+)d(\d+)\s*\[(.+?)\]/g;

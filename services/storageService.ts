@@ -8,11 +8,12 @@ const LS_KEY = 'diceonrails_game_data';
 const CAMPAIGNS_TABLE = 'campaigns';
 
 /** Builds a SavedGameData structure from campaign fields. */
-function buildSaveData(id: string, name: string, gameState: GameState, messages: Message[], timestamp: number): SavedGameData {
+function buildSaveData(id: string, name: string, gameState: GameState, messages: Message[], timestamp: number, hostId?: string): SavedGameData {
     return {
         version: '2.0',
         campaignId: id,
         campaignName: name,
+        hostId,
         gameState,
         messages,
         stage: AppStage.PLAY,
@@ -182,6 +183,7 @@ export const storageService = {
                                     { ...oldState, party },
                                     legacyData.messages || [],
                                     new Date(legacyData.updated_at || legacyData.created_at).getTime(),
+                                    userId,
                                 ),
                             };
                         }
@@ -195,6 +197,7 @@ export const storageService = {
                         data: buildSaveData(
                             data.id, data.name, data.game_state, data.messages,
                             new Date(data.created_at).getTime(),
+                            data.host_id as string | undefined,
                         ),
                     };
                 }
