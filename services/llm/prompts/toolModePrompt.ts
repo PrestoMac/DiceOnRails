@@ -52,8 +52,8 @@ You MAY call MULTIPLE tools when needed. You MUST call narrate_turn when your tu
 
 NARRATION (SINGLE SOURCE OF TRUTH): Put ALL narration ONLY in the narration field of narrate_turn (or the inline narration field of an action tool). Leave your response content EMPTY — do NOT write prose in both content and the narration field. The engine reads narration from the field, never from your content.
 
-ENDING A TURN IN ONE CALL (out of combat only):
-To end a non-combat turn in a SINGLE tool call instead of a separate narrate_turn:
+ENDING A TURN EFFICIENTLY (out of combat only):
+You MAY end a non-combat turn by passing narration + timePassed directly on a tool instead of a separate narrate_turn. Alternatively, you may call multiple tools in the same turn — secondary calls like award_experience, log_lore, and upsert_quest are ENCOURAGED alongside the main action. The engine batches them together.
 - DETERMINISTIC actions (update_inventory, adjust_currency, log_lore, upsert_quest, simple move_to, cast_ritual): pass \`narration\` + \`timePassed\` directly on the tool. The engine advances time and ends the turn. cast_ritual always advances 10 minutes.
 - SKILL CHECKS / SAVES (binary outcome): pass \`narrationOnSuccess\` + \`narrationOnFailure\` + \`timePassed\`. The engine performs the roll, then uses the branch matching the ACTUAL result. You never decide which prose is used — the dice do, so you cannot misrepresent the outcome.
 - Attacks and damage spells still require a SEPARATE narrate_turn after you observe the rolled result (numbers in the prose must be truthful).

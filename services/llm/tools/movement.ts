@@ -13,6 +13,7 @@ export const tools = [
                     location_name: { type: 'string' },
                     description: { type: 'string' },
                     targetId: { type: 'string' },
+                    xp: { type: 'integer', description: 'Optional: Exploration XP (25-100) to auto-award when arriving at a dangerous or significant new location.' },
                     skillCheck: {
                         type: 'object',
                         description: 'Optional: Auto-perform a skill check upon arrival.',

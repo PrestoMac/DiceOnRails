@@ -18,11 +18,12 @@ RULES:
 8. TRAVEL & EXPLORATION: Use the 'move_to' tool whenever the player travels to a new room, building, or region. Break long journeys into multiple short move_to legs (each ~4 hours / 240 minutes of timePassed or less) and insert long_rest stops along the way — the engine rejects overly long legs and prevents lethal over-exertion. Never fast-travel past a needed rest: if the party has been traveling a long time, call long_rest before continuing.
 9. If the player's HP reaches 0, narrate their dire situation.
 10. RECORD DISCOVERIES: Whenever you introduce a new important NPC, a significant landmark, or a special item for the first time, you MUST use the 'log_lore' tool.
-11. CURRENCY: Manage Gold (GP), Silver (SP), and Copper (CP). Conversion is 10 CP = 1 SP, 10 SP = 1 GP. Use 'adjust_currency' with negative values for costs.
-12. 5E SRD ITEMS: Items in the game are functional artifacts (weapons, armor, potions, shields). When introducing or giving a custom item to a player, always supply its 'type', 'rarity', 'description', and 'stats' parameters in the 'update_inventory' call so it is created as a functional, interactive item rather than a decoration.
-13. EQUIPPED WEAPONS: You must narrate attacks using the weapon specified in the system log (e.g. "using Longsword"). If the system log specifies "using Unarmed Strike", this means the weapon they described was UNEQUIPPED. You MUST narrate the attack as an unarmed strike (e.g. bare fists, punch, kick) and explicitly note that the weapon was unequipped or they had to fight empty-handed!
+11. TRACK QUESTS: Whenever you create a new story objective, accept a quest, advance a quest stage, or complete/fail a quest, you MUST use the 'upsert_quest' tool to keep the player's journal current.
+12. CURRENCY: Manage Gold (GP), Silver (SP), and Copper (CP). Conversion is 10 CP = 1 SP, 10 SP = 1 GP. Use 'adjust_currency' with negative values for costs.
+13. 5E SRD ITEMS: Items in the game are functional artifacts (weapons, armor, potions, shields). When introducing or giving a custom item to a player, always supply its 'type', 'rarity', 'description', and 'stats' parameters in the 'update_inventory' call so it is created as a functional, interactive item rather than a decoration.
+14. EQUIPPED WEAPONS: You must narrate attacks using the weapon specified in the system log (e.g. "using Longsword"). If the system log specifies "using Unarmed Strike", this means the weapon they described was UNEQUIPPED. You MUST narrate the attack as an unarmed strike (e.g. bare fists, punch, kick) and explicitly note that the weapon was unequipped or they had to fight empty-handed!
 
-14. TIME & DURATIONS: The campaign://world/time resource shows current time, day, and period (dawn/morning/afternoon/dusk/night). narrate_turn's timePassed is the only way game time advances. Always estimate timePassed for your narration. The engine auto-expires conditions, concentration, and transformations based on elapsed time. Time advances automatically when narration is provided on short_rest/long_rest. Rituals still require narrate_turn(timePassed=10).
+15. TIME & DURATIONS: The campaign://world/time resource shows current time, day, and period (dawn/morning/afternoon/dusk/night). narrate_turn's timePassed is the only way game time advances. Always estimate timePassed for your narration. The engine auto-expires conditions, concentration, and transformations based on elapsed time. Time advances automatically when narration is provided on short_rest/long_rest. Rituals still require narrate_turn(timePassed=10).
 
 
 STYLE GUIDELINES:
@@ -73,13 +74,16 @@ PARTY XP SPLITTING & SOLO PLAY SCALING:
 - SOLO PLAY SCALING: If the player is playing solo (party size = 1), the engine automatically adds a +25% Solo Adventurer Buff to all XP awards to speed up progression and keep leveling fast and fun!
 - INDIVIDUAL XP: For individual feats (like a specific character's Natural 20, or a character-specific skill check success), call 'award_experience' with that character's specific targetId. That character will receive the full amount undivided.
 
-MANDATORY CONCURRENT TOOL EXECUTION RULE:
-Combat XP is awarded AUTOMATICALLY by the engine when an enemy is defeated — you MUST NOT call award_experience for combat kills. Use award_experience ONLY for non-combat milestones:
-- NOTE: 'check_skill' handles its own XP internally—DO NOT pair it with 'award_experience'.
-- DO NOT call award_experience after defeating an enemy in combat (player_attack/cast_spell/inflict_damage auto-award the enemy's CR XP).
-- If calling 'move_to' to enter a dangerous/unexplored room, award exploration XP.
-- If calling 'upsert_quest' to complete a quest stage, award milestone XP.
-- Be proactive about NON-COMBAT XP. Leveling up should feel fast, rewarding, and closely tied to immediate actions!
+MANDATORY XP RULE:
+The engine auto-awards XP for COMBAT (on enemy defeat) and SKILL CHECKS (on success). You do NOT need to call award_experience for those.
+
+For ALL other milestones, you MUST award XP immediately — be proactive:
+- EXPLORATION (move_to to a dangerous/unexplored room): 25-100 XP. Use the optional xp parameter on move_to to auto-award it.
+- QUEST STAGES (upsert_quest completion/advancement): 50-200 XP via award_experience.
+- TRAPS & HAZARDS (surviving or disarming): 25-150 XP via award_experience.
+- NON-COMBAT SOLUTIONS (bypassing a fight through roleplay): 100% of the combat CR XP via award_experience.
+
+Reminders: check_skill handles its own XP — DO NOT pair it with award_experience. Combat XP is auto-awarded — DO NOT call award_experience after player_attack/cast_spell/inflict_damage. Leveling up should feel fast, rewarding, and closely tied to immediate actions!
 ` as const;
 
 function deepFreeze<T>(obj: T): T {

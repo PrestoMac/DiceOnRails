@@ -55,7 +55,7 @@ export interface TravelDeps {
 
 /** Service interface for movement, narration, rests, dice rolling, and skill checks. */
 export interface TravelService {
-  move_to(location_name: string, description?: string, targetId?: string, skillCheck?: Record<string, unknown>): Promise<MCPResponse>;
+  move_to(location_name: string, description?: string, targetId?: string, skillCheck?: Record<string, unknown>, xp?: number): Promise<MCPResponse>;
   narrate_turn(narration: string, timePassed?: number): Promise<MCPResponse>;
   setAtmosphere(url: string): void;
   setStartingLocation(location: { name: string; description: string; introHook?: string; atmosphereUrl?: string }): void;
@@ -359,7 +359,7 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
       };
     },
 
-    async move_to(location_name, description, targetId, skillCheck) {
+    async move_to(location_name, description, targetId, skillCheck, xp) {
       if (targetId) {
         const target = state.party.find(c => c.id === targetId);
         if (target) {
@@ -385,7 +385,31 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
         logMsg += '\n' + skillResult.message;
       }
 
-      return { success: true, data: { newLocation: location_name }, message: logMsg };
+      let xpAwarded = 0;
+      if (xp && typeof xp === 'number' && xp > 0) {
+        const xpTarget = targetId
+          ? (state.party.find(c => c.id === targetId) || state.party[0])
+          : state.party[0];
+        const partySize = state.party.length;
+        let finalXp = xp;
+        if (partySize === 1) {
+          finalXp = Math.round(xp * 1.25);
+        }
+        const progResult = awardExperience(xpTarget, finalXp);
+        const idx = state.party.findIndex(c => c.id === xpTarget.id);
+        if (idx > -1) {
+          state.party[idx] = progResult.character;
+        }
+        xpAwarded = finalXp;
+        const soloBuff = partySize === 1 ? ' (includes +25% Solo Buff)' : '';
+        logMsg += ` Exploration XP: ${finalXp} XP awarded${soloBuff}.`;
+        if (progResult.leveledUp && progResult.levelUpSummary) {
+          logMsg += ` LEVEL UP! Now level ${progResult.levelUpSummary.newLevel}!`;
+          state.sessionLogs.push(`${xpTarget.name} reached level ${progResult.levelUpSummary.newLevel}!`);
+        }
+      }
+
+      return { success: true, data: { newLocation: location_name, xpAwarded }, message: logMsg };
     },
 
     async narrate_turn(narration, timePassed = 0) {

@@ -115,7 +115,7 @@ export function formatToolResult(toolName: string, result: MCPResponse): string 
       case 'next_turn': return JSON.stringify({tool:'next_turn', success:result.success, message:result.message, next:d.combat?.initiative?.[d.combat?.turnIndex]?.name, round:d.combat?.round, ended:d.combatEnded});
       case 'end_combat': return JSON.stringify({tool:'end_combat', success:result.success, message:result.message});
       case 'player_attack': return JSON.stringify({tool:'player_attack', success:result.success, message:result.message, attacker:d.attacker, enemy:d.enemy, target:d.targetName, targetId:d.targetId, roll:d.roll, attackRoll:d.attackRoll, ac:d.targetAc, hit:d.isHit, damage:d.damage, crit:d.isCritical, fumble:d.isFumble, targetDefeated:d.targetDefeated, xpAwarded:d.xpAwarded});
-      case 'move_to': return JSON.stringify({tool:'move_to', success:result.success, message:result.message, location:d.newLocation});
+      case 'move_to': return JSON.stringify({tool:'move_to', success:result.success, message:result.message, location:d.newLocation, xp:d.xpAwarded});
       case 'check_skill': return JSON.stringify({tool:'check_skill', toolSuccess:result.success, message:result.message, skill:d.character, roll:d.roll, total:d.total, dc:d.difficulty, checkSuccess:d.success, xp:d.xpGained});
       case 'inflict_damage': return JSON.stringify({tool:'inflict_damage', success:result.success, message:result.message, target:d.character, damage:d.damage, hp_remaining:d.newHp, defeated:d.enemyDefeated, xpAwarded:d.xpAwarded, concSave: d.concentrationSave});
       case 'adjust_currency': return JSON.stringify({tool:'adjust_currency', success:result.success, message:result.message, gp:d.currency?.gp, sp:d.currency?.sp, cp:d.currency?.cp});
