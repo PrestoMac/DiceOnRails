@@ -51,7 +51,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     armorProfs: ['light', 'medium', 'heavy', 'shield'],
     weaponProfs: { simple: true, martial: true },
     skillChoices: { count: 2, from: ['acrobatics', 'animal handling', 'athletics', 'history', 'insight', 'intimidation', 'perception', 'survival'] },
-    startingEquipment: ['longsword', 'shield', 'chain mail', "explorer's-pack"],
+    startingEquipment: ['longsword', 'shield', 'chain mail'],
     recommendedStats: { str: 15, dex: 12, con: 14, int: 8, wis: 10, cha: 13 },
     statPriority: ['str', 'con', 'cha', 'dex', 'wis', 'int'],
     features: [
@@ -100,7 +100,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     armorProfs: ['light', 'medium', 'shield'],
     weaponProfs: { simple: true, martial: true },
     skillChoices: { count: 2, from: ['animal handling', 'athletics', 'intimidation', 'nature', 'perception', 'survival'] },
-    startingEquipment: ['greataxe', 'handaxe', "explorer's-pack", 'javelin'],
+    startingEquipment: ['greataxe', 'handaxe', 'javelin'],
     recommendedStats: { str: 15, dex: 13, con: 14, int: 8, wis: 10, cha: 12 },
     statPriority: ['str', 'con', 'dex', 'wis', 'cha', 'int'],
     features: [
@@ -149,7 +149,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     armorProfs: ['light'],
     weaponProfs: { simple: true, martial: false, specific: ['hand crossbow', 'longsword', 'rapier', 'shortsword'] },
     skillChoices: { count: 3, from: ['acrobatics', 'animal handling', 'arcana', 'athletics', 'deception', 'history', 'insight', 'intimidation', 'investigation', 'medicine', 'nature', 'perception', 'performance', 'persuasion', 'religion', 'sleight of hand', 'stealth', 'survival'] },
-    startingEquipment: ['rapier', 'dagger', "explorer's-pack", 'leather armor'],
+    startingEquipment: ['rapier', 'dagger', 'leather armor'],
     recommendedStats: { str: 8, dex: 14, con: 13, int: 10, wis: 12, cha: 15 },
     statPriority: ['cha', 'dex', 'con', 'wis', 'int', 'str'],
     spellcasting: {
@@ -222,7 +222,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     armorProfs: ['light', 'medium', 'shield'],
     weaponProfs: { simple: true, martial: false },
     skillChoices: { count: 2, from: ['history', 'insight', 'medicine', 'persuasion', 'religion'] },
-    startingEquipment: ['mace', 'shield', 'chain mail', "explorer's-pack", 'holy symbol'],
+    startingEquipment: ['mace', 'shield', 'chain mail', 'holy symbol'],
     recommendedStats: { str: 14, dex: 8, con: 13, int: 10, wis: 15, cha: 12 },
     statPriority: ['wis', 'str', 'con', 'cha', 'int', 'dex'],
     spellcasting: {
@@ -294,7 +294,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     armorProfs: ['light', 'medium', 'shield'],
     weaponProfs: { simple: true, martial: false, specific: ['scimitar', 'sickle', 'club', 'dagger', 'dart', 'javelin', 'mace', 'quarterstaff', 'shortbow', 'sling', 'spear'] },
     skillChoices: { count: 2, from: ['animal handling', 'arcana', 'insight', 'medicine', 'nature', 'perception', 'religion', 'survival'] },
-    startingEquipment: ['quarterstaff', "explorer's-pack", 'leather armor', 'shield'],
+    startingEquipment: ['quarterstaff', 'leather armor', 'shield'],
     recommendedStats: { str: 8, dex: 12, con: 14, int: 10, wis: 15, cha: 13 },
     statPriority: ['wis', 'con', 'dex', 'cha', 'int', 'str'],
     spellcasting: {
@@ -365,7 +365,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     armorProfs: [],
     weaponProfs: { simple: true, martial: false, specific: ['shortsword'] },
     skillChoices: { count: 2, from: ['acrobatics', 'athletics', 'history', 'insight', 'religion', 'stealth'] },
-    startingEquipment: ['shortsword', "explorer's-pack"],
+    startingEquipment: ['shortsword'],
     recommendedStats: { str: 10, dex: 15, con: 13, int: 8, wis: 14, cha: 12 },
     statPriority: ['dex', 'wis', 'con', 'str', 'cha', 'int'],
     features: [
@@ -417,7 +417,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     armorProfs: ['light', 'medium', 'heavy', 'shield'],
     weaponProfs: { simple: true, martial: true },
     skillChoices: { count: 2, from: ['athletics', 'insight', 'intimidation', 'medicine', 'persuasion', 'religion'] },
-    startingEquipment: ['longsword', 'shield', 'chain mail', "explorer's-pack", 'holy symbol'],
+    startingEquipment: ['longsword', 'shield', 'chain mail', 'holy symbol'],
     recommendedStats: { str: 15, dex: 8, con: 13, int: 10, wis: 12, cha: 14 },
     statPriority: ['str', 'cha', 'con', 'wis', 'dex', 'int'],
     spellcasting: {
@@ -494,7 +494,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     armorProfs: ['light', 'medium', 'shield'],
     weaponProfs: { simple: true, martial: true },
     skillChoices: { count: 3, from: ['animal handling', 'athletics', 'insight', 'investigation', 'nature', 'perception', 'stealth', 'survival'] },
-    startingEquipment: ['shortbow', 'longsword', 'leather armor', "explorer's-pack"],
+    startingEquipment: ['shortbow', 'longsword', 'leather armor'],
     recommendedStats: { str: 10, dex: 15, con: 13, int: 8, wis: 14, cha: 12 },
     statPriority: ['dex', 'wis', 'con', 'str', 'cha', 'int'],
     spellcasting: {
@@ -571,7 +571,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     armorProfs: ['light'],
     weaponProfs: { simple: true, martial: false, specific: ['hand crossbow', 'longsword', 'rapier', 'shortsword'] },
     skillChoices: { count: 4, from: ['acrobatics', 'athletics', 'deception', 'insight', 'intimidation', 'investigation', 'perception', 'performance', 'persuasion', 'sleight of hand', 'stealth'] },
-    startingEquipment: ['shortsword', 'shortbow', 'leather armor', "explorer's-pack", 'thieves\' tools'],
+    startingEquipment: ['shortsword', 'shortbow', 'leather armor', 'thieves\' tools'],
     recommendedStats: { str: 8, dex: 15, con: 12, int: 13, wis: 10, cha: 14 },
     statPriority: ['dex', 'cha', 'int', 'con', 'wis', 'str'],
     features: [
@@ -618,7 +618,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     armorProfs: [],
     weaponProfs: { simple: false, martial: false, specific: ['dagger', 'dart', 'sling', 'quarterstaff', 'light crossbow'] },
     skillChoices: { count: 2, from: ['arcana', 'deception', 'history', 'insight', 'intimidation', 'persuasion', 'religion'] },
-    startingEquipment: ['quarterstaff', 'dagger', "explorer's-pack"],
+    startingEquipment: ['quarterstaff', 'dagger'],
     recommendedStats: { str: 8, dex: 14, con: 13, int: 10, wis: 12, cha: 15 },
     statPriority: ['cha', 'con', 'dex', 'wis', 'int', 'str'],
     spellcasting: {
@@ -689,7 +689,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     armorProfs: ['light'],
     weaponProfs: { simple: true, martial: false },
     skillChoices: { count: 2, from: ['arcana', 'deception', 'history', 'intimidation', 'investigation', 'nature', 'religion'] },
-    startingEquipment: ['light crossbow', 'dagger', "explorer's-pack", 'leather armor'],
+    startingEquipment: ['light crossbow', 'dagger', 'leather armor'],
     recommendedStats: { str: 8, dex: 14, con: 13, int: 10, wis: 12, cha: 15 },
     statPriority: ['cha', 'con', 'dex', 'wis', 'int', 'str'],
     spellcasting: {
@@ -745,7 +745,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     armorProfs: [],
     weaponProfs: { simple: false, martial: false, specific: ['dagger', 'dart', 'sling', 'quarterstaff', 'light crossbow'] },
     skillChoices: { count: 2, from: ['arcana', 'history', 'insight', 'investigation', 'medicine', 'religion'] },
-    startingEquipment: ['quarterstaff', 'spellbook', "explorer's-pack"],
+    startingEquipment: ['quarterstaff', 'spellbook'],
     recommendedStats: { str: 8, dex: 14, con: 13, int: 15, wis: 12, cha: 10 },
     statPriority: ['int', 'dex', 'con', 'wis', 'cha', 'str'],
     spellcasting: {
