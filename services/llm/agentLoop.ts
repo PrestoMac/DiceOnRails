@@ -2,7 +2,7 @@ import { Message, MessageRole, LLMProvider, MCPResponse } from '../../types';
 import { SYSTEM_INSTRUCTION, PROGRESSION_SYSTEM_PROMPT } from '../../constants';
 import { getThinkingDisabledBody } from '../../utils/envHelper';
 import { isDebugMode } from '../../utils/debug';
-import { safeParseJson } from '../../utils/safeJson';
+import { safeParseJson, parseLlmResponse } from '../../utils/safeJson';
 import { mcpServer } from '../mcpService';
 import { tools, TOOL_MODE_INSTRUCTION } from './tools';
 import { extractRollData, formatToolResult } from './narration';
@@ -261,7 +261,7 @@ export async function runAgentLoop(
       throw new Error(errMsg);
     }
 
-    const data = await response.json();
+    const data = parseLlmResponse(await response.json());
     const promptT = data.usage?.prompt_tokens ?? 0;
     const completionT = data.usage?.completion_tokens ?? 0;
     const cachedT = data.usage?.prompt_tokens_details?.cached_tokens ?? 0;

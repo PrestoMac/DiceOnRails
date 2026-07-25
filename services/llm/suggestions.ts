@@ -1,6 +1,7 @@
 import { Message, LLMProvider, GameState } from '../../types';
 import { isDebugMode } from '../../utils/debug';
 import { sanitizeNarration } from '../../utils/textSanitize';
+import { parseLlmResponse } from '../../utils/safeJson';
 import { resolveLLMConfig, mapHistoryToMessages } from './llmApiClient';
 import { buildCombatSuggestions } from '../mcp/combatService';
 
@@ -138,7 +139,7 @@ export const generateSuggestions = async (
             const errMsg = `LLM request failed: ${response.status}`;
             throw new Error(errMsg);
         }
-        const data = await response.json();
+        const data = parseLlmResponse(await response.json());
         const msg = data.choices[0].message;
         const c = (typeof msg.content === 'string' && msg.content.trim()) ? msg.content : '';
         return parseSuggestionArray(c);

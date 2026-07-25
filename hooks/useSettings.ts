@@ -18,7 +18,10 @@ export const useSettings = () => {
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [settings, setSettings] = useState<AppSettings>(() => {
         const saved = localStorage.getItem('diceonrails_settings');
-        const parsed = saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
+        let parsed: Partial<AppSettings> | null = null;
+        if (saved) {
+            try { parsed = JSON.parse(saved); } catch { parsed = null; }
+        }
         const merged = { ...DEFAULT_SETTINGS, ...parsed };
         setDebugMode(merged.debugMode);
         return merged;

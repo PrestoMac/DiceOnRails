@@ -9,6 +9,8 @@ Before every commit, read `AGENTS.md`, `ARCHITECTURE.md`, and `README.md`, check
 - `npm run test:ci` — same but verbose (run locally before pushing — no CI is currently configured)
 - `npm run test:live` — live LLM integration tests (needs real API key)
 - `npm run test:live:tier3` — scenario tests via `npx tsx tests/live/run_all.ts`
+- `npm run test:json-hardening` — JSON hardening live tests via `npx tsx tests/live/run_json_hardening.ts` (Phase 2: malformed response crash guard)
+- `npm run test:json-hardening:quick` — same with 1 trial per variant: `cross-env JSON_HARDEN_TRIALS=1 npx tsx tests/live/run_json_hardening.ts`
 - `npm run lint` — `eslint . --ext .ts,.tsx`
 - `npm run build` — `vite build` → `dist/`
 

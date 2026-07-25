@@ -2,7 +2,7 @@ import { Message, LLMProvider, MCPResponse, RollData } from '../../types';
 import { SYSTEM_INSTRUCTION, PROGRESSION_SYSTEM_PROMPT } from '../../constants';
 import { getThinkingDisabledBody } from '../../utils/envHelper';
 import { isDebugMode } from '../../utils/debug';
-import { safeParseJson } from '../../utils/safeJson';
+import { safeParseJson, parseLlmResponse } from '../../utils/safeJson';
 import { sanitizeNarration } from '../../utils/textSanitize';
 import { streamChatCompletion } from '../streamingClient';
 import { resolveLLMConfig, mapHistoryToMessages } from './llmApiClient';
@@ -166,7 +166,7 @@ export const generateNarration = async (history: Message[], context: string, fro
         // isLoading and freezing the chat. It is cleared in the finally.
         if (isDebugMode) console.log(`[Narration] Response received in ${Date.now() - narrationStart}ms, status=${response.status}`);
         if (!response.ok) { let errMsg = `LLM request failed: ${response.status}`; const errData = await safeParseJson<{ error?: { message?: string } }>(response); if (errData?.error?.message) errMsg = errData.error.message; console.error('[Narration] Request failed', { status: response.status, errMsg }); throw new Error(errMsg); }
-        const data = await response.json();
+        const data = parseLlmResponse(await response.json());
         const assistantMessage = data.choices[0].message;
         if (isDebugMode && data.usage) { const promptTokens = data.usage.prompt_tokens ?? 0; const completionTokens = data.usage.completion_tokens ?? 0; const totalTokens = data.usage.total_tokens ?? 0; const cachedTokens = data.usage.prompt_tokens_details?.cached_tokens ?? 0; const cacheHitPct = promptTokens > 0 ? ((cachedTokens / promptTokens) * 100).toFixed(1) : '0'; console.log(`[LLM Usage] ${data.model || model} | mode=narration | prompt=${promptTokens} completion=${completionTokens} total=${totalTokens} | cached=${cachedTokens} (${cacheHitPct}% of prompt)`); }
         if (isDebugMode) { console.log(`[Narration] generateNarration done in ${Date.now() - narrationStart}ms, contentLength=${(assistantMessage.content || "").length}`); console.log(`[Narration] Content preview: ${(assistantMessage.content || "").substring(0, 200)}`); }
@@ -215,7 +215,7 @@ export const generateNarrationSimple = async (history: Message[], context: strin
     try {
         const response = await fetch(apiUrl, { method: "POST", headers: apiHeaders, body: JSON.stringify(payloadBase), signal: fetchController.signal });
         if (!response.ok) { const errMsg = `LLM request failed: ${response.status}`; const errData = await safeParseJson<{ error?: { message?: string } }>(response); if (errData?.error?.message) throw new Error(errData.error.message); throw new Error(errMsg); }
-        const data = await response.json();
+        const data = parseLlmResponse(await response.json());
         const msg = data.choices[0].message;
         // Content only — reasoning_content is planning meta, not narration prose
         // (see generateNarration rationale above).
