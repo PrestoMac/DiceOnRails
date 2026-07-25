@@ -11,7 +11,7 @@ interface CampaignContextValue {
   loadCampaigns: () => Promise<void>;
   handleCreateNewCampaign: () => void;
   handleConfirmCreateCampaign: (name: string) => void;
-  handleJoinCampaign: (id: string, loadGame: (uid?: string, cid?: string) => Promise<void>) => Promise<void>;
+  handleJoinCampaign: (id: string, loadGame: (uid?: string, cid?: string) => Promise<boolean>, joinAsNewMember?: boolean) => Promise<void>;
   handleDeleteCampaign: (id: string) => void;
   handleRenameCampaign: (id: string, newName: string) => void;
 }

@@ -72,7 +72,7 @@ export const useCampaigns = (
             'deleting campaign',
         );
 
-    const handleJoinCampaign = async (campaignId: string, loadGameCallback: (uid: string | undefined, cid: string) => Promise<void>) => {
+    const handleJoinCampaign = async (campaignId: string, loadGameCallback: (uid: string | undefined, cid: string) => Promise<boolean>, joinAsNewMember = false) => {
         if (gameState.isProcessing) {
             alert('Please wait for the current turn to finish before switching campaigns.');
             return;
@@ -91,7 +91,29 @@ export const useCampaigns = (
         mcpServer.reset();
         resetRewindGeneration();
         setCurrentCampaignId(campaignId);
-        await loadGameCallback(userId, campaignId);
+        const found = await loadGameCallback(userId, campaignId);
+
+        if (joinAsNewMember) {
+            // "Join Existing Party" path: the user should create a character to add to
+            // the party rather than dropping into an existing campaign as a viewer.
+            if (!found) {
+                alert('Campaign not found. Check the ID with your party host.');
+                return;
+            }
+            // Re-join guard: if the user already owns a character in this campaign,
+            // loadGameData already set stage to PLAY + myCharacterId. Skip the wizard so
+            // they don't create a duplicate character.
+            const loadedParty = mcpServer.getFullState().party;
+            if (userId && loadedParty.some(c => c.ownerId === userId)) {
+                return;
+            }
+            // Route to the character creation wizard. isNewCampaign=false hides the
+            // starting-grounds step (the campaign already has a starting location) and
+            // ends on the Review step. The new character is added via joinParty in
+            // handleCharacterCreated.
+            setIsNewCampaign(false);
+            setStage(AppStage.CREATION);
+        }
     };
 
     return {

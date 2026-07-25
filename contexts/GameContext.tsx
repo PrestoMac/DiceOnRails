@@ -20,7 +20,7 @@ interface GameContextValue {
   setStage: (s: AppStage) => void;
   setViewingCharacterId: (id: string | null) => void;
   syncState: () => void;
-  loadGameData: (userId?: string, campaignId?: string) => Promise<void>;
+  loadGameData: (userId?: string, campaignId?: string) => Promise<boolean>;
   saveGameData: () => Promise<void>;
   resetGame: () => void;
   handleUpdateInventory: (items: InventoryItem[], charId?: string) => void;

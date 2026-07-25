@@ -589,30 +589,44 @@ export const useGameActions = (
         setMyCharacterId(character.id); setViewingCharacterId(character.id);
         const startingLoc = mcpServer.getFullState().startingLocation;
         if (startingLoc) character.location = startingLoc.name;
+        // Detect "join existing party": the party already has members before joinParty
+        // runs (new campaigns always reset to an empty party before the wizard runs).
+        const isJoiningParty = mcpServer.getFullState().party.length > 0;
         mcpServer.joinParty(character); syncState(); setStage(AppStage.PLAY);
 
-        const locName = startingLoc?.name || 'the Rusty Tankard Tavern';
-        const desc = startingLoc?.description || 'The air is thick with smoke and the smell of roasted meats.';
-        const hook = startingLoc?.introHook || 'A hooded figure at the corner table catches your eye as you settle into a chair.';
-        const introMsg: Message = { id: 'welcome-' + Date.now(), role: MessageRole.MODEL, text: `Greetings, ${character.name}. Your journey begins in ${locName}. ${desc} ${hook} What do you do?`, timestamp: Date.now() };
-        setMessages([introMsg]);
+        let messagesToSync: Message[];
+        let spokenText: string | undefined;
+        if (isJoiningParty) {
+            // Append a brief join notice — preserve the existing campaign chat history
+            // rather than replacing it with a fresh intro message.
+            const joinMsg: Message = { id: 'join-' + Date.now(), role: MessageRole.SYSTEM, text: `${character.name} has joined the party.`, timestamp: Date.now() };
+            messagesToSync = [...messages, joinMsg];
+        } else {
+            const locName = startingLoc?.name || 'the Rusty Tankard Tavern';
+            const desc = startingLoc?.description || 'The air is thick with smoke and the smell of roasted meats.';
+            const hook = startingLoc?.introHook || 'A hooded figure at the corner table catches your eye as you settle into a chair.';
+            const introMsg: Message = { id: 'welcome-' + Date.now(), role: MessageRole.MODEL, text: `Greetings, ${character.name}. Your journey begins in ${locName}. ${desc} ${hook} What do you do?`, timestamp: Date.now() };
+            messagesToSync = [introMsg];
+            spokenText = introMsg.text;
+        }
+        setMessages(messagesToSync);
 
         if (userId && isSyncableCampaign(currentCampaignId)) {
             const fullState = mcpServer.getFullState();
             if (isNewCampaign) {
                 await storageService.createCampaign(userId, campaignName || "New Campaign", fullState, currentCampaignId);
-                await storageService.syncCampaignState(currentCampaignId, fullState, [introMsg]);
+                await storageService.syncCampaignState(currentCampaignId, fullState, messagesToSync);
                 setIsNewCampaign(false);
             } else {
-                await storageService.syncCampaignState(currentCampaignId, fullState, messages);
+                await storageService.syncCampaignState(currentCampaignId, fullState, messagesToSync);
             }
         } else if (currentCampaignId === ANONYMOUS_CAMPAIGN_ID) {
             // Persist the freshly created character + intro for anonymous players
-            await storageService.syncCampaignState(currentCampaignId, mcpServer.getFullState(), [introMsg]);
+            await storageService.syncCampaignState(currentCampaignId, mcpServer.getFullState(), messagesToSync);
             setIsNewCampaign(false);
         }
         if (settings.enableAtmosphere && startingLoc) performAtmosphereUpdate(startingLoc.name, startingLoc.description, settings);
-        autoSpeak(introMsg.text);
+        if (spokenText) autoSpeak(spokenText);
     };
 
     const handleSendMessageRef = useRef(handleSendMessage);

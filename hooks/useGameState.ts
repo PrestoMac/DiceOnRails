@@ -37,14 +37,17 @@ export const useGameState = (userId: string | undefined) => {
         }
     }, [currentCampaignId]);
 
-    const loadGameData = async (uid?: string, campaignId?: string) => {
+    // Returns true when campaign data was found and loaded, false otherwise (bad ID,
+    // storage error, or anonymous-with-no-save). Callers use this to decide whether to
+    // proceed (e.g. the join flow bails with an alert when false).
+    const loadGameData = async (uid?: string, campaignId?: string): Promise<boolean> => {
         setIsLoading(true);
         try {
             const { data, error } = await storageService.loadGame(uid, campaignId);
 
             if (error) {
                 console.error("Failed to load game: " + error);
-                return;
+                return false;
             }
 
             if (data) {
@@ -77,13 +80,17 @@ export const useGameState = (userId: string | undefined) => {
                     }
                 }
                 setStage(data.stage);
+                return true;
             } else if (campaignId === ANONYMOUS_CAMPAIGN_ID) {
                 // First-time anonymous user with no local save → start at the Quick Start vs Custom decision.
                 setIsNewCampaign(true);
                 setStage(AppStage.START_MODE);
+                return true;
             }
+            return false;
         } catch (e) {
             console.error('[loadGameData] Error:', e);
+            return false;
         } finally {
             setIsLoading(false);
         }

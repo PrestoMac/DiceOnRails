@@ -340,6 +340,8 @@ describe('useGameActions', () => {
 
   it('handleCharacterCreated shows welcome message', async () => {
     const char = makeBaseState().party[0];
+    // Empty party → non-join (new campaign) path → intro welcome message.
+    mcpServerMock.getFullState.mockReturnValue({ ...makeBaseState(), party: [] });
     const { result } = render();
 
     await act(async () => {
@@ -350,6 +352,37 @@ describe('useGameActions', () => {
     const setMessagesCall = vi.mocked(setMessages).mock.calls[0][0];
     expect(setMessagesCall[0].role).toBe(MessageRole.MODEL);
     expect(setMessagesCall[0].text).toContain('Greetings');
+  });
+
+  it('handleCharacterCreated appends join notice and preserves chat history when joining an existing party', async () => {
+    const existingMessages = [
+      { id: 'msg-1', role: MessageRole.MODEL, text: 'The party explores a dungeon.', timestamp: 0 },
+      { id: 'msg-2', role: MessageRole.USER, text: 'I attack the goblin', timestamp: 1 },
+    ];
+    defaultProps.messages = existingMessages;
+    // getFullState returns a state with an existing party member (length > 0 triggers join path)
+    mcpServerMock.getFullState.mockReturnValue(makeBaseState());
+    const char = makeBaseState().party[0];
+    const { result } = render();
+
+    await act(async () => {
+      await result.current.handleCharacterCreated(char);
+    });
+
+    expect(setMessages).toHaveBeenCalled();
+    const setMessagesCall = vi.mocked(setMessages).mock.calls[0][0];
+    // Existing messages preserved + join notice appended (not replaced)
+    expect(setMessagesCall).toHaveLength(existingMessages.length + 1);
+    expect(setMessagesCall[0]).toBe(existingMessages[0]);
+    expect(setMessagesCall[1]).toBe(existingMessages[1]);
+    const joinMsg = setMessagesCall[setMessagesCall.length - 1];
+    expect(joinMsg.role).toBe(MessageRole.SYSTEM);
+    expect(joinMsg.text).toContain('has joined the party');
+    // Should NOT contain the fresh-intro "Greetings" message
+    expect(setMessagesCall.some(m => m.text?.includes('Greetings'))).toBe(false);
+
+    // Reset for downstream tests
+    defaultProps.messages = [];
   });
 
   it('handleCharacterCreated persists via syncCampaignState for anonymous campaigns (no Supabase createCampaign)', async () => {

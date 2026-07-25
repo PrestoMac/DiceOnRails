@@ -24,6 +24,7 @@ import StartingGroundsStep from './StartingGroundsStep';
 interface WizardShellProps {
   onComplete: (character: Character) => void;
   isNewCampaign?: boolean;
+  defaultLevel?: number;
   campaignStartingLocation?: StartingLocation;
   onGenerateStartingLocations?: (charInfo: { name: string; race: string; class: string }) => Promise<StartingLocation[]>;
   onSetStartingLocation?: (location: StartingLocation) => void;
@@ -34,14 +35,14 @@ const CLASSES = CLASSES_CATALOG;
 
 /** Main character creation wizard. Orchestrates all steps (name, race, class, stats, skills, feats, spells, gear, review, starting grounds) into a multi-step form with progress tracking. */
 const WizardShell: React.FC<WizardShellProps> = ({
-  onComplete, isNewCampaign, campaignStartingLocation, onGenerateStartingLocations, onSetStartingLocation,
+  onComplete, isNewCampaign, defaultLevel, campaignStartingLocation, onGenerateStartingLocations, onSetStartingLocation,
 }) => {
   const [finalizeError, setFinalizeError] = useState<string | null>(null);
   const generationStartedRef = useRef(false);
   const generationIdRef = useRef(0);
 
   const [wizardState, setWizardState] = useState<WizardState>({
-    name: '', level: 1, backstory: '',
+    name: '', level: defaultLevel ?? 1, backstory: '',
     selectedRace: RACES[0], selectedClass: CLASSES[0],
     stats: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
     inventory: [], allocatedSkills: {}, goldPool: 10,

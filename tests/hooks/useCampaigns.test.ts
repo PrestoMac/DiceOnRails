@@ -189,4 +189,54 @@ describe('useCampaigns', () => {
     expect(loadGameCallback).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
   });
+
+  it('handleJoinCampaign with joinAsNewMember routes to the character creation wizard', async () => {
+    vi.mocked(loadGameCallback).mockResolvedValue(true);
+
+    const { result } = render();
+    await act(async () => {
+      await result.current.handleJoinCampaign('campaign-id-123', loadGameCallback, true);
+    });
+
+    expect(setIsNewCampaign).toHaveBeenCalledWith(false);
+    expect(setStage).toHaveBeenCalledWith(AppStage.CREATION);
+  });
+
+  it('handleJoinCampaign with joinAsNewMember alerts when campaign is not found', async () => {
+    const alertMock = vi.fn();
+    vi.stubGlobal('alert', alertMock);
+    vi.mocked(loadGameCallback).mockResolvedValue(false);
+
+    const { result } = render();
+    await act(async () => {
+      await result.current.handleJoinCampaign('campaign-id-123', loadGameCallback, true);
+    });
+
+    expect(alertMock).toHaveBeenCalledWith(expect.stringContaining('not found'));
+    expect(setStage).not.toHaveBeenCalledWith(AppStage.CREATION);
+    expect(setIsNewCampaign).not.toHaveBeenCalledWith(false);
+    vi.unstubAllGlobals();
+  });
+
+  it('handleJoinCampaign skips the wizard when the user already owns a character (re-join guard)', async () => {
+    vi.mocked(loadGameCallback).mockResolvedValue(true);
+    vi.mocked(mcpServer.getFullState).mockReturnValue({
+      party: [{ ownerId: 'user-1', id: 'char-1' }],
+    } as unknown as ReturnType<typeof mcpServer.getFullState>);
+
+    const { result } = render();
+    await act(async () => {
+      await result.current.handleJoinCampaign('campaign-id-123', loadGameCallback, true);
+    });
+
+    // loadGameData already set stage to PLAY + myCharacterId; skip the wizard.
+    expect(setStage).not.toHaveBeenCalledWith(AppStage.CREATION);
+    expect(setIsNewCampaign).not.toHaveBeenCalledWith(false);
+
+    // Restore default mock for subsequent tests.
+    vi.mocked(mcpServer.getFullState).mockReturnValue({
+      party: [], worldDescription: '', sessionLogs: [],
+      quests: [], lore: [], actionQueue: [],
+    });
+  });
 });

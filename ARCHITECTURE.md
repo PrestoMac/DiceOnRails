@@ -623,24 +623,28 @@ components/wizard/
 ### How it works
 
 1. `WizardShell` declares an array of `WizardStep<WizardState>` objects. Each step has `{ key, label, isVisible?, validate?, render({state, updateState, context}) }`.
-2. `StepWizard` filters by `isVisible` (e.g. the subclass step only shows if `selectedClass.subclassLevel <= level`), maintains a step-history stack for back-navigation, and renders the current step plus a progress bar.
-3. Steps mutate `wizardState` via `updateWizard` (a stable `useCallback`).
-4. The wizard includes two "Path" steps — `subclass-early` (for classes like Cleric whose subclass is chosen at L1) and `subclass-late` (for classes whose subclass comes at L2+). Only one is visible depending on the class.
-5. On the **Review** step, `handleFinalize` (WizardShell:90) computes final stats, applies racial ASIs (including Half-Elf flexible choices), collects feats, builds the resource pools (`recalculateResourcePools`), assigns HP from class hit die + CON mod, and calls `onComplete(character)`.
-6. For **new campaigns**, a final **StartingGrounds** step calls `onGenerateStartingLocations` (which hits the LLM with `STARTING_LOCATIONS_PROMPT`) to produce 4 unique taverns, each with an LLM-generated atmosphere image. The chosen location seeds the world.
+2. The optional `defaultLevel` prop sets the starting level (used when joining an existing party — defaults to the party's max level). `WizardState.level` inits to `defaultLevel ?? 1`.
+3. `StepWizard` filters by `isVisible` (e.g. the subclass step only shows if `selectedClass.subclassLevel <= level`), maintains a step-history stack for back-navigation, and renders the current step plus a progress bar.
+4. Steps mutate `wizardState` via `updateWizard` (a stable `useCallback`).
+5. The wizard includes two "Path" steps — `subclass-early` (for classes like Cleric whose subclass is chosen at L1) and `subclass-late` (for classes whose subclass comes at L2+). Only one is visible depending on the class.
+6. On the **Review** step, `handleFinalize` (WizardShell:90) computes final stats, applies racial ASIs (including Half-Elf flexible choices), collects feats, builds the resource pools (`recalculateResourcePools`), assigns HP from class hit die + CON mod, and calls `onComplete(character)`.
+7. For **new campaigns**, a final **StartingGrounds** step calls `onGenerateStartingLocations` (which hits the LLM with `STARTING_LOCATIONS_PROMPT`) to produce 4 unique taverns, each with an LLM-generated atmosphere image. The chosen location seeds the world.
 
 ### `onComplete` → `handleCharacterCreated`
 
-`useGameActions.ts:339`:
+`useGameActions.ts:587`:
 
 1. Tag character with `ownerId = userId`.
 2. Set `myCharacterId`, `viewingCharacterId`.
 3. Read starting location from state, set character location.
-4. `mcpServer.joinParty(character)` → adds to `state.party`.
-5. `setStage(AppStage.PLAY)`.
-6. Build an intro message (`"Greetings, X. Your journey begins in Y…"`) and set messages.
-7. If part of a real campaign: `storageService.createCampaign(...)` (new) or `syncCampaignState(...)` (existing).
-8. If atmosphere art is enabled, fetch and cache the starting image.
+4. **Join detection**: if `party.length > 0` before `joinParty` (party already has members, meaning the campaign was loaded from storage rather than created fresh), the handler takes the **join path**:
+   - Append a `[System]` join notice (`"<Name> has joined the party."`) to existing messages — preserves the campaign's chat history.
+   - Skip the intro welcome message and auto-speak.
+5. Otherwise (new/anonymous campaign): build the intro message (`"Greetings, X. Your journey begins in Y…"`) and set messages.
+6. `mcpServer.joinParty(character)` → adds to `state.party`.
+7. `setStage(AppStage.PLAY)`.
+8. Sync to Supabase or localStorage (the new campaign creates a row; the join path or existing campaign syncs the existing row). All branches use the explicitly-constructed message array (fixes a latent stale-closure bug).
+9. If atmosphere art is enabled, fetch and cache the starting image.
 
 ---
 

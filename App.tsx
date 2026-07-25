@@ -91,7 +91,7 @@ const AppContent: React.FC = () => {
   };
   const handleJoinCampaignWrapped = (id: string) => {
     resetContextState();
-    handleJoinCampaign(id, loadGameData);
+    handleJoinCampaign(id, loadGameData, true);
   };
   const handleConfirmCreateCampaignWrapped = (name: string) => {
     resetContextState();
@@ -171,7 +171,12 @@ const AppContent: React.FC = () => {
       return <QuickStartFlow onComplete={handleCharacterCreated} onGenerateStartingLocations={handleGenerateStartingLocations} onSetStartingLocation={handleSetStartingLocation} onSwitchToCustom={() => setStage(AppStage.CREATION)} />;
     }
     if (stage === AppStage.CREATION) {
-      return <WizardShell onComplete={handleCharacterCreated} isNewCampaign={isNewCampaign} campaignStartingLocation={gameState.startingLocation} onGenerateStartingLocations={isNewCampaign ? handleGenerateStartingLocations : undefined} onSetStartingLocation={handleSetStartingLocation} />;
+      // When joining an existing party (!isNewCampaign), default the wizard's level to
+      // the party's max level so the new member isn't underpowered.
+      const joinDefaultLevel = !isNewCampaign && gameState.party.length > 0
+        ? Math.max(...gameState.party.map(c => c.level))
+        : undefined;
+      return <WizardShell onComplete={handleCharacterCreated} isNewCampaign={isNewCampaign} defaultLevel={joinDefaultLevel} campaignStartingLocation={gameState.startingLocation} onGenerateStartingLocations={isNewCampaign ? handleGenerateStartingLocations : undefined} onSetStartingLocation={handleSetStartingLocation} />;
     }
     return <ErrorBoundary>{isMobile ? <MobileLayout key={currentCampaignId} /> : <DesktopLayout key={currentCampaignId} />}</ErrorBoundary>;
   };
