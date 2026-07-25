@@ -180,6 +180,7 @@ export class MockMCPServer {
   public async check_skill(skill_name: string, difficulty: number, targetId?: string, onSuccess?: Record<string, unknown>): Promise<MCPResponse> { return this.travel.check_skill(skill_name, difficulty, targetId, onSuccess); }
   public async long_rest(narration?: string, autoAdvanceTime?: boolean): Promise<MCPResponse> { return this.travel.long_rest(narration, autoAdvanceTime); }
   public async short_rest(targetId?: string, narration?: string, autoAdvanceTime?: boolean): Promise<MCPResponse> { return this.travel.short_rest(targetId, narration, autoAdvanceTime); }
+  public async arcane_recovery(characterId: string, selections: Array<{ level: number; count: number }>): Promise<MCPResponse> { return this.travel.arcane_recovery(characterId, selections); }
 
 
   public async cast_spell(characterId: string, spellId: string, slotLevel?: number, targets?: string[], targetSaveResults?: Record<string, boolean>, reaction?: boolean): Promise<MCPResponse> { return this.spells.cast_spell(characterId, spellId, slotLevel, targets, targetSaveResults, reaction); }

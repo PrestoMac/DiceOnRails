@@ -1939,6 +1939,108 @@ const roundTripped = deepClone(char.conditions);
     });
   });
 
+  describe('arcane_recovery', () => {
+    function makeWizard(overrides: Partial<Character> = {}): Character {
+      return {
+        id: 'wizard-1', name: 'Magus', class: 'wizard', race: 'elf', level: 5,
+        hp: { current: 32, max: 32 },
+        stats: { str: 8, dex: 14, con: 12, int: 16, wis: 13, cha: 10 },
+        inventory: [],
+        currency: { gp: 10, sp: 0, cp: 0 },
+        location: 'Test Lab',
+        experience: 0, experienceToNextLevel: 6500,
+        unusedStatPoints: 0, maxHpBonus: 0,
+        hitDice: { current: 5, max: 5 },
+        skills: { arcana: 1 },
+        resources: [
+          { id: 'spell-slot-1', name: 'Level 1 Spell Slot', current: 1, max: 4, resetOn: 'long', source: 'class', sourceId: 'wizard' },
+          { id: 'spell-slot-2', name: 'Level 2 Spell Slot', current: 0, max: 3, resetOn: 'long', source: 'class', sourceId: 'wizard' },
+          { id: 'spell-slot-3', name: 'Level 3 Spell Slot', current: 0, max: 2, resetOn: 'long', source: 'class', sourceId: 'wizard' },
+        ],
+        ...overrides,
+      };
+    }
+
+    it('recovers expended spell slots for a wizard', async () => {
+      const wizard = makeWizard();
+      const server = new MockMCPServer();
+      server.joinParty(wizard);
+      const result = await server.arcane_recovery('wizard-1', [{ level: 2, count: 1 }, { level: 1, count: 1 }]);
+      expect(result.success).toBe(true);
+      const slot1 = wizard.resources?.find(r => r.id === 'spell-slot-1');
+      const slot2 = wizard.resources?.find(r => r.id === 'spell-slot-2');
+      expect(slot1?.current).toBe(2);
+      expect(slot2?.current).toBe(1);
+      const arPool = wizard.resources?.find(r => r.id === 'arcane-recovery');
+      expect(arPool?.current).toBe(0);
+    });
+
+    it('rejects non-wizard characters', async () => {
+      const fighter = makeCharacter();
+      const server = new MockMCPServer();
+      server.joinParty(fighter);
+      const result = await server.arcane_recovery('hero-1', [{ level: 1, count: 1 }]);
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects when arcane recovery already used', async () => {
+      const wizard = makeWizard({ resources: [
+        { id: 'spell-slot-1', name: 'Level 1 Spell Slot', current: 1, max: 4, resetOn: 'long', source: 'class', sourceId: 'wizard' },
+        { id: 'arcane-recovery', name: 'Arcane Recovery', current: 0, max: 1, resetOn: 'long', source: 'class', sourceId: 'wizard' },
+      ]});
+      const server = new MockMCPServer();
+      server.joinParty(wizard);
+      const result = await server.arcane_recovery('wizard-1', [{ level: 1, count: 1 }]);
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects selections that exceed max recovery levels', async () => {
+      const wizard = makeWizard();
+      const server = new MockMCPServer();
+      server.joinParty(wizard);
+      // Level 5 wizard: ceil(5/2) = 3 max levels.
+      const result = await server.arcane_recovery('wizard-1', [{ level: 3, count: 1 }, { level: 1, count: 1 }]);
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects level 6+ slot recovery', async () => {
+      const wizard = makeWizard({ resources: [
+        { id: 'spell-slot-1', name: 'Level 1 Spell Slot', current: 1, max: 4, resetOn: 'long', source: 'class', sourceId: 'wizard' },
+        { id: 'spell-slot-6', name: 'Level 6 Spell Slot', current: 0, max: 1, resetOn: 'long', source: 'class', sourceId: 'wizard' },
+      ]});
+      const server = new MockMCPServer();
+      server.joinParty(wizard);
+      const result = await server.arcane_recovery('wizard-1', [{ level: 6, count: 1 }]);
+      expect(result.success).toBe(false);
+    });
+
+    it('handles already-full slots gracefully (no-op on those)', async () => {
+      const wizard = makeWizard({ resources: [
+        { id: 'spell-slot-1', name: 'Level 1 Spell Slot', current: 4, max: 4, resetOn: 'long', source: 'class', sourceId: 'wizard' },
+        { id: 'spell-slot-2', name: 'Level 2 Spell Slot', current: 3, max: 3, resetOn: 'long', source: 'class', sourceId: 'wizard' },
+      ]});
+      const server = new MockMCPServer();
+      server.joinParty(wizard);
+      const result = await server.arcane_recovery('wizard-1', [{ level: 1, count: 1 }]);
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('No spell slots to recover');
+    });
+
+    it('creates arcane-recovery pool on-the-fly for existing characters', async () => {
+      const wizard = makeWizard({ resources: [
+        { id: 'spell-slot-1', name: 'Level 1 Spell Slot', current: 0, max: 4, resetOn: 'long', source: 'class', sourceId: 'wizard' },
+      ]});
+      const server = new MockMCPServer();
+      server.joinParty(wizard);
+      const result = await server.arcane_recovery('wizard-1', [{ level: 1, count: 1 }]);
+      expect(result.success).toBe(true);
+      const arPool = wizard.resources?.find(r => r.id === 'arcane-recovery');
+      expect(arPool).toBeDefined();
+      expect(arPool?.current).toBe(0);
+      expect(wizard.resources?.[0].current).toBe(1);
+    });
+  });
+
   describe('player_attack', () => {
     it('performs an attack roll against an enemy', async () => {
       vi.mocked(cryptoRoll).mockReturnValue(10);

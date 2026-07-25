@@ -29,7 +29,7 @@ const DesktopLayout: React.FC = () => {
     handleEnqueueAction, handleRemoveQueueItem, handleUpdateQueueItem,
     handleReorderQueue, syncState,
   } = useGameContext();
-  const { handleSendMessage, handleUndo, handleRewind, handleExecuteBatch, handleResolveEnemyTurn } = useActionsContext();
+  const { handleSendMessage, handleUndo, handleRewind, handleExecuteBatch, handleResolveEnemyTurn, handleArcaneRecovery } = useActionsContext();
   const {
     showLevelUpModal, levelUpCharacter, selectedAllocations, remainingPoints,
     previewHp, allocationError, handleOpenLevelUp, handleCloseLevelUp,
@@ -165,7 +165,7 @@ const DesktopLayout: React.FC = () => {
         />
       </div>
       <div className="relative z-10 shrink-0">
-        <InputArea onSendMessage={handleSendMessage} onQueueAction={handleEnqueueAction} onResolveEnemyTurn={handleResolveEnemyTurn} isLoading={isLoading || gameState.isProcessing} combat={gameState.combat} character={charToShow} isMultiplayer={isMultiplayer} />
+        <InputArea onSendMessage={handleSendMessage} onQueueAction={handleEnqueueAction} onResolveEnemyTurn={handleResolveEnemyTurn} isLoading={isLoading || gameState.isProcessing} combat={gameState.combat} character={charToShow} isMultiplayer={isMultiplayer} onArcaneRecovery={(id, sel) => handleArcaneRecovery(id, sel)} />
       </div>
     </main>
     {isAtmosphereExpanded && gameState.currentAtmosphereUrl && <div className="fixed inset-0 z-[110] bg-black/95 backdrop-blur-2xl flex flex-col items-center justify-center p-4 md:p-12 animate-in fade-in zoom-in-95 duration-300" onClick={() => setIsAtmosphereExpanded(false)}>

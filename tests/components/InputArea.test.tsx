@@ -50,4 +50,21 @@ describe('<InputArea> expanded Quick Actions', () => {
     const { queryByText } = render(<InputArea onSendMessage={vi.fn()} isLoading={false} character={baseCharacter as never} />);
     expect(queryByText('Death Save')).toBeNull();
   });
+
+  it('renders Arcane Recovery button when character is a wizard with charge available', () => {
+    const wizard = { ...baseCharacter, class: 'wizard', resources: [{ id: 'arcane-recovery', name: 'Arcane Recovery', current: 1, max: 1, resetOn: 'long', source: 'class', sourceId: 'wizard' }] };
+    const { getByText } = render(<InputArea onSendMessage={vi.fn()} isLoading={false} character={wizard as never} onArcaneRecovery={vi.fn()} />);
+    expect(getByText('Arcane Recovery')).toBeTruthy();
+  });
+
+  it('hides Arcane Recovery button when charge is exhausted', () => {
+    const wizard = { ...baseCharacter, class: 'wizard', resources: [{ id: 'arcane-recovery', name: 'Arcane Recovery', current: 0, max: 1, resetOn: 'long', source: 'class', sourceId: 'wizard' }] };
+    const { queryByText } = render(<InputArea onSendMessage={vi.fn()} isLoading={false} character={wizard as never} onArcaneRecovery={vi.fn()} />);
+    expect(queryByText('Arcane Recovery')).toBeNull();
+  });
+
+  it('hides Arcane Recovery button for non-wizard characters', () => {
+    const { queryByText } = render(<InputArea onSendMessage={vi.fn()} isLoading={false} character={baseCharacter as never} onArcaneRecovery={vi.fn()} />);
+    expect(queryByText('Arcane Recovery')).toBeNull();
+  });
 });

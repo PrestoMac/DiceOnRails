@@ -186,9 +186,16 @@ Binary dice tools (`check_skill`, `make_save`) support **branch finalization** v
 - **`level_up` tool dispatches to `allocateStatPoints`**, not the full level-up flow. The actual level-up validation happens elsewhere.
 - **`buildCharacterFromWizard`** (8-step): name validation → location resolution → base stats → racial ASI → ASI/feat slots → con mod & racial traits → resource pools → assemble final Character. HP uses `conMod = getMod(fs.con)` (racial CON is already in `fs.con` from the ASI step). **New characters only** — the prior double-count of racial CON in the HP formula is fixed for freshly-created characters; existing saved characters keep their (inflated) HP to avoid clobbering GM hand-adjustments.
 
+### Wizard: Arcane Recovery
+- **`arcane-recovery` is `kind: 'resource'` with `grantsResource: 'arcane-recovery'` in `data/classes.ts`**. A resource pool (`max: 1, resetOn: 'long'`) is created by `recalculateResourcePools` in `classEngine.ts`. This differs from most resources (which auto-generate a Quick Action that pre-fills text) — Arcane Recovery is **skipped in the auto-generated feature list** (`InputArea.tsx:106`) and instead gets a dedicated button that opens `<ArcaneRecoveryModal>`.
+- **Modal flow** (`components/ArcaneRecoveryModal.tsx`): opens when the user clicks the Arcane Recovery button. Shows the wizard's name, level, recovery capacity (`ceil(level/2)`), and each spell slot level (1-5) with +/- selectors. User picks which slots to recover and confirms.
+- **Engine method** (`services/mcp/travelService.ts` — `arcane_recovery`): validates wizard class, consumable charge (find-or-creates the pool for existing characters), slot selection within `ceil(level/2)` cap, no 6th+ level slots. Mutates state: recovers slots (capped at `slot.max`), consumes charge.
+- **Hook** (`useGameActions.handleArcaneRecovery`): calls `mcpServer.arcane_recovery()` then `syncState()` for immediate UI refresh and persists via `storageService.syncCampaignState`. Returned through `ActionsContext` and threaded to `InputArea` via `onArcaneRecovery` prop.
+- **No LLM tool**: the modal bypasses the agent loop entirely. A system message may be appended by `syncState` to log the recovery in chat history.
+
 ### UI
 - **Multiplayer-only UI** (`gameState.party.length > 1`): the Queue Action / Queue Dialogue buttons (`InputArea`, via `isMultiplayer` prop), the `ActionQueuePanel` + its desktop sidebar section / mobile drawer / mobile toggle, and the per-character tab bar (Desktop & Mobile layouts) are all hidden in solo play. The onboarding tour's "Action Queue" step is skipped via `OnboardingTour`'s `multiplayer` prop.
-- **Quick Actions only pre-fill input text**, never send or queue. User must press Enter or click "Act Now"/"Queue Action".
+- **Quick Actions only pre-fill input text**, never send or queue. User must press Enter or click "Act Now"/"Queue Action". **Exception**: Arcane Recovery opens a modal instead.
 - **ChatLog dual roll rendering**: structured `msg.rollData` → `<DiceRollCard>` (animated SVG dice). Regex-parsed text → `<RollCard>` (compact badge).
 - **System message text stripping**: `formatMessageText()` removes `[System:identifier]` prefix via `/^\[System:[a-zA-Z0-9_-]+\]\s*/i`.
 - **DesktopLayout**: resizable sidebar (200-520px), font scaling `0.625 + (sidebarWidth / 520) * 0.5`, scroll gradient at bottom.

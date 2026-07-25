@@ -767,5 +767,23 @@ export const useGameActions = (
         }
     }, [restoreToBeforeLastTurn]);
 
-    return { handleSendMessage, handleExecuteBatch, handleCharacterCreated, handleUndo, handleRewind, resetContextState };
+    const handleArcaneRecovery = async (characterId: string, selections: Array<{ level: number; count: number }>): Promise<boolean> => {
+      if (!characterId || selections.length === 0) return false;
+      try {
+        const result = await mcpServer.arcane_recovery(characterId, selections);
+        if (result.success) {
+          syncState();
+          const cleanedMsgs = messagesRef.current.filter(m => m.text !== `[System] ${result.message}`);
+          storageService.syncCampaignState(currentCampaignId, mcpServer.getFullState(), cleanedMsgs).catch((e: unknown) => console.warn('[Sync] failed:', e));
+          return true;
+        }
+        console.warn('[Arcane Recovery] failed:', result.message);
+        return false;
+      } catch (err) {
+        console.error('[Arcane Recovery] error:', err instanceof Error ? err.message : String(err));
+        return false;
+      }
+    };
+
+    return { handleSendMessage, handleExecuteBatch, handleCharacterCreated, handleUndo, handleRewind, resetContextState, handleArcaneRecovery };
 };

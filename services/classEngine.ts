@@ -308,6 +308,9 @@ export function recalculateResourcePools(character: Character): ResourcePool[] {
           if (level >= 17) max = 3;
           else if (level >= 13) max = 2;
           else max = 1;
+        } else if (feat.grantsResource === 'arcane-recovery') {
+          max = 1;
+          resetOn = 'long';
         }
 
         resources.push({

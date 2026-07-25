@@ -779,7 +779,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     },
     features: [
       { id: 'spellcasting-wiz', name: 'Spellcasting', description: 'You have a spellbook containing the spells you know. You can prepare wizard spells from your spellbook equal to INT mod + wizard level.', level: 1, kind: 'passive', effect: { kind: 'spellcasting' } },
-      { id: 'arcane-recovery', name: 'Arcane Recovery', description: 'Once per day during a short rest, recover expended spell slots with a total level equal to or less than half your wizard level (round up).', level: 1, kind: 'passive' },
+      { id: 'arcane-recovery', name: 'Arcane Recovery', description: 'Once per day during a short rest, recover expended spell slots with a total level equal to or less than half your wizard level (round up).', level: 1, kind: 'resource', grantsResource: 'arcane-recovery' },
       { id: 'arcane-tradition', name: 'Arcane Tradition', description: 'Choose an arcane tradition at level 2, defining your specialized school of magic.', level: 2, kind: 'subclass' },
       { id: 'spell-mastery', name: 'Spell Mastery', description: 'Choose a 1st and 2nd level spell from your spellbook. You can cast them at their lowest level without expending a slot.', level: 18, kind: 'passive' },
       { id: 'signature-spells', name: 'Signature Spells', description: 'Choose two 3rd-level spells from your spellbook that are always prepared and can be cast once without a slot.', level: 20, kind: 'passive' },

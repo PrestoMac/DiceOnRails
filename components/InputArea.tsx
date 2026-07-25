@@ -5,6 +5,7 @@ import { SPELLS_BY_ID } from '../utils/spells';
 import { CLASSES_BY_ID } from '../utils/classes';
 import { SKILLS_LIST } from '../constants';
 import Tooltip from './ui/Tooltip';
+import ArcaneRecoveryModal from './ArcaneRecoveryModal';
 
 interface QuickAction {
   id: string;
@@ -26,6 +27,7 @@ interface InputAreaProps {
   showScrollButton?: boolean;
   /** When true (2+ party members), render the Queue Action/Dialogue buttons. */
   isMultiplayer?: boolean;
+  onArcaneRecovery?: (characterId: string, selections: Array<{ level: number; count: number }>) => void;
 }
 
 const SCHOOL_ICONS: Record<string, string> = {
@@ -48,12 +50,19 @@ const QUICK_BTN = 'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] 
 const DISABLED_STYLE = 'bg-stone-800/50 text-stone-600 cursor-not-allowed';
 
 /** Chat input area with quick-action buttons (spells, weapons, features, rests), speech-to-text, and queue/submit controls. */
-const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onQueueAction, onResolveEnemyTurn, isLoading, combat, character, isMultiplayer }) => {
+const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onQueueAction, onResolveEnemyTurn, isLoading, combat, character, isMultiplayer, onArcaneRecovery }) => {
   const [input, setInput] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [recognition, setRecognition] = useState<{ continuous: boolean; interimResults: boolean; lang: string; onresult: (e: unknown) => void; onerror: (e: unknown) => void; onend: () => void; start: () => void; abort: () => void } | null>(null);
+  const [showArcaneRecovery, setShowArcaneRecovery] = useState(false);
   const isEnemyTurn = combat?.isActive && (combat.initiative[combat.turnIndex]?.type === 'enemy');
   const effectivelyLocked = isLoading || isEnemyTurn;
+
+  const arcaneRecoveryAvailable = useMemo(() => {
+    if (!character || character.class !== 'wizard') return false;
+    const pool = character.resources?.find(r => r.id === 'arcane-recovery');
+    return pool ? pool.current > 0 : false;
+  }, [character]);
 
   const quickActions = useMemo<QuickAction[]>(() => {
     if (!character) return [];
@@ -104,6 +113,7 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onQueueAction, onR
     if (classDef) {
       for (const feat of classDef.features) {
         if (feat.level > character.level || feat.kind !== 'resource') continue;
+        if (feat.id === 'arcane-recovery') continue; // handled by dedicated modal button
         actions.push({
           id: `feature-${feat.id}`,
           label: feat.name,
@@ -212,6 +222,11 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onQueueAction, onR
           <Tooltip content="Long Rest (8h, 24h cooldown): restores all HP, half of Hit Dice, all spell slots (except Warlock pact slots), and reduces exhaustion by 1 level. Must have ≥1 HP." side="top">
             <QuickActionBtn action={{ id: 'longrest', label: 'Long Rest', icon: 'fa-bed', fillText: '/longrest', category: 'rest' }} locked={effectivelyLocked} onClick={() => setInput('/longrest')} extraTitle="Pre-fill Long Rest command" />
           </Tooltip>
+          {arcaneRecoveryAvailable && onArcaneRecovery && (
+            <Tooltip content={`Arcane Recovery: recover up to ${Math.ceil((character?.level ?? 1) / 2)} levels of spell slots. Once per long rest.`} side="top">
+              <QuickActionBtn action={{ id: 'arcane-recovery', label: 'Arcane Recovery', icon: 'fa-hat-wizard', fillText: '', category: 'feature' }} locked={effectivelyLocked} onClick={() => setShowArcaneRecovery(true)} extraTitle="Choose spell slots to recover" />
+            </Tooltip>
+          )}
         </div>
       </div>
       <form onSubmit={handleSubmit} className="max-w-4xl mx-auto flex flex-col gap-3">
@@ -249,6 +264,14 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onQueueAction, onR
           <span className="text-[10px] text-red-500 uppercase font-bold tracking-[0.2em] animate-pulse">⚔️ Enemy Turn Active</span>
           <span className="text-[9px] text-stone-500 font-sans">Wait for GM response, or click "Resolve Turn" to roll for enemy actions.</span>
         </div>
+      )}
+      {character && onArcaneRecovery && (
+        <ArcaneRecoveryModal
+          character={character}
+          isOpen={showArcaneRecovery}
+          onClose={() => setShowArcaneRecovery(false)}
+          onRecover={(selections) => onArcaneRecovery(character.id, selections)}
+        />
       )}
     </div>
   );

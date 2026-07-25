@@ -15,6 +15,7 @@ interface ActionsContextValue {
   handleCharacterCreated: (character: Character) => void;
   handleResolveEnemyTurn: () => Promise<void>;
   resetContextState: () => void;
+  handleArcaneRecovery: (characterId: string, selections: Array<{ level: number; count: number }>) => Promise<boolean>;
 }
 
 const ActionsContext = createContext<ActionsContextValue | null>(null);
