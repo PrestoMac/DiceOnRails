@@ -415,7 +415,7 @@ export async function runAgentLoop(
         if (!timeAlreadyAdvanced) {
           const narrateResult = await mcpServer.executeToolCall('narrate_turn', narrateCall.args);
           narrateTurnExecuted = true;
-          if (Array.isArray(narrateCall.args?.suggestions)) {
+          if ((!suggestions || suggestions.length === 0) && Array.isArray(narrateCall.args?.suggestions)) {
             suggestions = narrateCall.args.suggestions
               .filter((s: unknown): s is string => typeof s === 'string' && s.trim().length > 0)
               .slice(0, 3);

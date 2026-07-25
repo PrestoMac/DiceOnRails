@@ -112,7 +112,7 @@ Create a campaign → choose **Quick Start** (a pre-made hero) or **Custom** cre
 | **Atmosphere image** | Generated scene art behind the chat. Click to expand fullscreen. |
 | **Action Queue** (multiplayer) | Queue up actions/dialogue and resolve them as a batched "party turn". Only shown when 2+ party members are present. |
 | **Quick Actions** | One-tap buttons for your prepared spells, equipped weapons, class resources, skills, saves, and potions. |
-| **Suggested Actions** (opt-in) | Per-turn LLM-suggested next actions, shown as clickable chips above the input. |
+| **Suggested Actions** (opt-in) | 2-3 clickable next-action chips after each turn. A 4-tier fallback chain (inline → opt-in LLM call → deterministic → generic) keeps the tray populated; never blank when enabled. |
 | **Onboarding tour** | Auto-launches once on first play; replayable from Settings. |
 | **Voice input & TTS** | Microphone button for speech-to-text; speaker icon to hear the GM. |
 

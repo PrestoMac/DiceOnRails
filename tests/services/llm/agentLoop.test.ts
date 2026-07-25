@@ -400,6 +400,31 @@ describe('runAgentLoop', () => {
     expect(result.inlineNarration).toBe(NARR);
   });
 
+  it('inline-finalize suggestions are not overwritten by a following narrate_turn', async () => {
+    // check_skill finalizes the turn (timePassed:0 -> time not advanced) and
+    // carries its own suggestions. The LLM also emits a narrate_turn with
+    // different suggestions in the same response. The guard must keep the
+    // inline-finalize suggestions rather than letting narrate_turn clobber them.
+    const NARR = 'GUARDTOKEN The guard lowers his weapon, visibly moved by your words.';
+    mockFetch.mockResolvedValueOnce(makeLLMResponse('', [
+      { name: 'check_skill', args: {
+          skill_name: 'persuasion', difficulty: 15, targetId: 'hero-1',
+          narrationOnSuccess: NARR, narrationOnFailure: NARR, timePassed: 0,
+          suggestions: ['Keep suggestion A', 'Keep suggestion B'],
+      } },
+      { name: 'narrate_turn', args: { narration: 'filler narration text', timePassed: 0, suggestions: ['OVERWRITE X'] } },
+    ]));
+
+    const result = await runAgentLoop(
+      [{ id: 'u1', role: MessageRole.USER, text: 'I persuade the guard', timestamp: 0 }],
+      'Tavern',
+      undefined, undefined, undefined,
+      { requestEndNarration: true, enableSuggestions: true },
+    );
+
+    expect(result.suggestions).toEqual(['Keep suggestion A', 'Keep suggestion B']);
+  });
+
   it('inline-finalized tool keeps narration OUT of the system log message (no duplication)', async () => {
     const NARR = 'DUPECHECKTOKEN vivid narration that must not leak into the system log.';
     mockFetch.mockResolvedValueOnce(makeLLMResponse('', [

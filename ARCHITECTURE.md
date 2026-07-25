@@ -74,7 +74,7 @@ DiceOnRails/
 │   ├── sheet/                # CharacterSheet subpanels (SpellPanel)
 │   ├── ui/                   # Generic Tooltip primitive (portal + mobile long-press)
 │   ├── wizard/               # Generic StepWizard framework + shared ASI/skill UI
-│   └── *.tsx                 # Top-level screens & modals (incl. CompendiumModal, SuggestedActions, QuickStartFlow, StartModeScreen)
+│   └── *.tsx                 # Top-level screens & modals (incl. CompendiumModal, QuickStartFlow, StartModeScreen)
 ├── contexts/                 # 6 React Context providers
 ├── data/                     # Static SRD catalogs + reference data (classes, races, spells, conditionInfo, glossary, referenceConstants, …)
 ├── hooks/                    # 10 custom hooks backing the contexts
@@ -201,7 +201,7 @@ GameState = {
   lastLongRestTime?: number,
   _tiredWarningFired?: boolean,
   factionReputations?: Record<string, number>,
-  lastSuggestions?: string[],                 // LLM-generated suggested next actions (cached per turn)
+  lastSuggestions?: string[],                 // suggested next actions, cached per turn (4-tier fallback chain — see AGENTS.md)
 }
 ```
 
@@ -670,7 +670,7 @@ Differences:
 | `StartModeScreen` | Choose Quick Start (preset) vs. Custom character creation. |
 | `QuickStartFlow` | Pick a preset character, then a starting ground; can switch to Custom. |
 | `CompendiumModal` | Tabbed reference browser: Glossary, Conditions, Rules, Spells, Items (read-only). |
-| `SuggestedActions` | Collapsible panel of LLM-suggested next actions (opt-in, cached per turn). |
+| _(suggestion chips)_ | Inline in `ChatLog` — 2-3 clickable next-action chips below the last narration. Populated by the 4-tier suggestion fallback chain (`services/llm/suggestions.ts`), opt-in via `enableSuggestions`. |
 | `SetupWizard` | First-run installer; writes `.env` via dev-server middleware or pastes SQL into Supabase. |
 | `SettingsModal` | Toggles for voice, atmosphere, debug mode, TTS sliders, account actions, debug-log export. |
 | `DiceRollModal` | Big animated dice popup for skill checks / attacks. |

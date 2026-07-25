@@ -162,6 +162,7 @@ import {
   cleanSpeak,
   dispatchToolRolls, DiceRollFn, buildContextString, buildBatchContextString
 } from './gameActionHelpers';
+import { resolveSuggestions, GENERIC_SUGGESTIONS, buildExplorationSuggestions } from '../services/llm/suggestions';
 import { syncFinishedState as syncStateHelper, prepareContext as prepContext,
   runContextPipeline as runPipeline } from '../services/llm/contextManager';
 import { buildSessionId } from '../services/llmClient';
@@ -292,7 +293,6 @@ export const useGameActions = (
         }
 
         processingRef.current = true;
-        mcpServer.setLastSuggestions([]);
         const currentMessages = messagesRef.current;
         setMessages(prev => [...prev, userMsg]);
         setIsLoading(true);
@@ -308,8 +308,11 @@ export const useGameActions = (
 
         try {
             const currentState = mcpServer.getFullState();
+            // Capture the rewind point BEFORE clearing suggestions so rewinding a
+            // turn restores the previous turn's chips rather than an empty tray.
             mcpServer.saveRewindPoint(currentState, [...currentMessages, userMsg]);
             mcpServer.saveEmergencySnapshot(currentState);
+            mcpServer.setLastSuggestions([]);
             const allMessagesWithUser = [...messagesRef.current, userMsg];
             const ctxPrep = prepContext(ctxRef.current, allMessagesWithUser, buildContextString(myCharacterId));
             const historyForAPI = ctxPrep.activeMessages;
@@ -317,7 +320,7 @@ export const useGameActions = (
             const isClientSideAction = text.startsWith('[');
             const isTrivial = isTrivialInput(text);
             let inlineNarration: string | undefined;
-            let turnSuggestions: string[] = [];
+            let rawSuggestions: string[] = [];
 
             if (isClientSideAction) {
                 if (isDebugMode) console.log('[handleSendMessage] client-side action, skipping agent loop', { text: text.slice(0, 80) });
@@ -334,7 +337,7 @@ export const useGameActions = (
                 mcpServer.commitTransaction();
                 toolMessages = result.toolMessages;
                 inlineNarration = result.inlineNarration;
-                turnSuggestions = result.suggestions || [];
+                rawSuggestions = result.suggestions || [];
             }
 
             const streamingId = `model-${Date.now()}`;
@@ -394,6 +397,7 @@ export const useGameActions = (
             const safeNarration = sanitizeNarration(finalNarration);
             const modelMsg: Message = { id: streamingId, role: MessageRole.MODEL, text: safeNarration || 'The adventure continues...', timestamp: Date.now() };
             setMessages(prev => prev.map(m => m.id === streamingId ? modelMsg : m));
+            const turnSuggestions = await resolveSuggestions(mcpServer.getFullState(), historyForAPI, buildContextString(myCharacterId), ctxPrep.frozen, rawSuggestions, !!settings.enableSuggestions, sessionId);
             processingRef.current = false;
 
             const messagesToSync = [...currentMessages, userMsg, ...insertToolCallMessages(currentMessages, toolMessages, 'model-synth'), modelMsg];
@@ -410,6 +414,12 @@ export const useGameActions = (
         } catch (err) {
             if (isDebugMode) console.error("[DEBUG handleSendMessage] Critical failure:", err);
             mcpServer.rollbackTransaction();
+            // Leave a non-empty suggestion tray even when the turn crashed, so the
+            // tray is never blank while the feature is enabled.
+            if (settings.enableSuggestions) {
+                const det = buildExplorationSuggestions(mcpServer.getFullState());
+                mcpServer.setLastSuggestions(det.length > 0 ? det : [...GENERIC_SUGGESTIONS]);
+            }
             processingRef.current = false;
             if (isSyncableCampaign(currentCampaignId)) {
                 const finalState = { ...mcpServer.getFullState(), isProcessing: false, processingUser: undefined };
@@ -528,7 +538,7 @@ export const useGameActions = (
             const modelMsg: Message = { id: streamingId, role: MessageRole.MODEL, text: safeNarration || 'The adventure continues...', timestamp: Date.now() };
             setMessages(prev => prev.map(m => m.id === streamingId ? modelMsg : m));
 
-            const turnSuggestions = result.suggestions || [];
+            const turnSuggestions = await resolveSuggestions(mcpServer.getFullState(), historyForAPI, batchContext, batchCtxPrep.frozen, result.suggestions, !!settings.enableSuggestions, sessionId);
 
             const messagesToSync = [...currentMessages, userMsg, ...insertToolCallMessages(currentMessages, result.toolMessages, 'model-synth'), modelMsg];
 
@@ -559,6 +569,10 @@ export const useGameActions = (
         } catch (err) {
             if (isDebugMode) console.error("Batch failure:", err);
             mcpServer.rollbackTransaction();
+            if (settings.enableSuggestions) {
+                const det = buildExplorationSuggestions(mcpServer.getFullState());
+                mcpServer.setLastSuggestions(det.length > 0 ? det : [...GENERIC_SUGGESTIONS]);
+            }
             processingRef.current = false;
             if (isSyncableCampaign(currentCampaignId)) {
                 const finalState = { ...mcpServer.getFullState(), isProcessing: false, processingUser: undefined };

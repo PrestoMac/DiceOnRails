@@ -164,7 +164,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ settings, userId, message
           <section className="space-y-4 pt-4 border-t border-stone-800">
             <SectionH>Chronicler's Insight</SectionH>
             <ToggleRow label="Debug Mode" on={local.debugMode} onClick={() => hc('debugMode', !local.debugMode)} description="Enable verbose console logging for prompt caching & game state diagnostics" className="px-3" />
-            <ToggleRow label="Suggested Actions (LLM)" on={!!local.enableSuggestions} onClick={() => hc('enableSuggestions', !local.enableSuggestions)} description="Opt-in: makes one extra lightweight LLM call per turn to suggest 2-3 next actions. Incurs small additional API cost." className="px-3" />
+            <ToggleRow label="Suggested Actions" on={!!local.enableSuggestions} onClick={() => hc('enableSuggestions', !local.enableSuggestions)} description="Shows 2-3 suggested next actions after each turn. May make one small additional API call when a turn doesn't naturally produce suggestions." className="px-3" />
             <div className="px-3">
               <button onClick={copyDebugLogs} className="w-full py-2 bg-stone-950 hover:bg-stone-900 border border-stone-800 rounded-lg text-[10px] font-bold uppercase tracking-widest text-stone-400 hover:text-amber-500 transition-all flex items-center justify-center gap-2">
                 <i className="fas fa-clipboard text-[9px]"></i>

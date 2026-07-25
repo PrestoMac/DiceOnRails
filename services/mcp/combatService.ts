@@ -71,8 +71,10 @@ function buildEnemyActionNarration(attackResults: Record<string, unknown>[]): st
 /**
  * Builds contextual combat suggestions from the live party/enemy state.
  * Used so the suggestion tray is populated during engine-driven enemy turns.
+ * Hardened: never returns an empty array while combat is active (fallbacks fill
+ * any remaining slots) so the deterministic suggestion tier always has content.
  */
-function buildCombatSuggestions(state: GameState): string[] {
+export function buildCombatSuggestions(state: GameState): string[] {
   const suggestions: string[] = [];
   const aliveParty = state.party.filter(c => c.hp.current > 0);
   const wounded = aliveParty
@@ -86,11 +88,17 @@ function buildCombatSuggestions(state: GameState): string[] {
     suggestions.push(`Attack the ${aliveEnemies[0].name}`);
   }
   const caster = aliveParty.find(c => {
-    const slots = c.resources?.filter(r => r.type === 'spellSlot');
+    const slots = c.resources?.filter(r => r.id.startsWith('spell-slot-'));
     return slots?.some(s => s.current > 0);
   });
   if (caster) {
     suggestions.push(`Cast a spell with ${caster.name}`);
+  }
+  // Hardened fallbacks so combat suggestions are never empty.
+  if (suggestions.length < 3) {
+    if (aliveEnemies.length <= 1 && state.combat?.isActive) suggestions.push('End combat');
+    if (suggestions.length < 3) suggestions.push('Use an item');
+    if (suggestions.length < 3) suggestions.push('Reposition to safety');
   }
   return suggestions.slice(0, 3);
 }
