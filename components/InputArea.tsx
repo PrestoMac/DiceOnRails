@@ -211,6 +211,11 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onQueueAction, onR
           <div className="flex-1 h-px bg-stone-800"></div>
         </div>
         <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-stone-700 scrollbar-track-transparent" style={{ scrollbarWidth: 'thin' }}>
+          {arcaneRecoveryAvailable && onArcaneRecovery && (
+            <Tooltip content={`Arcane Recovery: recover up to ${Math.ceil((character?.level ?? 1) / 2)} levels of spell slots. Once per long rest.`} side="top">
+              <QuickActionBtn action={{ id: 'arcane-recovery', label: 'Arcane Recovery', icon: 'fa-hat-wizard', fillText: '', category: 'feature' }} locked={effectivelyLocked} onClick={() => setShowArcaneRecovery(true)} extraTitle="Choose spell slots to recover" />
+            </Tooltip>
+          )}
           {quickActions.map(action => (
             <Tooltip key={action.id} content={action.tooltip} side="top">
               <QuickActionBtn action={action} locked={effectivelyLocked} onClick={() => setInput(action.fillText)} />
@@ -222,11 +227,6 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onQueueAction, onR
           <Tooltip content="Long Rest (8h, 24h cooldown): restores all HP, half of Hit Dice, all spell slots (except Warlock pact slots), and reduces exhaustion by 1 level. Must have ≥1 HP." side="top">
             <QuickActionBtn action={{ id: 'longrest', label: 'Long Rest', icon: 'fa-bed', fillText: '/longrest', category: 'rest' }} locked={effectivelyLocked} onClick={() => setInput('/longrest')} extraTitle="Pre-fill Long Rest command" />
           </Tooltip>
-          {arcaneRecoveryAvailable && onArcaneRecovery && (
-            <Tooltip content={`Arcane Recovery: recover up to ${Math.ceil((character?.level ?? 1) / 2)} levels of spell slots. Once per long rest.`} side="top">
-              <QuickActionBtn action={{ id: 'arcane-recovery', label: 'Arcane Recovery', icon: 'fa-hat-wizard', fillText: '', category: 'feature' }} locked={effectivelyLocked} onClick={() => setShowArcaneRecovery(true)} extraTitle="Choose spell slots to recover" />
-            </Tooltip>
-          )}
         </div>
       </div>
       <form onSubmit={handleSubmit} className="max-w-4xl mx-auto flex flex-col gap-3">

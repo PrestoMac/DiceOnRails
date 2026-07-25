@@ -74,8 +74,8 @@ const ArcaneRecoveryModal: React.FC<ArcaneRecoveryModalProps> = ({ character, is
   const hasSlots = Object.keys(initialSlots).length > 0;
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 backdrop-blur-sm animate-in fade-in duration-200" onClick={handleClose}>
-      <div className="bg-stone-900 border border-stone-700 rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[120] bg-black/70 backdrop-blur-sm" onClick={handleClose}>
+      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-stone-900 border border-stone-700 rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="px-5 py-4 border-b border-stone-800 flex items-center justify-between">
           <div>
             <h2 className="text-lg font-bold text-amber-500 fantasy-font tracking-wide">Arcane Recovery</h2>
