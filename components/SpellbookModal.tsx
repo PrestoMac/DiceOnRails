@@ -254,6 +254,58 @@ const SpellbookModal: React.FC<SpellbookModalProps> = ({
             </div>
           )}
 
+          {swapPickOld && (
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <p className="text-[10px] uppercase font-bold text-amber-600 tracking-widest">
+                  {swapOldIsCantrip ? 'Pick New Cantrip' : 'Pick New Spell'}
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {SPELL_FILTERS.map(f => (
+                    <button
+                      key={f}
+                      onClick={() => setFilter(f)}
+                      className={`px-1.5 py-0.5 rounded text-[9px] uppercase font-bold tracking-wider border transition-all ${
+                        filter === f
+                          ? 'bg-amber-900/40 text-amber-400 border-amber-800/30'
+                          : 'bg-stone-900 text-stone-500 border-stone-800 hover:text-stone-300'
+                      }`}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-1.5 max-h-64 overflow-y-auto custom-scrollbar pr-1">
+                {classCatalog
+                  .filter(s => swapOldIsCantrip ? s.level === 0 : s.level > 0)
+                  .filter(s => !(character.knownSpells ?? []).includes(s.id))
+                  .filter(s => filter === 'all' || s.tags?.includes(filter))
+                  .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name))
+                  .slice(0, 60)
+                  .map(spell => (
+                    <div key={spell.id} className="flex items-center justify-between bg-stone-950/50 rounded-lg px-3 py-1.5 border border-stone-800/70">
+                      <button
+                        onClick={() => setViewingSpell(spell)}
+                        className="flex items-center gap-2 text-left hover:text-amber-400 transition-colors"
+                      >
+                        <i className={`fas ${SCHOOL_ICONS[spell.school] || 'fa-star'} text-[10px] text-stone-500 w-3`}></i>
+                        <span className="text-xs text-stone-300">{spell.name}</span>
+                        <span className="text-[9px] text-stone-600 uppercase">{levelLabel(spell.level)}</span>
+                      </button>
+                      <button
+                        onClick={() => handleSwapConfirm(spell.id)}
+                        disabled={busy}
+                        className="text-[10px] px-2 py-0.5 rounded bg-stone-800 hover:bg-amber-900/40 text-stone-400 hover:text-amber-300 border border-stone-700 hover:border-amber-800/50 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        Learn
+                      </button>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
           {/* PREPARED CASTER PATH */}
           {isPrepared && (
             <>
@@ -405,57 +457,7 @@ const SpellbookModal: React.FC<SpellbookModalProps> = ({
                 </div>
               </div>
 
-              {swapPickOld && (
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <p className="text-[10px] uppercase font-bold text-amber-600 tracking-widest">
-                      {swapOldIsCantrip ? 'Pick New Cantrip' : 'Pick New Spell'}
-                    </p>
-                    <div className="flex flex-wrap gap-1">
-                      {SPELL_FILTERS.map(f => (
-                        <button
-                          key={f}
-                          onClick={() => setFilter(f)}
-                          className={`px-1.5 py-0.5 rounded text-[9px] uppercase font-bold tracking-wider border transition-all ${
-                            filter === f
-                              ? 'bg-amber-900/40 text-amber-400 border-amber-800/30'
-                              : 'bg-stone-900 text-stone-500 border-stone-800 hover:text-stone-300'
-                          }`}
-                        >
-                          {f}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="space-y-1.5 max-h-64 overflow-y-auto custom-scrollbar pr-1">
-                    {classCatalog
-                      .filter(s => swapOldIsCantrip ? s.level === 0 : s.level > 0)
-                      .filter(s => !(character.knownSpells ?? []).includes(s.id))
-                      .filter(s => filter === 'all' || s.tags?.includes(filter))
-                      .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name))
-                      .slice(0, 60)
-                      .map(spell => (
-                        <div key={spell.id} className="flex items-center justify-between bg-stone-950/50 rounded-lg px-3 py-1.5 border border-stone-800/70">
-                          <button
-                            onClick={() => setViewingSpell(spell)}
-                            className="flex items-center gap-2 text-left hover:text-amber-400 transition-colors"
-                          >
-                            <i className={`fas ${SCHOOL_ICONS[spell.school] || 'fa-star'} text-[10px] text-stone-500 w-3`}></i>
-                            <span className="text-xs text-stone-300">{spell.name}</span>
-                            <span className="text-[9px] text-stone-600 uppercase">{levelLabel(spell.level)}</span>
-                          </button>
-                          <button
-                            onClick={() => handleSwapConfirm(spell.id)}
-                            disabled={busy}
-                            className="text-[10px] px-2 py-0.5 rounded bg-stone-800 hover:bg-amber-900/40 text-stone-400 hover:text-amber-300 border border-stone-700 hover:border-amber-800/50 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                          >
-                            Learn
-                          </button>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              )}
+
             </>
           )}
 
