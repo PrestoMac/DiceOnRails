@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Character, SpellDefinition } from '../types';
 import { SPELLS_BY_ID, getSpellsForClass } from '../utils/spells';
 import { getClassDef } from '../services/classEngine';
-import { getMaxPrepared } from '../services/spellcastingEngine';
+import { getMaxPrepared, getCantripsKnown } from '../services/spellcastingEngine';
 import SpellDetailModal from './modals/SpellDetailModal';
 import Tooltip from './ui/Tooltip';
 
@@ -12,7 +12,7 @@ interface SpellbookModalProps {
   isOpen: boolean;
   onClose: () => void;
   /** Prepared-caster management (prepare / unprepare). Required. */
-  onManageSpellbook: (characterId: string, action: 'prepare' | 'unprepare', spellId: string) => Promise<boolean>;
+  onManageSpellbook: (characterId: string, action: 'prepare' | 'unprepare' | 'learn', spellId: string) => Promise<boolean>;
   /** Known-caster Tasha's-style swap. Optional; only invoked when the character
    *  has `pendingSpellSwap === true`. If omitted, known casters see a read-only view. */
   onSwapKnownSpell?: (characterId: string, oldSpellId: string, newSpellId: string) => Promise<boolean>;
@@ -86,6 +86,20 @@ const SpellbookModal: React.FC<SpellbookModalProps> = ({
     [isPrepared, classCatalog, character.preparedSpells, filter]
   );
 
+  const cantripCap = useMemo(
+    () => classDef?.spellcasting ? getCantripsKnown(character, character.level) : 0,
+    [character, classDef]
+  );
+  const hasFreeCantripSlots = knownCantrips.length < cantripCap;
+  const availableCantrips = useMemo(
+    () => classCatalog
+      .filter(s => s.level === 0)
+      .filter(s => !(character.knownSpells ?? []).includes(s.id))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+    [classCatalog, character.knownSpells]
+  );
+  const swapOldIsCantrip = swapPickOld ? (SPELLS_BY_ID[swapPickOld]?.level === 0) : false;
+
   const runAction = async (fn: () => Promise<boolean>) => {
     if (busy) return;
     setBusy(true);
@@ -104,6 +118,8 @@ const SpellbookModal: React.FC<SpellbookModalProps> = ({
     runAction(() => onManageSpellbook(character.id, 'prepare', spellId));
   const handleUnprepare = (spellId: string) =>
     runAction(() => onManageSpellbook(character.id, 'unprepare', spellId));
+  const handleLearn = (spellId: string) =>
+    runAction(() => onManageSpellbook(character.id, 'learn', spellId));
 
   const handleSwapConfirm = (newSpellId: string) => {
     if (!swapPickOld || !onSwapKnownSpell) return;
@@ -161,22 +177,80 @@ const SpellbookModal: React.FC<SpellbookModalProps> = ({
         )}
 
         <div className="overflow-y-auto custom-scrollbar px-5 py-4 space-y-4 grow">
-          {/* Cantrips section — read-only for everyone (cannot be unprepared post-creation) */}
-          {knownCantrips.length > 0 && (
+          {/* Cantrips section — count display, optional swap (known casters), optional learn (free slots) */}
+          {(knownCantrips.length > 0 || hasFreeCantripSlots) && (
             <div>
-              <p className="text-[10px] uppercase font-bold text-amber-600 tracking-widest mb-1.5">Cantrips</p>
-              <div className="flex flex-wrap gap-1.5">
-                {knownCantrips.map(spell => (
-                  <button
-                    key={spell.id}
-                    onClick={() => setViewingSpell(spell)}
-                    className="text-[11px] text-stone-300 hover:text-amber-400 bg-stone-950/50 hover:bg-amber-950/30 hover:border-amber-800/50 px-2 py-1 rounded border border-stone-800 transition-all cursor-pointer flex items-center gap-1.5"
-                  >
-                    <i className={`fas ${SCHOOL_ICONS[spell.school] || 'fa-star'} text-[9px] text-stone-500`}></i>
-                    {spell.name}
-                  </button>
-                ))}
+              <div className="flex items-center justify-between mb-1.5">
+                <p className="text-[10px] uppercase font-bold text-amber-600 tracking-widest">Cantrips</p>
+                {cantripCap > 0 && (
+                  <span className="font-mono text-xs font-bold text-amber-400">
+                    {knownCantrips.length} / {cantripCap}
+                  </span>
+                )}
               </div>
+              {knownCantrips.length > 0 ? (
+                <div className="space-y-1.5">
+                  {knownCantrips.map(spell => {
+                    const isSwapSource = swapPickOld === spell.id;
+                    const canSwapCantrip = isKnown && hasPendingSwap && !!onSwapKnownSpell && !isCombatActive;
+                    return (
+                      <div key={spell.id} className={`flex items-center justify-between rounded-lg px-3 py-1.5 border transition-all ${
+                        isSwapSource ? 'bg-red-950/40 border-red-900/60' : 'bg-stone-950 border-stone-800'
+                      }`}>
+                        <button
+                          onClick={() => setViewingSpell(spell)}
+                          className="flex items-center gap-2 text-left hover:text-amber-400 transition-colors"
+                        >
+                          <i className={`fas ${SCHOOL_ICONS[spell.school] || 'fa-star'} text-[10px] text-stone-500 w-3`}></i>
+                          <span className="text-xs text-stone-300">{spell.name}</span>
+                        </button>
+                        {canSwapCantrip && (
+                          <button
+                            onClick={() => setSwapPickOld(isSwapSource ? null : spell.id)}
+                            disabled={busy}
+                            className={`text-[10px] px-2 py-0.5 rounded border transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                              isSwapSource
+                                ? 'bg-red-900/40 text-red-300 border-red-800/50 hover:bg-red-900/60'
+                                : 'bg-stone-800 text-stone-400 border-stone-700 hover:bg-amber-900/40 hover:text-amber-300 hover:border-amber-800/50'
+                            }`}
+                          >
+                            {isSwapSource ? 'Cancel' : 'Replace'}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-xs text-stone-600 italic">No cantrips known yet.</p>
+              )}
+
+              {/* Available Cantrips — learn when free slots (any caster) */}
+              {hasFreeCantripSlots && availableCantrips.length > 0 && !swapPickOld && (
+                <div className="mt-2">
+                  <p className="text-[10px] uppercase font-bold text-stone-500 tracking-widest mb-1.5">Available Cantrips</p>
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+                    {availableCantrips.map(spell => (
+                      <div key={spell.id} className="flex items-center justify-between bg-stone-950/50 rounded-lg px-3 py-1.5 border border-stone-800/70">
+                        <button
+                          onClick={() => setViewingSpell(spell)}
+                          className="flex items-center gap-2 text-left hover:text-amber-400 transition-colors"
+                        >
+                          <i className={`fas ${SCHOOL_ICONS[spell.school] || 'fa-star'} text-[10px] text-stone-500 w-3`}></i>
+                          <span className="text-xs text-stone-300">{spell.name}</span>
+                        </button>
+                        <button
+                          onClick={() => handleLearn(spell.id)}
+                          disabled={busy || isCombatActive}
+                          className="text-[10px] px-2 py-0.5 rounded bg-stone-800 hover:bg-amber-900/40 text-stone-400 hover:text-amber-300 border border-stone-700 hover:border-amber-800/50 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          Learn
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -334,7 +408,9 @@ const SpellbookModal: React.FC<SpellbookModalProps> = ({
               {swapPickOld && (
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <p className="text-[10px] uppercase font-bold text-amber-600 tracking-widest">Pick New Spell</p>
+                    <p className="text-[10px] uppercase font-bold text-amber-600 tracking-widest">
+                      {swapOldIsCantrip ? 'Pick New Cantrip' : 'Pick New Spell'}
+                    </p>
                     <div className="flex flex-wrap gap-1">
                       {SPELL_FILTERS.map(f => (
                         <button
@@ -353,7 +429,7 @@ const SpellbookModal: React.FC<SpellbookModalProps> = ({
                   </div>
                   <div className="space-y-1.5 max-h-64 overflow-y-auto custom-scrollbar pr-1">
                     {classCatalog
-                      .filter(s => s.level > 0)
+                      .filter(s => swapOldIsCantrip ? s.level === 0 : s.level > 0)
                       .filter(s => !(character.knownSpells ?? []).includes(s.id))
                       .filter(s => filter === 'all' || s.tags?.includes(filter))
                       .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name))

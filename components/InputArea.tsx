@@ -30,7 +30,7 @@ interface InputAreaProps {
   isMultiplayer?: boolean;
   onArcaneRecovery?: (characterId: string, selections: Array<{ level: number; count: number }>) => void;
   /** Spellbook management for casters (prepare/unprepare + known-caster swaps). */
-  onManageSpellbook?: (characterId: string, action: 'prepare' | 'unprepare', spellId: string) => Promise<boolean>;
+  onManageSpellbook?: (characterId: string, action: 'prepare' | 'unprepare' | 'learn', spellId: string) => Promise<boolean>;
   onSwapKnownSpell?: (characterId: string, oldSpellId: string, newSpellId: string) => Promise<boolean>;
 }
 
