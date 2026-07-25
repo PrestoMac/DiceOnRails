@@ -61,7 +61,7 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onQueueAction, onR
   const arcaneRecoveryAvailable = useMemo(() => {
     if (!character || character.class !== 'wizard') return false;
     const pool = character.resources?.find(r => r.id === 'arcane-recovery');
-    return pool ? pool.current > 0 : false;
+    return pool ? pool.current > 0 : true;
   }, [character]);
 
   const quickActions = useMemo<QuickAction[]>(() => {
