@@ -30,7 +30,7 @@ describe('questingTools', () => {
     });
 
     it('reputation changes on completion - factionReputations changes', async () => {
-      await server.upsert_quest('Help Village', 'Protect the village from raiders', 'completed', [
+      await server.upsert_quest('Help Village', 'Protect the village from raiders', 'completed', undefined, [
         { faction: 'Villagers', delta: 15 },
         { faction: 'Raiders', delta: -10 },
       ]);
@@ -76,12 +76,14 @@ describe('questingTools', () => {
       expect(state.lore).toHaveLength(4);
     });
 
-    it('duplicate title - adds duplicate (no uniqueness enforcement)', async () => {
+    it('duplicate title - rejected (dedup prevents XP farming)', async () => {
       await server.log_lore('Same Title', 'First', 'NPC');
       const result = await server.log_lore('Same Title', 'Second', 'NPC');
       expect(result.success).toBe(true);
+      expect(result.data?.duplicate).toBe(true);
       const state = server.getFullState();
-      expect(state.lore).toHaveLength(2);
+      expect(state.lore).toHaveLength(1);
+      expect(state.lore[0].content).toBe('First');
     });
 
     it('empty content - entry created with empty content', async () => {

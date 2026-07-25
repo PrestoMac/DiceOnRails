@@ -599,63 +599,6 @@ describe('MockMCPServer', () => {
     });
   });
 
-  describe('awardExperience', () => {
-    beforeEach(() => {
-      server.loadState(makeServerState());
-    });
-
-    it('awards XP to a specific character', () => {
-      const result = server.awardExperience(100, 'hero-1');
-      expect(result.success).toBe(true);
-      expect(result.data.character).toBe('Hero');
-      expect(result.leveledUp).toBe(false);
-    });
-
-    it('applies solo buff when party size is 1', () => {
-      const result = server.awardExperience(100, 'hero-1');
-      expect(result.message).toContain('Solo Buff');
-    });
-
-    it('does not apply solo buff for party of 2', () => {
-      server.joinParty(makeCharacter({ id: 'hero-2', name: 'Buddy' }));
-      const result = server.awardExperience(100, 'hero-1');
-      expect(result.message).not.toContain('Solo Buff');
-    });
-
-    it('party-wide award splits XP among members', () => {
-      server.joinParty(makeCharacter({ id: 'hero-2', name: 'Buddy' }));
-      const result = server.awardExperience(200, 'party');
-      expect(result.message).toContain('Divided');
-      expect(result.message).toContain('2 party members');
-    });
-
-    it('party-wide award with solo party applies buff', () => {
-      const result = server.awardExperience(100, 'all');
-      expect(result.message).toContain('Solo Buff');
-    });
-
-    it('returns error when party is empty', () => {
-      server.reset();
-      const result = server.awardExperience(100);
-      expect(result.success).toBe(false);
-      expect(result.message).toContain('No characters');
-    });
-
-    it('returns error when target character not found', () => {
-      const result = server.awardExperience(100, 'nobody');
-      expect(result.success).toBe(false);
-      expect(result.message).toContain('not found');
-    });
-
-    it('triggers level up with enough XP', () => {
-      const result = server.awardExperience(5000, 'hero-1');
-      expect(result.leveledUp).toBe(true);
-      expect(result.levelUpSummary).toBeDefined();
-      const levelUpSummary = result.levelUpSummary;
-      expect(levelUpSummary.newLevel).toBeGreaterThan(1);
-    });
-  });
-
   describe('check_skill', () => {
     beforeEach(() => {
       server.loadState(makeServerState());
@@ -2196,7 +2139,7 @@ const roundTripped = deepClone(char.conditions);
       const onSuccess = { awardCurrency: { gp: 5 }, logLore: { title: 'L', content: 'C', category: 'History' as const } };
       const result = await server.check_skill('perception', 5, 'hero-1', onSuccess);
       expect(result.success).toBe(true);
-      expect(result.message).toContain('Gained');
+      expect(result.message).toContain('Skill XP');
       expect(result.message).toContain('New Lore Entry Recorded');
     });
     it('does NOT fire onSuccess on failure', async () => {
@@ -2269,7 +2212,7 @@ const roundTripped = deepClone(char.conditions);
   describe('faction reputation', () => {
     it('updates reputation on quest completion', async () => {
       server.setCharacter(makeCharacter());
-      await server.upsert_quest('Help the Guard', 'Rescue villagers', 'completed', [{ faction: 'City Guard', delta: 20 }]);
+      await server.upsert_quest('Help the Guard', 'Rescue villagers', 'completed', undefined, [{ faction: 'City Guard', delta: 20 }]);
       const state = server.getFullState();
       expect(state.factionReputations?.['city guard']).toBe(20);
     });
@@ -2339,15 +2282,6 @@ const roundTripped = deepClone(char.conditions);
       // A failed call (missing item) should still fail and not get a warning stamped.
       const res = await server.executeToolCall('update_inventory', { item_name: 'Ghost Item', action: 'remove' });
       expect(res.success).toBe(false);
-      expect(res.message).not.toContain('WARNING: no actor id');
-    });
-
-    it('does NOT warn for award_experience with no targetId (documented party-split)', async () => {
-      const hero = makeCharacter({ id: 'hero-1', name: 'Hero' });
-      const ally = makeCharacter({ id: 'hero-2', name: 'Ally' });
-      server.loadState({ ...makeServerState({ party: [hero, ally] }) });
-      const res = await server.executeToolCall('award_experience', { amount: 100 });
-      expect(res.success).toBe(true);
       expect(res.message).not.toContain('WARNING: no actor id');
     });
   });

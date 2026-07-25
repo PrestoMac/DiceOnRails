@@ -6,13 +6,14 @@ export const tools = [
         type: "function",
         function: {
             name: 'upsert_quest',
-            description: 'Adds or updates a quest in the player\'s journal. Supports reputation changes.',
+            description: 'Adds or updates a quest in the player\'s journal. Supports reputation changes. Completion auto-awards XP based on difficulty.',
             parameters: {
                 type: 'object',
                 properties: {
                     title: { type: 'string' },
                     description: { type: 'string' },
                     status: { type: 'string', enum: ['active', 'completed', 'failed'] },
+                    difficulty: { type: 'string', enum: ['trivial', 'easy', 'medium', 'hard', 'deadly'], description: 'Quest difficulty. Controls XP awarded on completion (trivial=50, easy=100, medium=200, hard=400, deadly=800). Set when marking completed.' },
                     reputationChanges: {
                         type: 'array',
                         description: 'Optional: Faction reputation changes on quest completion/failure.',

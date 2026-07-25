@@ -3,7 +3,7 @@ import { tools } from '../../services/llm/toolDefinitions';
 
 const EXPECTED_TOOL_NAMES = [
   'roll_dice', 'add_enemy', 'start_combat', 'next_turn', 'end_combat',
-  'make_save', 'roll_death_save', 'award_experience', 'check_skill',
+  'make_save', 'roll_death_save', 'check_skill',
   'update_inventory', 'upsert_quest', 'log_lore', 'move_to',
   'adjust_currency', 'inflict_damage', 'long_rest', 'short_rest',
   'level_up', 'cast_spell', 'use_resource', 'manage_spellbook',

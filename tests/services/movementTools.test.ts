@@ -112,7 +112,7 @@ describe('check_skill', () => {
     const result = await server.check_skill('athletics', 10);
 
     expect(result.success).toBe(true);
-    expect(result.data?.xpGained).toBeGreaterThanOrEqual(40);
+    expect(result.data?.xpGained).toBe(30);
     expect(result.message).toContain('Nat 20');
   });
 });
@@ -156,13 +156,13 @@ describe('move_to', () => {
 
     await server.move_to('Kitchen', 'A cozy kitchen', 'hero-1');
 
-    expect(char1.location).toBe('Kitchen');
-    expect(char2.location).toBe('The Rusty Tankard');
+    expect(server.getTarget('hero-1').location).toBe('Kitchen');
+    expect(server.getTarget('hero-2').location).toBe('The Rusty Tankard');
 
     await server.move_to('Armory', 'Weapons room');
 
-    expect(char1.location).toBe('Armory');
-    expect(char2.location).toBe('Armory');
+    expect(server.getTarget('hero-1').location).toBe('Armory');
+    expect(server.getTarget('hero-2').location).toBe('Armory');
   });
 
   it('rejects move_to legs longer than 4 hours without moving the party', async () => {

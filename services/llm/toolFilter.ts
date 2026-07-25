@@ -59,9 +59,6 @@ export function filterTools(tools: Array<{ function: { name: string } }>, state:
       return hasCaster;
     }
 
-
-    if (name === 'award_experience' && inCombat) return false;
-
     return true;
   });
 }

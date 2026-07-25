@@ -36,7 +36,7 @@ describe('auto XP award on enemy defeat', () => {
     server = createTestServer();
   });
 
-  it('awards enemy.xp to a solo party with +25% buff on defeat via inflict_damage', async () => {
+  it('awards enemy.xp flat to a solo party (no split, no buff) on defeat via inflict_damage', async () => {
     server.joinParty(makeCharacter({ experience: 0 }));
     // add_enemy(name, ac, hp, attacks, cr, xp)
     await server.add_enemy('Goblin', 12, 5, undefined, 1, 200);
@@ -46,13 +46,13 @@ describe('auto XP award on enemy defeat', () => {
 
     expect(result.data.enemyDefeated).toBe(true);
     expect(result.data.xpAwarded).toBe(true);
-    // 200 * 1.25 = 250
+    // Flat 200 XP (no +25% buff)
     const xpAfter = server.getFullState().party[0].experience;
-    expect(xpAfter - xpBefore).toBe(250);
+    expect(xpAfter - xpBefore).toBe(200);
     expect(result.message).toContain('Combat XP (auto)');
   });
 
-  it('splits XP evenly across a multi-member party', async () => {
+  it('awards full XP flat to every party member (no split)', async () => {
     server.joinParty(makeCharacter({ id: 'p1', name: 'Aria', experience: 0 }));
     server.joinParty(makeCharacter({ id: 'p2', name: 'Bram', experience: 0 }));
     await server.add_enemy('Orc', 13, 6, undefined, 1, 100);
@@ -60,9 +60,9 @@ describe('auto XP award on enemy defeat', () => {
     await server.inflict_damage(6, 'Orc');
 
     const state = server.getFullState();
-    // 100 / 2 = 50 each
-    expect(state.party[0].experience).toBe(50);
-    expect(state.party[1].experience).toBe(50);
+    // 100 XP each (flat — no division)
+    expect(state.party[0].experience).toBe(100);
+    expect(state.party[1].experience).toBe(100);
   });
 
   it('is idempotent: xpAwarded flag prevents double-award', async () => {

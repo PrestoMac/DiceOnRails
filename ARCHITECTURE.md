@@ -233,7 +233,7 @@ Sub-services are factory functions (`createXService(state, deps?)`) that close o
 
 This same method is called by the agent loop **and** by the React layer (e.g. `mcpServer.resolveAllPendingEnemyTurns()` from `ActionsContext.handleResolveEnemyTurn`).
 
-Combat XP is auto-awarded on enemy defeat: `inflict_damage` calls `awardEnemyDefeatXp(state, enemy)` which party-splits the enemy's `xp` value (or +25% solo buff) idempotently via the `Enemy.xpAwarded` flag.
+Combat XP is auto-awarded on enemy defeat: `inflict_damage` calls `awardEnemyDefeatXp(state, enemy)` which awards CR-based XP flat to all party members via `xpEngine.computeXp('combat', ...)` idempotently via the `Enemy.xpAwarded` flag.
 
 ### Transactions, snapshots & rewind
 
@@ -271,7 +271,7 @@ services/llm/
     ├── inventory.ts      # update_inventory, adjust_currency
     ├── movement.ts       # move_to, narrate_turn
     ├── journal.ts        # upsert_quest, log_lore
-    └── rest.ts           # award_experience, long_rest, short_rest
+    └── rest.ts           # long_rest, short_rest
 ```
 
 ### `tools[]`
@@ -422,7 +422,7 @@ The single most important flow to understand. Entry point: `useGameActions.handl
 The engine trusts the LLM to pass the correct actor id per tool call, silently defaulting to `party[0]` when omitted. Hardening (all gated on `party.length > 1`, so solo is byte-identical unless noted):
 - **`MULTIPLAYER_PROMPT`** (`services/llm/prompts/multiplayerPrompt.ts`) is injected into the system message only when `party.length > 1`. It makes the attribution contract explicit.
 - **`PARTY:` context line** (`agentLoop.ts`) — `name (hp/max, AC N) [conditions]` per member via `calculateAc`. Additive; also helps solo.
-- **Actor-id warn-stamp** (`mcpService.executeToolCall`) — appends `WARNING: ...` to `result.message` when an actor tool is called with no id in multiplayer. `award_experience`/`long_rest` excluded (party-wide).
+- **Actor-id warn-stamp** (`mcpService.executeToolCall`) — appends `WARNING: ...` to `result.message` when an actor tool is called with no id in multiplayer. `long_rest` excluded (party-wide). XP is engine-driven (no LLM tool).
 - **`getTarget` ambiguity warning** (`partyService.ts`) — warns on 2+ name matches; resolution order unchanged.
 
 ### Rewind flow (`handleRewind`)
@@ -509,9 +509,18 @@ The conditions subsystem: 16 standard conditions (blinded, charmed, frightened, 
 
 ### `progressionService.ts`
 
-XP table lookups, `calculateXPToNextLevel`, `awardExperience` (with multi-level ups, ASI flags, subclass-feature-unlock flags), `applyStatAllocation`, `calculateHPGainForLevelUp`, `getProgressionContext` (string summary for the LLM). Honors the **Solo Adventurer Buff** (+25% XP when party size = 1) and **party-wide XP split** when no `targetId` is supplied.
+XP table lookups, `calculateXPToNextLevel`, `awardExperience` (with multi-level ups, ASI flags, subclass-feature-unlock flags), `applyStatAllocation`, `calculateHPGainForLevelUp`, `getProgressionContext` (string summary for the LLM). XP is always awarded flat to every party member (no split, no solo buff).
 
-**`awardEnemyDefeatXp(state, enemy)`** (`mcp/progressionService.ts:10`): a free function called automatically by `inflict_damage` when an enemy drops to 0 HP. Party-splits the enemy's `xp` value (or +25% solo buff), mutates state via engine `awardExperience`, idempotent via the `Enemy.xpAwarded` flag. Covers every kill path: `player_attack`, `cast_spell`, DoTs, enemy attacks.
+**`awardEnemyDefeatXp(state, enemy)`** (`mcp/progressionService.ts:10`): a free function called automatically by `inflict_damage` when an enemy drops to 0 HP. Awards CR-based XP flat to all party members via `xpEngine.computeXp('combat', ...)`, idempotent via the `Enemy.xpAwarded` flag. Covers every kill path: `player_attack`, `cast_spell`, DoTs, enemy attacks.
+
+### `xpEngine.ts`
+
+~120 lines. Centralized XP engine — every award in the system routes through one of two functions:
+
+- **`computeXp(trigger, ctx)`** — pure: returns the XP amount for a given trigger + context bundle. 6 triggers: `combat` (CR-based), `skill` (DC-bracketed, nat 20 = ×2), `explore` (first-visit, `significance`-tiered), `quest` (`difficulty`-tiered), `lore` (flat 10), `roleplay` (LLM-proposed, clamped 5-50).
+- **`awardXpToParty(state, amount)`** — mutates state: awards the full amount to every party member (no split, no solo buff). Returns `{ amount, reports, anyLevelUp, levelUpSummaries }`.
+
+Designed as a single config table (`XP_CONFIG`) to make tuning game feel a one-liner. No `award_experience` LLM tool exists — XP flows through tool parameters (`significance` on `move_to`, `difficulty` on `upsert_quest`, `xp` on `narrate_turn`) and engine-side auto-awards.
 
 ### `summoningEngine.ts` / `teleportationEngine.ts` / `transformationEngine.ts`
 
@@ -780,7 +789,7 @@ The `data/constants.ts` file is re-exported via the top-level `constants.ts`, wh
 `constants.ts:8-83` — two large prompt strings:
 
 - **`SYSTEM_INSTRUCTION`** (`constants.ts:8-39`) — base GM persona: "world-class Game Master", 14 numbered RULES (use tools for deterministic actions, manage currency, narrate equipped weapons correctly, handle time/durations, English-only responses, etc.), style guidelines, and the architectural note explaining the Storyteller/Engine split.
-- **`PROGRESSION_SYSTEM_PROMPT`** (`constants.ts:42-83`) — XP calibration: CR-to-XP tables, DC-to-XP tables, trap/exploration XP, party-wide split semantics, solo-adventurer +25% buff, mandatory concurrent `award_experience` rule.
+- **`PROGRESSION_SYSTEM_PROMPT`** (`constants.ts:43-87`) — engine-driven XP: 6 auto-award triggers (combat, skill, explore, quest, lore, roleplay), LLM triggers via `significance`/`difficulty`/`xp` params, long-rest rules. No CR/DC XP tables — engine owns them.
 
 Combined with `TOOL_MODE_INSTRUCTION` from `prompts/toolModePrompt.ts`, these form the agent loop's system message.
 
@@ -917,11 +926,11 @@ These are unwritten rules that hold across the codebase. Violate them at your pe
 - **All tool execution flows through `mcpServer.executeToolCall`** (or its typed wrappers on `MockMCPServer`). Don't call `combatEngine`/`spellcastingEngine` directly from React. `executeToolCall` now wraps certain results through `maybeFinalizeTurn` which collapses action+narrate_turn into one call for inline-finalized tools.
 - **A campaign is "syncable" iff `campaignId != null && campaignId !== 'anonymous'`.** The literal string `'anonymous'` is the sentinel for local-only play.
 - **`isProcessing` is a multiplayer lock.** Always set it before a turn and clear it in a `finally`.
-- **Combat XP is auto-awarded on enemy defeat.** `inflict_damage` calls `awardEnemyDefeatXp` which party-splits the enemy's `xp` value. Visit by `Enemy.xpAwarded` flag. Covers every kill path.
+- **Combat XP is auto-awarded on enemy defeat.** `inflict_damage` calls `awardEnemyDefeatXp` which awards CR-based XP flat to all party members via `xpEngine.computeXp('combat', ...)`. Idempotent via `Enemy.xpAwarded` flag. Covers every kill path.
 
 ### Tools
 
-- **`narrate_turn` is the primary way game time advances**, but deterministic action tools (`update_inventory`, `adjust_currency`, `log_lore`, `upsert_quest`, simple `move_to`) can optionally carry `narration`+`timePassed` to advance time and end the turn in one call (inline finalization). Binary dice tools (`check_skill`, `make_save`) carry `narrationOnSuccess`/`narrationOnFailure` — the engine selects the branch from the roll. `long_rest`/`short_rest`/`move_to` (with inline `narration`/`timePassed`) also advance time inline. `move_to` additionally supports an optional `xp` integer param — when provided, exploration XP is auto-awarded on arrival (mirrors `check_skill`'s auto-XP pattern). The agent loop enforces a no-op `narrate_turn(timePassed=0)` at the end if nothing else advanced time, so conditions/DoTs always tick. **Travel guardrails:** the named-route system is removed; `move_to` legs are capped at 240 min (longer legs rejected pre-dispatch), and the `narrate_turn` exhaustion loop is capped at `MAX_SAFE_EXHAUSTION` (2) so no single advance can kill via travel-fatigue.
+- **`narrate_turn` is the primary way game time advances**, but deterministic action tools (`update_inventory`, `adjust_currency`, `log_lore`, `upsert_quest`, simple `move_to`) can optionally carry `narration`+`timePassed` to advance time and end the turn in one call (inline finalization). Binary dice tools (`check_skill`, `make_save`) carry `narrationOnSuccess`/`narrationOnFailure` — the engine selects the branch from the roll. `long_rest`/`short_rest`/`move_to` (with inline `narration`/`timePassed`) also advance time inline. `move_to` additionally supports an optional `significance` param (`minor`/`major`/`landmark`) — first-visit exploration XP is auto-awarded on arrival (defaults to landmark=100 XP when omitted). `narrate_turn` supports an optional `xp` param (5-50) for roleplay XP. The agent loop enforces a no-op `narrate_turn(timePassed=0)` at the end if nothing else advanced time, so conditions/DoTs always tick. **Travel guardrails:** the named-route system is removed; `move_to` legs are capped at 240 min (longer legs rejected pre-dispatch), and the `narrate_turn` exhaustion loop is capped at `MAX_SAFE_EXHAUSTION` (2) so no single advance can kill via travel-fatigue.
 - **Never call `inflict_damage` after `player_attack` or `cast_spell`** — those tools handle damage atomically. This is repeated loudly in `TOOL_MODE_INSTRUCTION`.
 - **Spells never use `roll_dice`.** Spell attack rolls and damage are inside `cast_spell`.
 - **Critical tools** (`cast_spell`, `inflict_damage`, `roll_dice`, `player_attack`) failing sets `criticalToolFailed`, which suppresses inline narration and forces a separate narration pass.

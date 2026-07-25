@@ -39,51 +39,26 @@ STYLE GUIDELINES:
   LANGUAGE: You MUST respond in English at all times. Never switch to any other language. All narration, dialogue, descriptions, and system messages must be in English only.
 ` as const;
 
-/** Secondary system prompt covering 5e XP awards, combat CR calibration, skill DC rewards, rest mechanics, party splitting, solo-play scaling, and the mandatory concurrent tool-call rule. */
+/** Secondary system prompt covering 5e XP (engine-driven), rest mechanics, and how the LLM triggers XP via tool parameters. */
 export const PROGRESSION_SYSTEM_PROMPT = `
 CHARACTER PROGRESSION (5e SRD rules):
-You MUST award Experience Points (XP) immediately throughout gameplay for player actions. Do NOT wait until the end of a quest. Whenever the player overcomes a challenge, you MUST concurrently invoke the 'award_experience' tool in the same turn.
+XP is awarded AUTOMATICALLY by the engine. You do NOT call any XP tool — there is no award_experience tool. Instead, XP flows through the tools you already call:
 
-HOW TO CALIBRATE CHALLENGES & AWARDS:
-1. Combat Victories (Monster CR):
-   - Assess the threat of the monster and its CR relative to the player's level:
-     - Easy Minions (CR <= Player Level / 4): 10 to 50 XP (e.g. giant rats, skeletons, goblins)
-     - Standard Foes (CR = Player Level / 2): 100 to 200 XP (e.g. orcs, ghouls, dire wolves)
-     - Bosses/Hard Foes (CR = Player Level or higher): 450 to 1,800+ XP (e.g. ogres, trolls, wyrmlings)
-   - Standard CR XP Table: CR 0 = 10 XP | CR 1/8 = 25 XP | CR 1/4 = 50 XP | CR 1/2 = 100 XP | CR 1 = 200 XP | CR 2 = 450 XP | CR 3 = 700 XP | CR 4 = 1,100 XP | CR 5 = 1,800 XP | CR 10 = 5,900 XP.
-   - NON-COMBAT SOLUTIONS: If the player bypasses a fight through creative roleplay, stealth, charm, or intimidation, award 100% of the Combat CR XP!
+1. COMBAT VICTORIES — XP is auto-awarded based on the enemy's Challenge Rating when it is defeated. Every party member receives the full amount (no split). Just run combat normally; the engine handles XP.
 
-2. Successful Skill & Ability Checks (based on DC):
-   - Easy (DC 10): 15 XP (e.g. leaping a small gap, finding hidden common keys)
-   - Medium (DC 15): 35 XP (e.g. picking a door lock, stealthing past a guard, persuading an NPC)
-   - Hard (DC 20): 75 XP (e.g. picking an intricate chest lock, persuading a hostile leader)
-   - Very Hard (DC 25+): 150 XP (e.g. recalling legendary lore, picking a royal treasury lock)
-   - CRITICAL SUCCESS BONUS: If the player rolls a Natural 20 on a check or combat roll, award an extra +25 to +50 XP bonus immediately!
+2. SKILL CHECKS — XP is auto-awarded on success, scaled by DC. A Natural 20 DOUBLES the XP. Just call check_skill; the engine handles XP.
 
-3. Traps & Environmental Hazards:
-   - Surviving or disarming a minor trap: 25-50 XP.
-   - Surviving or disarming a deadly trap: 50-150 XP.
+3. EXPLORATION — When the party visits a NEW location for the first time, XP is auto-awarded. Pass the 'significance' parameter on move_to to calibrate: 'minor' (25 XP, a minor room), 'major' (50 XP, a significant area), or 'landmark' (100 XP, a major destination). If omitted, the engine defaults to landmark (100 XP) — so be intentional about marking trivial locations 'minor'.
 
-4. Exploration & Secret Discoveries:
-   - Finding secret passages, hidden rooms, exploring dangerous dungeons, or arriving at major landmarks: 25-100 XP depending on the level of threat.
+4. QUEST COMPLETION — When you mark a quest 'completed' via upsert_quest, XP is auto-awarded based on the 'difficulty' parameter: 'trivial' (50), 'easy' (100), 'medium' (200), 'hard' (400), 'deadly' (800). Always set difficulty when completing a quest.
 
-LONG REST (SRD 5e): call long_rest when the player rests/sleeps/camps. It restores all HP, recovers half total Hit Dice (min 1), and requires ≥1 HP. The engine now enforces the 24h cooldown mechanically. Time advances automatically when narration is provided.
+5. LORE DISCOVERY — When you log_lore, a small XP bonus (10) is auto-awarded to the party. Duplicate lore entries are rejected (dedup by title).
 
-PARTY XP SPLITTING & SOLO PLAY SCALING:
-- PARTY XP SPLIT: When you award XP for a party-wide event (like a battle victory, quest landmark, or exploration), call 'award_experience' without a targetId. The engine will automatically check the party size and divide the total XP equally among all players.
-- SOLO PLAY SCALING: If the player is playing solo (party size = 1), the engine automatically adds a +25% Solo Adventurer Buff to all XP awards to speed up progression and keep leveling fast and fun!
-- INDIVIDUAL XP: For individual feats (like a specific character's Natural 20, or a character-specific skill check success), call 'award_experience' with that character's specific targetId. That character will receive the full amount undivided.
+6. ROLEPLAY — For significant character moments, creative problem-solving, or meaningful social interaction, pass an optional 'xp' parameter (5-50) on narrate_turn. The engine clamps it to the valid range. Use this to reward memorable roleplay.
 
-MANDATORY XP RULE:
-The engine auto-awards XP for COMBAT (on enemy defeat) and SKILL CHECKS (on success). You do NOT need to call award_experience for those.
+LEVELING: Leveling is fast and frequent. When a character levels up, the level_up tool becomes available — use it to allocate stat points, skill points, and feats.
 
-For ALL other milestones, you MUST award XP immediately — be proactive:
-- EXPLORATION (move_to to a dangerous/unexplored room): 25-100 XP. Use the optional xp parameter on move_to to auto-award it.
-- QUEST STAGES (upsert_quest completion/advancement): 50-200 XP via award_experience.
-- TRAPS & HAZARDS (surviving or disarming): 25-150 XP via award_experience.
-- NON-COMBAT SOLUTIONS (bypassing a fight through roleplay): 100% of the combat CR XP via award_experience.
-
-Reminders: check_skill handles its own XP — DO NOT pair it with award_experience. Combat XP is auto-awarded — DO NOT call award_experience after player_attack/cast_spell/inflict_damage. Leveling up should feel fast, rewarding, and closely tied to immediate actions!
+LONG REST (SRD 5e): call long_rest when the player rests/sleeps/camps. It restores all HP, recovers half total Hit Dice (min 1), and requires ≥1 HP. The engine enforces the 24h cooldown mechanically. Time advances automatically when narration is provided.
 ` as const;
 
 function deepFreeze<T>(obj: T): T {

@@ -1,10 +1,10 @@
-import { Character, GameState, MCPResponse, InventoryItem, Enemy } from '../../types';
+import { Character, GameState, MCPResponse, InventoryItem, Enemy, LocationSignificance, QuestDifficulty } from '../../types';
 import { cryptoRoll } from '../../utils/random';
 import { fail } from './_shared';
 import { SKILLS_LIST } from '../../constants';
 import { isDebugMode } from '../../utils/debug';
 import { getMod, getClassDef, recoverResources as classEngineRecoverResources } from '../classEngine';
-import { awardExperience } from '../progressionService';
+import { computeXp, awardXpToParty, formatXpAwardLine } from '../xpEngine';
 import { getConditionEffects, applyCondition, tickConditionsByTime, tickConditionsByRounds, hasCondition, getExhaustionPenalty, executeConditionOnRemove } from '../conditionEngine';
 import { getTimePeriod, AMBIENT_LINES } from '../../utils/timeUtils';
 import { SPELLS_BY_ID } from '../../utils/spells';
@@ -50,13 +50,13 @@ export interface TravelDeps {
   adjust_currency: (gp?: number, sp?: number, cp?: number, targetId?: string) => Promise<MCPResponse>;
   update_inventory: (item_name: string, action: 'add' | 'remove' | 'edit', quantity?: number, new_name?: string, targetId?: string, type?: InventoryItem['type'], rarity?: InventoryItem['rarity'], description?: string, stats?: InventoryItem['stats'], equipped?: boolean, cost_gp?: number, cost_sp?: number, cost_cp?: number, autoDeductMarketPrice?: boolean, craft?: boolean) => Promise<MCPResponse>;
   log_lore: (title: string, content: string, category: string) => Promise<MCPResponse>;
-  upsert_quest: (title: string, description: string, status: 'active' | 'completed' | 'failed', reputationChanges?: Array<{ faction: string; delta: number }>) => Promise<MCPResponse>;
+  upsert_quest: (title: string, description: string, status: 'active' | 'completed' | 'failed', difficulty?: QuestDifficulty, reputationChanges?: Array<{ faction: string; delta: number }>) => Promise<MCPResponse>;
 }
 
 /** Service interface for movement, narration, rests, dice rolling, and skill checks. */
 export interface TravelService {
-  move_to(location_name: string, description?: string, targetId?: string, skillCheck?: Record<string, unknown>, xp?: number): Promise<MCPResponse>;
-  narrate_turn(narration: string, timePassed?: number): Promise<MCPResponse>;
+  move_to(location_name: string, description?: string, targetId?: string, skillCheck?: Record<string, unknown>, significance?: LocationSignificance): Promise<MCPResponse>;
+  narrate_turn(narration: string, timePassed?: number, xp?: number): Promise<MCPResponse>;
   setAtmosphere(url: string): void;
   setStartingLocation(location: { name: string; description: string; introHook?: string; atmosphereUrl?: string }): void;
   cacheLocationImage(name: string, url: string): void;
@@ -97,7 +97,8 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
     if (onSuccess.upsertQuest) {
       const qr = await deps.upsert_quest(
         onSuccess.upsertQuest.title, onSuccess.upsertQuest.description || '',
-        onSuccess.upsertQuest.status);
+        onSuccess.upsertQuest.status,
+        onSuccess.upsertQuest.difficulty as QuestDifficulty | undefined);
       if (qr.success) logs.push(qr.message);
     }
     if (onSuccess.updateInventory) {
@@ -304,44 +305,14 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
       const success = total >= difficulty;
 
       let xpGained = 0;
-      let nat20Bonus = false;
       let xpMsg = "";
 
       if (success) {
-        let baseXP = 5;
-        if (difficulty >= 25) baseXP = 150;
-        else if (difficulty >= 20) baseXP = 75;
-        else if (difficulty >= 15) baseXP = 35;
-        else if (difficulty >= 10) baseXP = 15;
-
-        xpGained = baseXP;
-
-        if (roll === 20) {
-          xpGained += 25;
-          nat20Bonus = true;
-        }
-
-        const partySize = state.party.length;
-        let finalXp = xpGained;
-        let soloBuffApplied = false;
-        if (partySize === 1) {
-          finalXp = Math.round(xpGained * 1.25);
-          soloBuffApplied = true;
-        }
-
-        const progResult = awardExperience(target, finalXp);
-        const idx = state.party.findIndex(c => c.id === target.id);
-        if (idx > -1) {
-          state.party[idx] = progResult.character;
-        }
-
-        xpMsg = ` Gained ${finalXp} XP${soloBuffApplied ? ' (includes +25% Solo Buff)' : ''}${nat20Bonus ? ' [Nat 20 Bonus included]' : ''}!`;
-        if (progResult.leveledUp && progResult.levelUpSummary) {
-          xpMsg += ` LEVEL UP! Now level ${progResult.levelUpSummary.newLevel}!`;
-          state.sessionLogs.push(`${progResult.character.name} reached level ${progResult.levelUpSummary.newLevel}!`);
-        }
-
-        xpGained = finalXp;
+        const amount = computeXp('skill', { dc: difficulty, nat20: roll === 20 });
+        xpGained = amount;
+        const xpResult = awardXpToParty(state, amount);
+        xpMsg = ' ' + formatXpAwardLine('skill', xpResult);
+        if (roll === 20) xpMsg += ' [Nat 20: XP doubled!]';
       }
 
       if (success && onSuccess) {
@@ -360,7 +331,7 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
       };
     },
 
-    async move_to(location_name, description, targetId, skillCheck, xp) {
+    async move_to(location_name, description, targetId, skillCheck, significance) {
       if (targetId) {
         const target = state.party.find(c => c.id === targetId);
         if (target) {
@@ -387,33 +358,21 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
       }
 
       let xpAwarded = 0;
-      if (xp && typeof xp === 'number' && xp > 0) {
-        const xpTarget = targetId
-          ? (state.party.find(c => c.id === targetId) || state.party[0])
-          : state.party[0];
-        const partySize = state.party.length;
-        let finalXp = xp;
-        if (partySize === 1) {
-          finalXp = Math.round(xp * 1.25);
-        }
-        const progResult = awardExperience(xpTarget, finalXp);
-        const idx = state.party.findIndex(c => c.id === xpTarget.id);
-        if (idx > -1) {
-          state.party[idx] = progResult.character;
-        }
-        xpAwarded = finalXp;
-        const soloBuff = partySize === 1 ? ' (includes +25% Solo Buff)' : '';
-        logMsg += ` Exploration XP: ${finalXp} XP awarded${soloBuff}.`;
-        if (progResult.leveledUp && progResult.levelUpSummary) {
-          logMsg += ` LEVEL UP! Now level ${progResult.levelUpSummary.newLevel}!`;
-          state.sessionLogs.push(`${xpTarget.name} reached level ${progResult.levelUpSummary.newLevel}!`);
-        }
+      if (!Array.isArray(state.visitedLocations)) state.visitedLocations = [];
+      const locationKey = location_name.toLowerCase().trim();
+      const isFirstVisit = !state.visitedLocations.includes(locationKey);
+      if (isFirstVisit) {
+        state.visitedLocations.push(locationKey);
+        const amount = computeXp('explore', { significance });
+        xpAwarded = amount;
+        const xpResult = awardXpToParty(state, amount);
+        logMsg += ' ' + formatXpAwardLine('explore', xpResult);
       }
 
-      return { success: true, data: { newLocation: location_name, xpAwarded }, message: logMsg };
+      return { success: true, data: { newLocation: location_name, xpAwarded, firstVisit: isFirstVisit }, message: logMsg };
     },
 
-    async narrate_turn(narration, timePassed = 0) {
+    async narrate_turn(narration, timePassed = 0, xp) {
       const logs: string[] = [];
       const safeTimePassed = (typeof timePassed === 'number' && !isNaN(timePassed)) ? Math.max(0, timePassed) : 0;
 
@@ -561,10 +520,18 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
         }
       }
 
+      let xpAwarded = 0;
+      if (typeof xp === 'number' && xp > 0) {
+        const amount = computeXp('roleplay', { amount: xp });
+        xpAwarded = amount;
+        const xpResult = awardXpToParty(state, amount);
+        logs.push(formatXpAwardLine('roleplay', xpResult));
+      }
+
       const suffix = logs.length > 0 ? '\n' + logs.join('\n') : '';
       return {
         success: true,
-        data: { narration, timePassed: safeTimePassed, gameTime: state.gameTime, logs },
+        data: { narration, timePassed: safeTimePassed, gameTime: state.gameTime, logs, xpAwarded },
         message: narration + suffix
       };
     },

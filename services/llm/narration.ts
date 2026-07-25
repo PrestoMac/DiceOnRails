@@ -126,7 +126,6 @@ export function formatToolResult(toolName: string, result: MCPResponse): string 
       case 'cast_spell': return JSON.stringify({tool:'cast_spell', success:result.success, message:result.message, damage:d.damage, healing:d.healing, concentration:d.concentrationStarted, saveRoll:d.saveRoll, attackRoll:d.attackRoll, perTarget:d.damage?.perTarget, perBeam:d.perBeam, casterName:d.casterName, appliedConditions:(d as unknown as { appliedConditions?: unknown[] }).appliedConditions, affectedTargets:d.affectedTargets, narrationHint:d.narrationHint});
       case 'use_resource': return JSON.stringify({tool:'use_resource', success:result.success, message:result.message, healed:d.healed, raging:d.raging});
       case 'manage_spellbook': return JSON.stringify({tool:'manage_spellbook', success:result.success, message:result.message, spell:d.spell});
-      case 'award_experience': return JSON.stringify({tool:'award_experience', success:result.success, message:result.message, amount:d.character?.xp, leveledUp:d.leveledUp});
       default: return result.message.substring(0, 80);
     }
   } catch { return result.message.substring(0, 80); }

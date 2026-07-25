@@ -46,7 +46,6 @@ const ACTOR_TOOL_KEYS: Record<string, string[]> = {
   long_rest: ['targetId'],
   manage_spellbook: ['characterId', 'targetId'],
   level_up: ['targetId'],
-  award_experience: ['targetId'],
 };
 
 /**

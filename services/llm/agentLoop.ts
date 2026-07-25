@@ -320,7 +320,7 @@ export async function runAgentLoop(
       // Layer-2 guardrail: the model suffered a tool-calling format failure and emitted
       // its calls as raw <tool_call>/<function> text instead of using the structured
       // tool_calls field. Nudge it to re-issue proper structured calls (recovers dropped
-      // calls like award_experience). Up to 2 corrective retries.
+      // calls like log_lore). Up to 2 corrective retries.
       const rawToolText = /<tool_call>|<function\s*=|<\/function>/i.test(assistantContent);
       if (rawToolText && correctiveRetries < 2) {
         correctiveRetries++;

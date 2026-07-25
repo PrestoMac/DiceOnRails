@@ -1,20 +1,5 @@
-/** Tool definitions for rest and experience: awarding XP, and taking long/short rests. */
+/** Tool definitions for rest mechanics: long and short rests. XP is engine-awarded (no manual tool). */
 export const tools = [
-    {
-        type: "function",
-        function: {
-            name: 'award_experience',
-            description: 'AWARD XP. Use immediately when a challenge is overcome. Without targetId = party-wide split.',
-            parameters: {
-                type: 'object',
-                properties: {
-                    amount: { type: 'integer', description: 'Total XP to award' },
-                    targetId: { type: 'string', description: 'Specific character ID (omit for party-wide)' }
-                },
-                required: ['amount']
-            }
-        }
-    },
     {
         type: "function",
         function: {

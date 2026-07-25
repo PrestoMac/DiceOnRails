@@ -94,22 +94,6 @@ describe('toolFilter', () => {
     });
   });
 
-  describe('award_experience', () => {
-    it('hidden when combat.isActive is true with enemies present', async () => {
-      server.joinParty(makeCharacter());
-      await server.add_enemy('Goblin');
-      await server.start_combat();
-      const names = getToolNames();
-      expect(names).not.toContain('award_experience');
-    });
-
-    it('visible when combat is inactive', () => {
-      server.joinParty(makeCharacter());
-      const names = getToolNames();
-      expect(names).toContain('award_experience');
-    });
-  });
-
   describe('hasUnspentPoints', () => {
     it('shows level_up when only unusedSkillPoints > 0 (no stat points)', () => {
       server.joinParty(makeCharacter({ unusedStatPoints: 0, unusedSkillPoints: 2 }));

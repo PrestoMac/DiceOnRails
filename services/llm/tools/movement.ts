@@ -13,7 +13,7 @@ export const tools = [
                     location_name: { type: 'string' },
                     description: { type: 'string' },
                     targetId: { type: 'string' },
-                    xp: { type: 'integer', description: 'Optional: Exploration XP (25-100) to auto-award when arriving at a dangerous or significant new location.' },
+                    significance: { type: 'string', enum: ['minor', 'major', 'landmark'], description: 'Optional: significance of the location. Controls exploration XP on first visit (minor=25, major=50, landmark=100). Omit defaults to landmark (100 XP).' },
                     skillCheck: {
                         type: 'object',
                         description: 'Optional: Auto-perform a skill check upon arrival.',
@@ -52,7 +52,8 @@ export const tools = [
                         items: { type: 'string', description: 'A single suggested action in first person, e.g. "I attack the goblin" (max 80 chars).' },
                         maxItems: 3,
                         description: 'Optional: 2-3 suggested next actions in first person, e.g. "I cast Cure Wounds on the fighter". Include when the player might need tactical guidance.'
-                    }
+                    },
+                    xp: { type: 'integer', description: 'Optional: Roleplay XP (5-50) to award for significant character moments, creative problem-solving, or meaningful social interaction.' }
                 },
                 required: ['narration', 'timePassed']
             }

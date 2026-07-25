@@ -54,23 +54,6 @@ describe('toolFilter', () => {
     expect(names).toContain('player_attack');
   });
 
-  it('hides award_experience during combat', () => {
-    const state = makeState({
-      party: [],
-      combat: { isActive: true, round: 1, turnIndex: 0, initiative: [], enemies: [] },
-    });
-    const filtered = filterTools(tools, state);
-    const names = toolNames(filtered);
-    expect(names).not.toContain('award_experience');
-  });
-
-  it('shows award_experience outside combat', () => {
-    const state = makeState({ party: [] });
-    const filtered = filterTools(tools, state);
-    const names = toolNames(filtered);
-    expect(names).toContain('award_experience');
-  });
-
   it('hides level_up when no unused points', () => {
     const state = makeState({
       party: [{ id: 'p1', name: 'Test', class: 'fighter', race: 'human', level: 1,

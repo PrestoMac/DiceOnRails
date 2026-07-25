@@ -1,4 +1,4 @@
-import { GameState, MCPResponse, Character, Message, EnemyAttack, InventoryItem, Currency, Enemy, InitiativeEntry } from '../types';
+import { GameState, MCPResponse, Character, Message, EnemyAttack, InventoryItem, Currency, Enemy, InitiativeEntry, LocationSignificance, QuestDifficulty } from '../types';
 import { isDebugMode } from '../utils/debug';
 import { cryptoRoll } from '../utils/random';
 import { sanitizeNarration } from '../utils/textSanitize';
@@ -24,8 +24,7 @@ export { generateId };
  * tool result message so the model self-corrects on subsequent calls. This NEVER
  * changes success/failure — it only appends text the LLM sees via formatToolResult.
  *
- * `award_experience` is intentionally EXCLUDED: omitting its targetId is the
- * documented party-split behavior. `long_rest` is excluded (party-wide by design).
+ * `long_rest` is excluded (party-wide by design). XP tools are engine-driven (no LLM call).
  */
 const ACTOR_ID_ARGS: Record<string, string[]> = {
   player_attack: ['attackerId'],
@@ -143,7 +142,6 @@ export class MockMCPServer {
   public clearEmergencySnapshot(): void { this.stateManager.clearEmergencySnapshot(); }
 
 
-  public awardExperience(amount: number, targetId?: string) { return this.progression.awardExperience(amount, targetId); }
   public async level_up(targetId: string, statAllocations?: Record<string, number>, subclassSelection?: string, chosenFeats?: string[]): Promise<MCPResponse> { return this.progression.level_up(targetId, statAllocations, subclassSelection, chosenFeats); }
   public allocateStatPoints(allocations: Partial<Record<keyof Character['stats'], number>>, targetId?: string, skillAllocations?: Record<string, number>, hpDeviation?: number): MCPResponse { return this.progression.allocateStatPoints(allocations, targetId, skillAllocations, hpDeviation); }
   public getCharacterProgression(targetId?: string): string { return this.progression.getCharacterProgression(targetId); }
@@ -166,12 +164,12 @@ export class MockMCPServer {
   public initializeDeathSaves(character: Character) { this.combat.initializeDeathSaves(character); }
 
 
-  public async upsert_quest(title: string, description: string, status: 'active' | 'completed' | 'failed', reputationChanges?: Array<{ faction: string; delta: number }>): Promise<MCPResponse> { return this.content.upsert_quest(title, description, status, reputationChanges); }
+  public async upsert_quest(title: string, description: string, status: 'active' | 'completed' | 'failed', difficulty?: QuestDifficulty, reputationChanges?: Array<{ faction: string; delta: number }>): Promise<MCPResponse> { return this.content.upsert_quest(title, description, status, difficulty, reputationChanges); }
   public async log_lore(title: string, content: string, category: string): Promise<MCPResponse> { return this.content.log_lore(title, content, category); }
 
 
-  public async move_to(location_name: string, description?: string, targetId?: string, skillCheck?: { skill_name?: string; difficulty?: number; onSuccess?: unknown }): Promise<MCPResponse> { return this.travel.move_to(location_name, description, targetId, skillCheck); }
-  public async narrate_turn(narration: string, timePassed?: number): Promise<MCPResponse> { return this.travel.narrate_turn(narration, timePassed); }
+  public async move_to(location_name: string, description?: string, targetId?: string, skillCheck?: { skill_name?: string; difficulty?: number; onSuccess?: unknown }, significance?: LocationSignificance): Promise<MCPResponse> { return this.travel.move_to(location_name, description, targetId, skillCheck, significance); }
+  public async narrate_turn(narration: string, timePassed?: number, xp?: number): Promise<MCPResponse> { return this.travel.narrate_turn(narration, timePassed, xp); }
   public setAtmosphere(url: string) { this.travel.setAtmosphere(url); }
   public setStartingLocation(location: { name: string; description: string; introHook?: string; atmosphereUrl?: string }) { this.travel.setStartingLocation(location); }
   public cacheLocationImage(name: string, url: string) { this.travel.cacheLocationImage(name, url); }
@@ -347,7 +345,7 @@ export class MockMCPServer {
         case 'player_attack':
           res = await this.combat.player_attack(String(args.attackerId || ''), String(args.weaponName || ''), String(args.targetId || args.target_name || args.target || ''), args.isOffHand as boolean | undefined, args.isSneakAttack as boolean | undefined, args.sharpshooter as boolean | undefined, args.greatWeaponMaster as boolean | undefined); break;
         case 'move_to': {
-          res = await this.travel.move_to(String(args.location_name || 'Unknown'), String(args.description || ''), args.targetId as string | undefined, args.skillCheck as unknown as { skill_name?: string; difficulty?: number; onSuccess?: unknown }, args.xp as number | undefined);
+          res = await this.travel.move_to(String(args.location_name || 'Unknown'), String(args.description || ''), args.targetId as string | undefined, args.skillCheck as unknown as { skill_name?: string; difficulty?: number; onSuccess?: unknown }, args.significance as LocationSignificance | undefined);
           res = await this.maybeFinalizeTurn(args, res);
           break;
         }
@@ -379,15 +377,13 @@ export class MockMCPServer {
           break;
         }
         case 'upsert_quest':
-          res = await this.maybeFinalizeTurn(args, await this.content.upsert_quest(String(args.title || ''), String(args.description || ''), String(args.status || 'active') as 'active' | 'completed' | 'failed', args.reputationChanges as unknown as Array<{ faction: string; delta: number }>)); break;
+          res = await this.maybeFinalizeTurn(args, await this.content.upsert_quest(String(args.title || ''), String(args.description || ''), String(args.status || 'active') as 'active' | 'completed' | 'failed', args.difficulty as QuestDifficulty | undefined, args.reputationChanges as unknown as Array<{ faction: string; delta: number }>)); break;
         case 'log_lore':
           res = await this.maybeFinalizeTurn(args, await this.content.log_lore(String(args.title || ''), String(args.content || ''), String(args.category || 'History'))); break;
         case 'make_save':
           res = await this.maybeFinalizeTurn(args, await this.combat.make_save(String(args.targetId || ''), String(args.stat || 'dex'), Number(args.dc ?? 10))); break;
         case 'roll_death_save':
           res = await this.combat.roll_death_save(String(args.targetId || '')); break;
-        case 'award_experience':
-          res = await this.progression.awardExperience(Number(args.amount ?? 0), args.targetId as string); break;
         case 'level_up': {
           const baseRes = this.progression.allocateStatPoints((args.stats || {}) as unknown as Partial<Record<keyof Character['stats'], number>>, args.targetId as string, (args.skills || {}) as Record<string, number>, Number(args.hpDeviation ?? 0));
           if (!baseRes.success) { res = baseRes; break; }
@@ -455,7 +451,7 @@ export class MockMCPServer {
           } else if (isDebugMode) {
             console.log('[narrate_turn] No suggestions in args');
           }
-          res = await this.travel.narrate_turn(sanitizeNarration(String(args.narration || '')), Number(args.timePassed ?? 0)); break;
+          res = await this.travel.narrate_turn(sanitizeNarration(String(args.narration || '')), Number(args.timePassed ?? 0), args.xp as number | undefined); break;
         default:
           res = fail(`Unknown tool: ${name}`);
       }

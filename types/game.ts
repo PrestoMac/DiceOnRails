@@ -2,12 +2,21 @@ import type { Character } from './character';
 import type { CombatState } from './combat';
 import type { QueuedAction } from './common';
 
+/** Difficulty tiers for quest XP calibration (mirrors combat CR buckets). */
+export type QuestDifficulty = 'trivial' | 'easy' | 'medium' | 'hard' | 'deadly';
+
+/** Significance tiers for exploration XP on first location visits. */
+export type LocationSignificance = 'minor' | 'major' | 'landmark';
+
 /** A quest or objective tracked by the party. */
 export interface Quest {
   id: string;
   title: string;
   description: string;
   status: 'active' | 'completed' | 'failed';
+  difficulty?: QuestDifficulty;
+  /** Idempotency flag — set true when quest-completion XP has been awarded. */
+  xpAwarded?: boolean;
 }
 
 /** A lore entry (NPC, Location, History, or Item) discovered by the party. */
@@ -49,6 +58,8 @@ export interface GameState {
   sessionLogs: string[];
   quests: Quest[];
   lore: LoreEntry[];
+  /** Locations the party has visited (first-visit exploration XP gated on this set). */
+  visitedLocations?: string[];
   startingLocation?: StartingLocation;
   locationImages?: Record<string, string>;
   isProcessing?: boolean;

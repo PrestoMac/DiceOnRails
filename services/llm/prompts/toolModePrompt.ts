@@ -25,9 +25,8 @@ QUICK REFERENCE:
 - LONG JOURNEYS: break multi-hour travel into short move_to legs (≤4h / 240 min of timePassed each) with long_rest stops along the way. The engine rejects longer legs and hard-caps travel-fatigue, so never try to fast-travel a whole day or more in one call — split it and rest when road-weary.
 - search/sneak/look/listen/recall → check_skill
 - take damage → inflict_damage (traps/environment only)
-- accept/complete quest → upsert_quest
-- discover lore → log_lore
-- overcome challenge → award_experience
+- accept/complete quest → upsert_quest (set difficulty for XP)
+- discover lore → log_lore (auto-awards XP)
 - rest/sleep/heal/camp → short_rest / long_rest
 - trivial chat → narrate_turn(timePassed=0)
 - end narration + advance time → narrate_turn(narration=..., timePassed=minutes)
@@ -53,7 +52,7 @@ You MAY call MULTIPLE tools when needed. You MUST call narrate_turn when your tu
 NARRATION (SINGLE SOURCE OF TRUTH): Put ALL narration ONLY in the narration field of narrate_turn (or the inline narration field of an action tool). Leave your response content EMPTY — do NOT write prose in both content and the narration field. The engine reads narration from the field, never from your content.
 
 ENDING A TURN EFFICIENTLY (out of combat only):
-You MAY end a non-combat turn by passing narration + timePassed directly on a tool instead of a separate narrate_turn. Alternatively, you may call multiple tools in the same turn — secondary calls like award_experience, log_lore, and upsert_quest are ENCOURAGED alongside the main action. The engine batches them together.
+You MAY end a non-combat turn by passing narration + timePassed directly on a tool instead of a separate narrate_turn. Alternatively, you may call multiple tools in the same turn — secondary calls like log_lore and upsert_quest are ENCOURAGED alongside the main action. The engine batches them together.
 - DETERMINISTIC actions (update_inventory, adjust_currency, log_lore, upsert_quest, simple move_to, cast_ritual): pass \`narration\` + \`timePassed\` directly on the tool. The engine advances time and ends the turn. cast_ritual always advances 10 minutes.
 - SKILL CHECKS / SAVES (binary outcome): pass \`narrationOnSuccess\` + \`narrationOnFailure\` + \`timePassed\`. The engine performs the roll, then uses the branch matching the ACTUAL result. You never decide which prose is used — the dice do, so you cannot misrepresent the outcome.
 - Attacks and damage spells still require a SEPARATE narrate_turn after you observe the rolled result (numbers in the prose must be truthful).

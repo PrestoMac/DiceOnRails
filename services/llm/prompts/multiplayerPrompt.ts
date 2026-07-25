@@ -19,7 +19,7 @@ ATTRIBUTION IS MANDATORY:
 - You MUST include the correct actor identifier on EVERY tool call that acts on a character:
   - player_attack  → attackerId (name or id of the attacking character)
   - cast_spell     → casterId  (name or id of the casting character)
-  - check_skill / make_save / roll_death_save / update_inventory / adjust_currency / use_resource / short_rest / long_rest / manage_spellbook / level_up / award_experience → targetId (or characterId) of the acting/affected character
+  - check_skill / make_save / roll_death_save / update_inventory / adjust_currency / use_resource / short_rest / long_rest / manage_spellbook / level_up → targetId (or characterId) of the acting/affected character
 - NEVER omit the actor id. If you do, the action silently applies to the FIRST party member — a mis-attribution bug. Always name the correct character.
 - Each character acts from their OWN state: their own spell slots, their own HP, their own equipped weapon, their own resources. Do not mix up who holds which item or who knows which spell.
 - When narrating, attribute actions and dialogue to the correct character by name. Keep each character's voice and backstory distinct.
