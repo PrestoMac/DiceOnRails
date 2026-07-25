@@ -105,7 +105,7 @@ Create a campaign → choose **Quick Start** (a pre-made hero) or **Custom** cre
 | Area | What it does |
 |---|---|
 | **Chat Log (center)** | The GM's narration, your actions, system logs. Filterable, searchable, and exportable. |
-| **Character Sheet (left)** | Your hero's HP, AC, stats, skills, inventory, spellbook, conditions, feats, and resources. Edit anything inline; click spells, items, and conditions for detail popups. |
+| **Character Sheet (left)** | Your hero's HP, AC, stats, skills, inventory, spellbook, conditions, feats, and resources. Edit anything inline; click spells, items, and conditions for detail popups. Casters get a "Manage" button next to Spellcasting to prepare/unprepare spells (prepared casters) or swap a known spell on level-up (known casters, Tasha's rule) — locked during combat. |
 | **Journal tab** | Active quests + categorized lore (NPCs, Locations, History, Items) the GM has logged. |
 | **Compendium (📖)** | In-app reference browser: glossary, all conditions + exhaustion levels, rules tables, the full spell catalog, and SRD items. Read-only, pulls from the same data the engine uses. |
 | **Combat Tracker** | Slides in during fights — shows initiative order, current turn, HP bars, conditions. |

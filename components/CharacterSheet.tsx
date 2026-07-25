@@ -11,6 +11,7 @@ import { SPELLS_BY_ID } from '../utils/spells';
 import { CONDITION_INFO, EXHAUSTION_LEVELS, getExhaustionSummary } from '../data/conditionInfo';
 import { BUFF_SOURCES, STAT_INFO } from '../data/referenceConstants';
 import FeatDetailModal from './FeatDetailModal';
+import SpellbookModal from './SpellbookModal';
 import SpellDetailModal from './modals/SpellDetailModal';
 import ItemDetailModal from './modals/ItemDetailModal';
 import ConditionDetailModal from './modals/ConditionDetailModal';
@@ -56,6 +57,12 @@ interface CharacterSheetProps {
   isHost?: boolean;
   /** Patches arbitrary character fields (notes/gmNotes). UI-only path. */
   onUpdateCharacterFields?: (partial: Partial<Character>, charId?: string) => void;
+  /** UI-direct spellbook management (prepare/unprepare for prepared casters). */
+  onManageSpellbook?: (characterId: string, action: 'prepare' | 'unprepare', spellId: string) => Promise<boolean>;
+  /** Known-caster Tasha's-style swap. Optional. */
+  onSwapKnownSpell?: (characterId: string, oldSpellId: string, newSpellId: string) => Promise<boolean>;
+  /** True when combat is active — locks spell management. */
+  isCombatActive?: boolean;
 }
 
 const rarityStyle = (rarity?: string) =>
@@ -92,13 +99,14 @@ const FeatureList: React.FC<{ title: string; icon: string; features?: Array<{ id
 };
 
 /** Full character sheet displaying stats, HP, XP, AC, saving throws, skills, inventory, currency, spells, conditions, feats, and resources. */
-const CharacterSheet: React.FC<CharacterSheetProps> = ({ character, onUpdateInventory, onLevelUp, onSendMessage, onTriggerDiceRoll, isProcessing, currentUserId, isHost, onUpdateCharacterFields }) => {
+const CharacterSheet: React.FC<CharacterSheetProps> = ({ character, onUpdateInventory, onLevelUp, onSendMessage, onTriggerDiceRoll, isProcessing, currentUserId, isHost, onUpdateCharacterFields, onManageSpellbook, onSwapKnownSpell, isCombatActive }) => {
   const [hoveredItem, setHoveredItem] = useState<InventoryItem|null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x:0, y:0 });
   const [viewingFeat, setViewingFeat] = useState<FeatDefinition | null>(null);
   const [viewingSpell, setViewingSpell] = useState<SpellDefinition | null>(null);
   const [viewingItem, setViewingItem] = useState<InventoryItem | null>(null);
   const [viewingCondition, setViewingCondition] = useState<{ id: string; name: string } | null>(null);
+  const [showSpellbook, setShowSpellbook] = useState(false);
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth <= 768);
   const feats = getAllFeats(character);
 
@@ -282,7 +290,18 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ character, onUpdateInve
       </div>
 
       {classDef?.spellcasting && <div className="mt-4 space-y-2">
-        <h3 className="text-xs uppercase font-bold text-stone-400 tracking-widest border-b border-stone-850 pb-1 text-left">Spellcasting</h3>
+        <div className="flex items-center justify-between border-b border-stone-850 pb-1">
+          <h3 className="text-xs uppercase font-bold text-stone-400 tracking-widest text-left">Spellcasting</h3>
+          {onManageSpellbook && (
+            <button
+              onClick={() => setShowSpellbook(true)}
+              className="text-[10px] uppercase tracking-wider font-bold text-amber-600 hover:text-amber-400 transition-colors flex items-center gap-1"
+              title="Prepare / unprepare spells (disabled in combat)"
+            >
+              <i className="fas fa-book"></i> Manage
+            </button>
+          )}
+        </div>
         <div className="flex flex-wrap gap-1.5">
           {activeResources.filter(r => r.id.startsWith('spell-slot-')).map(slot => {
             const level = parseInt(slot.id.replace('spell-slot-', ''), 10);
@@ -480,6 +499,16 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ character, onUpdateInve
         />
       )}
       <FeatDetailModal feat={viewingFeat} onClose={() => setViewingFeat(null)} />
+      {onManageSpellbook && showSpellbook && (
+        <SpellbookModal
+          character={character}
+          isOpen={showSpellbook}
+          onClose={() => setShowSpellbook(false)}
+          onManageSpellbook={onManageSpellbook}
+          onSwapKnownSpell={onSwapKnownSpell}
+          isCombatActive={isCombatActive}
+        />
+      )}
       <SpellDetailModal spell={viewingSpell} onClose={() => setViewingSpell(null)} />
       <ItemDetailModal item={viewingItem} onClose={() => setViewingItem(null)} />
       <ConditionDetailModal data={viewingCondition} onClose={() => setViewingCondition(null)} />

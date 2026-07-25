@@ -237,6 +237,10 @@ export interface Character {
   sneakAttackDice?: number;
   unlockedSubclassFeatures?: number[];
   pendingSubclassFeature?: boolean;
+  /** Tasha's-style "swap one known spell on level-up" flag. Set true by
+   *  awardExperience when a known caster (bard/sorcerer/warlock/ranger)
+   *  gains a level. Consumed (set false) by swap_known_spell. */
+  pendingSpellSwap?: boolean;
   raging?: boolean;
   tempHp?: number;
   conditionsImmunities?: string[];

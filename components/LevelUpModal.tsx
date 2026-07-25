@@ -347,6 +347,12 @@ const LevelUpModal: React.FC<LevelUpModalProps> = ({ character, selectedAllocati
             {(character.resources || []).filter(r => r.max > 0).length === 0 && <p className="text-xs text-stone-500 text-center py-6 italic">No resource pools available.</p>}
           </div>}
           {activeTab==='spells' && <div className="space-y-3 py-2 animate-in fade-in duration-350">
+            {character.pendingSpellSwap && classDef?.spellcasting?.prepMode === 'known' && (
+              <div className="bg-amber-950/40 border border-amber-800/50 rounded-lg p-2.5 flex items-center gap-2 text-xs text-amber-200">
+                <i className="fas fa-arrows-rotate text-amber-400"></i>
+                <span>You may swap one known spell for another. Use the "Manage Spells" button on your character sheet or input bar after closing this modal.</span>
+              </div>
+            )}
             {classDef?.spellcasting && <div className="bg-stone-950/40 border border-stone-850 rounded-lg p-3 space-y-2">
               <div className="flex justify-between items-center">
                 <span className="text-[10px] uppercase text-stone-400 font-bold">Spellcasting Ability</span>

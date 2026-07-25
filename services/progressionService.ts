@@ -1,6 +1,6 @@
 import { Character, LevelUpSummary } from '../types';
 import { XP_TABLE, STAT_POINTS_PER_LEVEL, MAX_STAT_VALUE, ASI_LEVELS } from '../constants';
-import { calculateMaxHp as classEngineCalculateMaxHp, getSubclassDef, recalculateResourcePools } from './classEngine';
+import { calculateMaxHp as classEngineCalculateMaxHp, getClassDef, getSubclassDef, recalculateResourcePools } from './classEngine';
 
 /** Returns the XP required to reach a given character level from the XP table. */
 export function getXpForLevel(level: number): number {
@@ -78,6 +78,14 @@ export function awardExperience(
           updated.pendingSubclassFeature = true;
         }
       }
+    }
+
+    // Tasha's-style optional rule: known casters (bard/sorcerer/warlock/ranger)
+    // may swap one known spell per level gained. Prepared casters re-prepare
+    // freely outside combat via the SpellbookModal, so they are excluded.
+    const classDef = getClassDef(updated.class);
+    if (classDef?.spellcasting?.prepMode === 'known') {
+      updated.pendingSpellSwap = true;
     }
 
     const oldMaxHp = character.hp.max;
@@ -178,7 +186,8 @@ export function getProgressionContext(character: Character): string {
     : 100;
   const base = `Level ${character.level} (${character.experience}/${character.experienceToNextLevel} XP, ${xpProgress}%), ${character.unusedStatPoints} unspent stat points, ${character.unusedSkillPoints ?? 0} unspent skill points`;
   const feats = character.feats?.length ? ` | Feats: ${character.feats.join(', ')}` : '';
-  return base + feats;
+  const pendingSwap = character.pendingSpellSwap ? ' | pending spell swap' : '';
+  return base + feats + pendingSwap;
 }
 
 /** Sums all positive numeric values from an array of key-value entries. */

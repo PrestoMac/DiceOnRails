@@ -785,5 +785,28 @@ export const useGameActions = (
       }
     };
 
-    return { handleSendMessage, handleExecuteBatch, handleCharacterCreated, handleUndo, handleRewind, resetContextState, handleArcaneRecovery };
+    /** UI-direct spellbook management (bypasses the LLM agent loop). Mirrors
+     *  handleArcaneRecovery. Used by SpellbookModal for prepared casters. */
+    const handleManageSpellbook = async (
+      characterId: string,
+      action: 'learn' | 'prepare' | 'unprepare' | 'forget',
+      spellId: string
+    ): Promise<boolean> => {
+      if (!characterId || !spellId) return false;
+      try {
+        const result = await mcpServer.manage_spellbook(characterId, action, spellId);
+        if (result.success) {
+          syncState();
+          storageService.syncCampaignState(currentCampaignId, mcpServer.getFullState(), messagesRef.current).catch((e: unknown) => console.warn('[Sync] failed:', e));
+          return true;
+        }
+        console.warn('[Manage Spellbook] failed:', result.message);
+        return false;
+      } catch (err) {
+        console.error('[Manage Spellbook] error:', err instanceof Error ? err.message : String(err));
+        return false;
+      }
+    };
+
+    return { handleSendMessage, handleExecuteBatch, handleCharacterCreated, handleUndo, handleRewind, resetContextState, handleArcaneRecovery, handleManageSpellbook };
 };

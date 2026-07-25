@@ -63,7 +63,7 @@ export const tools = [
                 type: 'object',
                 properties: {
                     targetId: { type: 'string' },
-                    action: { type: 'string', enum: ['learn', 'unlearn', 'prepare', 'unprepare'] },
+                    action: { type: 'string', enum: ['learn', 'prepare', 'unprepare', 'forget'] },
                     spellId: { type: 'string' }
                 },
                 required: ['targetId', 'action', 'spellId']

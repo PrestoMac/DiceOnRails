@@ -155,6 +155,30 @@ export const useProgression = (
     handleCloseLevelUp();
   }, [levelUpCharacterId, levelUpCharacter, applyResultToParty, handleCloseLevelUp]);
 
+  /** Tasha's-style known-spell swap during the level-up flow. Calls the
+   *  engine's swap_known_spell, which atomically forgets the old spell,
+   *  learns the new, and consumes `pendingSpellSwap`. Returns true on
+   *  success (caller may keep the modal open for further swaps if desired;
+   *  the engine only permits one swap per pendingSpellSwap grant). */
+  const handleConfirmSpellSwap = useCallback(async (oldSpellId: string, newSpellId: string): Promise<boolean> => {
+    if (!levelUpCharacterId) return false;
+    try {
+      const result = await mcpServer.swap_known_spell(levelUpCharacterId, oldSpellId, newSpellId);
+      if (!result.success) {
+        setAllocationError(result.message);
+        return false;
+      }
+      syncState();
+      if (currentCampaignId) {
+        await storageService.syncCampaignState(currentCampaignId, mcpServer.getFullState());
+      }
+      return true;
+    } catch (err) {
+      setAllocationError(err instanceof Error ? err.message : String(err));
+      return false;
+    }
+  }, [levelUpCharacterId, syncState, currentCampaignId]);
+
   const previewHp = (() => {
     if (!levelUpCharacter) return 0;
     const result = applyStatAllocation(levelUpCharacter, selectedAllocations, selectedSkillAllocations, 0);
@@ -179,5 +203,6 @@ export const useProgression = (
     handleConfirmAsiChoice,
     handleConfirmFeatChoice,
     handleAcknowledgeSubclass,
+    handleConfirmSpellSwap,
   };
 };

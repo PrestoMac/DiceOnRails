@@ -6,6 +6,7 @@ import { CLASSES_BY_ID } from '../utils/classes';
 import { SKILLS_LIST } from '../constants';
 import Tooltip from './ui/Tooltip';
 import ArcaneRecoveryModal from './ArcaneRecoveryModal';
+import SpellbookModal from './SpellbookModal';
 
 interface QuickAction {
   id: string;
@@ -28,6 +29,9 @@ interface InputAreaProps {
   /** When true (2+ party members), render the Queue Action/Dialogue buttons. */
   isMultiplayer?: boolean;
   onArcaneRecovery?: (characterId: string, selections: Array<{ level: number; count: number }>) => void;
+  /** Spellbook management for casters (prepare/unprepare + known-caster swaps). */
+  onManageSpellbook?: (characterId: string, action: 'prepare' | 'unprepare', spellId: string) => Promise<boolean>;
+  onSwapKnownSpell?: (characterId: string, oldSpellId: string, newSpellId: string) => Promise<boolean>;
 }
 
 const SCHOOL_ICONS: Record<string, string> = {
@@ -50,11 +54,12 @@ const QUICK_BTN = 'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] 
 const DISABLED_STYLE = 'bg-stone-800/50 text-stone-600 cursor-not-allowed';
 
 /** Chat input area with quick-action buttons (spells, weapons, features, rests), speech-to-text, and queue/submit controls. */
-const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onQueueAction, onResolveEnemyTurn, isLoading, combat, character, isMultiplayer, onArcaneRecovery }) => {
+const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onQueueAction, onResolveEnemyTurn, isLoading, combat, character, isMultiplayer, onArcaneRecovery, onManageSpellbook, onSwapKnownSpell }) => {
   const [input, setInput] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [recognition, setRecognition] = useState<{ continuous: boolean; interimResults: boolean; lang: string; onresult: (e: unknown) => void; onerror: (e: unknown) => void; onend: () => void; start: () => void; abort: () => void } | null>(null);
   const [showArcaneRecovery, setShowArcaneRecovery] = useState(false);
+  const [showSpellbook, setShowSpellbook] = useState(false);
   const isEnemyTurn = combat?.isActive && (combat.initiative[combat.turnIndex]?.type === 'enemy');
   const effectivelyLocked = isLoading || isEnemyTurn;
 
@@ -63,6 +68,13 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onQueueAction, onR
     const pool = character.resources?.find(r => r.id === 'arcane-recovery');
     return pool ? pool.current > 0 : true;
   }, [character]);
+
+  /** Spellbook management available for any caster, locked during combat. */
+  const spellbookAvailable = useMemo(() => {
+    if (!character || !onManageSpellbook) return false;
+    const cls = CLASSES_BY_ID[character.class];
+    return !!cls?.spellcasting && !combat?.isActive;
+  }, [character, onManageSpellbook, combat?.isActive]);
 
   const quickActions = useMemo<QuickAction[]>(() => {
     if (!character) return [];
@@ -216,6 +228,11 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onQueueAction, onR
               <QuickActionBtn action={{ id: 'arcane-recovery', label: 'Arcane Recovery', icon: 'fa-hat-wizard', fillText: '', category: 'feature' }} locked={effectivelyLocked} onClick={() => setShowArcaneRecovery(true)} extraTitle="Choose spell slots to recover" />
             </Tooltip>
           )}
+          {spellbookAvailable && (
+            <Tooltip content="Manage Spells: prepare/unprepare spells (prepared casters) or swap a known spell (known casters with a pending level-up swap). Locked in combat." side="top">
+              <QuickActionBtn action={{ id: 'manage-spells', label: 'Manage Spells', icon: 'fa-book', fillText: '', category: 'feature' }} locked={effectivelyLocked} onClick={() => setShowSpellbook(true)} extraTitle="Open spellbook" />
+            </Tooltip>
+          )}
           {quickActions.map(action => (
             <Tooltip key={action.id} content={action.tooltip} side="top">
               <QuickActionBtn action={action} locked={effectivelyLocked} onClick={() => setInput(action.fillText)} />
@@ -271,6 +288,16 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onQueueAction, onR
           isOpen={showArcaneRecovery}
           onClose={() => setShowArcaneRecovery(false)}
           onRecover={(selections) => onArcaneRecovery(character.id, selections)}
+        />
+      )}
+      {character && onManageSpellbook && (
+        <SpellbookModal
+          character={character}
+          isOpen={showSpellbook}
+          onClose={() => setShowSpellbook(false)}
+          onManageSpellbook={onManageSpellbook}
+          onSwapKnownSpell={onSwapKnownSpell}
+          isCombatActive={!!combat?.isActive}
         />
       )}
     </div>

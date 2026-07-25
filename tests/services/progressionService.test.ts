@@ -163,6 +163,27 @@ describe('progressionService', () => {
       expect(sorceryPoints?.max).toBe(3);
       expect(sorceryPoints?.current).toBe(3);
     });
+
+    it('grants pendingSpellSwap on known-caster level-up', () => {
+      const char = makeCharacter({ class: 'bard', level: 1, stats: { str: 8, dex: 14, con: 12, int: 10, wis: 10, cha: 16 } });
+      const result = awardExperience(char, 1000);
+      expect(result.leveledUp).toBe(true);
+      expect(result.character.pendingSpellSwap).toBe(true);
+    });
+
+    it('does NOT grant pendingSpellSwap for prepared casters', () => {
+      const char = makeCharacter({ class: 'wizard', level: 1, stats: { str: 8, dex: 14, con: 12, int: 15, wis: 10, cha: 10 } });
+      const result = awardExperience(char, 1000);
+      expect(result.leveledUp).toBe(true);
+      expect(result.character.pendingSpellSwap).toBeFalsy();
+    });
+
+    it('does NOT grant pendingSpellSwap for non-casters', () => {
+      const char = makeCharacter({ class: 'fighter', level: 1 });
+      const result = awardExperience(char, 1000);
+      expect(result.leveledUp).toBe(true);
+      expect(result.character.pendingSpellSwap).toBeFalsy();
+    });
   });
 
   describe('applyStatAllocation', () => {
@@ -215,6 +236,18 @@ describe('progressionService', () => {
       expect(ctx).toContain('Level 1');
       expect(ctx).toContain('XP');
       expect(ctx).toContain('unspent stat points');
+    });
+
+    it('surfaces pendingSpellSwap when set', () => {
+      const char = makeCharacter({ class: 'bard', pendingSpellSwap: true });
+      const ctx = getProgressionContext(char);
+      expect(ctx).toContain('pending spell swap');
+    });
+
+    it('omits pending spell swap line when flag is false', () => {
+      const char = makeCharacter({ class: 'bard', pendingSpellSwap: false });
+      const ctx = getProgressionContext(char);
+      expect(ctx).not.toContain('pending spell swap');
     });
   });
 });

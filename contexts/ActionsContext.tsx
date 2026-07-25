@@ -16,6 +16,11 @@ interface ActionsContextValue {
   handleResolveEnemyTurn: () => Promise<void>;
   resetContextState: () => void;
   handleArcaneRecovery: (characterId: string, selections: Array<{ level: number; count: number }>) => Promise<boolean>;
+  handleManageSpellbook: (
+    characterId: string,
+    action: 'learn' | 'prepare' | 'unprepare' | 'forget',
+    spellId: string
+  ) => Promise<boolean>;
 }
 
 const ActionsContext = createContext<ActionsContextValue | null>(null);

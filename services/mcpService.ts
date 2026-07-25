@@ -188,6 +188,7 @@ export class MockMCPServer {
   public async cast_ritual(characterId: string, spellId: string): Promise<MCPResponse> { return this.spells.cast_ritual(characterId, spellId); }
   public async spell_effect(mode: 'counter' | 'dispel', casterId: string, targetSpellLevel: number, targetId?: string): Promise<MCPResponse> { return this.spells.spell_effect(mode, casterId, targetSpellLevel, targetId); }
   public async manage_spellbook(characterId: string, action: 'learn' | 'prepare' | 'unprepare' | 'forget', spellId: string): Promise<MCPResponse> { return this.spells.manage_spellbook(characterId, action, spellId); }
+  public async swap_known_spell(characterId: string, oldSpellId: string, newSpellId: string): Promise<MCPResponse> { return this.spells.swap_known_spell(characterId, oldSpellId, newSpellId); }
   public async use_resource(characterId: string, resourceId: string, targetId?: string, amount?: number): Promise<MCPResponse> { return this.spells.use_resource(characterId, resourceId, targetId, amount); }
 
 

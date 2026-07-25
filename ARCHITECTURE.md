@@ -680,6 +680,7 @@ Differences:
 | `DiceRollModal` | Big animated dice popup for skill checks / attacks. |
 | `LevelUpModal` | Allocates stat points, picks ASI vs. Feat, picks subclass features. |
 | `ArcaneRecoveryModal` | Wizard-only modal for choosing which spell slots to recover via Arcane Recovery (once per long rest). Opens from InputArea. |
+| `SpellbookModal` | Caster spell management. Prepared casters prepare/unprepare freely out of combat; known casters swap one spell per level-up (Tasha's rule) when `pendingSpellSwap` is set. Opens from CharacterSheet "Manage" button + InputArea Quick Action. Locked in combat. |
 | `FeatDetailModal` | Reference modal for feat definitions. |
 | `ErrorBoundary` | Wraps the Play layout; catches render errors so a single bad turn doesn't kill the session. |
 
@@ -698,7 +699,7 @@ The story view. Notable features:
 ### `InputArea.tsx`
 
 The input box. Notable features:
-- **Quick Actions** — auto-generated from the character's prepared/known spells, equipped weapons, and class resources. Plus hardcoded Short Rest / Long Rest shortcuts and Arcane Recovery modal button (wizard only, once per long rest).
+- **Quick Actions** — auto-generated from the character's prepared/known spells, equipped weapons, and class resources. Plus hardcoded Short Rest / Long Rest shortcuts, Arcane Recovery modal button (wizard only, once per long rest), and Manage Spells modal button (any caster, locked in combat).
 - **Voice input** via `webkitSpeechRecognition` (browser support gated).
 - **Queue Action / Queue Dialogue** buttons for multiplayer turn queueing. Only rendered when `gameState.party.length > 1` (2+ party members); in solo play the buttons, the Action Queue panel/drawer, the mobile queue toggle, and the per-character tab bar are all hidden. The onboarding tour's "Action Queue" step is likewise skipped in solo via the `multiplayer` prop.
 - **Resolve Turn** button appears during enemy turns; calls `handleResolveEnemyTurn`.

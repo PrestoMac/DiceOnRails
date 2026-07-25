@@ -1491,6 +1491,88 @@ describe('MockMCPServer', () => {
     });
   });
 
+  describe('swap_known_spell', () => {
+    it('swaps one known leveled spell for another on level-up (happy path)', async () => {
+      const char = makeCharacter({
+        class: 'bard', level: 3,
+        stats: { str: 8, dex: 14, con: 12, int: 10, wis: 10, cha: 16 },
+        knownSpells: ['vicious-mockery', 'cure-wounds', 'faerie-fire', 'sleep'],
+        preparedSpells: [], pendingSpellSwap: true,
+      });
+      const server = new MockMCPServer();
+      server.joinParty(char);
+      const result = await server.swap_known_spell('hero-1', 'sleep', 'detect-magic');
+      expect(result.success).toBe(true);
+      expect(char.knownSpells).not.toContain('sleep');
+      expect(char.knownSpells).toContain('detect-magic');
+      expect(char.pendingSpellSwap).toBe(false);
+    });
+
+    it('rejects swap when character is not a known caster', async () => {
+      const char = makeCharacter({
+        class: 'wizard', level: 3,
+        stats: { str: 8, dex: 14, con: 12, int: 15, wis: 10, cha: 10 },
+        knownSpells: ['fire-bolt', 'magic-missile'], preparedSpells: ['magic-missile'],
+        pendingSpellSwap: true,
+      });
+      const server = new MockMCPServer();
+      server.joinParty(char);
+      const result = await server.swap_known_spell('hero-1', 'magic-missile', 'shield');
+      expect(result.success).toBe(false);
+      expect(result.message).toMatch(/known caster/i);
+    });
+
+    it('rejects swap when pendingSpellSwap is false', async () => {
+      const char = makeCharacter({
+        class: 'bard', level: 3,
+        stats: { str: 8, dex: 14, con: 12, int: 10, wis: 10, cha: 16 },
+        knownSpells: ['vicious-mockery', 'cure-wounds'], preparedSpells: [],
+        pendingSpellSwap: false,
+      });
+      const server = new MockMCPServer();
+      server.joinParty(char);
+      const result = await server.swap_known_spell('hero-1', 'cure-wounds', 'detect-magic');
+      expect(result.success).toBe(false);
+      expect(result.message).toMatch(/no pending spell swap/i);
+    });
+
+    it('rejects cantrip-for-leveled swap (must be like-for-like)', async () => {
+      const char = makeCharacter({
+        class: 'bard', level: 3,
+        stats: { str: 8, dex: 14, con: 12, int: 10, wis: 10, cha: 16 },
+        knownSpells: ['vicious-mockery', 'cure-wounds'], preparedSpells: [],
+        pendingSpellSwap: true,
+      });
+      const server = new MockMCPServer();
+      server.joinParty(char);
+      const result = await server.swap_known_spell('hero-1', 'vicious-mockery', 'detect-magic');
+      expect(result.success).toBe(false);
+      expect(result.message).toMatch(/cantrip/i);
+      // State unchanged on rejection.
+      expect(char.knownSpells).toContain('vicious-mockery');
+      expect(char.knownSpells).not.toContain('detect-magic');
+      expect(char.pendingSpellSwap).toBe(true);
+    });
+
+    it('rolls back if the new spell cannot be learned (atomic)', async () => {
+      const char = makeCharacter({
+        class: 'bard', level: 3,
+        stats: { str: 8, dex: 14, con: 12, int: 10, wis: 10, cha: 16 },
+        knownSpells: ['vicious-mockery', 'cure-wounds'], preparedSpells: [],
+        pendingSpellSwap: true,
+      });
+      const server = new MockMCPServer();
+      server.joinParty(char);
+      // 'fireball' is not a bard spell — canLearnSpell will reject it.
+      const result = await server.swap_known_spell('hero-1', 'cure-wounds', 'fireball');
+      expect(result.success).toBe(false);
+      // Old spell must still be known (rollback).
+      expect(char.knownSpells).toContain('cure-wounds');
+      expect(char.knownSpells).not.toContain('fireball');
+      expect(char.pendingSpellSwap).toBe(true);
+    });
+  });
+
   describe('use_resource breath-weapon color lookup', () => {
     it('uses draconicDamageType set on character for blue dragonborn', async () => {
       vi.mocked(cryptoRoll).mockImplementation(() => 4);

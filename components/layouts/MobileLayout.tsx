@@ -46,12 +46,12 @@ const MobileLayout: React.FC = () => {
     handleEnqueueAction, handleRemoveQueueItem, handleUpdateQueueItem,
     handleReorderQueue, syncState,
   } = useGameContext();
-  const { handleSendMessage, handleUndo, handleRewind, handleExecuteBatch, handleResolveEnemyTurn, handleArcaneRecovery } = useActionsContext();
+  const { handleSendMessage, handleUndo, handleRewind, handleExecuteBatch, handleResolveEnemyTurn, handleArcaneRecovery, handleManageSpellbook } = useActionsContext();
   const {
     showLevelUpModal, levelUpCharacter, selectedAllocations, remainingPoints,
     previewHp, allocationError, handleOpenLevelUp, handleCloseLevelUp,
     handleAllocateStat, handleConfirmAllocation, handleConfirmAsiChoice,
-    handleConfirmFeatChoice, handleAcknowledgeSubclass
+    handleConfirmFeatChoice, handleAcknowledgeSubclass, handleConfirmSpellSwap
   } = useProgressionContext();
   const { settings, setSettingsOpen, handleTriggerDiceRoll, setCompendiumOpen } = useUIContext();
   const { userId, handleLogout } = useAuthContext();
@@ -116,11 +116,11 @@ const MobileLayout: React.FC = () => {
             <button onClick={()=>setShowQueue(!showQueue)} className={`px-3 py-1 rounded text-[10px] font-bold uppercase tracking-wider whitespace-nowrap border transition-all ${showQueue?'bg-amber-900 border-amber-700 text-amber-100':'bg-stone-800 border-stone-700 text-stone-400'}${queueLen>0?' animate-glow-pulse':''}`}><i className="fas fa-layer-group mr-1"></i> Queue ({queueLen})</button>
           </div>}
           {charToShow&&!showQueue&&<HpStatusBar character={charToShow} />}
-          {!showQueue&&<InputArea onSendMessage={handleSendMessage} onQueueAction={(t: string, ty: 'action'|'dialogue') => handleEnqueueAction(t, ty)} onResolveEnemyTurn={handleResolveEnemyTurn} isLoading={isLoading||gameState.isProcessing===true} combat={gameState.combat} character={charToShow} isMultiplayer={isMultiplayer} onArcaneRecovery={(id, sel) => handleArcaneRecovery(id, sel)}/>}
+          {!showQueue&&<InputArea onSendMessage={handleSendMessage} onQueueAction={(t: string, ty: 'action'|'dialogue') => handleEnqueueAction(t, ty)} onResolveEnemyTurn={handleResolveEnemyTurn} isLoading={isLoading||gameState.isProcessing===true} combat={gameState.combat} character={charToShow} isMultiplayer={isMultiplayer} onArcaneRecovery={(id, sel) => handleArcaneRecovery(id, sel)} onManageSpellbook={handleManageSpellbook} onSwapKnownSpell={handleConfirmSpellSwap}/>}
         </>}
         {mobileTab==='character'&&<div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
           {isMultiplayer && <div className="flex gap-2 overflow-x-auto pb-2 mb-2">{gameState.party.map((char: Character) => <button key={char.id} onClick={() => setViewingCharacterId(char.id)} className={`p-2 rounded text-xs whitespace-nowrap ${viewingCharacterId===char.id?'bg-amber-700 text-white':'bg-stone-800 text-stone-400'}`}>{char.name}{char.id===myCharacterId?' (You)':''}</button>)}</div>}
-          {charToShow?<CharacterSheet character={charToShow} onUpdateInventory={handleUpdateInventory} onLevelUp={handleOpenLevelUp} onSendMessage={handleSendMessage} onTriggerDiceRoll={handleTriggerDiceRoll} isProcessing={gameState.isProcessing} currentUserId={userId} isHost={!!userId && userId === hostId} onUpdateCharacterFields={handleUpdateCharacterFields}/>:<div className="text-stone-500 text-center mt-10">No characters in party.</div>}
+          {charToShow?<CharacterSheet character={charToShow} onUpdateInventory={handleUpdateInventory} onLevelUp={handleOpenLevelUp} onSendMessage={handleSendMessage} onTriggerDiceRoll={handleTriggerDiceRoll} isProcessing={gameState.isProcessing} currentUserId={userId} isHost={!!userId && userId === hostId} onUpdateCharacterFields={handleUpdateCharacterFields} onManageSpellbook={handleManageSpellbook} onSwapKnownSpell={handleConfirmSpellSwap} isCombatActive={gameState.combat?.isActive}/>:<div className="text-stone-500 text-center mt-10">No characters in party.</div>}
         </div>}
         {mobileTab==='journal'&&<div className="flex-1 overflow-y-auto p-4 custom-scrollbar"><Journal quests={gameState.quests} lore={gameState.lore}/></div>}
       </div>

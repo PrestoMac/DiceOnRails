@@ -23,6 +23,9 @@ export interface SpellcastingService {
   cast_ritual(characterId: string, spellId: string): Promise<MCPResponse>;
   spell_effect(mode: 'counter' | 'dispel', casterId: string, targetSpellLevel: number, targetId?: string): Promise<MCPResponse>;
   manage_spellbook(characterId: string, action: 'learn' | 'prepare' | 'unprepare' | 'forget', spellId: string): Promise<MCPResponse>;
+  /** Tasha's-style swap: known caster replaces one known spell with another.
+   *  Atomic. Requires `character.pendingSpellSwap === true`; consumes it on success. */
+  swap_known_spell(characterId: string, oldSpellId: string, newSpellId: string): Promise<MCPResponse>;
   use_resource(characterId: string, resourceId: string, targetId?: string, amount?: number): Promise<MCPResponse>;
   abilityCheckForSpell(caster: Character, targetSpellLevel: number): { roll: number; total: number; dc: number; success: boolean; ability: string; abilityMod: number; profBonus: number } | null;
   getDotDamageFormula(spellId: string, slotLevel: number): string;
@@ -694,6 +697,44 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
         return { success: true, data: {}, message: `${spell.name} removed.` };
       }
       return fail('Unknown action.');
+    },
+
+    async swap_known_spell(characterId, oldSpellId, newSpellId) {
+      const char = deps.getTarget(characterId);
+      if (!char) return fail('Character not found.');
+      const classDef = getClassDef(char.class);
+      if (!classDef?.spellcasting || classDef.spellcasting.prepMode !== 'known') {
+        return fail(`${classDef?.name || 'This class'} cannot swap spells (only known casters can).`);
+      }
+      if (!char.pendingSpellSwap) {
+        return fail(`${char.name} has no pending spell swap. Swaps are granted on level-up.`);
+      }
+      const oldSpell = SPELLS_BY_ID[oldSpellId.toLowerCase()];
+      const newSpell = SPELLS_BY_ID[newSpellId.toLowerCase()];
+      if (!oldSpell || !newSpell) return fail('Unknown spell.');
+      const oldIdx = char.knownSpells.indexOf(oldSpell.id);
+      if (oldIdx === -1) return fail(`${oldSpell.name} is not known by ${char.name}.`);
+      // Tasha's: swap like-for-like (cantrip for cantrip, leveled for leveled).
+      const oldIsCantrip = oldSpell.level === 0;
+      const newIsCantrip = newSpell.level === 0;
+      if (oldIsCantrip !== newIsCantrip) {
+        return fail(`Cannot swap ${oldSpell.name} for ${newSpell.name}: one is a cantrip and the other is not. Swap like-for-like.`);
+      }
+      // Splice old first so the known-spell/cantrip cap passes for the new one.
+      char.knownSpells.splice(oldIdx, 1);
+      const ok = engineLearnSpell(char, newSpell.id);
+      if (!ok) {
+        // Rollback: re-insert old spell at its original index.
+        char.knownSpells.splice(oldIdx, 0, oldSpell.id);
+        const check = canLearnSpell(char, newSpell.id);
+        return fail(check.reason || `Cannot learn ${newSpell.name}.`);
+      }
+      char.pendingSpellSwap = false;
+      return {
+        success: true,
+        data: { oldSpell: oldSpell.name, newSpell: newSpell.name },
+        message: `${char.name} forgot ${oldSpell.name} and learned ${newSpell.name}.`,
+      };
     },
 
     async use_resource(characterId, resourceId, targetId, amount) {

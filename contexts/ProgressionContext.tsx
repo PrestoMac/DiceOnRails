@@ -17,6 +17,7 @@ interface ProgressionContextValue {
   handleConfirmAsiChoice: () => Promise<void>;
   handleConfirmFeatChoice: (opts: FeatChoiceOptions) => Promise<void>;
   handleAcknowledgeSubclass: () => Promise<void>;
+  handleConfirmSpellSwap: (oldSpellId: string, newSpellId: string) => Promise<boolean>;
 }
 
 const ProgressionContext = createContext<ProgressionContextValue | null>(null);
@@ -40,6 +41,7 @@ export function ProgressionProvider({ children }: { children: ReactNode }) {
     handleConfirmAsiChoice: progression.handleConfirmAsiChoice,
     handleConfirmFeatChoice: progression.handleConfirmFeatChoice,
     handleAcknowledgeSubclass: progression.handleAcknowledgeSubclass,
+    handleConfirmSpellSwap: progression.handleConfirmSpellSwap,
   };
 
   return <ProgressionContext.Provider value={value}>{children}</ProgressionContext.Provider>;
