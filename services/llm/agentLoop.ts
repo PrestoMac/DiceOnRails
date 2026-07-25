@@ -435,6 +435,17 @@ export async function runAgentLoop(
               inlineNarration = text;
             }
           }
+        } else if (typeof narrateCall.args?.xp === 'number' && (narrateCall.args.xp as number) > 0) {
+          const narrateResult = await mcpServer.executeToolCall('narrate_turn', { narration: '', timePassed: 0, xp: narrateCall.args.xp });
+          const logs = narrateResult.data?.logs;
+          if (Array.isArray(logs) && logs.length > 0) {
+            toolMessages.push({
+              id: `sys-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+              role: MessageRole.SYSTEM,
+              text: logs.join('\n'),
+              timestamp: Date.now(),
+            });
+          }
         }
         // Fallback: if no narration was captured from the tool result (e.g.
         // data.narration came back empty, or time was already advanced so

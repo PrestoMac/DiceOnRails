@@ -327,7 +327,7 @@ const ChatLog: React.FC<ChatLogProps> = ({ messages, settings, onRewind, onUndo,
   };
 
   const formatMessageText = (text: string, role: MessageRole) => {
-    if (role === MessageRole.SYSTEM) {
+    if (role === MessageRole.SYSTEM || role === MessageRole.TOOL) {
       return text.replace(/^\[System:[a-zA-Z0-9_-]+\]\s*/i, '');
     }
     return text;

@@ -58,7 +58,8 @@ export const END_OF_TURN_PROPERTIES = {
         items: { type: 'string' },
         maxItems: 3,
         description: 'Optional: 2-3 suggested next actions in first person (e.g. "I search the room").'
-    }
+    },
+    xp: { type: 'integer', description: 'Optional: Roleplay XP (5-50) to award for significant character moments, creative problem-solving, or meaningful social interaction.' }
 };
 
 /**
