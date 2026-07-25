@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Character, SpellDefinition } from '../types';
 import { SPELLS_BY_ID, getSpellsForClass } from '../utils/spells';
 import { getClassDef } from '../services/classEngine';
@@ -126,7 +127,7 @@ const SpellbookModal: React.FC<SpellbookModalProps> = ({
     ? `${character.name} · Level ${character.level} ${classDef.name}`
     : character.name;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[120] bg-black/70 backdrop-blur-sm" onClick={handleClose}>
       <div
         className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-stone-900 border border-stone-700 rounded-xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden flex flex-col max-h-[85vh]"
@@ -398,7 +399,8 @@ const SpellbookModal: React.FC<SpellbookModalProps> = ({
       </div>
 
       <SpellDetailModal spell={viewingSpell} onClose={() => setViewingSpell(null)} />
-    </div>
+    </div>,
+    document.body
   );
 };
 
