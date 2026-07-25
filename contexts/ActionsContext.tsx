@@ -21,6 +21,7 @@ interface ActionsContextValue {
     action: 'learn' | 'prepare' | 'unprepare' | 'forget',
     spellId: string
   ) => Promise<boolean>;
+  handleSwapKnownSpell: (characterId: string, oldSpellId: string, newSpellId: string) => Promise<boolean>;
 }
 
 const ActionsContext = createContext<ActionsContextValue | null>(null);

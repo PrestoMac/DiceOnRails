@@ -121,14 +121,20 @@ const SpellbookModal: React.FC<SpellbookModalProps> = ({
   const handleLearn = (spellId: string) =>
     runAction(() => onManageSpellbook(character.id, 'learn', spellId));
 
-  const handleSwapConfirm = (newSpellId: string) => {
+  const handleSwapConfirm = async (newSpellId: string) => {
     if (!swapPickOld || !onSwapKnownSpell) return;
     const oldId = swapPickOld;
     setSwapPickOld(null);
-    runAction(async () => {
+    setBusy(true);
+    setError(null);
+    try {
       const ok = await onSwapKnownSpell(character.id, oldId, newSpellId);
-      return ok;
-    });
+      if (!ok) setError('Swap failed — the engine rejected the request.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handleClose = () => {

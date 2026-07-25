@@ -808,5 +808,29 @@ export const useGameActions = (
       }
     };
 
-    return { handleSendMessage, handleExecuteBatch, handleCharacterCreated, handleUndo, handleRewind, resetContextState, handleArcaneRecovery, handleManageSpellbook };
+    /** UI-direct known-spell / cantrip swap (bypasses the LLM agent loop).
+     *  Handles both Tasha's leveled swap (known casters, pendingSpellSwap)
+     *  and 2024 cantrip swap (any caster, cantripSwapAvailable from long_rest). */
+    const handleSwapKnownSpell = async (
+      characterId: string,
+      oldSpellId: string,
+      newSpellId: string
+    ): Promise<boolean> => {
+      if (!characterId || !oldSpellId || !newSpellId) return false;
+      try {
+        const result = await mcpServer.swap_known_spell(characterId, oldSpellId, newSpellId);
+        if (result.success) {
+          syncState();
+          storageService.syncCampaignState(currentCampaignId, mcpServer.getFullState(), messagesRef.current).catch((e: unknown) => console.warn('[Sync] failed:', e));
+          return true;
+        }
+        console.warn('[Swap Spell] failed:', result.message);
+        return false;
+      } catch (err) {
+        console.error('[Swap Spell] error:', err instanceof Error ? err.message : String(err));
+        return false;
+      }
+    };
+
+    return { handleSendMessage, handleExecuteBatch, handleCharacterCreated, handleUndo, handleRewind, resetContextState, handleArcaneRecovery, handleManageSpellbook, handleSwapKnownSpell };
 };
