@@ -680,7 +680,7 @@ Differences:
 | `DiceRollModal` | Big animated dice popup for skill checks / attacks. |
 | `LevelUpModal` | Allocates stat points, picks ASI vs. Feat, picks subclass features. |
 | `ArcaneRecoveryModal` | Wizard-only modal for choosing which spell slots to recover via Arcane Recovery (once per long rest). Opens from InputArea. |
-| `SpellbookModal` | Caster spell management. Prepared casters prepare/unprepare freely out of combat; known casters swap one spell per level-up (Tasha's rule) when `pendingSpellSwap` is set. Cantrips can be learned when free slots exist (via level-up), and swapped like-for-like by known casters with a pending swap. Opens from CharacterSheet "Manage" button + InputArea Quick Action. Locked in combat. |
+| `SpellbookModal` | Caster spell management. Prepared casters prepare/unprepare freely out of combat; known casters swap one spell per level-up (Tasha's rule) when `pendingSpellSwap` is set. Cantrips can be learned when free slots exist (via level-up), and swapped like-for-like by any caster via the 2024 long-rest rule when `cantripSwapAvailable` is true (set by `long_rest`). Opens from CharacterSheet "Manage" button + InputArea Quick Action. Locked in combat. |
 | `FeatDetailModal` | Reference modal for feat definitions. |
 | `ErrorBoundary` | Wraps the Play layout; catches render errors so a single bad turn doesn't kill the session. |
 

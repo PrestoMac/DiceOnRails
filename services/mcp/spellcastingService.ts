@@ -703,22 +703,34 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
       const char = deps.getTarget(characterId);
       if (!char) return fail('Character not found.');
       const classDef = getClassDef(char.class);
-      if (!classDef?.spellcasting || classDef.spellcasting.prepMode !== 'known') {
-        return fail(`${classDef?.name || 'This class'} cannot swap spells (only known casters can).`);
-      }
-      if (!char.pendingSpellSwap) {
-        return fail(`${char.name} has no pending spell swap. Swaps are granted on level-up.`);
+      if (!classDef?.spellcasting) {
+        return fail(`${classDef?.name || 'This class'} cannot cast spells.`);
       }
       const oldSpell = SPELLS_BY_ID[oldSpellId.toLowerCase()];
       const newSpell = SPELLS_BY_ID[newSpellId.toLowerCase()];
       if (!oldSpell || !newSpell) return fail('Unknown spell.');
       const oldIdx = char.knownSpells.indexOf(oldSpell.id);
       if (oldIdx === -1) return fail(`${oldSpell.name} is not known by ${char.name}.`);
-      // Tasha's: swap like-for-like (cantrip for cantrip, leveled for leveled).
+      // Like-for-like: both cantrips or both leveled (checked before flag validation).
       const oldIsCantrip = oldSpell.level === 0;
       const newIsCantrip = newSpell.level === 0;
       if (oldIsCantrip !== newIsCantrip) {
         return fail(`Cannot swap ${oldSpell.name} for ${newSpell.name}: one is a cantrip and the other is not. Swap like-for-like.`);
+      }
+      // Validate the appropriate flag based on swap type.
+      if (oldIsCantrip) {
+        // 2024 rule: any caster can replace one cantrip per long rest.
+        if (!char.cantripSwapAvailable) {
+          return fail(`${char.name} has no cantrip swap available. One is granted per long rest.`);
+        }
+      } else {
+        // Tasha's: known casters only, granted on level-up.
+        if (classDef.spellcasting.prepMode !== 'known') {
+          return fail(`${classDef.name} cannot swap leveled spells (only known casters can).`);
+        }
+        if (!char.pendingSpellSwap) {
+          return fail(`${char.name} has no pending spell swap. Swaps are granted on level-up.`);
+        }
       }
       // Splice old first so the known-spell/cantrip cap passes for the new one.
       char.knownSpells.splice(oldIdx, 1);
@@ -729,7 +741,12 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
         const check = canLearnSpell(char, newSpell.id);
         return fail(check.reason || `Cannot learn ${newSpell.name}.`);
       }
-      char.pendingSpellSwap = false;
+      // Consume the appropriate flag.
+      if (oldIsCantrip) {
+        char.cantripSwapAvailable = false;
+      } else {
+        char.pendingSpellSwap = false;
+      }
       return {
         success: true,
         data: { oldSpell: oldSpell.name, newSpell: newSpell.name },

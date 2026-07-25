@@ -1571,6 +1571,38 @@ describe('MockMCPServer', () => {
       expect(char.knownSpells).not.toContain('fireball');
       expect(char.pendingSpellSwap).toBe(true);
     });
+
+    it('swaps a cantrip via 2024 long-rest rule (any caster with cantripSwapAvailable)', async () => {
+      const char = makeCharacter({
+        class: 'wizard', level: 3,
+        stats: { str: 8, dex: 14, con: 12, int: 15, wis: 10, cha: 10 },
+        knownSpells: ['fire-bolt', 'ray-of-frost', 'prestidigitation'],
+        preparedSpells: [], cantripSwapAvailable: true,
+      });
+      const server = new MockMCPServer();
+      server.joinParty(char);
+      const result = await server.swap_known_spell('hero-1', 'ray-of-frost', 'mage-hand');
+      expect(result.success).toBe(true);
+      expect(char.knownSpells).not.toContain('ray-of-frost');
+      expect(char.knownSpells).toContain('mage-hand');
+      expect(char.cantripSwapAvailable).toBe(false);
+    });
+
+    it('rejects cantrip swap when cantripSwapAvailable is false', async () => {
+      const char = makeCharacter({
+        class: 'wizard', level: 3,
+        stats: { str: 8, dex: 14, con: 12, int: 15, wis: 10, cha: 10 },
+        knownSpells: ['fire-bolt', 'ray-of-frost'],
+        preparedSpells: [], cantripSwapAvailable: false,
+      });
+      const server = new MockMCPServer();
+      server.joinParty(char);
+      const result = await server.swap_known_spell('hero-1', 'fire-bolt', 'ray-of-frost');
+      expect(result.success).toBe(false);
+      expect(result.message).toMatch(/no cantrip swap/i);
+      expect(char.knownSpells).toContain('fire-bolt');
+      expect(char.cantripSwapAvailable).toBe(false);
+    });
   });
 
   describe('use_resource breath-weapon color lookup', () => {

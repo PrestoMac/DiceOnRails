@@ -192,7 +192,7 @@ const SpellbookModal: React.FC<SpellbookModalProps> = ({
                 <div className="space-y-1.5">
                   {knownCantrips.map(spell => {
                     const isSwapSource = swapPickOld === spell.id;
-                    const canSwapCantrip = isKnown && hasPendingSwap && !!onSwapKnownSpell && !isCombatActive;
+                    const canSwapCantrip = !isCombatActive && !!onSwapKnownSpell && ((isKnown && hasPendingSwap) || character.cantripSwapAvailable);
                     return (
                       <div key={spell.id} className={`flex items-center justify-between rounded-lg px-3 py-1.5 border transition-all ${
                         isSwapSource ? 'bg-red-950/40 border-red-900/60' : 'bg-stone-950 border-stone-800'

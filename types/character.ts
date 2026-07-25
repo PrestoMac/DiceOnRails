@@ -241,6 +241,10 @@ export interface Character {
    *  awardExperience when a known caster (bard/sorcerer/warlock/ranger)
    *  gains a level. Consumed (set false) by swap_known_spell. */
   pendingSpellSwap?: boolean;
+  /** 2024-style "replace one cantrip on long-rest" flag. Set true by
+   *  long_rest for all spellcasting characters. Consumed (set false) by
+   *  swap_known_spell when swapping a cantrip. */
+  cantripSwapAvailable?: boolean;
   raging?: boolean;
   tempHp?: number;
   conditionsImmunities?: string[];

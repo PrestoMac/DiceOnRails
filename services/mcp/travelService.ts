@@ -632,6 +632,8 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
           hitDiceMax: char.hitDice.max,
         });
         classEngineRecoverResources(char, 'long');
+        // 2024 rule: each caster can replace one cantrip after a long rest.
+        if (classDef?.spellcasting) char.cantripSwapAvailable = true;
         for (const slot of char.resources) {
           if (slot.id.startsWith('spell-slot-')) slot.current = slot.max;
         }
