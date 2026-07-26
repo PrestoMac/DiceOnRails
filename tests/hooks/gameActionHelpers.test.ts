@@ -61,6 +61,41 @@ describe('gameActionHelpers — multiplayer context enrichment', () => {
       expect(out).not.toContain('SPELLS [');
       expect(out).not.toContain('ACTIVE RESOURCES');
     });
+
+    it('emits a PERSONA block when SRD persona fields are present', () => {
+      const acolyte = {
+        ...fighter,
+        alignment: 'lg',
+        background: 'acolyte',
+        personalityTraits: ['I quote sacred texts.'],
+        ideals: ['Charity.'],
+        bonds: ['I would die for my faith.'],
+        flaws: ['I judge others harshly.'],
+        backstory: 'Raised in a temple.',
+      } as Character;
+      const out = buildCharacterEnrichment(acolyte);
+      expect(out).toContain('PERSONA [');
+      expect(out).toContain('Alignment: Lawful Good');
+      expect(out).toContain('Background: Acolyte');
+      expect(out).toContain('Personality: "I quote sacred texts."');
+      expect(out).toContain('Ideals: "Charity."');
+      expect(out).toContain('Bonds: "I would die for my faith."');
+      expect(out).toContain('Flaws: "I judge others harshly."');
+      expect(out).toContain('Backstory: Raised in a temple.');
+    });
+
+    it('omits the PERSONA block when no persona fields are set (zero token cost)', () => {
+      const plain = { ...fighter, alignment: '', background: '', personalityTraits: [], ideals: [], bonds: [], flaws: [], backstory: '' } as Character;
+      const out = buildCharacterEnrichment(plain);
+      expect(out).not.toContain('PERSONA [');
+    });
+
+    it('emits a PERSONA block from backstory alone (existing-char compatibility)', () => {
+      const oldChar = { ...fighter, backstory: 'A lone wanderer.' } as Character;
+      const out = buildCharacterEnrichment(oldChar);
+      expect(out).toContain('PERSONA [');
+      expect(out).toContain('Backstory: A lone wanderer.');
+    });
   });
 
   describe('buildContextString (solo — regression guard)', () => {

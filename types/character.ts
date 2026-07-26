@@ -227,6 +227,15 @@ export interface Character {
   draconicDamageType?: DamageType;
   halfElfStatChoices?: ('str'|'dex'|'con'|'int'|'wis'|'cha')[];
   backstory?: string;
+  /** Background & persona — SRD 5.1 narrative fields (no mechanical effects).
+   *  All public to the LLM (never stripped by withoutPrivateNotes). */
+  alignment?: string;
+  background?: string;
+  personalityTraits?: string[];
+  ideals?: string[];
+  bonds?: string[];
+  flaws?: string[];
+  appearance?: string;
   bonusSkillProficiencies?: string[];
   fightingStyle?: string;
   divineDomain?: string;

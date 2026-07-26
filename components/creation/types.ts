@@ -7,6 +7,13 @@ export interface WizardState {
   name: string;
   level: number;
   backstory: string;
+  alignment: string;
+  background: string;
+  personalityTraits: string[];
+  ideals: string[];
+  bonds: string[];
+  flaws: string[];
+  appearance: string;
   selectedRace: RaceDefinition;
   selectedClass: ClassDefinition;
   stats: Character['stats'];

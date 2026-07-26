@@ -23,6 +23,8 @@ export const PRESET_CHARACTERS: readonly PresetCharacterSpec[] = Object.freeze([
     allocatedSkills: { athletics: 1, perception: 1 },
     asiFeatSlot: { type: 'asi', statAllocations: { str: 2 } },
     goldPool: 10,
+    alignment: 'ln',
+    background: 'soldier',
     backstory: 'A sellsword who outlived three captains and remembers every debt.',
   },
   {
@@ -38,6 +40,8 @@ export const PRESET_CHARACTERS: readonly PresetCharacterSpec[] = Object.freeze([
     cantrips: ['fire-bolt', 'light', 'mage-hand'],
     spells: ['magic-missile', 'shield', 'burning-hands', 'sleep'],
     goldPool: 10,
+    alignment: 'ng',
+    background: 'sage',
     backstory: 'Left the tower because scrolls do not bleed, and only bleeding things teach.',
   },
   {
@@ -54,6 +58,8 @@ export const PRESET_CHARACTERS: readonly PresetCharacterSpec[] = Object.freeze([
     cantrips: ['sacred-flame', 'guidance', 'light'],
     spells: ['cure-wounds', 'bless', 'healing-word', 'guiding-bolt'],
     goldPool: 10,
+    alignment: 'lg',
+    background: 'acolyte',
     backstory: 'The last of her stronghold\'s healers; the stronghold did not fall, but it emptied.',
   },
   {
@@ -67,6 +73,8 @@ export const PRESET_CHARACTERS: readonly PresetCharacterSpec[] = Object.freeze([
     allocatedSkills: { stealth: 1, perception: 1, 'sleight of hand': 1, investigation: 1 },
     asiFeatSlot: { type: 'asi', statAllocations: { dex: 2 } },
     goldPool: 10,
+    alignment: 'cg',
+    background: 'criminal',
     backstory: 'Three siblings, one loaf, one roof, and a talent that grew from hunger.',
   },
   {
@@ -81,6 +89,8 @@ export const PRESET_CHARACTERS: readonly PresetCharacterSpec[] = Object.freeze([
     allocatedSkills: { athletics: 1, persuasion: 1 },
     asiFeatSlot: { type: 'asi', statAllocations: { str: 2 } },
     goldPool: 10,
+    alignment: 'lg',
+    background: 'noble',
     backstory: 'Exiled for an oath sworn in the wrong tongue; he keeps it anyway.',
   },
   {
@@ -94,6 +104,8 @@ export const PRESET_CHARACTERS: readonly PresetCharacterSpec[] = Object.freeze([
     allocatedSkills: { athletics: 1, intimidation: 1 },
     asiFeatSlot: { type: 'asi', statAllocations: { str: 2 } },
     goldPool: 10,
+    alignment: 'cn',
+    background: 'outlander',
     backstory: 'The tribe is gone. The rage stayed.',
   },
   {
@@ -107,6 +119,8 @@ export const PRESET_CHARACTERS: readonly PresetCharacterSpec[] = Object.freeze([
     allocatedSkills: { acrobatics: 1, stealth: 1 },
     asiFeatSlot: { type: 'asi', statAllocations: { dex: 2 } },
     goldPool: 10,
+    alignment: 'ln',
+    background: 'hermit',
     backstory: 'The monastery took him in for a laugh; he stayed for the silence.',
   },
   {
@@ -123,6 +137,8 @@ export const PRESET_CHARACTERS: readonly PresetCharacterSpec[] = Object.freeze([
     cantrips: ['eldritch-blast', 'chill-touch'],
     spells: ['charm-person', 'false-life'],
     goldPool: 10,
+    alignment: 'ne',
+    background: 'charlatan',
     backstory: 'The pact was signed in ash. He has not yet asked the price.',
   },
   {
@@ -139,6 +155,8 @@ export const PRESET_CHARACTERS: readonly PresetCharacterSpec[] = Object.freeze([
     cantrips: ['vicious-mockery', 'dancing-lights'],
     spells: ['cure-wounds', 'charm-person', 'faerie-fire', 'sleep'],
     goldPool: 10,
+    alignment: 'cg',
+    background: 'entertainer',
     backstory: 'She knows a verse for every occasion, and a knife for the rest.',
   },
   {
@@ -152,6 +170,8 @@ export const PRESET_CHARACTERS: readonly PresetCharacterSpec[] = Object.freeze([
     allocatedSkills: { survival: 1, perception: 1, stealth: 1 },
     asiFeatSlot: { type: 'asi', statAllocations: { dex: 2 } },
     goldPool: 10,
+    alignment: 'ng',
+    background: 'outlander',
     backstory: 'The forest marked him; he marks what enters it in return.',
   },
 ]);

@@ -26,6 +26,15 @@ export function ensureCharacterFields(char: Character): void {
   char.pendingSubclassFeature ??= false;
   char.pendingSpellSwap ??= false;
   char.cantripSwapAvailable ??= false;
+  // Background & persona (SRD 5.1 narrative fields). Initialized so the UI/LLM
+  // never crashes on `.length`/`.trim()` against undefined; empty = "unset".
+  char.alignment ??= '';
+  char.background ??= '';
+  char.personalityTraits ??= [];
+  char.ideals ??= [];
+  char.bonds ??= [];
+  char.flaws ??= [];
+  char.appearance ??= '';
   if (!char.conditionsImmunities && (char.racialTraits || []).includes('fey-ancestry')) {
     // Fey Ancestry: magic can't put elf/half-elf to sleep. (Charm-save advantage
     // is applied via the charmSave flag on the make_save path.)

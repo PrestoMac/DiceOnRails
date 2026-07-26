@@ -18,6 +18,7 @@ import SkillsStep from './SkillsStep';
 import FeatsStep from './FeatsStep';
 import SpellsStep from './SpellsStep';
 import GearStep from './GearStep';
+import BackgroundStep from './BackgroundStep';
 import ReviewStep from './ReviewStep';
 import StartingGroundsStep from './StartingGroundsStep';
 
@@ -44,6 +45,7 @@ const WizardShell: React.FC<WizardShellProps> = ({
 
   const [wizardState, setWizardState] = useState<WizardState>({
     name: '', level: defaultLevel ?? 1, backstory: '',
+    alignment: '', background: '', personalityTraits: [], ideals: [], bonds: [], flaws: [], appearance: '',
     selectedRace: RACES[0], selectedClass: CLASSES[0],
     stats: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
     inventory: [], allocatedSkills: {}, goldPool: 10,
@@ -226,7 +228,7 @@ const WizardShell: React.FC<WizardShellProps> = ({
         const needsSpells = !!state.selectedClass.spellcasting;
         const needsLateSub = state.selectedClass.subclassLevel >= 2 && state.selectedClass.subclassLevel <= state.level;
         return (
-          <GearStep wizardState={state} updateWizard={updateState} onNext={() => context.goToStep('review')} onBack={context.goBack} goToStep={() => {}}
+          <GearStep wizardState={state} updateWizard={updateState} onNext={() => context.goToStep('background')} onBack={context.goBack} goToStep={() => {}}
             onBackToSpells={() => context.goToStep('spells')}
             onBackToFeats={() => context.goToStep('feats')}
             onBackToSubclass={() => context.goToStep('subclass-late')}
@@ -235,6 +237,12 @@ const WizardShell: React.FC<WizardShellProps> = ({
           />
         );
       },
+    },
+    {
+      key: 'background', label: 'Story',
+      render: ({ state, updateState, context }) => (
+        <BackgroundStep wizardState={state} updateWizard={updateState} onNext={() => context.goToStep('review')} onBack={context.goBack} goToStep={() => {}} />
+      ),
     },
     {
       key: 'review', label: 'Review',

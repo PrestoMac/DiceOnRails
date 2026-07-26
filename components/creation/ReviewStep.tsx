@@ -5,6 +5,7 @@ import { getMod } from '../../services/classEngine';
 import { FEATS_CATALOG } from '../../utils/feats';
 import { STAT_LABELS } from './constants';
 import { getEffectiveAsiMap } from './asiUtils';
+import { getAlignmentName, getBackgroundName } from '../../utils/backgrounds';
 import { StepH, ErrorBanner } from './SharedComponents';
 import Tooltip from '../ui/Tooltip';
 
@@ -23,7 +24,7 @@ interface ReviewStepProps {
 const ReviewStep: React.FC<ReviewStepProps> = ({
   wizardState, finalizeError, isNewCampaign, campaignStartingLocation, needsSpellsStep, onFinalize, onGoToStart,
 }) => {
-  const { name, selectedRace, selectedClass, stats, level, allocatedSkills, goldPool, inventory, asiFeatSlots, selectedSubclassId, selectedCantrips, selectedSpells } = wizardState;
+  const { name, selectedRace, selectedClass, stats, level, allocatedSkills, goldPool, inventory, asiFeatSlots, selectedSubclassId, selectedCantrips, selectedSpells, alignment, background, personalityTraits, ideals, bonds, flaws, backstory } = wizardState;
   const asiMap = getEffectiveAsiMap(selectedRace, wizardState.halfElfChoice1, wizardState.halfElfChoice2);
   const stepCls = "space-y-6 animate-in fade-in duration-500";
 
@@ -167,6 +168,34 @@ const ReviewStep: React.FC<ReviewStepProps> = ({
           <div>
             <p className="text-stone-500 uppercase text-[10px] font-bold tracking-widest mb-2">Starting Location</p>
             <p className="text-amber-400 fantasy-font text-lg">{campaignStartingLocation.name}</p>
+          </div>
+        )}
+        {(alignment || background || personalityTraits.length || ideals.length || bonds.length || flaws.length || backstory.trim()) && (
+          <div className="border-t border-stone-900 pt-4">
+            <p className="text-stone-500 uppercase text-[10px] font-bold tracking-widest mb-2">Persona & Background</p>
+            <div className="space-y-1.5">
+              {(alignment || background) && (
+                <div className="flex flex-wrap gap-1.5">
+                  {alignment && <span className="text-[10px] text-amber-400 bg-amber-950/20 border border-amber-900/30 px-2 py-0.5 rounded">{getAlignmentName(alignment)}</span>}
+                  {background && <span className="text-[10px] text-stone-300 bg-stone-900 border border-stone-800 px-2 py-0.5 rounded">{getBackgroundName(background)}</span>}
+                </div>
+              )}
+              {personalityTraits.filter(t => t.trim()).map((t, i) => (
+                <p key={`p${i}`} className="text-[10px] text-stone-300"><span className="text-amber-700 font-bold">Trait:</span> {t}</p>
+              ))}
+              {ideals.filter(t => t.trim()).map((t, i) => (
+                <p key={`i${i}`} className="text-[10px] text-stone-300"><span className="text-amber-700 font-bold">Ideal:</span> {t}</p>
+              ))}
+              {bonds.filter(t => t.trim()).map((t, i) => (
+                <p key={`b${i}`} className="text-[10px] text-stone-300"><span className="text-amber-700 font-bold">Bond:</span> {t}</p>
+              ))}
+              {flaws.filter(t => t.trim()).map((t, i) => (
+                <p key={`f${i}`} className="text-[10px] text-stone-300"><span className="text-red-700 font-bold">Flaw:</span> {t}</p>
+              ))}
+              {backstory.trim() && (
+                <p className="text-[10px] text-stone-400 italic">{backstory}</p>
+              )}
+            </div>
           </div>
         )}
       </div>

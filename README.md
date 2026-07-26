@@ -146,9 +146,9 @@ When you start a new campaign you first choose between two paths:
 
 ### The Creation Wizard
 
-The 10–12 step wizard walks you through a fully SRD-compliant build:
+The 11–13 step wizard walks you through a fully SRD-compliant build:
 
-1. **Name** — your hero's identity (with optional backstory)
+1. **Name** — your hero's identity
 2. **Race** — from Human to Dragonborn (pick your Draconic Ancestry)
 3. **Class** — Barbarian, Bard, Cleric, Druid, Fighter, Monk, Paladin, Ranger, Rogue, Sorcerer, Warlock, Wizard
 4. **Subclass** (early-path classes only — e.g. Cleric Domain at L1)
@@ -158,8 +158,9 @@ The 10–12 step wizard walks you through a fully SRD-compliant build:
 8. **Subclass** (late-path classes — e.g. Wizard Arcane Tradition at L2)
 9. **Spells** (casters only) — pick cantrips + known/prepared spells
 10. **Gear** — starting equipment from your class
-11. **Review** — final summary, finalize to enter the world
-12. **Starting Grounds** — pick one of 4 LLM-generated taverns/inns (new campaigns only)
+11. **Background & Persona** — SRD 5.1 background, alignment, and rollable personality/ideals/bonds/flaws tables (all optional)
+12. **Review** — final summary, finalize to enter the world
+13. **Starting Grounds** — pick one of 4 LLM-generated taverns/inns (new campaigns only)
 
 ---
 

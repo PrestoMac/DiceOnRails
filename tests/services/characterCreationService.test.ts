@@ -15,6 +15,7 @@ function baseWizard(overrides: Partial<WizardState> = {}): WizardState {
     name: 'Aria',
     level: 1,
     backstory: '',
+    alignment: '', background: '', personalityTraits: [], ideals: [], bonds: [], flaws: [], appearance: '',
     selectedRace: RACES_BY_ID['human'],
     selectedClass: CLASSES_BY_ID['fighter'],
     stats: { ...STANDARD_ARRAY },
@@ -346,6 +347,39 @@ describe('buildCharacterFromWizard', () => {
         { isNewCampaign: true }
       );
       expect(character?.backstory).toBe('Once a street urchin...');
+    });
+
+    it('stores SRD 5.1 background & persona fields when provided', () => {
+      const { character } = buildCharacterFromWizard(
+        baseWizard({
+          alignment: 'lg',
+          background: 'acolyte',
+          personalityTraits: ['I quote sacred texts in almost every situation.'],
+          ideals: ['Charity. I always try to help those in need.'],
+          bonds: ['I would die to recover an ancient relic of my faith.'],
+          flaws: ['I judge others harshly, and myself even more severely.'],
+          appearance: 'Tall, with shaved head and ceremonial robes.',
+        }),
+        { isNewCampaign: true }
+      );
+      expect(character?.alignment).toBe('lg');
+      expect(character?.background).toBe('acolyte');
+      expect(character?.personalityTraits).toEqual(['I quote sacred texts in almost every situation.']);
+      expect(character?.ideals).toEqual(['Charity. I always try to help those in need.']);
+      expect(character?.bonds).toEqual(['I would die to recover an ancient relic of my faith.']);
+      expect(character?.flaws).toEqual(['I judge others harshly, and myself even more severely.']);
+      expect(character?.appearance).toBe('Tall, with shaved head and ceremonial robes.');
+    });
+
+    it('omits persona fields when left empty (no undefined arrays persisted)', () => {
+      const { character } = buildCharacterFromWizard(baseWizard(), { isNewCampaign: true });
+      expect(character?.alignment).toBeUndefined();
+      expect(character?.background).toBeUndefined();
+      expect(character?.personalityTraits).toBeUndefined();
+      expect(character?.ideals).toBeUndefined();
+      expect(character?.bonds).toBeUndefined();
+      expect(character?.flaws).toBeUndefined();
+      expect(character?.appearance).toBeUndefined();
     });
   });
 

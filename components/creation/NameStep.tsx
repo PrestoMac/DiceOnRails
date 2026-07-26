@@ -6,7 +6,7 @@ import Tooltip from '../ui/Tooltip';
 
 /** Name and starting level step. Captures the character name, backstory, and starting level with ASI slot preview. */
 const NameStep: React.FC<StepProps> = ({ wizardState, updateWizard, onNext }) => {
-  const { name, level, backstory } = wizardState;
+  const { name, level } = wizardState;
   const stepCls = "space-y-6 animate-in fade-in duration-500";
 
   return (
@@ -41,20 +41,6 @@ const NameStep: React.FC<StepProps> = ({ wizardState, updateWizard, onNext }) =>
             </div>
           )}
         </div>
-      </div>
-      <div className="space-y-1">
-        <label className="text-[10px] uppercase font-bold text-stone-500 tracking-widest">
-          Backstory <span className="text-stone-700 normal-case">(optional)</span>
-        </label>
-        <textarea
-          value={backstory}
-          onChange={e => updateWizard({ backstory: e.target.value })}
-          rows={3}
-          maxLength={500}
-          className="w-full bg-stone-950 border border-stone-800 rounded-lg p-3 text-xs text-stone-300 focus:border-amber-600 outline-none resize-none placeholder-stone-700"
-          placeholder="A few words about your character's history, personality, or goals..."
-        />
-        <p className="text-[9px] text-stone-700 text-right">{backstory.length}/500</p>
       </div>
       <div className="flex gap-4 text-[10px] text-stone-400 justify-center flex-wrap">
         <Tooltip content="Proficiency Bonus is added to attack rolls, saving throws, and skill checks you are trained in. Scales with level: +2 at L1, +3 at L5, +4 at L9, +5 at L13, +6 at L17." side="top">

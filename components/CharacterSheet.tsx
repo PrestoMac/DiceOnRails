@@ -12,6 +12,7 @@ import { CONDITION_INFO, EXHAUSTION_LEVELS, getExhaustionSummary } from '../data
 import { BUFF_SOURCES, STAT_INFO } from '../data/referenceConstants';
 import FeatDetailModal from './FeatDetailModal';
 import SpellbookModal from './SpellbookModal';
+import BackgroundModal from './BackgroundModal';
 import SpellDetailModal from './modals/SpellDetailModal';
 import ItemDetailModal from './modals/ItemDetailModal';
 import ConditionDetailModal from './modals/ConditionDetailModal';
@@ -107,6 +108,7 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ character, onUpdateInve
   const [viewingItem, setViewingItem] = useState<InventoryItem | null>(null);
   const [viewingCondition, setViewingCondition] = useState<{ id: string; name: string } | null>(null);
   const [showSpellbook, setShowSpellbook] = useState(false);
+  const [showBackground, setShowBackground] = useState(false);
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth <= 768);
   const feats = getAllFeats(character);
 
@@ -188,7 +190,14 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ character, onUpdateInve
         </div>
       )}
       <div className="text-center relative">
-        <h2 className="text-3xl font-bold text-amber-500 uppercase tracking-widest">{character.name}</h2>
+        <button
+          onClick={() => setShowBackground(true)}
+          className="group inline-flex items-center gap-2 align-middle"
+          title="View background & persona"
+        >
+          <h2 className="text-3xl font-bold text-amber-500 uppercase tracking-widest group-hover:text-amber-400 transition-colors">{character.name}</h2>
+          <i className="fas fa-id-card text-stone-600 group-hover:text-amber-600 text-sm transition-colors"></i>
+        </button>
         <div className="flex items-center justify-center gap-2">
           <p className="text-stone-400 italic">Level {character.level} {character.race} {character.class}</p>
           {((character.unusedStatPoints||0)>0||(character.unusedSkillPoints||0)>0)&&onLevelUp&&<button onClick={()=>onLevelUp(character.id)} className="px-2 py-0.5 bg-amber-700 hover:bg-amber-600 rounded text-[9px] uppercase font-bold text-white tracking-widest animate-pulse transition-all shadow-[0_0_8px_rgba(217,119,6,0.6)]"><i className="fas fa-arrow-up text-[8px] mr-1"></i> Level Up!</button>}
@@ -510,6 +519,12 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ character, onUpdateInve
         />
       )}
       <SpellDetailModal spell={viewingSpell} onClose={() => setViewingSpell(null)} />
+      <BackgroundModal
+        character={character}
+        isOpen={showBackground}
+        onClose={() => setShowBackground(false)}
+        onUpdateCharacterFields={onUpdateCharacterFields}
+      />
       <ItemDetailModal item={viewingItem} onClose={() => setViewingItem(null)} />
       <ConditionDetailModal data={viewingCondition} onClose={() => setViewingCondition(null)} />
     </div>

@@ -15,7 +15,7 @@ export function buildCharacterFromWizard(
   options: { isNewCampaign: boolean; campaignStartingLocation?: StartingLocation; remainingSkillPoints?: number; onSetStartingLocation?: (location: StartingLocation) => void }
 ): { character: Character; errors: string[] } {
   const errors: string[] = [];
-  const { name, selectedRace, selectedClass, stats, inventory, goldPool, level, allocatedSkills, asiFeatSlots, selectedSubclassId, selectedCantrips, selectedSpells, draconicAncestry, halfElfChoice1, halfElfChoice2, backstory } = wizard;
+  const { name, selectedRace, selectedClass, stats, inventory, goldPool, level, allocatedSkills, asiFeatSlots, selectedSubclassId, selectedCantrips, selectedSpells, draconicAncestry, halfElfChoice1, halfElfChoice2, backstory, alignment, background, personalityTraits, ideals, bonds, flaws, appearance } = wizard;
   const { isNewCampaign, campaignStartingLocation, remainingSkillPoints, onSetStartingLocation } = options;
 
   if (!name.trim()) { errors.push("Your character must have a name before beginning their chronicle."); return { character: null as unknown as Character, errors }; }
@@ -97,6 +97,13 @@ export function buildCharacterFromWizard(
       preparedSpells: !selectedClass.spellcasting ? [] : (selectedClass.spellcasting.prepMode === 'prepared' ? [...selectedCantrips, ...selectedSpells] : [...selectedCantrips]),
       subclassId: selectedSubclassId || undefined,
       backstory: backstory || undefined,
+      alignment: alignment || undefined,
+      background: background || undefined,
+      personalityTraits: personalityTraits.length ? personalityTraits : undefined,
+      ideals: ideals.length ? ideals : undefined,
+      bonds: bonds.length ? bonds : undefined,
+      flaws: flaws.length ? flaws : undefined,
+      appearance: appearance || undefined,
       halfElfStatChoices: (typeof selectedRace.asi === 'string' && halfElfChoice1 && halfElfChoice2) ? [halfElfChoice1, halfElfChoice2] as unknown as [string, string] : undefined,
       draconicAncestry: (() => {
         if (selectedRace.id === 'dragonborn' && draconicAncestry) return draconicAncestry;
@@ -149,6 +156,14 @@ export interface PresetCharacterSpec {
   goldPool?: number;
   /** Optional character backstory. */
   backstory?: string;
+  /** Optional SRD 5.1 background & persona fields (narrative-only). */
+  alignment?: string;
+  background?: string;
+  personalityTraits?: string[];
+  ideals?: string[];
+  bonds?: string[];
+  flaws?: string[];
+  appearance?: string;
 }
 
 /**
@@ -201,6 +216,13 @@ export function buildPresetCharacter(spec: PresetCharacterSpec): Character {
     name: spec.name,
     level: 1,
     backstory: spec.backstory ?? '',
+    alignment: spec.alignment ?? '',
+    background: spec.background ?? '',
+    personalityTraits: spec.personalityTraits ?? [],
+    ideals: spec.ideals ?? [],
+    bonds: spec.bonds ?? [],
+    flaws: spec.flaws ?? [],
+    appearance: spec.appearance ?? '',
     selectedRace: race,
     selectedClass: cls,
     stats: spec.stats,

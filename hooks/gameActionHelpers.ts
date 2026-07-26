@@ -3,6 +3,7 @@ import { mcpServer } from '../services/mcpService';
 import { getAllFeats } from '../services/featsService';
 import { getClassDef, getSubclassDef, getMod, getProficiencyBonus } from '../services/classEngine';
 import { SPELLS_BY_ID } from '../utils/spells';
+import { getAlignmentName, getBackgroundName } from '../utils/backgrounds';
 
 /**
  * Returns a shallow copy of a character with the private `notes`/`gmNotes` fields
@@ -63,6 +64,27 @@ export function buildCharacterEnrichment(mc: Character): string {
     }
     const allF = getAllFeats(mc);
     if (allF.length > 0) parts.push(`ACTIVE FEATS [${allF.map(f => `${f.name}: ${f.mechanicalEffect}`).join(' | ')}]`);
+    // PERSONA block — surfaces the SRD 5.1 background/alignment/trait fields as a
+    // single first-class labeled block instead of dense JSON ids/arrays. Gated on
+    // at least one non-empty field so existing characters with no persona add zero
+    // tokens. All persona fields are public (never stripped by withoutPrivateNotes).
+    const personaLines: string[] = [];
+    const alignName = getAlignmentName(mc.alignment);
+    const bgName = getBackgroundName(mc.background);
+    const headerBits: string[] = [];
+    if (alignName) headerBits.push(`Alignment: ${alignName}`);
+    if (bgName) headerBits.push(`Background: ${bgName}`);
+    if (headerBits.length) personaLines.push(headerBits.join(' | '));
+    const traits = (mc.personalityTraits || []).filter(t => t && t.trim());
+    const idealList = (mc.ideals || []).filter(t => t && t.trim());
+    const bondList = (mc.bonds || []).filter(t => t && t.trim());
+    const flawList = (mc.flaws || []).filter(t => t && t.trim());
+    if (traits.length) personaLines.push(`Personality: ${traits.map(t => `"${t}"`).join(' | ')}`);
+    if (idealList.length) personaLines.push(`Ideals: ${idealList.map(t => `"${t}"`).join(' | ')}`);
+    if (bondList.length) personaLines.push(`Bonds: ${bondList.map(t => `"${t}"`).join(' | ')}`);
+    if (flawList.length) personaLines.push(`Flaws: ${flawList.map(t => `"${t}"`).join(' | ')}`);
+    if (mc.backstory && mc.backstory.trim()) personaLines.push(`Backstory: ${mc.backstory.trim()}`);
+    if (personaLines.length) parts.push(`PERSONA [${personaLines.join('; ')}]`);
     return parts.map(s => `\n\n${s}`).join('');
 }
 
