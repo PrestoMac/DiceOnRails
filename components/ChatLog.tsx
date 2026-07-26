@@ -190,6 +190,9 @@ interface ChatLogProps {
   onPickSuggestion?: (text: string) => void;
   /** Called when the user dismisses the suggestion pills. */
   onDismissSuggestion?: () => void;
+  /** Map of characterId → portraitUrl, used to render avatars beside player
+   *  message bubbles. Built by the layouts from gameState.party. */
+  portraitMap?: Record<string, string>;
 }
 
 type FilterType = 'all' | 'narration' | 'player' | 'system';
@@ -212,7 +215,7 @@ const EXPORT_BTN_CLASS = 'w-full flex items-center gap-3 px-4 py-2.5 text-sm tex
 const EXPORT_ICON_CLASS = 'text-xs w-5 text-center text-stone-500';
 
 /** Renders the scrollable message history with search, filter, export, speech playback, rewind, and roll-highlighting cards. */
-const ChatLog: React.FC<ChatLogProps> = ({ messages, settings, onRewind, onUndo, isProcessing, onExpandAtmosphere, atmosphereUrl, scrollRef: externalScrollRef, onScrollChange, disableInternalScroll, onPrefillInput, showWelcomeChips, suggestions, onPickSuggestion, onDismissSuggestion }) => {
+const ChatLog: React.FC<ChatLogProps> = ({ messages, settings, onRewind, onUndo, isProcessing, onExpandAtmosphere, atmosphereUrl, scrollRef: externalScrollRef, onScrollChange, disableInternalScroll, onPrefillInput, showWelcomeChips, suggestions, onPickSuggestion, onDismissSuggestion, portraitMap }) => {
   const internalScrollRef = useRef<HTMLDivElement>(null);
   const scrollRef = externalScrollRef || internalScrollRef;
   const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
@@ -455,7 +458,21 @@ const ChatLog: React.FC<ChatLogProps> = ({ messages, settings, onRewind, onUndo,
             .trim();
 
           return (
-          <div key={msg.id} className={`flex flex-col ${msg.role === MessageRole.USER ? 'items-end' : 'items-start'}`}>
+          (() => {
+            const showAvatar = msg.role === MessageRole.USER && !!msg.characterId;
+            const portraitUrl = showAvatar && msg.characterId ? portraitMap?.[msg.characterId] : undefined;
+            const initial = (msg.senderName || '?').charAt(0).toUpperCase();
+            const avatar = (
+              <div className="w-8 h-8 rounded-full overflow-hidden border border-amber-700/40 bg-stone-900 flex items-center justify-center shrink-0 mt-1">
+                {portraitUrl ? (
+                  <img src={portraitUrl} alt={msg.senderName || ''} className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-[11px] font-bold text-amber-600/80">{initial}</span>
+                )}
+              </div>
+            );
+            const content = (
+              <>
             <div className={`group relative max-w-[85%] rounded-lg p-4 transition-all duration-300 ${MSG_STYLES[msg.role]}`}>
               {msg.role === MessageRole.MODEL && <button onClick={() => handleSpeech(msg)} className={`absolute -right-12 top-2 p-2.5 rounded-full transition-all duration-300 ${playingMessageId === msg.id ? 'text-amber-500 animate-pulse bg-amber-900/30 ring-2 ring-amber-500/50 shadow-[0_0_20px_rgba(245,158,11,0.4)]' : 'text-stone-600 hover:text-amber-600 opacity-0 group-hover:opacity-100 bg-stone-900/40 hover:scale-110'}`} title={playingMessageId === msg.id ? "Silence Narrator" : "Hear Narration"}><i className={`fas ${playingMessageId === msg.id ? 'fa-volume-xmark' : 'fa-volume-high'} text-sm`}></i></button>}
               {msg.role === MessageRole.SYSTEM && <div className="flex items-center gap-2 mb-1 text-stone-500 uppercase text-[10px] font-bold tracking-widest border-b border-red-800/50 pb-1"><i className="fas fa-triangle-exclamation text-red-700"></i> System</div>}
@@ -479,7 +496,17 @@ const ChatLog: React.FC<ChatLogProps> = ({ messages, settings, onRewind, onUndo,
                 {onRewind && <button onClick={e => { e.stopPropagation(); onRewind(); }} disabled={isProcessing} className={`ml-1 p-1.5 rounded-full transition-all duration-300 ${isProcessing ? 'text-stone-700 cursor-not-allowed' : 'text-stone-500 hover:text-amber-400 hover:bg-stone-800/60'}`} title="Retry — reverts game state and reprocesses"><i className="fas fa-redo text-[10px]"></i></button>}
               </>}
             </div>
-          </div>
+              </>
+            );
+            return (
+            <div key={msg.id} className={showAvatar ? "flex flex-row items-start gap-2 justify-end" : `flex flex-col ${msg.role === MessageRole.USER ? 'items-end' : 'items-start'}`}>
+              {showAvatar ? (
+                <div className="flex flex-col items-end max-w-[80%]">{content}</div>
+              ) : content}
+              {showAvatar && avatar}
+            </div>
+            );
+          })()
           );
         })}
 

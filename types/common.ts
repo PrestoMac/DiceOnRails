@@ -42,6 +42,9 @@ export interface AppSettings {
   debugMode: boolean;
   /** Opt-in: enable per-turn LLM-driven Suggested Actions (extra API call per turn). */
   enableSuggestions?: boolean;
+  /** Enable auto-generation of character portraits via ImageRouter on creation
+   *  (and manual regeneration via the BackgroundModal). Mirrors enableAtmosphere. */
+  enablePortraits?: boolean;
 }
 
 /** Structured data about a dice roll, used for UI rendering and result display. */
@@ -70,6 +73,10 @@ export interface Message {
   role: MessageRole;
   text: string;
   senderName?: string;
+  /** The id of the party member who sent this message (used to look up their
+   *  portraitUrl in the chat). Absent for MODEL/SYSTEM/TOOL messages and for
+   *  collaborative batch turns (which carry senderName "Party"). */
+  characterId?: string;
   timestamp: number;
   isToolCall?: boolean;
   toolCallId?: string;

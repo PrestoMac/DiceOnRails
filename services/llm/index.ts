@@ -4,5 +4,6 @@ export * from './narration';
 export * from './suggestions';
 export * from './agentLoop';
 export * from './atmosphere';
+export * from './portrait';
 export * from './llmApiClient';
 export * from './contextManager';

@@ -267,4 +267,7 @@ export interface Character {
   /** GM/host-only notes. Private-by-convention to the campaign host. Not fed
    *  into the LLM context. UI renders it only when the viewer is the host. */
   gmNotes?: string;
+  /** URL of an auto-generated character portrait (ImageRouter). Empty/undefined
+   *  means no portrait yet (placeholder shown). Never fed into the LLM context. */
+  portraitUrl?: string;
 }

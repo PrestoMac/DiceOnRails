@@ -247,7 +247,15 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onQueueAction, onR
         </div>
       </div>
       <form onSubmit={handleSubmit} className="max-w-4xl mx-auto flex flex-col gap-3">
-        <div className="relative flex-1 container mx-auto">
+        <div className="flex items-center gap-2 container mx-auto">
+          <div className="w-9 h-9 rounded-full overflow-hidden border border-amber-700/40 bg-stone-900 flex items-center justify-center shrink-0" title={character?.name || 'Adventurer'}>
+            {character?.portraitUrl ? (
+              <img src={character.portraitUrl} alt={character?.name || ''} className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-xs font-bold text-amber-600/80">{(character?.name || '?').charAt(0).toUpperCase()}</span>
+            )}
+          </div>
+          <div className="relative flex-1">
           <input type="text" value={input} onChange={e => setInput(e.target.value)}
             placeholder={isEnemyTurn ? "The enemy is acting..." : isLoading ? "The GM is narrating..." : "What do you do, adventurer?"}
             disabled={effectivelyLocked}
@@ -256,6 +264,7 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onQueueAction, onR
             }`}
           />
           <button type="button" onClick={toggleListening} disabled={effectivelyLocked} className={`absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full transition-all ${isListening ? 'text-red-500 bg-red-900/20 animate-pulse shadow-[0_0_10px_rgba(220,38,38,0.3)]' : 'text-stone-500 hover:text-amber-500 hover:bg-stone-800'}`} title={isListening ? "Stop Listening" : "Speak Action"}><i className={`fas ${isListening ? 'fa-microphone' : 'fa-microphone-lines'}`}></i></button>
+          </div>
         </div>
         <div className="flex gap-2 justify-end">
           {onQueueAction && isMultiplayer && <>

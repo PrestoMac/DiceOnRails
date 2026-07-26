@@ -162,6 +162,7 @@ const DesktopLayout: React.FC = () => {
           suggestions={settings.enableSuggestions ? gameState.lastSuggestions : undefined}
           onPickSuggestion={(text) => handleSendMessage(text)}
           onDismissSuggestion={() => { mcpServer.setLastSuggestions([]); syncState(); }}
+          portraitMap={gameState.party.reduce((m, c) => { if (c.portraitUrl) m[c.id] = c.portraitUrl; return m; }, {} as Record<string, string>)}
         />
       </div>
       <div className="relative z-10 shrink-0">

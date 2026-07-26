@@ -4,6 +4,7 @@ import { Character } from '../types';
 import PersonaField from './shared/PersonaField';
 import TabButton from './shared/TabButton';
 import Tooltip from './ui/Tooltip';
+import { generatePortrait } from '../services/llm';
 import {
   BACKGROUNDS_CATALOG,
   ALIGNMENTS,
@@ -30,10 +31,22 @@ const MAX_SINGLE = 1;
  *  character prop — every edit commits immediately via onUpdateCharacterFields. */
 const BackgroundModal: React.FC<BackgroundModalProps> = ({ character, isOpen, onClose, onUpdateCharacterFields }) => {
   const [tab, setTab] = useState<Tab>('persona');
+  const [isGeneratingPortrait, setIsGeneratingPortrait] = useState(false);
   if (!isOpen) return null;
 
   const readOnly = !onUpdateCharacterFields;
   const update = (patch: Partial<Character>) => onUpdateCharacterFields?.(patch, character.id);
+
+  const handleGeneratePortrait = async () => {
+    if (readOnly || isGeneratingPortrait) return;
+    setIsGeneratingPortrait(true);
+    try {
+      const url = await generatePortrait(character);
+      if (url) update({ portraitUrl: url });
+    } finally {
+      setIsGeneratingPortrait(false);
+    }
+  };
 
   const bgDef = getBackgroundDef(character.background);
   const idealTexts: string[] = bgDef ? bgDef.ideals.map((i: IdealEntry) => i.text) : [];
@@ -67,6 +80,30 @@ const BackgroundModal: React.FC<BackgroundModalProps> = ({ character, isOpen, on
         <div className="px-6 py-4 space-y-4">
           {tab === 'persona' && (
             <>
+              {/* Portrait */}
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-amber-700/50 bg-stone-900 flex items-center justify-center shrink-0 shadow-lg">
+                  {character.portraitUrl ? (
+                    <img src={character.portraitUrl} alt={character.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <i className="fas fa-user text-xl text-stone-600"></i>
+                  )}
+                </div>
+                <div className="flex flex-col gap-1.5 min-w-0">
+                  <p className="text-[10px] uppercase font-bold text-stone-500 tracking-widest">Portrait</p>
+                  <button
+                    type="button"
+                    onClick={handleGeneratePortrait}
+                    disabled={readOnly || isGeneratingPortrait}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-700/50 bg-amber-900/20 hover:bg-amber-900/40 text-amber-400 text-[10px] uppercase font-bold tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                  >
+                    <i className={`fas ${isGeneratingPortrait ? 'fa-spinner fa-spin' : 'fa-wand-magic-sparkles'} text-[9px]`}></i>
+                    {isGeneratingPortrait ? 'Generating...' : character.portraitUrl ? 'Regenerate' : 'Generate'}
+                  </button>
+                  <p className="text-[9px] text-stone-600 italic">Seeded from appearance (or name + race + class)</p>
+                </div>
+              </div>
+
               {/* Background quick-select */}
               <div>
                 <p className="text-[10px] uppercase font-bold text-stone-500 tracking-widest mb-2">Background</p>

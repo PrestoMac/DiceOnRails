@@ -9,6 +9,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     volume: 1.0,
     autoSpeak: false,
     enableAtmosphere: true,
+    enablePortraits: true,
     debugMode: false,
     enableSuggestions: true,
 };

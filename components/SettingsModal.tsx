@@ -125,6 +125,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ settings, userId, message
               <div className="flex items-center gap-3"><span className="text-[9px] uppercase font-bold text-stone-600 tracking-widest">Enable Atmosphere</span><Toggle on={local.enableAtmosphere} onClick={() => hc('enableAtmosphere', !local.enableAtmosphere)} /></div>
             </div>
             <p className="text-xs text-stone-500 italic px-3">Dynamic visual atmosphere for your current location</p>
+            <div className="flex items-center gap-3"><span className="text-[9px] uppercase font-bold text-stone-600 tracking-widest">Enable Portraits</span><Toggle on={!!local.enablePortraits} onClick={() => hc('enablePortraits', !local.enablePortraits)} /></div>
+            <p className="text-xs text-stone-500 italic px-3">Auto-generate a portrait for each new character (regenerate anytime in the persona modal)</p>
           </section>
           <section className="space-y-4 pt-4 border-t border-stone-800">
             <SectionH>Narrator's Voice</SectionH>

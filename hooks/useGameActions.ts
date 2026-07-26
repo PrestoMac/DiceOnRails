@@ -150,7 +150,7 @@ function insertToolCallMessages(
 import React, { useCallback, useRef, useEffect } from 'react';
 import { GameState, Message, MessageRole, AppSettings, Character, AppStage } from '../types';
 import { mcpServer } from '../services/mcpService';
-import { runAgentLoop, generateNarration, generateNarrationSimple, buildDeterministicNarration } from '../services/llm';
+import { runAgentLoop, generateNarration, generateNarrationSimple, buildDeterministicNarration, generatePortrait } from '../services/llm';
 import { storageService } from '../services/storageService';
 import { speakText, stopSpeaking } from '../services/audioService';
 import { isDebugMode } from '../utils/debug';
@@ -278,7 +278,7 @@ export const useGameActions = (
     const handleSendMessage = async (text: string, isRetry = false) => {
         if (isDebugMode) console.log('[DEBUG handleSendMessage] entered', { text, isRetry });
         const senderName = getSenderName();
-        const userMsg: Message = { id: 'user-' + Date.now(), role: MessageRole.USER, text, senderName, timestamp: Date.now() };
+        const userMsg: Message = { id: 'user-' + Date.now(), role: MessageRole.USER, text, senderName, characterId: myCharacterId, timestamp: Date.now() };
 
         if (!isRetry && (gameState.isProcessing || processingRef.current)) return;
         if (isRetry && processingRef.current) return;
@@ -625,6 +625,20 @@ export const useGameActions = (
             setIsNewCampaign(false);
         }
         if (settings.enableAtmosphere && startingLoc) performAtmosphereUpdate(startingLoc.name, startingLoc.description, settings);
+        // Fire-and-forget portrait generation on creation (mirrors the atmosphere
+        // pattern above). Lets the player enter the game instantly; the portrait
+        // pops in when the ImageRouter call resolves. Fail-open: no key or a
+        // network error leaves portraitUrl empty (placeholder shown). Patched via
+        // the same engine mutator + syncState + persist trio used by handleUpdateCharacterFields.
+        if (settings.enablePortraits) {
+            generatePortrait(character).then(url => {
+                if (url) {
+                    mcpServer.updateCharacterFieldsDirectly({ portraitUrl: url }, character.id);
+                    syncState();
+                    storageService.syncCampaignState(currentCampaignId, mcpServer.getFullState(), messagesRef.current).catch(e => console.warn('[Sync] portrait persist failed:', e));
+                }
+            });
+        }
         if (spokenText) autoSpeak(spokenText);
     };
 

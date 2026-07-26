@@ -12,6 +12,7 @@ DiceOnRails pairs a **large language model** (for narration, roleplay, and inten
 - **Full 5e SRD mechanics** — Classes, subclasses, races, feats, skills, spell slots, concentration, conditions, death saves, multi-character parties, and a 1–20 XP progression.
 - **Function-calling agent loop** — The GM "thinks" by calling tools (`player_attack`, `cast_spell`, `check_skill`, `move_to`, `narrate_turn` …) up to 20 iterations per turn, then narrates the result.
 - **Generated atmosphere art** — Auto-commissioned scene art (via ImageRouter / SDXL-Turbo) for every tavern, dungeon, and forest you enter.
+- **Character portraits** — Each hero gets an auto-generated portrait on creation (seeded from their appearance text), shown in the sheet, the input bar, and beside their chat bubbles. Regenerate anytime from the persona modal.
 - **Voice narration** — In-browser text-to-speech reads the GM's prose aloud.
 - **Solo or multiplayer** — Play alone (anonymous/local) or invite friends to a shared cloud campaign with realtime sync.
 - **Cross-platform UI** — Responsive layouts for desktop and mobile, voice input, action queueing, dice popups, and a searchable / exportable chat log.

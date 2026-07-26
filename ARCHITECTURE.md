@@ -256,6 +256,7 @@ services/llm/
 ├── llmApiClient.ts       # resolveLLMConfig, mapHistoryToMessages, fetchWithTimeout
 ├── narration.ts          # generateNarration, generateNarrationStream, extractRollData, formatToolResult
 ├── atmosphere.ts         # generateAtmosphere (image), generateStartingLocations, compressRawToCheckpoint
+├── portrait.ts           # generatePortrait (character portrait image), buildPortraitPrompt
 ├── contextManager.ts     # Token-budget enforcement + episode-checkpoint pipeline
 ├── tokenEstimation.ts    # Heuristic length→token estimator + budget constants
 ├── toolDefinitions.ts    # Re-export shim (tools + TOOL_MODE_INSTRUCTION)
@@ -687,7 +688,7 @@ Differences:
 | `CompendiumModal` | Tabbed reference browser: Glossary, Conditions, Rules, Spells, Items (read-only). |
 | _(suggestion chips)_ | Inline in `ChatLog` — 2-3 clickable next-action chips below the last narration. Populated by the 4-tier suggestion fallback chain (`services/llm/suggestions.ts`), opt-in via `enableSuggestions`. |
 | `SetupWizard` | First-run installer; writes `.env` via dev-server middleware or pastes SQL into Supabase. |
-| `SettingsModal` | Toggles for voice, atmosphere, debug mode, TTS sliders, account actions, debug-log export. |
+| `SettingsModal` | Toggles for voice, atmosphere, portraits, debug mode, TTS sliders, account actions, debug-log export. |
 | `DiceRollModal` | Big animated dice popup for skill checks / attacks. |
 | `LevelUpModal` | Allocates stat points, picks ASI vs. Feat, picks subclass features. |
 | `ArcaneRecoveryModal` | Wizard-only modal for choosing which spell slots to recover via Arcane Recovery (once per long rest). Opens from InputArea. |
@@ -881,8 +882,8 @@ tests/
 | `VITE_LLM_API_BASE` | no | `https://openrouter.ai/api/v1` | LLM endpoint; set to `/api` in prod |
 | `VITE_LLM_MODEL` | no | `deepseek/deepseek-v4-flash` | Primary model |
 | `VITE_SUMMARIZATION_MODEL` | no | `xiaomi/mimo-v2.5` | Checkpoint compression |
-| `VITE_IMAGE_ROUTER_API_KEY` | no | — | Atmosphere art |
-| `VITE_IMAGE_MODEL` | no | `stabilityai/sdxl-turbo` | Atmosphere model |
+| `VITE_IMAGE_ROUTER_API_KEY` | no | — | Atmosphere art + character portraits |
+| `VITE_IMAGE_MODEL` | no | `stabilityai/sdxl-turbo` | Atmosphere + portrait model |
 | `VITE_SUPABASE_URL` | no | — | Cloud DB / auth |
 | `VITE_SUPABASE_ANON_KEY` | no | — | Cloud DB / auth |
 | `VITE_CONTEXT_RAW_CAP` | no | `30000` | Tokens before raw history → checkpoint |

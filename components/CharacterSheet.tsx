@@ -190,6 +190,19 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ character, onUpdateInve
         </div>
       )}
       <div className="text-center relative">
+        <div className="flex justify-center mb-3">
+          <button
+            onClick={() => setShowBackground(true)}
+            title="View background & persona"
+            className="group relative w-20 h-20 rounded-full overflow-hidden border-2 border-amber-700/50 group-hover:border-amber-500 bg-stone-900 flex items-center justify-center shadow-lg transition-all"
+          >
+            {character.portraitUrl ? (
+              <img src={character.portraitUrl} alt={character.name} className="w-full h-full object-cover" />
+            ) : (
+              <i className="fas fa-user text-2xl text-stone-600 group-hover:text-amber-600 transition-colors"></i>
+            )}
+          </button>
+        </div>
         <button
           onClick={() => setShowBackground(true)}
           className="group inline-flex items-center gap-2 align-middle"
