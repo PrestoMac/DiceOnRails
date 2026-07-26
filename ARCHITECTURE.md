@@ -607,6 +607,8 @@ components/creation/
 ├── WizardShell.tsx       # Orchestrator — owns wizardState, assembles steps
 ├── types.ts              # WizardState interface
 ├── constants.ts          # STEP_LABELS, DRAGON_ANCESTRIES, sub-class lists
+├── asiUtils.ts           # getEffectiveAsiMap (resolves Half-Elf flexible-2 into a concrete ASI map)
+├── skillPoints.ts        # computeSkillBudget / computeRemainingSkillPoints (single source for the skill-point house rule)
 ├── SharedComponents.tsx  # StepH, NavBtn, SubclassList, DragonColorPicker
 ├── NameStep.tsx
 ├── RaceStep.tsx
@@ -631,7 +633,7 @@ components/wizard/
 
 ### How it works
 
-1. `WizardShell` declares an array of `WizardStep<WizardState>` objects. Each step has `{ key, label, isVisible?, validate?, render({state, updateState, context}) }`.
+1. `WizardShell` declares an array of `WizardStep<WizardState>` objects. Each step has `{ key, label, isVisible?, render({state, updateState, context}) }`. Validation is performed by each step's own continue handler and `WizardShell.handleFinalize` (the framework defines no `validate` hook).
 2. The optional `defaultLevel` prop sets the starting level (used when joining an existing party — defaults to the party's max level). `WizardState.level` inits to `defaultLevel ?? 1`.
 3. `StepWizard` filters by `isVisible` (e.g. the subclass step only shows if `selectedClass.subclassLevel <= level`), maintains a step-history stack for back-navigation, and renders the current step plus a progress bar.
 4. Steps mutate `wizardState` via `updateWizard` (a stable `useCallback`).

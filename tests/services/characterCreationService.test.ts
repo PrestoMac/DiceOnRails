@@ -32,6 +32,10 @@ function baseWizard(overrides: Partial<WizardState> = {}): WizardState {
     selectedLocation: { name: 'Phandalin', description: 'A small mining town.' },
     isGeneratingLocs: false,
     isRerolling: false,
+    statsGenMode: 'array',
+    rolledStatValues: [],
+    rollHistory: [],
+    bonusStatAllocations: {},
     ...overrides,
   };
 }
@@ -261,6 +265,48 @@ describe('buildCharacterFromWizard', () => {
       expect(character?.hp).toEqual({ current: 28, max: 28 });
       expect(character?.hitDice).toEqual({ current: 3, max: 3 });
       expect(character?.unusedStatPoints).toBe(4);
+    });
+
+    it('applies bonus stat allocations and reduces unusedStatPoints', () => {
+      const { character } = buildCharacterFromWizard(
+        baseWizard({ level: 3, bonusStatAllocations: { str: 2, dex: 1 } }),
+        { isNewCampaign: true }
+      );
+      // Human +1 all: str 15->16, dex 14->15, con 13->14, int 12->13, wis 10->11, cha 8->9.
+      // Bonus: str +2 -> 18, dex +1 -> 16.
+      expect(character?.stats.str).toBe(18);
+      expect(character?.stats.dex).toBe(16);
+      // Budget (3-1)*2 = 4; allocated 3 -> 1 left over.
+      expect(character?.unusedStatPoints).toBe(1);
+    });
+
+    it('rolls silver pieces into gold when >= 10 SP', () => {
+      const { character } = buildCharacterFromWizard(
+        baseWizard({ goldPool: 12.98 }),
+        { isNewCampaign: true }
+      );
+      // 0.98 fractional -> 9.8 ~ rounds to 10 SP -> rolls into 1 GP.
+      // goldPool 12.98 -> gp floor 12, sp round(0.98*10)=10 -> gp 13, sp 0.
+      expect(character?.currency.gp).toBe(13);
+      expect(character?.currency.sp).toBe(0);
+    });
+  });
+
+  describe('spell selection clears on non-caster', () => {
+    it('does not bake phantom spells when the class has no spellcasting', () => {
+      // Simulates: user picks Wizard spells, then switches to Fighter without the
+      // UI clearing the selections. The build service must not emit spells for a
+      // non-caster regardless of the stale selection state.
+      const { character } = buildCharacterFromWizard(
+        baseWizard({
+          selectedClass: CLASSES_BY_ID['fighter'],
+          selectedCantrips: ['fire-bolt'],
+          selectedSpells: ['magic-missile'],
+        }),
+        { isNewCampaign: true }
+      );
+      expect(character?.knownSpells).toEqual([]);
+      expect(character?.preparedSpells).toEqual([]);
     });
   });
 

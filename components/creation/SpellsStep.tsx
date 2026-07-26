@@ -21,7 +21,27 @@ const SpellsStep: React.FC<StepProps & { onBackToSubclass: () => void; onBackToF
 
   const classSpells = getSpellsForClass(selectedClass.id);
   const cantrips = classSpells.filter(s => s.level === 0);
-  const leveledSpells = classSpells.filter(s => s.level > 0 && s.level <= Math.ceil(level / 2) + 1);
+  // Highest spell level the character actually has slots for, derived from the
+  // class slot table (handles full casters, half-casters, and warlock pact magic).
+  const maxCastableLevel = (() => {
+    const sc = selectedClass.spellcasting;
+    if (!sc) return 0;
+    const slotsRow = sc.spellSlots?.[Math.min(level - 1, sc.spellSlots.length - 1)];
+    if (slotsRow) {
+      for (let i = slotsRow.length - 1; i >= 0; i--) {
+        if (slotsRow[i] > 0) return i + 1;
+      }
+    }
+    if (selectedClass.id === 'warlock' && sc.pactMagic) {
+      if (level >= 17) return 5;
+      if (level >= 11) return 4;
+      if (level >= 9) return 3;
+      if (level >= 5) return 2;
+      if (level >= 3) return 1;
+    }
+    return 1;
+  })();
+  const leveledSpells = classSpells.filter(s => s.level > 0 && s.level <= maxCastableLevel);
   const maxCantrips = getCantripsKnown({ stats, class: selectedClass.id } as Parameters<typeof getCantripsKnown>[0], level);
   const isPrepared = selectedClass.spellcasting?.prepMode === 'prepared';
   const maxSpells = isPrepared
@@ -80,7 +100,7 @@ const SpellsStep: React.FC<StepProps & { onBackToSubclass: () => void; onBackToF
       <div className="space-y-2">
         <p className="text-[10px] uppercase font-bold text-amber-600 tracking-widest">Cantrips</p>
         <div className="grid grid-cols-2 gap-2">
-          {filteredCantrips.slice(0, 20).map(spell => (
+          {filteredCantrips.map(spell => (
             <SpellCard
               key={spell.id}
               spell={spell}
@@ -92,7 +112,7 @@ const SpellsStep: React.FC<StepProps & { onBackToSubclass: () => void; onBackToF
         </div>
         <p className="text-[10px] uppercase font-bold text-amber-600 tracking-widest mt-3">Leveled Spells</p>
         <div className="grid grid-cols-2 gap-2">
-          {filteredLeveledSpells.slice(0, 40).map(spell => (
+          {filteredLeveledSpells.map(spell => (
             <SpellCard
               key={spell.id}
               spell={spell}

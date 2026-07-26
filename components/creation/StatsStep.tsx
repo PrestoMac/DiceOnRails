@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { StepProps } from './types';
 import { CLASSES_CATALOG } from '../../utils/classes';
 import { getMod } from '../../services/classEngine';
 import { cryptoRoll } from '../../utils/random';
 import { STAT_LABELS, POINT_BUY_COSTS, GEN_MODES } from './constants';
+import { getEffectiveAsiMap } from './asiUtils';
 import { TabBtn, AdjBtn, ErrorBanner } from './SharedComponents';
 import Tooltip from '../ui/Tooltip';
 
@@ -17,14 +18,19 @@ const StatsStep: React.FC<StepProps> = ({ wizardState, updateWizard, onNext }) =
   const { selectedClass, selectedRace, stats, level } = wizardState;
   const stepCls = "space-y-6 animate-in fade-in duration-500";
 
-  const [genMode, setGenMode] = useState<'buy' | 'array' | 'roll'>('buy');
-  const [rolledValues, setRolledValues] = useState<number[]>([]);
-  const [rollHistory, setRollHistory] = useState<Array<{ dice: number[]; dropped: number; total: number }>>([]);
-  const [hasRolled, setHasRolled] = useState(false);
+  // All transient state is seeded from wizardState so navigating away and back
+  // (which remounts this component) preserves the chosen mode, rolls, and bonus
+  // allocations instead of resetting them.
+  const [genMode, setGenMode] = useState<'buy' | 'array' | 'roll'>(wizardState.statsGenMode || 'buy');
+  const [rolledValues, setRolledValues] = useState<number[]>(wizardState.rolledStatValues || []);
+  const [rollHistory, setRollHistory] = useState<Array<{ dice: number[]; dropped: number; total: number }>>(wizardState.rollHistory || []);
   const [localStats, setLocalStats] = useState(stats);
   const [halfElfChoice1, setHalfElfChoice1] = useState<string | null>(wizardState.halfElfChoice1);
   const [halfElfChoice2, setHalfElfChoice2] = useState<string | null>(wizardState.halfElfChoice2);
+  const [bonusStats, setBonusStats] = useState<Record<string, number>>(wizardState.bonusStatAllocations || {});
   const [finalizeError, setFinalizeError] = useState<string | null>(null);
+
+  const hasRolled = rolledValues.length > 0;
 
   const totalSpent = Object.values(localStats).reduce((s, v) => s + (POINT_BUY_COSTS[v] || 0), 0);
 
@@ -33,13 +39,15 @@ const StatsStep: React.FC<StepProps> = ({ wizardState, updateWizard, onNext }) =
     return Object.fromEntries(CLASS_STATS_PRIORITY[selectedClass.name].map((s, i) => [s, sorted[i]])) as typeof stats;
   }, [selectedClass.name]);
 
-  useEffect(() => {
-    if (genMode === 'buy') setLocalStats({ str: 8, dex: 8, con: 8, int: 8, wis: 8, cha: 8 });
-    else if (genMode === 'array') setLocalStats({ ...CLASS_RECOMMENDED_STATS[selectedClass.name] } as Record<string, number>);
-    else if (genMode === 'roll' && rolledValues.length > 0) {
-      setLocalStats(buildStatMap(rolledValues));
-    }
-  }, [genMode, selectedClass.name, rolledValues, buildStatMap]);
+  // Switching generation mode re-seeds localStats. This is invoked ONLY from
+  // the mode-tab onClick (a real user action) — never on mount — so navigating
+  // away and back no longer wipes previously chosen stats.
+  const applyGenMode = useCallback((mode: 'buy' | 'array' | 'roll') => {
+    setGenMode(mode);
+    if (mode === 'buy') setLocalStats({ str: 8, dex: 8, con: 8, int: 8, wis: 8, cha: 8 });
+    else if (mode === 'array') setLocalStats({ ...CLASS_RECOMMENDED_STATS[selectedClass.name] } as Record<string, number>);
+    else if (mode === 'roll' && rolledValues.length > 0) setLocalStats(buildStatMap(rolledValues));
+  }, [selectedClass.name, rolledValues, buildStatMap]);
 
   const handlePointBuyUpdate = (stat: string, delta: number) => {
     const nv = (localStats as Record<string, number>)[stat] + delta;
@@ -66,15 +74,20 @@ const StatsStep: React.FC<StepProps> = ({ wizardState, updateWizard, onNext }) =
     setRollHistory(rolls);
     const totals = rolls.map(r => r.total);
     setRolledValues(totals);
-    setHasRolled(true);
     setLocalStats(buildStatMap(totals));
+    // Persist immediately so a remount (navigate away and back) keeps the roll.
+    updateWizard({ rolledStatValues: totals, rollHistory: rolls, statsGenMode: 'roll' });
   };
 
-  const asiMap = typeof selectedRace.asi === 'object' ? selectedRace.asi as Record<string, number> : {};
+  const asiMap = getEffectiveAsiMap(selectedRace, halfElfChoice1, halfElfChoice2);
   const racialConBonus = asiMap['con'] || 0;
   const totalCon = localStats.con + racialConBonus;
   const conMod = getMod(totalCon);
   const previewHp = selectedClass.hpBase + conMod + (selectedClass.hpPerLevel + conMod) * (level - 1);
+
+  const bonusBudget = (level - 1) * 2;
+  const bonusAllocated = Object.values(bonusStats).reduce((s, v) => s + (typeof v === 'number' ? v : 0), 0);
+  const bonusRemaining = bonusBudget - bonusAllocated;
 
   const handleContinue = () => {
     if (genMode === 'buy' && 27 - totalSpent > 0) {
@@ -93,6 +106,10 @@ const StatsStep: React.FC<StepProps> = ({ wizardState, updateWizard, onNext }) =
       stats: localStats,
       halfElfChoice1,
       halfElfChoice2,
+      statsGenMode: genMode,
+      rolledStatValues: rolledValues,
+      rollHistory,
+      bonusStatAllocations: bonusStats,
     });
     setFinalizeError(null);
     onNext();
@@ -113,12 +130,8 @@ const StatsStep: React.FC<StepProps> = ({ wizardState, updateWizard, onNext }) =
       <div className="flex border border-stone-800 bg-stone-950/60 rounded-lg p-1 text-xs">
         {GEN_MODES.map(m => (
           <TabBtn key={m.key} active={genMode === m.key} onClick={() => {
-            if (m.key !== 'roll') {
-              setHasRolled(false);
-              setRolledValues([]);
-              setRollHistory([]);
-            }
-            setGenMode(m.key);
+            applyGenMode(m.key);
+            updateWizard({ statsGenMode: m.key });
           }}>{m.label}</TabBtn>
         ))}
       </div>
@@ -257,6 +270,37 @@ const StatsStep: React.FC<StepProps> = ({ wizardState, updateWizard, onNext }) =
                   <div className="font-bold uppercase">{stat}</div>
                   <div className="text-[9px]">{selected ? '+1' : '—'}</div>
                 </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      {level > 1 && (
+        <div className="bg-purple-950/10 border border-purple-800/30 rounded-lg p-4 space-y-3 mt-4">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-purple-300 font-bold">Bonus Ability Points</p>
+            <span className={`text-xs font-mono font-bold ${bonusRemaining > 0 ? 'text-purple-400' : 'text-green-500'}`}>{bonusRemaining} / {bonusBudget}</span>
+          </div>
+          <p className="text-[9px] text-stone-500 -mt-2">
+            Bonus progression points from your higher starting level. Unspent points carry over for later allocation.
+          </p>
+          <div role="group" aria-label="Bonus ability points" className="grid grid-cols-3 gap-2">
+            {(['str', 'dex', 'con', 'int', 'wis', 'cha'] as const).map(stat => {
+              const base = (localStats as Record<string, number>)[stat];
+              const racial = asiMap[stat] || 0;
+              const al = bonusStats[stat] || 0;
+              const projected = base + racial + al;
+              const disableAdd = al >= 2 || bonusRemaining <= 0 || projected >= 20;
+              const disableRem = al <= 0;
+              return (
+                <div key={stat} className="bg-stone-950/40 border border-stone-850 rounded p-2 text-center">
+                  <div className="text-[9px] uppercase text-stone-500 font-bold">{STAT_LABELS[stat]}</div>
+                  <div className="flex items-center justify-center gap-0.5 my-1">
+                    <button onClick={() => setBonusStats(s => ({ ...s, [stat]: Math.max(0, (s[stat] || 0) - 1) }))} disabled={disableRem} className="w-5 h-5 text-[9px] bg-stone-800 rounded disabled:opacity-30">-</button>
+                    <span className={`text-xs font-mono font-bold w-7 ${al > 0 ? 'text-purple-400' : 'text-stone-300'}`}>{projected}</span>
+                    <button onClick={() => setBonusStats(s => ({ ...s, [stat]: (s[stat] || 0) + 1 }))} disabled={disableAdd} className="w-5 h-5 text-[9px] bg-stone-800 rounded disabled:opacity-30">+</button>
+                  </div>
+                </div>
               );
             })}
           </div>

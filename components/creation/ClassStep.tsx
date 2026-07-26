@@ -25,6 +25,8 @@ const ClassStep: React.FC<StepProps> = ({ wizardState, updateWizard, onNext }) =
                 selectedClass: cls,
                 selectedSubclassId: null,
                 draconicAncestry: cls.id !== 'sorcerer' ? null : wizardState.draconicAncestry,
+                selectedSpells: [],
+                selectedCantrips: [],
               });
             }}
             className={`p-4 rounded-xl border-2 text-left transition-all cursor-pointer ${selectedClass.name === cls.name ? 'border-amber-600 bg-amber-900/10' : 'border-stone-800 bg-stone-900/40 hover:border-stone-600'}`}

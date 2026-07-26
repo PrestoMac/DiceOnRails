@@ -4,6 +4,7 @@ import { SKILLS_LIST, ASI_LEVELS } from '../../constants';
 import { getMod } from '../../services/classEngine';
 import { FEATS_CATALOG } from '../../utils/feats';
 import { STAT_LABELS } from './constants';
+import { getEffectiveAsiMap } from './asiUtils';
 import { StepH, ErrorBanner } from './SharedComponents';
 import Tooltip from '../ui/Tooltip';
 
@@ -23,7 +24,7 @@ const ReviewStep: React.FC<ReviewStepProps> = ({
   wizardState, finalizeError, isNewCampaign, campaignStartingLocation, needsSpellsStep, onFinalize, onGoToStart,
 }) => {
   const { name, selectedRace, selectedClass, stats, level, allocatedSkills, goldPool, inventory, asiFeatSlots, selectedSubclassId, selectedCantrips, selectedSpells } = wizardState;
-  const asiMap = typeof selectedRace.asi === 'object' ? selectedRace.asi as Record<string, number> : {};
+  const asiMap = getEffectiveAsiMap(selectedRace, wizardState.halfElfChoice1, wizardState.halfElfChoice2);
   const stepCls = "space-y-6 animate-in fade-in duration-500";
 
   return (

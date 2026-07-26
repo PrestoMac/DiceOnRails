@@ -9,12 +9,11 @@ export interface WizardStepContext {
   isFirstStep: boolean;
 }
 
-/** Defines a single step in a multi-step wizard: key, label, validation, render component, and lifecycle hooks. */
+/** Defines a single step in a multi-step wizard: key, label, render component, and lifecycle hooks. Validation is performed by each step's own continue handler and the orchestrator's finalize routine, not by this framework. */
 export interface WizardStep<TState, TExtraProps = Record<string, never>> {
   key: string;
   label: string;
   icon?: string;
-  validate: (state: TState) => string | null;
   render: React.FC<{
     state: TState;
     updateState: (updates: Partial<TState>) => void;

@@ -4,15 +4,14 @@ import { SKILLS_LIST } from '../../constants';
 import { getMod } from '../../services/classEngine';
 import { CLASS_RECOMMENDED_SKILLS } from './constants';
 import { StepH, AdjBtn } from './SharedComponents';
+import { computeRemainingSkillPoints } from './skillPoints';
 
 /** Skill training step. Allocates skill points derived from class choices and level, with class-recommended skills highlighted. */
 const SkillsStep: React.FC<StepProps> = ({ wizardState, updateWizard, onNext }) => {
   const { selectedClass, selectedRace, stats, allocatedSkills, level } = wizardState;
   const stepCls = "space-y-6 animate-in fade-in duration-500";
 
-  const startingPoints = selectedClass.skillChoices.count * 2;
-  const remainingSkillPoints = startingPoints + (level - 1) * (selectedClass.name === 'Rogue' ? 4 : 3)
-    - Object.values(allocatedSkills).reduce((s, v) => s + v, 0);
+  const remainingSkillPoints = computeRemainingSkillPoints(selectedClass, level, allocatedSkills);
 
   const asiMap = typeof selectedRace.asi === 'object' ? selectedRace.asi as Record<string, number> : {};
 

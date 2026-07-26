@@ -8,6 +8,7 @@ import { lookupSRDItem } from '../../utils/srdItems';
 import { CLASSES_CATALOG } from '../../utils/classes';
 import { RACES_CATALOG } from '../../utils/races';
 import { buildCharacterFromWizard } from '../../services/characterCreationService';
+import { computeRemainingSkillPoints } from './skillPoints';
 import { StepH, NavBtn, SubclassList, DragonColorPicker } from './SharedComponents';
 import NameStep from './NameStep';
 import RaceStep from './RaceStep';
@@ -51,12 +52,18 @@ const WizardShell: React.FC<WizardShellProps> = ({
     halfElfChoice1: null, halfElfChoice2: null,
     generatedLocations: [], selectedLocation: null,
     isGeneratingLocs: false, isRerolling: false,
+    statsGenMode: 'buy', rolledStatValues: [], rollHistory: [],
+    bonusStatAllocations: {},
   });
 
   const updateWizard = useCallback((updates: Partial<WizardState>) => {
     setWizardState(prev => ({ ...prev, ...updates }));
   }, []);
 
+  // Reset starting equipment, gold, and skill allocations ONLY when the class
+  // changes (different starting kit / skill list). Level changes must not wipe
+  // gear purchases or skill picks the user already made.
+  const selectedClassId = wizardState.selectedClass.id;
   useEffect(() => {
     const defaults = (wizardState.selectedClass.startingEquipment || []).map((item: string) => {
       const srd = lookupSRDItem(item);
@@ -65,7 +72,7 @@ const WizardShell: React.FC<WizardShellProps> = ({
     const ep = lookupSRDItem("Explorer's Pack");
     defaults.push({ name: "Explorer's Pack", quantity: 1, type: ep?.type || 'other', rarity: ep?.rarity || 'common', description: ep?.description || 'No description available.', weight: ep?.weight || 0, cost: ep?.cost || '0 gp', stats: ep?.stats || {}, equipped: false });
     updateWizard({ inventory: defaults, goldPool: 10 * wizardState.level, allocatedSkills: {} });
-  }, [wizardState.selectedClass, wizardState.level, updateWizard]);
+  }, [selectedClassId, updateWizard]);
 
   useEffect(() => {
     const targetSlots = ASI_LEVELS.filter(l => l <= wizardState.level);
@@ -78,10 +85,7 @@ const WizardShell: React.FC<WizardShellProps> = ({
 
   const needsSpellsStep = !!wizardState.selectedClass.spellcasting;
 
-  const remainingSkillPoints = (() => {
-    const sp = wizardState.selectedClass.skillChoices.count * 2;
-    return sp + (wizardState.level - 1) * (wizardState.selectedClass.name === 'Rogue' ? 4 : 3) - Object.values(wizardState.allocatedSkills).reduce((s, v) => s + v, 0);
-  })();
+  const remainingSkillPoints = computeRemainingSkillPoints(wizardState.selectedClass, wizardState.level, wizardState.allocatedSkills);
 
   const handleFinalize = () => {
     setFinalizeError(null);
@@ -124,21 +128,18 @@ const WizardShell: React.FC<WizardShellProps> = ({
   const steps: WizardStep<WizardState>[] = [
     {
       key: 'name', label: 'Name',
-      validate: (s) => !s.name.trim() ? 'Enter a name' : null,
       render: ({ state, updateState, context }) => (
         <NameStep wizardState={state} updateWizard={updateState} onNext={() => context.goToStep('race')} onBack={context.goBack} goToStep={() => {}} />
       ),
     },
     {
       key: 'race', label: 'Race',
-      validate: (s) => s.selectedRace.id === 'dragonborn' && !s.draconicAncestry ? 'Choose your Draconic Ancestry' : null,
       render: ({ state, updateState, context }) => (
         <RaceStep wizardState={state} updateWizard={updateState} onNext={() => context.goToStep('class')} onBack={context.goBack} goToStep={() => {}} />
       ),
     },
     {
       key: 'class', label: 'Class',
-      validate: () => null,
       render: ({ state, updateState, context }) => (
         <ClassStep wizardState={state} updateWizard={updateState} onNext={() => {
           if (state.selectedClass.subclassLevel === 1) context.goToStep('subclass-early');
@@ -149,7 +150,6 @@ const WizardShell: React.FC<WizardShellProps> = ({
     {
       key: 'subclass-early', label: 'Path',
       isVisible: (s) => s.selectedClass.subclassLevel === 1,
-      validate: (s) => !s.selectedSubclassId ? 'Choose a subclass' : null,
       render: ({ state, updateState, context }) => (
         <div className={stepCls}>
           <StepH>Choose Your Path</StepH>
@@ -162,21 +162,18 @@ const WizardShell: React.FC<WizardShellProps> = ({
     },
     {
       key: 'stats', label: 'Stats',
-      validate: () => null,
       render: ({ state, updateState, context }) => (
         <StatsStep wizardState={state} updateWizard={updateState} onNext={() => context.goToStep('skills')} onBack={context.goBack} goToStep={() => {}} />
       ),
     },
     {
       key: 'skills', label: 'Skills',
-      validate: () => null,
       render: ({ state, updateState, context }) => (
         <SkillsStep wizardState={state} updateWizard={updateState} onNext={() => context.goToStep('feats')} onBack={context.goBack} goToStep={() => {}} />
       ),
     },
     {
       key: 'feats', label: 'Feats',
-      validate: () => null,
       render: ({ state, updateState, context }) => {
         const needsSub = state.selectedClass.subclassLevel >= 2 && state.selectedClass.subclassLevel <= state.level;
         const needsSpells = !!state.selectedClass.spellcasting;
@@ -194,7 +191,6 @@ const WizardShell: React.FC<WizardShellProps> = ({
     {
       key: 'subclass-late', label: 'Path',
       isVisible: (s) => s.selectedClass.subclassLevel >= 2 && s.selectedClass.subclassLevel <= s.level,
-      validate: (s) => !s.selectedSubclassId ? 'Choose a subclass' : null,
       render: ({ state, updateState, context }) => {
         const needsSpells = !!state.selectedClass.spellcasting;
         return (
@@ -214,7 +210,6 @@ const WizardShell: React.FC<WizardShellProps> = ({
     {
       key: 'spells', label: 'Spells',
       isVisible: (s) => !!s.selectedClass.spellcasting,
-      validate: () => null,
       render: ({ state, updateState, context }) => {
         return (
           <SpellsStep wizardState={state} updateWizard={updateState} onNext={() => context.goToStep('gear')} onBack={context.goBack} goToStep={() => {}}
@@ -227,7 +222,6 @@ const WizardShell: React.FC<WizardShellProps> = ({
     },
     {
       key: 'gear', label: 'Gear',
-      validate: () => null,
       render: ({ state, updateState, context }) => {
         const needsSpells = !!state.selectedClass.spellcasting;
         const needsLateSub = state.selectedClass.subclassLevel >= 2 && state.selectedClass.subclassLevel <= state.level;
@@ -244,7 +238,6 @@ const WizardShell: React.FC<WizardShellProps> = ({
     },
     {
       key: 'review', label: 'Review',
-      validate: () => null,
       render: ({ state, context }) => (
         <ReviewStep wizardState={state} finalizeError={finalizeError} isNewCampaign={!!isNewCampaign}
           campaignStartingLocation={campaignStartingLocation} needsSpellsStep={needsSpellsStep}
@@ -262,7 +255,6 @@ const WizardShell: React.FC<WizardShellProps> = ({
     {
       key: 'starting-grounds', label: 'Start',
       isVisible: () => !!isNewCampaign,
-      validate: () => null,
       render: ({ state, updateState }) => (
         <StartingGroundsStep wizardState={state} updateWizard={updateState}
           onFinalize={handleFinalize} onReroll={handleReroll} />

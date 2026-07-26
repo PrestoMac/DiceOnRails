@@ -587,7 +587,7 @@ export const useGameActions = (
         if (userId) character.ownerId = userId;
         setMyCharacterId(character.id); setViewingCharacterId(character.id);
         const startingLoc = mcpServer.getFullState().startingLocation;
-        if (startingLoc) character.location = startingLoc.name;
+        if (!character.location && startingLoc) character.location = startingLoc.name;
         // Detect "join existing party": the party already has members before joinParty
         // runs (new campaigns always reset to an empty party before the wizard runs).
         const isJoiningParty = mcpServer.getFullState().party.length > 0;

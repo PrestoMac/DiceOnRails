@@ -1,4 +1,4 @@
-import { Character, StartingLocation, InventoryItem, SpellDefinition } from '../../types';
+import { Character, StartingLocation, InventoryItem, SpellDefinition, FeatSelection } from '../../types';
 import { ClassDefinition } from '../../utils/classes';
 import { RaceDefinition } from '../../utils/races';
 
@@ -24,6 +24,14 @@ export interface WizardState {
   selectedLocation: StartingLocation | null;
   isGeneratingLocs: boolean;
   isRerolling: boolean;
+  /** Stats generation method chosen on the Stats step. Persisted so navigating away and back preserves it. */
+  statsGenMode: 'buy' | 'array' | 'roll';
+  /** The 6 totals from the last 4d6-drop-lowest roll. Empty until the user rolls. */
+  rolledStatValues: number[];
+  /** Per-roll dice breakdown for the roll-history display. */
+  rollHistory: Array<{ dice: number[]; dropped: number; total: number }>;
+  /** Bonus stat points allocated on the Stats step (spends down `(level-1)*2`). */
+  bonusStatAllocations: Record<string, number>;
 }
 
 /** Base props shared by all wizard step components. */

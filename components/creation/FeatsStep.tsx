@@ -6,6 +6,7 @@ import { FEATS_CATALOG, FEAT_CATEGORIES, FeatDefinition } from '../../utils/feat
 import { filterAvailableFeats, validateFeatPrereqs } from '../../services/featsService';
 import { ASI_LEVELS } from '../../constants';
 import { STAT_LABELS } from './constants';
+import { getEffectiveAsiMap } from './asiUtils';
 import { StepH } from './SharedComponents';
 import FeatDetailModal from '../FeatDetailModal';
 import Tooltip from '../ui/Tooltip';
@@ -16,6 +17,7 @@ const FeatsStep: React.FC<StepProps & { onGoToSpells: () => void; onGoToGear: ()
 }) => {
   const { selectedClass, selectedRace, stats, inventory, allocatedSkills, level, asiFeatSlots } = wizardState;
   const stepCls = "space-y-6 animate-in fade-in duration-500";
+  const asiMap = getEffectiveAsiMap(selectedRace, wizardState.halfElfChoice1, wizardState.halfElfChoice2);
 
   const [featSearch, setFeatSearch] = useState('');
   const [featCategory, setFeatCategory] = useState<string>('all');
@@ -142,7 +144,7 @@ const FeatsStep: React.FC<StepProps & { onGoToSpells: () => void; onGoToGear: ()
                 <div className="grid grid-cols-3 gap-1.5">
                   {(Object.keys(stats) as (keyof Character['stats'])[]).map(stat => {
                     const al = (slot.statAllocations as Record<string, number>)?.[stat] || 0;
-                    const racialBonus = typeof selectedRace.asi === 'object' ? ((selectedRace.asi as Record<string, number>)[stat] || 0) : (stat === 'cha' ? 2 : 0);
+                    const racialBonus = asiMap[stat] || 0;
                     const currentFinal = stats[stat] + racialBonus;
                     const proposed = currentFinal + al;
                     const disableAdd = al >= 2 || Object.values(slot.statAllocations || {}).reduce((s: number, v) => s + (typeof v === 'number' ? v : 0), 0) >= 2 || proposed > 20;
@@ -197,11 +199,11 @@ const FeatsStep: React.FC<StepProps & { onGoToSpells: () => void; onGoToGear: ()
 
                 {!slot.featId && (() => {
                   const simChar: Character = {
-                    id: 'tmp', name: wizardState.name, class: selectedClass.name, race: selectedRace.name, level,
+                    id: 'tmp', name: wizardState.name, class: selectedClass.id, race: selectedRace.id, level,
                     hp: { current: 0, max: 0 },
                     stats: (() => {
-                      const out: Record<string, number> = { ...stats };
-                      if (typeof selectedRace.asi === 'object') for (const [k, v] of Object.entries(selectedRace.asi)) out[k] = (out[k] || 0) + (v as number);
+                      const out = { ...stats };
+                      for (const [k, v] of Object.entries(asiMap)) (out as Record<string, number>)[k] = ((out as Record<string, number>)[k] || 0) + v;
                       return out;
                     })(),
                     inventory, currency: { gp: 0, sp: 0, cp: 0 }, location: '',

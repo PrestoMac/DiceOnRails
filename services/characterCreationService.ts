@@ -4,6 +4,7 @@ import { calculateXPToNextLevel } from './progressionService';
 import { ASI_LEVELS, FALLBACK_STARTING_LOCATION } from '../constants';
 import { getMod, getRaceDef, recalculateResourcePools } from './classEngine';
 import { DRAGON_ANCESTRIES } from '../components/creation/constants';
+import { computeSkillBudget } from '../components/creation/skillPoints';
 import { RACES_BY_ID } from '../utils/races';
 import { CLASSES_BY_ID } from '../utils/classes';
 import { lookupSRDItem } from '../utils/srdItems';
@@ -32,6 +33,13 @@ export function buildCharacterFromWizard(
     if (halfElfChoice2) (halfElfStats as Record<string, number>)[halfElfChoice2] += 1;
     for (const [s, v] of Object.entries(halfElfStats)) (fs as Record<string, number>)[s] += v as number;
   }
+
+  // Bonus stat points allocated on the Stats step (spends down the
+  // (level-1)*2 budget granted by this system's STAT_POINTS_PER_LEVEL rule).
+  for (const [stat, v] of Object.entries(wizard.bonusStatAllocations || {})) {
+    if (typeof v === 'number' && v > 0) (fs as Record<string, number>)[stat] = ((fs as Record<string, number>)[stat] || 0) + v;
+  }
+  const bonusAllocated = Object.values(wizard.bonusStatAllocations || {}).reduce((s, v) => s + (typeof v === 'number' ? v : 0), 0);
 
   const collectedFeats: string[] = [];
   const featSelections: { level: number; type: 'asi' | 'feat'; featId?: string; statAllocations?: Record<string, number> }[] = [];
@@ -73,15 +81,20 @@ export function buildCharacterFromWizard(
         max: selectedClass.hpBase + conMod + (selectedClass.hpPerLevel + conMod) * (level - 1),
       },
       stats: fs, inventory,
-      currency: { gp: Math.floor(goldPool), sp: Math.round((goldPool % 1) * 10), cp: 0 },
+      currency: (() => {
+        let gp = Math.floor(goldPool);
+        let sp = Math.round((goldPool - gp) * 10);
+        if (sp >= 10) { gp += Math.floor(sp / 10); sp = sp % 10; }
+        return { gp, sp, cp: 0 };
+      })(),
       location: loc?.name || '', experience: 0, experienceToNextLevel: calculateXPToNextLevel(level),
-      unusedStatPoints: (level - 1) * 2, maxHpBonus: 0, hitDice: { current: level, max: level },
+      unusedStatPoints: Math.max(0, (level - 1) * 2 - bonusAllocated), maxHpBonus: 0, hitDice: { current: level, max: level },
       skills: updatedSkills, unusedSkillPoints: remainingSkillPoints || 0,
       feats: collectedFeats, featSelections, featChoices, pendingFeatChoice: false,
       resources, racialTraits,
       conditionsImmunities: (selectedRace.id === 'elf' || selectedRace.id === 'half-elf') ? ['sleep'] : undefined,
-      knownSpells: selectedClass.spellcasting?.prepMode === 'prepared' ? [...selectedCantrips] : [...selectedCantrips, ...selectedSpells],
-      preparedSpells: selectedClass.spellcasting?.prepMode === 'prepared' ? [...selectedCantrips, ...selectedSpells] : [...selectedCantrips],
+      knownSpells: !selectedClass.spellcasting ? [] : (selectedClass.spellcasting.prepMode === 'prepared' ? [...selectedCantrips] : [...selectedCantrips, ...selectedSpells]),
+      preparedSpells: !selectedClass.spellcasting ? [] : (selectedClass.spellcasting.prepMode === 'prepared' ? [...selectedCantrips, ...selectedSpells] : [...selectedCantrips]),
       subclassId: selectedSubclassId || undefined,
       backstory: backstory || undefined,
       halfElfStatChoices: (typeof selectedRace.asi === 'string' && halfElfChoice1 && halfElfChoice2) ? [halfElfChoice1, halfElfChoice2] as unknown as [string, string] : undefined,
@@ -205,10 +218,14 @@ export function buildPresetCharacter(spec: PresetCharacterSpec): Character {
     selectedLocation: null,
     isGeneratingLocs: false,
     isRerolling: false,
+    statsGenMode: 'array',
+    rolledStatValues: [],
+    rollHistory: [],
+    bonusStatAllocations: {},
   };
 
-  // Replicate WizardShell's remainingSkillPoints formula at level 1 (no per-level bonus term).
-  const skillBudget = cls.skillChoices.count * 2;
+  // Replicate the skill-points formula at level 1 (no per-level bonus term).
+  const skillBudget = computeSkillBudget(cls, 1);
   const allocatedSum = Object.values(spec.allocatedSkills).reduce((s, v) => s + v, 0);
   const remainingSkillPoints = skillBudget - allocatedSum;
 
