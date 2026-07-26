@@ -59,6 +59,7 @@ function StepWizard<TState>({
       {renderProgress && currentIndex >= 0 && renderProgress({ currentIndex, total: visibleSteps.length, steps: visibleSteps, goToStep })}
       {StepComponent && currentStep && (
         <StepComponent
+          key={currentStep.key}
           state={state}
           updateState={updateState}
           context={ctx}
