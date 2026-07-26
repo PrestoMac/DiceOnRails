@@ -2285,4 +2285,40 @@ const roundTripped = deepClone(char.conditions);
       expect(res.message).not.toContain('WARNING: no actor id');
     });
   });
+
+  describe('narrate_turn roleplay XP (executeToolCall dispatch)', () => {
+    it('awards 1 XP baseline when roleplay tag is dialogue and xp omitted', async () => {
+      server.loadState(makeServerState());
+      const res = await server.executeToolCall('narrate_turn', { narration: 'The guard nods.', timePassed: 5, roleplay: 'dialogue' });
+      expect(res.success).toBe(true);
+      expect(res.data.xpAwarded).toBe(1);
+      const char = server.getTarget('hero-1');
+      expect(char?.experience).toBe(1);
+    });
+
+    it('awards 5 XP default when roleplay tag is creative and xp omitted', async () => {
+      server.loadState(makeServerState());
+      const res = await server.executeToolCall('narrate_turn', { narration: 'A clever ruse.', timePassed: 2, roleplay: 'creative' });
+      expect(res.success).toBe(true);
+      expect(res.data.xpAwarded).toBe(5);
+      const char = server.getTarget('hero-1');
+      expect(char?.experience).toBe(5);
+    });
+
+    it('explicit xp overrides the tag baseline', async () => {
+      server.loadState(makeServerState());
+      const res = await server.executeToolCall('narrate_turn', { narration: 'A moving speech.', timePassed: 3, roleplay: 'dialogue', xp: 7 });
+      expect(res.success).toBe(true);
+      expect(res.data.xpAwarded).toBe(7);
+    });
+
+    it('awards nothing when no roleplay tag and no xp', async () => {
+      server.loadState(makeServerState());
+      const res = await server.executeToolCall('narrate_turn', { narration: 'Traveling onward.', timePassed: 10 });
+      expect(res.success).toBe(true);
+      expect(res.data.xpAwarded).toBe(0);
+      const char = server.getTarget('hero-1');
+      expect(char?.experience).toBe(0);
+    });
+  });
 });

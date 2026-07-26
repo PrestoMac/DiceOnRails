@@ -169,7 +169,7 @@ export class MockMCPServer {
 
 
   public async move_to(location_name: string, description?: string, targetId?: string, skillCheck?: { skill_name?: string; difficulty?: number; onSuccess?: unknown }, significance?: LocationSignificance): Promise<MCPResponse> { return this.travel.move_to(location_name, description, targetId, skillCheck, significance); }
-  public async narrate_turn(narration: string, timePassed?: number, xp?: number): Promise<MCPResponse> { return this.travel.narrate_turn(narration, timePassed, xp); }
+  public async narrate_turn(narration: string, timePassed?: number, xp?: number, roleplay?: 'dialogue' | 'creative'): Promise<MCPResponse> { return this.travel.narrate_turn(narration, timePassed, xp, roleplay); }
   public setAtmosphere(url: string) { this.travel.setAtmosphere(url); }
   public setStartingLocation(location: { name: string; description: string; introHook?: string; atmosphereUrl?: string }) { this.travel.setStartingLocation(location); }
   public cacheLocationImage(name: string, url: string) { this.travel.cacheLocationImage(name, url); }
@@ -453,7 +453,7 @@ export class MockMCPServer {
           } else if (isDebugMode) {
             console.log('[narrate_turn] No suggestions in args');
           }
-          res = await this.travel.narrate_turn(sanitizeNarration(String(args.narration || '')), Number(args.timePassed ?? 0), args.xp as number | undefined); break;
+          res = await this.travel.narrate_turn(sanitizeNarration(String(args.narration || '')), Number(args.timePassed ?? 0), args.xp as number | undefined, args.roleplay as 'dialogue' | 'creative' | undefined); break;
         default:
           res = fail(`Unknown tool: ${name}`);
       }
