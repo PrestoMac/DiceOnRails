@@ -59,7 +59,12 @@ export const END_OF_TURN_PROPERTIES = {
         maxItems: 3,
         description: 'Optional: 2-3 suggested next actions in first person (e.g. "I search the room").'
     },
-    xp: { type: 'integer', description: 'Optional: Roleplay XP (5-50) to award for significant character moments, creative problem-solving, or meaningful social interaction.' }
+    roleplay: {
+        type: 'string',
+        enum: ['dialogue', 'creative'],
+        description: 'Optional: Tag the turn to award baseline roleplay XP. "dialogue" = turn involves speaking with / soliciting an NPC response (engine awards 1 XP baseline). "creative" = clever problem-solving or inventive play (pass xp=2-10; if omitted, engine awards 5 XP). Do NOT tag routine exploration or combat.'
+    },
+    xp: { type: 'integer', description: 'Optional: Roleplay XP (1-10) to award. Overrides the roleplay-tag baseline. Hard cap is 10 per turn.' }
 };
 
 /**

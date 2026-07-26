@@ -54,7 +54,11 @@ XP is awarded AUTOMATICALLY by the engine. You do NOT call any XP tool — there
 
 5. LORE DISCOVERY — When you log_lore, a small XP bonus (10) is auto-awarded to the party. Duplicate lore entries are rejected (dedup by title).
 
-6. ROLEPLAY — For significant character moments, creative problem-solving, or meaningful social interaction, pass an optional 'xp' parameter (5-50) on narrate_turn. The engine clamps it to the valid range. Use this to reward memorable roleplay.
+6. ROLEPLAY — Reward memorable play by tagging the turn with the 'roleplay' parameter on narrate_turn (or any action tool that ends the turn with inline narration). Be generous — players love seeing XP for social and creative play:
+   - roleplay='dialogue': Use whenever the turn centers on speaking with, persuading, intimidating, deceiving, performing for, or otherwise soliciting a response from an NPC. The engine awards a flat 1 XP baseline even if you omit xp. DEFAULT TO THIS for any conversational turn — do not skip it just because no dice were rolled.
+   - roleplay='creative': Use for clever problem-solving, lateral thinking, inventive use of abilities/items/environment, or a plan that bypasses an obvious obstacle. Pass xp=2-10 based on ingenuity (2=mild, 5=clever, 10=brilliant). If you omit xp, the engine awards 5 XP.
+   - You MAY pass xp=1-10 directly to override the baseline. Hard cap is 10 XP per turn.
+   - Do NOT tag routine exploration, travel narration, or combat descriptions — those are covered by other triggers (or award no roleplay XP).
 
 LEVELING: Leveling is fast and frequent. When a character levels up, the level_up tool becomes available — use it to allocate stat points, skill points, and feats.
 

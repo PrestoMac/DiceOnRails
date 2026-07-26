@@ -53,7 +53,12 @@ export const tools = [
                         maxItems: 3,
                         description: 'Optional: 2-3 suggested next actions in first person, e.g. "I cast Cure Wounds on the fighter". Include when the player might need tactical guidance.'
                     },
-                    xp: { type: 'integer', description: 'Optional: Roleplay XP (5-50) to award for significant character moments, creative problem-solving, or meaningful social interaction.' }
+                    roleplay: {
+                        type: 'string',
+                        enum: ['dialogue', 'creative'],
+                        description: 'Optional: Tag the turn to award baseline roleplay XP. Use "dialogue" when the turn centers on speaking with, persuading, intimidating, deceiving, or otherwise soliciting a response from an NPC (engine awards 1 XP baseline). Use "creative" for clever problem-solving, lateral thinking, or inventive use of abilities/items/environment (pass xp=2-10 based on ingenuity; if omitted, engine awards 5 XP). Do NOT tag routine exploration, travel narration, or combat descriptions.'
+                    },
+                    xp: { type: 'integer', description: 'Optional: Roleplay XP (1-10) to award. Overrides the roleplay-tag baseline. Hard cap is 10 per turn.' }
                 },
                 required: ['narration', 'timePassed']
             }

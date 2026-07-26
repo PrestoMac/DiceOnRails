@@ -297,7 +297,8 @@ export class MockMCPServer {
     if (!narrationText.trim() && timePassed === 0) return baseResult;
 
     const xp = typeof args.xp === 'number' ? (args.xp as number) : undefined;
-    const narrateResult = await this.travel.narrate_turn(narrationText, timePassed, xp);
+    const roleplay = args.roleplay === 'dialogue' || args.roleplay === 'creative' ? args.roleplay : undefined;
+    const narrateResult = await this.travel.narrate_turn(narrationText, timePassed, xp, roleplay);
     if (isDebugMode) console.log(`[maybeFinalizeTurn] finalized turn: timePassed=${timePassed}, branch=${hasBranches}, gameTime=${this.state.gameTime}`);
     // IMPORTANT: the narration prose must NOT be appended to `message` — the tool result
     // becomes a visible [System:<tool>] chat log, which would duplicate the narration bubble.

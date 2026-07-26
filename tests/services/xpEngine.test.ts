@@ -122,23 +122,23 @@ describe('xpEngine — computeXp', () => {
 
   describe('roleplay trigger', () => {
     it('passes through amounts within range', () => {
-      expect(computeXp('roleplay', { amount: 30 })).toBe(30);
-      expect(computeXp('roleplay', { amount: 5 })).toBe(5);
-      expect(computeXp('roleplay', { amount: 50 })).toBe(50);
+      expect(computeXp('roleplay', { amount: 3 })).toBe(3);
+      expect(computeXp('roleplay', { amount: 1 })).toBe(1);
+      expect(computeXp('roleplay', { amount: 10 })).toBe(10);
     });
-    it('clamps below minimum to 5', () => {
-      expect(computeXp('roleplay', { amount: 0 })).toBe(5);
-      expect(computeXp('roleplay', { amount: -10 })).toBe(5);
+    it('clamps below minimum to 1', () => {
+      expect(computeXp('roleplay', { amount: 0 })).toBe(1);
+      expect(computeXp('roleplay', { amount: -10 })).toBe(1);
     });
-    it('clamps above maximum to 50', () => {
-      expect(computeXp('roleplay', { amount: 100 })).toBe(50);
-      expect(computeXp('roleplay', { amount: 9999 })).toBe(50);
+    it('clamps above maximum to 10', () => {
+      expect(computeXp('roleplay', { amount: 50 })).toBe(10);
+      expect(computeXp('roleplay', { amount: 9999 })).toBe(10);
     });
-    it('defaults to 10 when amount omitted', () => {
-      expect(computeXp('roleplay', {})).toBe(10);
+    it('defaults to 1 when amount omitted', () => {
+      expect(computeXp('roleplay', {})).toBe(1);
     });
     it('rounds fractional amounts', () => {
-      expect(computeXp('roleplay', { amount: 17.6 })).toBe(18);
+      expect(computeXp('roleplay', { amount: 7.6 })).toBe(8);
     });
   });
 });

@@ -89,10 +89,10 @@ function loreXp(): number {
   return 10;
 }
 
-/** Roleplay XP: LLM-proposed amount clamped to the 5–50 range. */
+/** Roleplay XP: LLM-proposed amount clamped to the 1–10 range. Default baseline is 1 XP. */
 function roleplayXp(ctx: XpContext): number {
-  const amount = typeof ctx.amount === 'number' ? ctx.amount : 10;
-  return Math.max(5, Math.min(50, Math.round(amount)));
+  const amount = typeof ctx.amount === 'number' ? ctx.amount : 1;
+  return Math.max(1, Math.min(10, Math.round(amount)));
 }
 
 /**

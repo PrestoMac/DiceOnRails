@@ -56,7 +56,7 @@ export interface TravelDeps {
 /** Service interface for movement, narration, rests, dice rolling, and skill checks. */
 export interface TravelService {
   move_to(location_name: string, description?: string, targetId?: string, skillCheck?: Record<string, unknown>, significance?: LocationSignificance): Promise<MCPResponse>;
-  narrate_turn(narration: string, timePassed?: number, xp?: number): Promise<MCPResponse>;
+  narrate_turn(narration: string, timePassed?: number, xp?: number, roleplay?: 'dialogue' | 'creative'): Promise<MCPResponse>;
   setAtmosphere(url: string): void;
   setStartingLocation(location: { name: string; description: string; introHook?: string; atmosphereUrl?: string }): void;
   cacheLocationImage(name: string, url: string): void;
@@ -372,7 +372,7 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
       return { success: true, data: { newLocation: location_name, xpAwarded, firstVisit: isFirstVisit }, message: logMsg };
     },
 
-    async narrate_turn(narration, timePassed = 0, xp) {
+    async narrate_turn(narration, timePassed = 0, xp, roleplay) {
       const logs: string[] = [];
       const safeTimePassed = (typeof timePassed === 'number' && !isNaN(timePassed)) ? Math.max(0, timePassed) : 0;
 
@@ -521,8 +521,16 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
       }
 
       let xpAwarded = 0;
+      let rawAmount: number | undefined;
       if (typeof xp === 'number' && xp > 0) {
-        const amount = computeXp('roleplay', { amount: xp });
+        rawAmount = xp;
+      } else if (roleplay === 'dialogue') {
+        rawAmount = 1;
+      } else if (roleplay === 'creative') {
+        rawAmount = 5;
+      }
+      if (rawAmount !== undefined) {
+        const amount = computeXp('roleplay', { amount: rawAmount });
         xpAwarded = amount;
         const xpResult = awardXpToParty(state, amount);
         logs.push(formatXpAwardLine('roleplay', xpResult));

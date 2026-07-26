@@ -342,6 +342,63 @@ describe('travelService — narrate_turn', () => {
       expect(state.gameTime).toBe(5);
     });
   });
+
+  describe('roleplay XP awards', () => {
+    it('awards 1 XP baseline for dialogue tag without xp', async () => {
+      state.party.push(makeChar());
+      const result = await service.narrate_turn('The guard nods.', 5, undefined, 'dialogue');
+      expect(result.data.xpAwarded).toBe(1);
+      expect(result.data.logs).toEqual(expect.arrayContaining([expect.stringContaining('Roleplay XP')]));
+    });
+
+    it('awards 5 XP default for creative tag without xp', async () => {
+      state.party.push(makeChar());
+      const result = await service.narrate_turn('You rig a pulley.', 5, undefined, 'creative');
+      expect(result.data.xpAwarded).toBe(5);
+    });
+
+    it('awards xp param directly when provided (no tag)', async () => {
+      state.party.push(makeChar());
+      const result = await service.narrate_turn('A moment of insight.', 5, 7);
+      expect(result.data.xpAwarded).toBe(7);
+    });
+
+    it('xp param overrides creative tag baseline', async () => {
+      state.party.push(makeChar());
+      const result = await service.narrate_turn('Clever plan.', 5, 9, 'creative');
+      expect(result.data.xpAwarded).toBe(9);
+    });
+
+    it('xp param overrides dialogue tag baseline', async () => {
+      state.party.push(makeChar());
+      const result = await service.narrate_turn('A speech.', 5, 4, 'dialogue');
+      expect(result.data.xpAwarded).toBe(4);
+    });
+
+    it('clamps xp above 10 down to 10', async () => {
+      state.party.push(makeChar());
+      const result = await service.narrate_turn('Godlike play.', 5, 999);
+      expect(result.data.xpAwarded).toBe(10);
+    });
+
+    it('clamps fractional xp up to 1', async () => {
+      state.party.push(makeChar());
+      const result = await service.narrate_turn('Tiny moment.', 5, 0.4);
+      expect(result.data.xpAwarded).toBe(1);
+    });
+
+    it('awards 0 XP when no tag and no xp (pure narration)', async () => {
+      state.party.push(makeChar());
+      const result = await service.narrate_turn('Travel flavor.', 5);
+      expect(result.data.xpAwarded).toBe(0);
+    });
+
+    it('does not award roleplay XP for xp=0 explicitly passed', async () => {
+      state.party.push(makeChar());
+      const result = await service.narrate_turn('Nothing.', 5, 0);
+      expect(result.data.xpAwarded).toBe(0);
+    });
+  });
 });
 
 describe('travelService — long_rest', () => {
