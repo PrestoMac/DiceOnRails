@@ -524,10 +524,14 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
       let rawAmount: number | undefined;
       if (typeof xp === 'number' && xp > 0) {
         rawAmount = xp;
-      } else if (roleplay === 'dialogue') {
-        rawAmount = 1;
-      } else if (roleplay === 'creative') {
-        rawAmount = 5;
+      } else if (typeof xp !== 'number') {
+        if (roleplay === 'dialogue') {
+          rawAmount = 1;
+        } else if (roleplay === 'creative') {
+          rawAmount = 5;
+        } else if (!state.combat?.isActive && narration && narration.trim().length > 0) {
+          rawAmount = 1;
+        }
       }
       if (rawAmount !== undefined) {
         const amount = computeXp('roleplay', { amount: rawAmount });

@@ -387,9 +387,22 @@ describe('travelService — narrate_turn', () => {
       expect(result.data.xpAwarded).toBe(1);
     });
 
-    it('awards 0 XP when no tag and no xp (pure narration)', async () => {
+    it('awards 1 XP baseline for non-empty narration without tag or xp', async () => {
       state.party.push(makeChar());
       const result = await service.narrate_turn('Travel flavor.', 5);
+      expect(result.data.xpAwarded).toBe(1);
+      expect(result.data.logs).toEqual(expect.arrayContaining([expect.stringContaining('Roleplay XP')]));
+    });
+
+    it('awards 0 XP for empty narration (synthetic tick)', async () => {
+      state.party.push(makeChar());
+      const result = await service.narrate_turn('', 0);
+      expect(result.data.xpAwarded).toBe(0);
+    });
+
+    it('awards 0 XP for whitespace-only narration', async () => {
+      state.party.push(makeChar());
+      const result = await service.narrate_turn('   ', 2);
       expect(result.data.xpAwarded).toBe(0);
     });
 

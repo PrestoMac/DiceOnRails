@@ -124,7 +124,8 @@ describe('runAgentLoop', () => {
     );
 
     expect(result.iterationCount).toBe(1);
-    expect(result.toolMessages).toHaveLength(0);
+    expect(result.toolMessages).toHaveLength(1);
+    expect(result.toolMessages[0].text).toContain('Roleplay XP');
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 

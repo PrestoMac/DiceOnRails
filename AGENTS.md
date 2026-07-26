@@ -117,7 +117,7 @@ Binary dice tools (`check_skill`, `make_save`) support **branch finalization** v
 | `teleport_creature` | inline | |
 | `polymorph_creature` | inline | |
 | `cast_ritual` | spells | **Auto-advances 10 minutes** (no separate `narrate_turn` needed since S3). |
-| `narrate_turn` | travel | Optional `xp` (1-10) for roleplay XP + optional `roleplay: 'dialogue'\|'creative'` tag (dialogue=1 XP baseline, creative=5 XP default when `xp` omitted; explicit `xp` overrides). |
+| `narrate_turn` | travel | Optional `xp` (1-10) for roleplay XP + optional `roleplay: 'dialogue'\|'creative'` tag. Any non-empty narration auto-awards 1 XP baseline (no tag needed); `creative` tag = 5 XP default when `xp` omitted; explicit `xp` overrides; `xp=0` suppresses. |
 
 **ToolFilter** (`services/llm/toolFilter.ts`): always visible: `roll_dice`, `check_skill`, `update_inventory`, `adjust_currency`, `move_to`, `upsert_quest`, `log_lore`, `narrate_turn`, `make_save`, `use_resource`, `roll_death_save`, `cast_spell`, `manage_spellbook`, `spell_effect`, `add_enemy`, `start_combat`, `inflict_damage`. Hidden unless: `state.combat?.isActive` → `next_turn`, `end_combat`, `player_attack`; party has unused stat/skill points → `level_up`; party not at full → `short_rest`, `long_rest`; party has spells → `summon_creature`, `teleport_creature`, `polymorph_creature`, `cast_ritual`.
 
@@ -181,7 +181,7 @@ Binary dice tools (`check_skill`, `make_save`) support **branch finalization** v
 
 ### XP system (`services/xpEngine.ts`)
 - **Centralized engine**: ALL XP awards flow through `computeXp(trigger, ctx)` (pure amount) → `awardXpToParty(state, amount)` (flat to every party member). No party splitting, no solo buff. One config table to tune game feel.
-- **6 triggers**: `combat` (CR-based), `skill` (DC-bracketed, nat 20 = ×2), `explore` (first visit, `significance`-tiered), `quest` (`difficulty`-tiered on completion), `lore` (flat 10 per new entry), `roleplay` (LLM-tagged via `narrate_turn` `roleplay: 'dialogue'\|'creative'` param or `xp` param; clamped 1-10; dialogue=1 XP baseline, creative=5 XP default, explicit `xp` overrides).
+- **6 triggers**: `combat` (CR-based), `skill` (DC-bracketed, nat 20 = ×2), `explore` (first visit, `significance`-tiered), `quest` (`difficulty`-tiered on completion), `lore` (flat 10 per new entry), `roleplay` (auto-awards 1 XP baseline on every non-combat `narrate_turn` with non-empty narration; `roleplay: 'creative'` tag or explicit `xp` param boosts up to 10; clamped 1-10; explicit `xp=0` suppresses).
 - **No `award_experience` tool**: removed entirely. The LLM never calls an XP tool — XP flows through tool parameters (`significance` on `move_to`, `difficulty` on `upsert_quest`, `xp` on `narrate_turn`) and engine-side auto-awards (combat kills, skill checks, lore entries).
 - **Exploration XP**: `move_to` checks `state.visitedLocations` (string array, party-wide). First visit awards XP; re-visits do not. Omitted `significance` defaults to landmark (100 XP).
 - **Quest XP**: `upsert_quest` awards on `status → 'completed'` transition, guarded by `Quest.xpAwarded` flag for idempotence. `Quest.difficulty` (trivial/easy/medium/hard/deadly) controls the bracket.

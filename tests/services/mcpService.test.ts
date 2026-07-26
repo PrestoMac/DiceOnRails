@@ -2312,9 +2312,18 @@ const roundTripped = deepClone(char.conditions);
       expect(res.data.xpAwarded).toBe(7);
     });
 
-    it('awards nothing when no roleplay tag and no xp', async () => {
+    it('awards 1 XP baseline for narrated turn with no roleplay tag and no xp', async () => {
       server.loadState(makeServerState());
       const res = await server.executeToolCall('narrate_turn', { narration: 'Traveling onward.', timePassed: 10 });
+      expect(res.success).toBe(true);
+      expect(res.data.xpAwarded).toBe(1);
+      const char = server.getTarget('hero-1');
+      expect(char?.experience).toBe(1);
+    });
+
+    it('awards 0 XP for empty narration (synthetic tick dispatch)', async () => {
+      server.loadState(makeServerState());
+      const res = await server.executeToolCall('narrate_turn', { narration: '', timePassed: 0 });
       expect(res.success).toBe(true);
       expect(res.data.xpAwarded).toBe(0);
       const char = server.getTarget('hero-1');
