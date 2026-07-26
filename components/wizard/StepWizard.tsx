@@ -51,21 +51,16 @@ function StepWizard<TState>({
     isFirstStep,
   }), [goToStep, goBack, currentKey, isLastStep, isFirstStep]);
 
-  const StepComponent = currentStep?.render;
-
   return (
     <div className={className || ''}>
       {renderHeader}
       {renderProgress && currentIndex >= 0 && renderProgress({ currentIndex, total: visibleSteps.length, steps: visibleSteps, goToStep })}
-      {StepComponent && currentStep && (
-        <StepComponent
-          key={currentStep.key}
-          state={state}
-          updateState={updateState}
-          context={ctx}
-          {...(extraProps || {})}
-        />
-      )}
+      {currentStep?.render?.({
+        state,
+        updateState,
+        context: ctx,
+        ...(extraProps || {}),
+      })}
     </div>
   );
 }
