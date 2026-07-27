@@ -263,8 +263,7 @@ const BattleMapPanel: React.FC<BattleMapPanelProps> = ({
         ctx.fillStyle = '#fff';
         ctx.fill();
       }
-    }
-  }, [battleMap, cellSize, bgLoaded, currentTurnId, dragOverCell]);
+  }, [battleMap, cellSize, currentTurnId, dragOverCell]);
 
   useEffect(() => { draw(); }, [draw]);
 
