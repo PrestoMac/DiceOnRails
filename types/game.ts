@@ -79,6 +79,21 @@ export interface GameState {
   lastLongRestTime?: number;
   _tiredWarningFired?: boolean;
   factionReputations?: Record<string, number>;
-  /** Optional LLM-generated suggested next actions, cached per turn. */
+  /**
+   * DEPRECATED: single shared suggestion list. Kept read-only for back-compat
+   * with existing saves — never written by current code. New code writes
+   * `lastSuggestionsByCharacter` instead. Consumers should prefer
+   * `pickSuggestionsForCharacter(state, characterId)` which falls back to this
+   * field when the per-character map is absent.
+   */
   lastSuggestions?: string[];
+  /**
+   * Per-character suggested next actions, keyed by character id. Source of
+   * truth for the suggestion tray. Solo play stores a single entry under the
+   * lone character's id; multiplayer stores one entry per party member so each
+   * player sees class-aware, scoped chips instead of a shared global list.
+   * Old saves without this field fall back to `lastSuggestions` via
+   * `pickSuggestionsForCharacter`.
+   */
+  lastSuggestionsByCharacter?: Record<string, string[]>;
 }

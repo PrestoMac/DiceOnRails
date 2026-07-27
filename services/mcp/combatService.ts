@@ -69,12 +69,100 @@ function buildEnemyActionNarration(attackResults: Record<string, unknown>[]): st
 }
 
 /**
- * Builds contextual combat suggestions from the live party/enemy state.
- * Used so the suggestion tray is populated during engine-driven enemy turns.
- * Hardened: never returns an empty array while combat is active (fallbacks fill
- * any remaining slots) so the deterministic suggestion tier always has content.
+ * Class-keyed combat action verbs. Each entry maps a class id to a function
+ * that produces a class-flavored "do something to <enemy>" chip. Used by the
+ * per-character mode so the Rogue sees Sneak Attack while the Cleric sees
+ * divine channels for the same enemy.
  */
-export function buildCombatSuggestions(state: GameState): string[] {
+const CLASS_COMBAT_SUGGESTIONS: Record<string, (enemyName: string) => string> = {
+  rogue:     (e) => `Sneak Attack the ${e}`,
+  fighter:   (e) => `Strike down the ${e}`,
+  barbarian: (e) => `Rage and crush the ${e}`,
+  paladin:   (e) => `Smite the ${e}`,
+  monk:      (e) => `Flurry of Blows on the ${e}`,
+  ranger:    (e) => `Loose arrows at the ${e}`,
+  wizard:    (e) => `Cast at the ${e}`,
+  cleric:    (e) => `Channel divinity against the ${e}`,
+  bard:      (e) => `Viciously Mock the ${e}`,
+  druid:     (e) => `Call nature's wrath on the ${e}`,
+  warlock:   (e) => `Eldritch Blast the ${e}`,
+  sorcerer:  (e) => `Unleash magic at the ${e}`,
+};
+
+/** Classes that can self-heal with spells mid-combat. */
+const COMBAT_SELF_HEALING_CLASSES = new Set(['cleric', 'druid', 'paladin', 'bard', 'ranger']);
+
+/** Returns true if the character has at least one unused spell slot. */
+function hasAvailableSpellSlot(c: Character): boolean {
+  return (c.resources || []).some(r => r.id.startsWith('spell-slot-') && (r.current ?? 0) > 0);
+}
+
+/**
+ * Builds contextual combat suggestions from the live party/enemy state.
+ * Two modes:
+ *   - Per-character (`characterId` supplied): class-aware chips scoped to that
+ *     character's HP/resources/class. Each player in a multiplayer party sees
+ *     class-flavored, unique chips.
+ *   - Party-wide (`characterId` omitted): legacy heuristic — used by
+ *     back-compat callers and engine-driven enemy turns (`next_turn`).
+ *
+ * Hardened: never returns an empty array while combat is active (fallbacks
+ * fill any remaining slots) so the deterministic suggestion tier always has
+ * content in either mode.
+ */
+export function buildCombatSuggestions(state: GameState, characterId?: string): string[] {
+  if (!characterId) return buildCombatSuggestionsLegacy(state);
+  const character = (state.party || []).find(c => c.id === characterId);
+  if (!character) return buildCombatSuggestionsLegacy(state);
+
+  const suggestions: string[] = [];
+  const aliveEnemies = state.combat?.enemies.filter(e => !e.isDead) ?? [];
+  const primaryEnemy = aliveEnemies[0]?.name ?? 'foe';
+  const isWounded = character.hp.current > 0
+    && character.hp.current < (character.hp.max || 1) * 0.5;
+
+  // 1. Self-preservation: wounded -> heal (class-aware) or fall back.
+  if (isWounded) {
+    if (COMBAT_SELF_HEALING_CLASSES.has(character.class.toLowerCase())) {
+      suggestions.push('Cast a healing spell on yourself');
+    } else {
+      suggestions.push('Drink a healing potion');
+    }
+  }
+
+  // 2. Class-flavored strike at the primary enemy.
+  const classVerb = CLASS_COMBAT_SUGGESTIONS[character.class.toLowerCase()];
+  if (classVerb) {
+    suggestions.push(classVerb(primaryEnemy));
+  } else {
+    suggestions.push(`Attack the ${primaryEnemy}`);
+  }
+
+  // 3. Spell-slot-aware cast suggestion (caster with slots remaining).
+  if (hasAvailableSpellSlot(character)) {
+    const cd = getClassDef(character.class);
+    if (cd?.spellcasting) {
+      suggestions.push(`Cast a spell at the ${primaryEnemy}`);
+    }
+  } else if ((character.knownSpells?.length ?? 0) + (character.preparedSpells?.length ?? 0) > 0) {
+    // Caster out of slots -> cantrip.
+    suggestions.push('Cast a cantrip');
+  }
+
+  // 4. Hardened fallbacks so combat suggestions are never empty.
+  if (suggestions.length < 3) {
+    if (aliveEnemies.length <= 1 && state.combat?.isActive) suggestions.push('End combat');
+    if (suggestions.length < 3) suggestions.push('Use an item');
+    if (suggestions.length < 3) suggestions.push('Reposition to safety');
+  }
+  return suggestions.slice(0, 3);
+}
+
+/**
+ * Legacy party-wide combat generator. Used when no `characterId` is supplied
+ * (engine-driven `next_turn`, back-compat callers, tests).
+ */
+function buildCombatSuggestionsLegacy(state: GameState): string[] {
   const suggestions: string[] = [];
   const aliveParty = state.party.filter(c => c.hp.current > 0);
   const wounded = aliveParty

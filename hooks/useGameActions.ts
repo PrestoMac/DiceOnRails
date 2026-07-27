@@ -161,7 +161,7 @@ import {
   cleanSpeak,
   dispatchToolRolls, DiceRollFn, buildContextString, buildBatchContextString
 } from './gameActionHelpers';
-import { resolveSuggestions, GENERIC_SUGGESTIONS, buildExplorationSuggestions } from '../services/llm/suggestions';
+import { resolveSuggestionsPerCharacter, GENERIC_SUGGESTIONS, buildExplorationSuggestions } from '../services/llm/suggestions';
 import { syncFinishedState as syncStateHelper, prepareContext as prepContext,
   runContextPipeline as runPipeline } from '../services/llm/contextManager';
 import { buildSessionId } from '../services/llmClient';
@@ -312,6 +312,10 @@ export const useGameActions = (
             mcpServer.saveRewindPoint(currentState, [...currentMessages, userMsg]);
             mcpServer.saveEmergencySnapshot(currentState);
             mcpServer.setLastSuggestions([]);
+            // Push the cleared tray to React immediately so suggestion chips vanish
+            // the moment one is clicked. Snapshot capture above still holds the prior
+            // chips, so undo restores them.
+            syncState();
             const allMessagesWithUser = [...messagesRef.current, userMsg];
             const ctxPrep = prepContext(ctxRef.current, allMessagesWithUser, buildContextString(myCharacterId));
             const historyForAPI = ctxPrep.activeMessages;
@@ -320,6 +324,7 @@ export const useGameActions = (
             const isTrivial = isTrivialInput(text);
             let inlineNarration: string | undefined;
             let rawSuggestions: string[] = [];
+            let rawSuggestionsByChar: Record<string, string[]> | undefined;
 
             if (isClientSideAction) {
                 if (isDebugMode) console.log('[handleSendMessage] client-side action, skipping agent loop', { text: text.slice(0, 80) });
@@ -337,6 +342,7 @@ export const useGameActions = (
                 toolMessages = result.toolMessages;
                 inlineNarration = result.inlineNarration;
                 rawSuggestions = result.suggestions || [];
+                rawSuggestionsByChar = result.suggestionsByChar;
             }
 
             const streamingId = `model-${Date.now()}`;
@@ -396,11 +402,25 @@ export const useGameActions = (
             const safeNarration = sanitizeNarration(finalNarration);
             const modelMsg: Message = { id: streamingId, role: MessageRole.MODEL, text: safeNarration || 'The adventure continues...', timestamp: Date.now() };
             setMessages(prev => prev.map(m => m.id === streamingId ? modelMsg : m));
-            const turnSuggestions = await resolveSuggestions(mcpServer.getFullState(), historyForAPI, buildContextString(myCharacterId), ctxPrep.frozen, rawSuggestions, !!settings.enableSuggestions, sessionId);
+            // Per-character suggestions (multiplayer-aware). Solo collapses to a
+            // single-entry record keyed by myCharacterId; multiplayer produces a
+            // per-party-member map. The agent loop's flat `rawSuggestions`
+            // (legacy narrate_turn.suggestions) seeds Tier 0 for the solo char;
+            // multiplayer Tier 0 comes from `result.suggestionsByChar` instead.
+            const currentState2 = mcpServer.getFullState();
+            const party = currentState2.party || [];
+            const isMultiplayer = party.length > 1;
+            const turnSuggestionsByChar = isMultiplayer
+                ? rawSuggestionsByChar
+                : (rawSuggestions.length > 0 && myCharacterId ? { [myCharacterId]: rawSuggestions } : undefined);
+            const suggestionsMap = await resolveSuggestionsPerCharacter(
+                currentState2, historyForAPI, buildContextString(myCharacterId),
+                ctxPrep.frozen, turnSuggestionsByChar, !!settings.enableSuggestions, sessionId,
+            );
             processingRef.current = false;
 
             const messagesToSync = [...currentMessages, userMsg, ...insertToolCallMessages(currentMessages, toolMessages, 'model-synth'), modelMsg];
-            syncFinished(messagesToSync, { lastSuggestions: turnSuggestions });
+            syncFinished(messagesToSync, { lastSuggestionsByCharacter: suggestionsMap });
             autoSpeak(modelMsg.text);
             messagesRef.current = messagesToSync;
             runPipeline_();
@@ -414,10 +434,22 @@ export const useGameActions = (
             if (isDebugMode) console.error("[DEBUG handleSendMessage] Critical failure:", err);
             mcpServer.rollbackTransaction();
             // Leave a non-empty suggestion tray even when the turn crashed, so the
-            // tray is never blank while the feature is enabled.
+            // tray is never blank while the feature is enabled. Writes the
+            // per-character map (source of truth) keyed by each alive party
+            // member's id so every player sees recovery chips after a crash.
             if (settings.enableSuggestions) {
-                const det = buildExplorationSuggestions(mcpServer.getFullState());
-                mcpServer.setLastSuggestions(det.length > 0 ? det : [...GENERIC_SUGGESTIONS]);
+                const crashState = mcpServer.getFullState();
+                const aliveParty = (crashState.party || []).filter(c => c.hp && c.hp.current > 0);
+                if (aliveParty.length > 0) {
+                    const crashMap: Record<string, string[]> = {};
+                    for (const c of aliveParty) {
+                        const det = buildExplorationSuggestions(crashState, c.id);
+                        crashMap[c.id] = det.length > 0 ? det : [...GENERIC_SUGGESTIONS];
+                    }
+                    mcpServer.setLastSuggestionsByCharacter(crashMap);
+                } else {
+                    mcpServer.setLastSuggestions([...GENERIC_SUGGESTIONS]);
+                }
             }
             processingRef.current = false;
             if (isSyncableCampaign(currentCampaignId)) {
@@ -461,6 +493,11 @@ export const useGameActions = (
         try {
             mcpServer.saveRewindPoint(mcpServer.getFullState(), [...currentMessages, userMsg]);
             mcpServer.saveEmergencySnapshot(mcpServer.getFullState());
+            // Clear the suggestion tray immediately when a batch starts processing
+            // (mirrors the solo path). Snapshots above still hold the prior chips so
+            // undo restores them per-player.
+            mcpServer.setLastSuggestions([]);
+            syncState();
 
             // Enriched batch context: per-character class features / resources / spells /
             // feats for EVERY party member (not just the locally-active one), plus the
@@ -537,7 +574,16 @@ export const useGameActions = (
             const modelMsg: Message = { id: streamingId, role: MessageRole.MODEL, text: safeNarration || 'The adventure continues...', timestamp: Date.now() };
             setMessages(prev => prev.map(m => m.id === streamingId ? modelMsg : m));
 
-            const turnSuggestions = await resolveSuggestions(mcpServer.getFullState(), historyForAPI, batchContext, batchCtxPrep.frozen, result.suggestions, !!settings.enableSuggestions, sessionId);
+            // Per-character suggestions: in batch (multiplayer) mode the agent
+            // loop may have produced a `suggestionsByChar` map via the
+            // narrate_turn.suggestionsByCharacter arg; this seeds Tier 0. The
+            // resolver falls through to deterministic per-character generators
+            // for any character the LLM missed.
+            const batchStateForSuggestions = mcpServer.getFullState();
+            const suggestionsMap = await resolveSuggestionsPerCharacter(
+                batchStateForSuggestions, historyForAPI, batchContext, batchCtxPrep.frozen,
+                result.suggestionsByChar, !!settings.enableSuggestions, sessionId,
+            );
 
             const messagesToSync = [...currentMessages, userMsg, ...insertToolCallMessages(currentMessages, result.toolMessages, 'model-synth'), modelMsg];
 
@@ -555,7 +601,7 @@ export const useGameActions = (
             }
 
             processingRef.current = false;
-            syncFinished(messagesToSync, { actionQueue: preservedQueue, lastSuggestions: turnSuggestions });
+            syncFinished(messagesToSync, { actionQueue: preservedQueue, lastSuggestionsByCharacter: suggestionsMap });
             autoSpeak(modelMsg.text);
             messagesRef.current = messagesToSync;
             runPipeline_();
@@ -568,9 +614,21 @@ export const useGameActions = (
         } catch (err) {
             if (isDebugMode) console.error("Batch failure:", err);
             mcpServer.rollbackTransaction();
+            // Multiplayer batch crash: write per-character recovery chips so
+            // every player sees a non-empty tray.
             if (settings.enableSuggestions) {
-                const det = buildExplorationSuggestions(mcpServer.getFullState());
-                mcpServer.setLastSuggestions(det.length > 0 ? det : [...GENERIC_SUGGESTIONS]);
+                const crashState = mcpServer.getFullState();
+                const aliveParty = (crashState.party || []).filter(c => c.hp && c.hp.current > 0);
+                if (aliveParty.length > 0) {
+                    const crashMap: Record<string, string[]> = {};
+                    for (const c of aliveParty) {
+                        const det = buildExplorationSuggestions(crashState, c.id);
+                        crashMap[c.id] = det.length > 0 ? det : [...GENERIC_SUGGESTIONS];
+                    }
+                    mcpServer.setLastSuggestionsByCharacter(crashMap);
+                } else {
+                    mcpServer.setLastSuggestions([...GENERIC_SUGGESTIONS]);
+                }
             }
             processingRef.current = false;
             if (isSyncableCampaign(currentCampaignId)) {

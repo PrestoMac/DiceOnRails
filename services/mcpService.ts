@@ -129,6 +129,12 @@ export class MockMCPServer {
   public reset() { this.stateManager.reset(); this.inventory.clearCurrencyAdjustment(); }
   public getFullState(): GameState { return this.stateManager.getFullState(); }
   public setLastSuggestions(suggestions: string[]): void { this.state.lastSuggestions = suggestions; }
+  /**
+   * Writes the per-character suggestion map (new source of truth). Replaces the
+   * entire map — pass `{}` to clear. Solo stores a single entry under the lone
+   * character's id; multiplayer stores one entry per party member.
+   */
+  public setLastSuggestionsByCharacter(map: Record<string, string[]>): void { this.state.lastSuggestionsByCharacter = map; }
   public beginTransaction(): void { this.stateManager.beginTransaction(); }
   public rollbackTransaction(): void { this.stateManager.rollbackTransaction(); }
   public commitTransaction(): void { this.stateManager.commitTransaction(); }
@@ -452,6 +458,25 @@ export class MockMCPServer {
             if (isDebugMode) console.log(`[narrate_turn] Stored ${this.state.lastSuggestions.length} suggestions on state:`, this.state.lastSuggestions);
           } else if (isDebugMode) {
             console.log('[narrate_turn] No suggestions in args');
+          }
+          // Multiplayer per-character suggestions: if the LLM provided a
+          // suggestionsByCharacter map, store it as the source of truth. Solo
+          // never sends this field; the flat `suggestions` above is used.
+          if (args.suggestionsByCharacter && typeof args.suggestionsByCharacter === 'object' && !Array.isArray(args.suggestionsByCharacter)) {
+            const map: Record<string, string[]> = {};
+            for (const [k, v] of Object.entries(args.suggestionsByCharacter as Record<string, unknown>)) {
+              if (Array.isArray(v)) {
+                const cleaned = v
+                  .filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
+                  .map(s => s.slice(0, 80))
+                  .slice(0, 3);
+                if (cleaned.length > 0) map[k] = cleaned;
+              }
+            }
+            if (Object.keys(map).length > 0) {
+              this.state.lastSuggestionsByCharacter = map;
+              if (isDebugMode) console.log(`[narrate_turn] Stored per-character suggestions for ${Object.keys(map).length} characters`);
+            }
           }
           res = await this.travel.narrate_turn(sanitizeNarration(String(args.narration || '')), Number(args.timePassed ?? 0), args.xp as number | undefined, args.roleplay as 'dialogue' | 'creative' | undefined); break;
         default:

@@ -19,6 +19,7 @@ import { useActivityTracking } from '../../hooks/useActivityTracking';
 import { useOnboarding } from '../../hooks/useOnboarding';
 import { formatGameTime } from '../../utils/timeUtils';
 import { mcpServer } from '../../services/mcpService';
+import { pickSuggestionsForCharacter } from '../../services/llm/suggestions';
 
 /** Primary desktop layout with resizable sidebar, chat log, input area, and full header controls. */
 const DesktopLayout: React.FC = () => {
@@ -159,9 +160,19 @@ const DesktopLayout: React.FC = () => {
           onScrollChange={setIsChatScrolledUp}
           showWelcomeChips={onboarding.shouldShowWelcomeChips}
           onPrefillInput={(text) => { onboarding.markWelcomeSeen(); handleSendMessage(text); }}
-          suggestions={settings.enableSuggestions ? gameState.lastSuggestions : undefined}
+          suggestions={settings.enableSuggestions ? pickSuggestionsForCharacter(gameState, myCharacterId) : undefined}
           onPickSuggestion={(text) => handleSendMessage(text)}
-          onDismissSuggestion={() => { mcpServer.setLastSuggestions([]); syncState(); }}
+          onDismissSuggestion={() => {
+              // Clear only the local player's entry so other players keep theirs.
+              if (myCharacterId && gameState.lastSuggestionsByCharacter) {
+                  const updated = { ...gameState.lastSuggestionsByCharacter };
+                  delete updated[myCharacterId];
+                  mcpServer.setLastSuggestionsByCharacter(updated);
+              } else {
+                  mcpServer.setLastSuggestions([]);
+              }
+              syncState();
+          }}
           portraitMap={gameState.party.reduce((m, c) => { if (c.portraitUrl) m[c.id] = c.portraitUrl; return m; }, {} as Record<string, string>)}
         />
       </div>

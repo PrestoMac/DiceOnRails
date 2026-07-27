@@ -51,7 +51,12 @@ export const tools = [
                         type: 'array',
                         items: { type: 'string', description: 'A single suggested action in first person, e.g. "I attack the goblin" (max 80 chars).' },
                         maxItems: 3,
-                        description: 'Optional: 2-3 suggested next actions in first person, e.g. "I cast Cure Wounds on the fighter". Include when the player might need tactical guidance.'
+                        description: 'Optional: 2-3 suggested next actions in first person, e.g. "I cast Cure Wounds on the fighter". Include when the player might need tactical guidance. Use this in SOLO play.'
+                    },
+                    suggestionsByCharacter: {
+                        type: 'object',
+                        description: 'MULTIPLAYER ONLY (party.length > 1). Prefer this over `suggestions` in collaborative turns. A JSON object keyed by character id, each value a 2-3 element array of UNIQUE, class-appropriate actions for THAT character in first person. Example: {"char-1":["I smite the goblin","Heal the rogue"],"char-2":["I Sneak Attack the goblin","I hide"]}. Each character must see DIFFERENT actions tuned to their class and current state.',
+                        additionalProperties: { type: 'array', items: { type: 'string' }, maxItems: 3 }
                     },
                     roleplay: {
                         type: 'string',

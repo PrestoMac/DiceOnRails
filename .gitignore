@@ -38,3 +38,5 @@ tuning/
 # Coverage reports
 coverage/
 
+
+.commandcode/

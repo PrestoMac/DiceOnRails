@@ -88,6 +88,14 @@ export async function runAgentLoop(
   cachedTokens: number;
   inlineNarration?: string;
   suggestions?: string[];
+  /**
+   * Per-character suggestions captured from the LLM's
+   * `narrate_turn.args.suggestionsByCharacter` (multiplayer only). Keyed by
+   * character id. When present, the suggestion resolver uses these as Tier 0
+   * per character; otherwise the deterministic per-character generators fill
+   * in. Solo never populates this (the flat `suggestions` field is used).
+   */
+  suggestionsByChar?: Record<string, string[]>;
 }> {
   const { model, apiUrl, apiHeaders, sessionId } = resolveLLMConfig(providerConfig, options?.sessionId);
   if (isDebugMode) {
@@ -210,6 +218,7 @@ export async function runAgentLoop(
   let itersCompleted = 0;
   let inlineNarration: string | undefined;
   let suggestions: string[] | undefined;
+  let suggestionsByChar: Record<string, string[]> | undefined;
   let narrateTurnExecuted = false;
   let correctiveRetries = 0;
   // Tracks the most recent assistant prose (or reasoning_content fallback) across
@@ -420,6 +429,23 @@ export async function runAgentLoop(
               .filter((s: unknown): s is string => typeof s === 'string' && s.trim().length > 0)
               .slice(0, 3);
           }
+          // Multiplayer: capture per-character suggestions if the LLM provided
+          // them via `suggestionsByCharacter`. Each value is normalized to a
+          // clean string[] (filter, trim, clamp). Solo never sets this.
+          const rawByChar = narrateCall.args?.suggestionsByCharacter;
+          if (rawByChar && typeof rawByChar === 'object' && !Array.isArray(rawByChar)) {
+            const map: Record<string, string[]> = {};
+            for (const [k, v] of Object.entries(rawByChar as Record<string, unknown>)) {
+              if (Array.isArray(v)) {
+                const cleaned = v
+                  .filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
+                  .map(s => s.slice(0, 80))
+                  .slice(0, 3);
+                if (cleaned.length > 0) map[k] = cleaned;
+              }
+            }
+            if (Object.keys(map).length > 0) suggestionsByChar = map;
+          }
           const logs = narrateResult.data?.logs;
           if (Array.isArray(logs) && logs.length > 0) {
             toolMessages.push({
@@ -561,6 +587,7 @@ export async function runAgentLoop(
       inlineNarrationLen: inlineNarration?.length ?? 0,
       timeAdvancedThisTurn,
       hasSuggestions: !!suggestions?.length,
+      hasSuggestionsByChar: !!suggestionsByChar && Object.keys(suggestionsByChar).length > 0,
     });
   }
   return {
@@ -571,5 +598,6 @@ export async function runAgentLoop(
     cachedTokens: totalCached,
     inlineNarration: sanitizeNarration(inlineNarration) || undefined,
     suggestions,
+    suggestionsByChar,
   };
 }

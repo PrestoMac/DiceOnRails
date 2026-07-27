@@ -154,4 +154,45 @@ describe('stateService rewind cycle (spell slot restoration)', () => {
     // The old (stale) character still reflects the mutation; that's expected.
     expect(slot3.current).toBe(0);
   });
+
+  it('saveRewindPoint captures lastSuggestionsByCharacter so a rewind restores each player\'s chips', () => {
+    // Validates the Part 1 disappear-on-select contract: a turn clears the
+    // local player's chips immediately (handled in useGameActions), but
+    // because the snapshot was saved BEFORE the clear, an undo restores them.
+    // Per-character entries must survive the deep-clone cycle intact.
+    const initialState = makeState();
+    const stateService = createStateService(initialState);
+
+    // Each player has unique suggestions.
+    const preTurnMap = {
+      'wiz-1': ['Cast fireball', 'Examine aura'],
+      'rogue-1': ['Sneak Attack', 'Hide'],
+    };
+    stateService.loadState({
+      ...stateService.getFullState(),
+      lastSuggestionsByCharacter: preTurnMap,
+    });
+
+    // Pre-turn snapshot captures the populated map.
+    stateService.saveRewindPoint(stateService.getFullState(), []);
+
+    // During the turn: loadState clears the map (the engine side of Part 1's
+    // immediate clear, before the new turn's suggestions resolve).
+    stateService.loadState({
+      ...stateService.getFullState(),
+      lastSuggestionsByCharacter: {},
+    });
+    expect(stateService.getFullState().lastSuggestionsByCharacter).toEqual({});
+
+    // Rewind restores the pre-turn map.
+    const loaded = stateService.loadRewindPoint();
+    if (!loaded) throw new Error('expected rewind point');
+    stateService.restoreSnapshot(loaded.gameState);
+
+    const restored = stateService.getFullState().lastSuggestionsByCharacter;
+    expect(restored).toEqual(preTurnMap);
+    // Both players' chips survived the deep-clone round-trip.
+    expect(restored?.['wiz-1']).toEqual(['Cast fireball', 'Examine aura']);
+    expect(restored?.['rogue-1']).toEqual(['Sneak Attack', 'Hide']);
+  });
 });

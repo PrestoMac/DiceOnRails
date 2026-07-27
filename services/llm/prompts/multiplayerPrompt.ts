@@ -25,4 +25,18 @@ ATTRIBUTION IS MANDATORY:
 - When narrating, attribute actions and dialogue to the correct character by name. Keep each character's voice and backstory distinct.
 
 PROCESS ALL ACTIONS: In a [Collaborative Turn], resolve every prefixed action. Do not skip or merge a character's action into another's. If two characters attack the same enemy, make two separate tool calls with the correct attackerId each.
+
+SUGGESTED ACTIONS ARE PER-CHARACTER:
+- In a party, each player needs UNIQUE, class-appropriate next-action suggestions — NOT the same chips for everyone.
+- When ending a collaborative turn with narrate_turn, pass 'suggestionsByCharacter' (NOT the flat 'suggestions' array). It is a JSON object keyed by character id, each value a 2-3 element array of actions tailored to THAT character's class, current HP, resources, and known spells.
+- Cross-reference each character's id in FULL PARTY STATE for the keys.
+- Examples: the Cleric sees "I cast Healing Word on the wounded rogue"; the Rogue sees "I Sneak Attack the goblin"; the Wizard sees "I cast Firebolt at the goblin". Never repeat the same string across characters.
+- If you cannot produce unique per-character chips, omit the field entirely and the engine will deterministically generate class-aware chips for each character.
 `;
+
+/**
+ * True when per-character suggestion generation should be used. Currently
+ * active whenever more than one party member is present; solo uses the legacy
+ * flat 'suggestions' field on narrate_turn.
+ */
+export const MULTIPLAYER_SUGGESTIONS_ACTIVE = (partySize: number): boolean => partySize > 1;

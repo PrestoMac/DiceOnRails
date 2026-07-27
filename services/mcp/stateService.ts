@@ -57,6 +57,7 @@ export function createStateService(state: GameState): StateService {
       delete (state as { lastDiceRoll?: unknown }).lastDiceRoll;
       delete (state as { _tiredWarningFired?: unknown })._tiredWarningFired;
       delete (state as { lastSuggestions?: unknown }).lastSuggestions;
+      delete (state as { lastSuggestionsByCharacter?: unknown }).lastSuggestionsByCharacter;
       delete (state as { ctx?: unknown }).ctx;
       delete (state as { isProcessing?: unknown }).isProcessing;
       delete (state as { processingUser?: unknown }).processingUser;
@@ -70,6 +71,9 @@ export function createStateService(state: GameState): StateService {
       if (!state.locationImages) state.locationImages = {};
       if (!('lastSuggestions' in savedState)) {
         state.lastSuggestions = undefined;
+      }
+      if (!('lastSuggestionsByCharacter' in savedState)) {
+        state.lastSuggestionsByCharacter = undefined;
       }
       ensureAllCharacterFields(state.party);
       ensureLocalGameStateFields();
@@ -96,6 +100,7 @@ export function createStateService(state: GameState): StateService {
       delete (state as { ctx?: unknown }).ctx;
       delete (state as { lastDiceRoll?: unknown }).lastDiceRoll;
       delete (state as { lastSuggestions?: unknown }).lastSuggestions;
+      delete (state as { lastSuggestionsByCharacter?: unknown }).lastSuggestionsByCharacter;
       delete (state as { _tiredWarningFired?: unknown })._tiredWarningFired;
       delete (state as { isProcessing?: unknown }).isProcessing;
       delete (state as { processingUser?: unknown }).processingUser;

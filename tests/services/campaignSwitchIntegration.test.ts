@@ -19,6 +19,7 @@ import { GameState } from '../../types';
 function makeCampaignState(opts: {
   combat?: GameState['combat'];
   lastSuggestions?: string[];
+  lastSuggestionsByCharacter?: Record<string, string[]>;
   ctx?: GameState['ctx'];
   lastDiceRoll?: GameState['lastDiceRoll'];
   gameTime?: number;
@@ -32,6 +33,7 @@ function makeCampaignState(opts: {
     actionQueue: [],
     combat: opts.combat,
     lastSuggestions: opts.lastSuggestions,
+    lastSuggestionsByCharacter: opts.lastSuggestionsByCharacter,
     ctx: opts.ctx,
     lastDiceRoll: opts.lastDiceRoll,
     gameTime: opts.gameTime,
@@ -50,6 +52,7 @@ describe('campaign switch reset chain — engine isolation', () => {
     const campaignA = makeCampaignState({
       combat: { isActive: true, round: 3, initiative: [] } as unknown as GameState['combat'],
       lastSuggestions: ['Attack the goblin', 'Cast fireball'],
+      lastSuggestionsByCharacter: { 'hero-1': ['A-char1-suggestion'], 'hero-2': ['A-char2-suggestion'] },
       ctx: {
         episodeCheckpoints: ['A summary: met the dragon'],
         frozenRawHistory: 'A earlier events',
@@ -68,6 +71,7 @@ describe('campaign switch reset chain — engine isolation', () => {
     const stateA = server.getFullState();
     expect(stateA.combat?.isActive).toBe(true);
     expect(stateA.lastSuggestions).toEqual(['Attack the goblin', 'Cast fireball']);
+    expect(stateA.lastSuggestionsByCharacter).toEqual({ 'hero-1': ['A-char1-suggestion'], 'hero-2': ['A-char2-suggestion'] });
     expect(stateA.ctx?.episodeCheckpoints).toHaveLength(1);
     expect(stateA.lastDiceRoll).toBeDefined();
     expect(stateA.gameTime).toBe(7200);
@@ -82,6 +86,7 @@ describe('campaign switch reset chain — engine isolation', () => {
     // Optional fields from A must NOT bleed into B.
     expect(stateB.combat).toBeUndefined();
     expect(stateB.lastSuggestions).toBeUndefined();
+    expect(stateB.lastSuggestionsByCharacter).toBeUndefined();
     expect(stateB.ctx).toBeUndefined();
     expect(stateB.lastDiceRoll).toBeUndefined();
 
