@@ -60,7 +60,8 @@ interface CharacterSheetProps {
   /** Patches arbitrary character fields (notes/gmNotes). UI-only path. */
   onUpdateCharacterFields?: (partial: Partial<Character>, charId?: string) => void;
   /** UI-direct spellbook management (prepare/unprepare for prepared casters). */
-  onManageSpellbook?: (characterId: string, action: 'prepare' | 'unprepare' | 'learn', spellId: string) => Promise<boolean>;
+  onManageSpellbook?: (characterId: string, action: 'prepare' | 'unprepare' | 'learn' | 'forget' | 'finish_prep', spellId: string) => Promise<boolean>;
+
   /** Known-caster Tasha's-style swap. Optional. */
   onSwapKnownSpell?: (characterId: string, oldSpellId: string, newSpellId: string) => Promise<boolean>;
   /** True when combat is active — locks spell management. */

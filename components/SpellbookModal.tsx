@@ -12,7 +12,8 @@ interface SpellbookModalProps {
   isOpen: boolean;
   onClose: () => void;
   /** Prepared-caster management (prepare / unprepare). Required. */
-  onManageSpellbook: (characterId: string, action: 'prepare' | 'unprepare' | 'learn', spellId: string) => Promise<boolean>;
+  onManageSpellbook: (characterId: string, action: 'prepare' | 'unprepare' | 'learn' | 'forget' | 'finish_prep', spellId: string) => Promise<boolean>;
+
   /** Known-caster Tasha's-style swap. Optional; only invoked when the character
    *  has `pendingSpellSwap === true`. If omitted, known casters see a read-only view. */
   onSwapKnownSpell?: (characterId: string, oldSpellId: string, newSpellId: string) => Promise<boolean>;
@@ -45,6 +46,8 @@ const SpellbookModal: React.FC<SpellbookModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [swapPickOld, setSwapPickOld] = useState<string | null>(null);
+  const [showLockConfirm, setShowLockConfirm] = useState(false);
+
 
 
   const classDef = useMemo(() => getClassDef(character.class), [character.class]);
@@ -158,10 +161,32 @@ const SpellbookModal: React.FC<SpellbookModalProps> = ({
   };
 
   const handleClose = () => {
-    setError(null);
-    setSwapPickOld(null);
-    onClose();
+    const hasPrepAccess = (character.longRestPrepAvailable ?? true) || character.shortRestSpellSwapAvailable;
+    if (isPrepared && hasPrepAccess && !isCombatActive) {
+      setShowLockConfirm(true);
+    } else {
+      setError(null);
+      setSwapPickOld(null);
+      setShowLockConfirm(false);
+      onClose();
+    }
   };
+
+  const handleConfirmLockAndClose = async () => {
+    setBusy(true);
+    try {
+      await onManageSpellbook(character.id, 'finish_prep', '');
+    } catch (err) {
+      console.warn('[SpellbookModal] finish_prep error:', err);
+    } finally {
+      setBusy(false);
+      setShowLockConfirm(false);
+      setError(null);
+      setSwapPickOld(null);
+      onClose();
+    }
+  };
+
 
   if (!isOpen) return null;
 
@@ -644,8 +669,47 @@ const SpellbookModal: React.FC<SpellbookModalProps> = ({
         </div>
       </div>
 
+      {showLockConfirm && (
+        <div className="fixed inset-0 z-[130] bg-black/80 backdrop-blur-md flex items-center justify-center p-4" onClick={e => e.stopPropagation()}>
+          <div className="bg-stone-900 border border-stone-700 rounded-xl shadow-2xl max-w-md w-full p-5 space-y-4 animate-in fade-in zoom-in duration-150">
+            <div className="flex items-center gap-3 text-amber-400">
+              <i className="fas fa-triangle-exclamation text-2xl"></i>
+              <h4 className="text-base font-bold text-stone-100">Finish Spell Preparation?</h4>
+            </div>
+
+            <div className="text-xs text-stone-300 space-y-2.5 leading-relaxed bg-stone-950/70 p-3.5 rounded-lg border border-stone-800">
+              <p>
+                Are you finished modifying your prepared spells? Once confirmed, your prepared spell list will be <strong className="text-amber-300">locked</strong> until your next rest:
+              </p>
+              <ul className="list-disc list-inside text-stone-400 space-y-1 pl-1">
+                <li><strong className="text-stone-200">Long Rest:</strong> Full re-preparation of your daily spell list (up to {maxPrepared} spells).</li>
+                <li><strong className="text-stone-200">Short Rest (2024 SRD):</strong> Allows swapping 1 prepared spell from your spellbook/class list.</li>
+              </ul>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                onClick={() => setShowLockConfirm(false)}
+                className="px-3.5 py-2 rounded-lg text-xs font-semibold bg-stone-800 hover:bg-stone-700 text-stone-300 transition-all"
+              >
+                Keep Preparing
+              </button>
+              <button
+                onClick={handleConfirmLockAndClose}
+                disabled={busy}
+                className="px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider bg-amber-900/80 hover:bg-amber-800 text-amber-200 border border-amber-700 transition-all flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <i className="fas fa-lock text-[10px]"></i>
+                <span>Confirm & Lock Spells</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <SpellDetailModal spell={viewingSpell} onClose={() => setViewingSpell(null)} />
     </div>,
+
     document.body
   );
 };

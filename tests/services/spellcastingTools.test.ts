@@ -414,6 +414,26 @@ describe('manage_spellbook', () => {
     expect(result.success).toBe(false);
     expect(result.message).toContain('Rest');
   });
+
+  it('locks preparation when finish_prep is called', async () => {
+    const wizard = makeWizard();
+    wizard.knownSpells = ['fireball', 'detect-magic', 'shield'];
+    wizard.preparedSpells = ['fireball'];
+    wizard.longRestPrepAvailable = true;
+    wizard.shortRestSpellSwapAvailable = true;
+    server.joinParty(wizard);
+
+    const result = await server.manage_spellbook('wizard-1', 'finish_prep', '');
+
+    expect(result.success).toBe(true);
+    expect(wizard.longRestPrepAvailable).toBe(false);
+    expect(wizard.shortRestSpellSwapAvailable).toBe(false);
+
+    // Subsequent preparation attempt fails
+    const result2 = await server.manage_spellbook('wizard-1', 'prepare', 'shield');
+    expect(result2.success).toBe(false);
+    expect(result2.message).toContain('Rest');
+  });
 });
 
 describe('summon_creature', () => {

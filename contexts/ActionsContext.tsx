@@ -18,9 +18,10 @@ interface ActionsContextValue {
   handleArcaneRecovery: (characterId: string, selections: Array<{ level: number; count: number }>) => Promise<boolean>;
   handleManageSpellbook: (
     characterId: string,
-    action: 'learn' | 'prepare' | 'unprepare' | 'forget',
+    action: 'learn' | 'prepare' | 'unprepare' | 'forget' | 'finish_prep',
     spellId: string
   ) => Promise<boolean>;
+
   handleSwapKnownSpell: (characterId: string, oldSpellId: string, newSpellId: string) => Promise<boolean>;
 }
 

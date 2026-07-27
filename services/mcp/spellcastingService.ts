@@ -22,7 +22,8 @@ export interface SpellcastingService {
   resolve_dot_damage(spellId: string, targetId: string, casterId?: string): Promise<MCPResponse>;
   cast_ritual(characterId: string, spellId: string): Promise<MCPResponse>;
   spell_effect(mode: 'counter' | 'dispel', casterId: string, targetSpellLevel: number, targetId?: string): Promise<MCPResponse>;
-  manage_spellbook(characterId: string, action: 'learn' | 'prepare' | 'unprepare' | 'forget', spellId: string): Promise<MCPResponse>;
+  manage_spellbook(characterId: string, action: 'learn' | 'prepare' | 'unprepare' | 'forget' | 'finish_prep', spellId: string): Promise<MCPResponse>;
+
   /** Tasha's-style swap: known caster replaces one known spell with another.
    *  Atomic. Requires `character.pendingSpellSwap === true`; consumes it on success. */
   swap_known_spell(characterId: string, oldSpellId: string, newSpellId: string): Promise<MCPResponse>;
@@ -684,8 +685,14 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
     async manage_spellbook(characterId, action, spellId) {
       const char = deps.getTarget(characterId);
       if (!char) return fail('Character not found.');
+      if (action === 'finish_prep') {
+        char.longRestPrepAvailable = false;
+        char.shortRestSpellSwapAvailable = false;
+        return { success: true, data: {}, message: `${char.name} finished preparing spells.` };
+      }
       const spell = SPELLS_BY_ID[spellId.toLowerCase()];
       if (!spell) return fail('Unknown spell.');
+
       if (action === 'learn') {
         const ok = engineLearnSpell(char, spellId);
         if (!ok) {

@@ -875,10 +875,11 @@ export const useGameActions = (
      *  handleArcaneRecovery. Used by SpellbookModal for prepared casters. */
     const handleManageSpellbook = async (
       characterId: string,
-      action: 'learn' | 'prepare' | 'unprepare' | 'forget',
+      action: 'learn' | 'prepare' | 'unprepare' | 'forget' | 'finish_prep',
       spellId: string
     ): Promise<boolean> => {
-      if (!characterId || !spellId) return false;
+      if (!characterId || (action !== 'finish_prep' && !spellId)) return false;
+
       try {
         const result = await mcpServer.manage_spellbook(characterId, action, spellId);
         if (result.success) {
