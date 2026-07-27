@@ -688,8 +688,10 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
       if (action === 'finish_prep') {
         char.longRestPrepAvailable = false;
         char.shortRestSpellSwapAvailable = false;
-        return { success: true, data: {}, message: `${char.name} finished preparing spells.` };
+        char.cantripSwapAvailable = false;
+        return { success: true, data: {}, message: `${char.name} finished preparing spells and cantrips.` };
       }
+
       const spell = SPELLS_BY_ID[spellId.toLowerCase()];
       if (!spell) return fail('Unknown spell.');
 

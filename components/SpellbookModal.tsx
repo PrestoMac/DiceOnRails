@@ -162,7 +162,10 @@ const SpellbookModal: React.FC<SpellbookModalProps> = ({
 
   const handleClose = () => {
     const hasPrepAccess = (character.longRestPrepAvailable ?? true) || character.shortRestSpellSwapAvailable;
-    if (isPrepared && hasPrepAccess && !isCombatActive) {
+    const hasCantripAccess = !!character.cantripSwapAvailable;
+    const shouldConfirmLock = !isCombatActive && ((isPrepared && hasPrepAccess) || hasCantripAccess);
+
+    if (shouldConfirmLock) {
       setShowLockConfirm(true);
     } else {
       setError(null);
@@ -171,6 +174,7 @@ const SpellbookModal: React.FC<SpellbookModalProps> = ({
       onClose();
     }
   };
+
 
   const handleConfirmLockAndClose = async () => {
     setBusy(true);
@@ -674,18 +678,19 @@ const SpellbookModal: React.FC<SpellbookModalProps> = ({
           <div className="bg-stone-900 border border-stone-700 rounded-xl shadow-2xl max-w-md w-full p-5 space-y-4 animate-in fade-in zoom-in duration-150">
             <div className="flex items-center gap-3 text-amber-400">
               <i className="fas fa-triangle-exclamation text-2xl"></i>
-              <h4 className="text-base font-bold text-stone-100">Finish Spell Preparation?</h4>
+              <h4 className="text-base font-bold text-stone-100">Finish Spell & Cantrip Preparation?</h4>
             </div>
 
             <div className="text-xs text-stone-300 space-y-2.5 leading-relaxed bg-stone-950/70 p-3.5 rounded-lg border border-stone-800">
               <p>
-                Are you finished modifying your prepared spells? Once confirmed, your prepared spell list will be <strong className="text-amber-300">locked</strong> until your next rest:
+                Are you finished modifying your prepared spells and cantrip selections? Once confirmed, your spell list and cantrip swap will be <strong className="text-amber-300">locked</strong> until your next rest:
               </p>
               <ul className="list-disc list-inside text-stone-400 space-y-1 pl-1">
-                <li><strong className="text-stone-200">Long Rest:</strong> Full re-preparation of your daily spell list (up to {maxPrepared} spells).</li>
+                <li><strong className="text-stone-200">Long Rest:</strong> Full re-preparation of daily spells + 1 cantrip swap (2024 SRD rule).</li>
                 <li><strong className="text-stone-200">Short Rest (2024 SRD):</strong> Allows swapping 1 prepared spell from your spellbook/class list.</li>
               </ul>
             </div>
+
 
             <div className="flex items-center justify-end gap-2 pt-1">
               <button
