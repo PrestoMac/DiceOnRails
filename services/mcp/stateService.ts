@@ -61,6 +61,7 @@ export function createStateService(state: GameState): StateService {
       delete (state as { ctx?: unknown }).ctx;
       delete (state as { isProcessing?: unknown }).isProcessing;
       delete (state as { processingUser?: unknown }).processingUser;
+      delete (state as { battleMap?: unknown }).battleMap;
       Object.assign(state, savedState);
       if (!state.party) state.party = [];
       if (!state.quests) state.quests = [];
@@ -104,6 +105,7 @@ export function createStateService(state: GameState): StateService {
       delete (state as { _tiredWarningFired?: unknown })._tiredWarningFired;
       delete (state as { isProcessing?: unknown }).isProcessing;
       delete (state as { processingUser?: unknown }).processingUser;
+      delete (state as { battleMap?: unknown }).battleMap;
       rewindPoint = null;
       emergencySnapshot = null;
       ensureLocalGameStateFields();

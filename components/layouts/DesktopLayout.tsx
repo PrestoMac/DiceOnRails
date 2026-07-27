@@ -13,6 +13,7 @@ import CharacterSheet from '../CharacterSheet';
 import Journal from '../Journal';
 import LevelUpModal from '../LevelUpModal';
 import CombatTracker from '../CombatTracker';
+import BattleMapPanel from '../BattleMapPanel';
 import ActivityBell from '../shared/ActivityBell';
 import AtmosphereOverlay from '../shared/AtmosphereOverlay';
 import { useActivityTracking } from '../../hooks/useActivityTracking';
@@ -20,6 +21,8 @@ import { useOnboarding } from '../../hooks/useOnboarding';
 import { formatGameTime } from '../../utils/timeUtils';
 import { mcpServer } from '../../services/mcpService';
 import { pickSuggestionsForCharacter } from '../../services/llm/suggestions';
+import { generateMapImage } from '../../services/llm/mapGeneration';
+import { initBattleMap, autoPlaceParty, autoPlaceEnemies } from '../../services/gridService';
 
 /** Primary desktop layout with resizable sidebar, chat log, input area, and full header controls. */
 const DesktopLayout: React.FC = () => {
@@ -46,6 +49,7 @@ const DesktopLayout: React.FC = () => {
   const [sidebarWidth, setSidebarWidth] = useState(320);
   const [isDragging, setIsDragging] = useState(false);
   const [isAtmosphereExpanded, setIsAtmosphereExpanded] = useState(false);
+  const [mapPanelOpen, setMapPanelOpen] = useState(true);
 
   useEffect(() => {
     setIsAtmosphereExpanded(false);
@@ -98,7 +102,72 @@ const DesktopLayout: React.FC = () => {
 
   const charToShow = gameState.party.find(c => c.id === viewingCharacterId) || gameState.party[0];
   const isMultiplayer = gameState.party.length > 1;
+  const isHost = !!userId && userId === hostId;
   const handleBackOrReset = () => userId ? confirm('Return to dashboard?') && setStage(AppStage.DASHBOARD) : confirm('Are you sure you want to reset the game? All progress will be lost.') && resetGame();
+
+  // --- VTT Battle Map handlers ---
+
+  const handleTokenMove = useCallback((tokenId: string, x: number, y: number) => {
+    mcpServer.updateBattleMapTokens(
+      (gameState.battleMap?.tokens ?? []).map(t =>
+        t.id === tokenId ? { ...t, pos: { x, y } } : t
+      )
+    );
+    syncState();
+  }, [gameState.battleMap, syncState]);
+
+  const handleGenerateMap = useCallback(async () => {
+    if (!gameState.battleMap) return;
+    mcpServer.setBattleMapImageUrl(''); // clear old image & set isGenerating
+    if (gameState.battleMap) {
+      mcpServer.getFullState().battleMap!.isGenerating = true;
+    }
+    syncState();
+    try {
+      const url = await generateMapImage(gameState, gameState.battleMap.label);
+      if (url) {
+        mcpServer.setBattleMapImageUrl(url);
+      } else {
+        // If generation failed, just clear the generating flag
+        if (mcpServer.getFullState().battleMap) {
+          mcpServer.getFullState().battleMap!.isGenerating = false;
+        }
+      }
+    } catch {
+      if (mcpServer.getFullState().battleMap) {
+        mcpServer.getFullState().battleMap!.isGenerating = false;
+      }
+    }
+    syncState();
+  }, [gameState]);
+
+  const handleClearMap = useCallback(() => {
+    if (!confirm('Remove the battle map?')) return;
+    mcpServer.clearBattleMap();
+    syncState();
+  }, [syncState]);
+
+  const handleInitMap = useCallback((width: number, height: number) => {
+    let bmap = initBattleMap(width, height, gameState.party[0]?.location ?? 'Battle');
+    bmap = autoPlaceParty(bmap, gameState.party.map(c => ({ id: c.id, name: c.name })));
+    if (gameState.combat?.enemies) {
+      bmap = autoPlaceEnemies(bmap, gameState.combat.enemies.filter(e => !e.isDead).map(e => ({ id: e.id, name: e.name })));
+    }
+    mcpServer.updateBattleMapTokens(bmap.tokens);
+    // Re-assign full map via state mutation pattern
+    const state = mcpServer.getFullState();
+    if (state.battleMap) {
+      state.battleMap.width  = bmap.width;
+      state.battleMap.height = bmap.height;
+      state.battleMap.tokens = bmap.tokens;
+    }
+    syncState();
+  }, [gameState, syncState]);
+
+  const currentTurnId = (() => {
+    if (!gameState.combat?.isActive) return undefined;
+    return gameState.combat.initiative[gameState.combat.turnIndex]?.id;
+  })();
 
   return (<>
     <aside style={{ width: sidebarOpen ? sidebarWidth : 0 }} data-tour="character-sheet" className={`bg-stone-950/90 backdrop-blur-xl border-r border-stone-800 flex flex-col overflow-hidden relative z-20 ${isDragging ? '' : 'transition-all duration-300'}`}>
@@ -109,7 +178,7 @@ const DesktopLayout: React.FC = () => {
       <div ref={sidebarScrollRef} className="flex-1 overflow-y-auto custom-scrollbar relative" style={{ padding: `${Math.max(12, sidebarWidth * 0.075)}px`, fontSize: `${fontScale}rem` }}>
         {tab === 'character' ? <div className="flex flex-col h-full">
           {isMultiplayer && <div className="flex gap-2 overflow-x-auto pb-2 mb-2 shrink-0">{gameState.party.map(char => <button key={char.id} onClick={() => setViewingCharacterId(char.id)} className={`p-2 rounded whitespace-nowrap transition-colors ${viewingCharacterId === char.id ? 'bg-amber-700 text-white' : 'bg-stone-800 text-stone-400 hover:bg-stone-700'}`}>{char.name}{char.id === myCharacterId ? ' (You)' : ''}</button>)}</div>}
-          {charToShow ? <CharacterSheet character={charToShow} onUpdateInventory={handleUpdateInventory} onLevelUp={handleOpenLevelUp} onSendMessage={handleSendMessage} onTriggerDiceRoll={handleTriggerDiceRoll} isProcessing={gameState.isProcessing} currentUserId={userId} isHost={!!userId && userId === hostId} onUpdateCharacterFields={handleUpdateCharacterFields} onManageSpellbook={handleManageSpellbook} onSwapKnownSpell={handleSwapKnownSpell} isCombatActive={gameState.combat?.isActive} /> : <div className="text-stone-500 text-center mt-10">No characters in party.</div>}
+          {charToShow ? <CharacterSheet character={charToShow} onUpdateInventory={handleUpdateInventory} onLevelUp={handleOpenLevelUp} onSendMessage={handleSendMessage} onTriggerDiceRoll={handleTriggerDiceRoll} isProcessing={gameState.isProcessing} currentUserId={userId} isHost={isHost} onUpdateCharacterFields={handleUpdateCharacterFields} onManageSpellbook={handleManageSpellbook} onSwapKnownSpell={handleSwapKnownSpell} isCombatActive={gameState.combat?.isActive} /> : <div className="text-stone-500 text-center mt-10">No characters in party.</div>}
         </div> : <Journal quests={gameState.quests} lore={gameState.lore} />}
         {hasScrollOverflow && <div className="sticky bottom-0 left-0 right-0 h-12 -mt-12 pointer-events-none bg-gradient-to-t from-stone-950/95 via-stone-950/60 to-transparent z-10" />}
       </div>
@@ -146,7 +215,36 @@ const DesktopLayout: React.FC = () => {
           <div className="h-2 w-2 rounded-full bg-green-500 shadow-sm shadow-green-900 animate-pulse" />
         </div>
       </header>
-      {gameState.combat?.isActive && <div className="relative z-10" data-tour="combat-tracker"><CombatTracker combat={gameState.combat} party={gameState.party} /></div>}
+      {gameState.combat?.isActive && <div className="relative z-10" data-tour="combat-tracker"><CombatTracker combat={gameState.combat} party={gameState.party} isHost={isHost} hasBattleMap={!!gameState.battleMap} onToggleBattleMap={() => { if (!gameState.battleMap) handleInitMap(20, 15); else setMapPanelOpen(p => !p); }} /></div>}
+      {/* VTT Battle Map panel — shown when battleMap is active */}
+      {gameState.battleMap && (
+        <div className="relative z-10 border-b border-stone-800 shrink-0" style={{ height: mapPanelOpen ? '320px' : 'auto' }}>
+          <button
+            onClick={() => setMapPanelOpen(p => !p)}
+            className="w-full flex items-center gap-2 px-3 py-1.5 bg-stone-900/80 hover:bg-stone-900 border-b border-stone-800 text-[10px] uppercase tracking-wider font-bold text-stone-500 hover:text-amber-500 transition-colors"
+          >
+            <span>🗺</span>
+            <span>Battle Map</span>
+            <i className={`fas fa-chevron-${mapPanelOpen ? 'up' : 'down'} ml-auto`} />
+          </button>
+          {mapPanelOpen && (
+            <div style={{ height: '280px' }}>
+              <BattleMapPanel
+                battleMap={gameState.battleMap}
+                party={gameState.party}
+                combat={gameState.combat}
+                currentTurnId={currentTurnId}
+                isHost={isHost}
+                isProcessing={isLoading || !!gameState.isProcessing}
+                onTokenMove={handleTokenMove}
+                onGenerateMap={handleGenerateMap}
+                onClearMap={handleClearMap}
+                onInitMap={handleInitMap}
+              />
+            </div>
+          )}
+        </div>
+      )}
       <div className="flex-1 flex flex-col relative z-10 min-h-0">
         <ChatLog
           messages={messages}

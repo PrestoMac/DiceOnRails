@@ -1,6 +1,7 @@
 import type { Character } from './character';
 import type { CombatState } from './combat';
 import type { QueuedAction } from './common';
+import type { BattleMap } from './grid';
 
 /** Difficulty tiers for quest XP calibration (mirrors combat CR buckets). */
 export type QuestDifficulty = 'trivial' | 'easy' | 'medium' | 'hard' | 'deadly';
@@ -96,4 +97,11 @@ export interface GameState {
    * `pickSuggestionsForCharacter`.
    */
   lastSuggestionsByCharacter?: Record<string, string[]>;
+  /**
+   * VTT battle map state. Present only when the GM has activated the map for
+   * the current encounter. Cleared (set to undefined) when combat ends or
+   * the GM dismisses the map. Serializes automatically with the rest of
+   * GameState — multiplayer sync is free via the existing Supabase path.
+   */
+  battleMap?: BattleMap;
 }

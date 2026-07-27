@@ -7,6 +7,9 @@ interface CombatTrackerProps {
   combat: CombatState;
   party: Character[];
   isMobile?: boolean;
+  isHost?: boolean;
+  hasBattleMap?: boolean;
+  onToggleBattleMap?: () => void;
 }
 
 const modifierText = (m: number | null | undefined) =>
@@ -41,7 +44,7 @@ const ConditionsList: React.FC<{
   );
 
 /** Combat initiative tracker panel showing turn order, HP bars, and expandable combatant details. */
-const CombatTracker: React.FC<CombatTrackerProps> = ({ combat, party, isMobile }) => {
+const CombatTracker: React.FC<CombatTrackerProps> = ({ combat, party, isMobile, isHost, hasBattleMap, onToggleBattleMap }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -64,19 +67,31 @@ const CombatTracker: React.FC<CombatTrackerProps> = ({ combat, party, isMobile }
   if (isMobile) {
     return (
       <div className="bg-stone-900/95 border-b border-stone-800 backdrop-blur-md">
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="w-full px-3 py-2 flex items-center justify-between text-stone-300"
-        >
-          <div className="flex items-center gap-2">
+        <div className="w-full px-3 py-2 flex items-center justify-between text-stone-300">
+          <button onClick={() => setCollapsed(!collapsed)} className="flex items-center gap-2 flex-1">
             <span className="text-amber-500 text-xs">⚔️</span>
             <span className="text-xs font-bold uppercase tracking-wider">Round {combat.round}</span>
             <span className="text-[10px] text-stone-500 font-mono">
               {combat.initiative[combat.turnIndex]?.name || '—'}
             </span>
+          </button>
+          <div className="flex items-center gap-2">
+            {isHost && onToggleBattleMap && (
+              <button
+                onClick={onToggleBattleMap}
+                className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border transition-colors ${
+                  hasBattleMap ? 'bg-amber-900/40 border-amber-700 text-amber-300' : 'bg-stone-800 border-stone-700 text-stone-400 hover:text-stone-200'
+                }`}
+                title={hasBattleMap ? 'Toggle Battle Map' : 'Launch Battle Map'}
+              >
+                🗺 {hasBattleMap ? 'Map' : '+ Map'}
+              </button>
+            )}
+            <button onClick={() => setCollapsed(!collapsed)} className="p-1">
+              <i className={`fas fa-chevron-${collapsed ? 'down' : 'up'} text-xs text-stone-600 transition-transform`}></i>
+            </button>
           </div>
-          <i className={`fas fa-chevron-${collapsed ? 'down' : 'up'} text-xs text-stone-600 transition-transform`}></i>
-        </button>
+        </div>
         {!collapsed && (
           <div className="px-2 pb-2 space-y-0.5">
             {combat.initiative.map((entry, i) => {
@@ -130,11 +145,8 @@ const CombatTracker: React.FC<CombatTrackerProps> = ({ combat, party, isMobile }
   return (
     <div className={`transition-all duration-300 w-full`}>
       <div className="bg-stone-900/90 backdrop-blur-md border border-stone-800 rounded-lg shadow-2xl overflow-hidden">
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="w-full px-3 py-2 flex items-center justify-between bg-stone-950/50 hover:bg-stone-800/50 transition-colors"
-        >
-          <div className="flex items-center gap-2">
+        <div className="w-full px-3 py-2 flex items-center justify-between bg-stone-950/50">
+          <button onClick={() => setCollapsed(!collapsed)} className="flex items-center gap-2 flex-1 hover:opacity-80 transition-opacity">
             <span className="text-amber-500 text-sm">⚔️</span>
             {!collapsed && (
               <>
@@ -146,9 +158,24 @@ const CombatTracker: React.FC<CombatTrackerProps> = ({ combat, party, isMobile }
                 </span>
               </>
             )}
+          </button>
+          <div className="flex items-center gap-2">
+            {isHost && onToggleBattleMap && (
+              <button
+                onClick={onToggleBattleMap}
+                className={`px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider border transition-colors ${
+                  hasBattleMap ? 'bg-amber-900/40 border-amber-700 text-amber-300' : 'bg-stone-800 border-stone-700 text-stone-400 hover:text-stone-200 hover:border-amber-600/50'
+                }`}
+                title={hasBattleMap ? 'Toggle Battle Map view' : 'Launch VTT Battle Map'}
+              >
+                🗺 {hasBattleMap ? 'Battle Map' : '+ Launch Map'}
+              </button>
+            )}
+            <button onClick={() => setCollapsed(!collapsed)} className="p-1">
+              <i className={`fas fa-chevron-${collapsed ? 'down' : 'up'} text-xs text-stone-500 transition-transform`}></i>
+            </button>
           </div>
-          <i className={`fas fa-chevron-${collapsed ? 'down' : 'up'} text-xs text-stone-500 transition-transform`}></i>
-        </button>
+        </div>
         {!collapsed && (
           <div className="px-2 pb-2 space-y-0.5 max-h-80 overflow-y-auto custom-scrollbar">
             {combat.initiative.map((entry, i) => {

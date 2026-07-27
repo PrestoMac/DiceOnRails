@@ -120,8 +120,10 @@ Binary dice tools (`check_skill`, `make_save`) support **branch finalization** v
 | `polymorph_creature` | inline | |
 | `cast_ritual` | spells | **Auto-advances 10 minutes** (no separate `narrate_turn` needed since S3). |
 | `narrate_turn` | travel | Optional `xp` (1-10) for roleplay XP + optional `roleplay: 'dialogue'\|'creative'` tag. Any non-empty narration auto-awards 1 XP baseline (no tag needed); `creative` tag = 5 XP default when `xp` omitted; explicit `xp` overrides; `xp=0` suppresses. Supports `suggestionsByCharacter` (multiplayer-only field keyed by character id) as an alternative to the flat `suggestions` for per-player chips. |
+| `move_token` | grid | `tokenId`, `x`, `y` (0-based grid coords). Moves a combatant token on the VTT battle map. Chebyshev distance (5 ft/cell). |
+| `init_battle_map` | grid | `label`, `width` (def 20), `height` (def 15), `generateImage` (boolean). Activates VTT grid map and auto-places party + enemies. |
 
-**ToolFilter** (`services/llm/toolFilter.ts`): always visible: `roll_dice`, `check_skill`, `update_inventory`, `adjust_currency`, `move_to`, `upsert_quest`, `log_lore`, `narrate_turn`, `make_save`, `use_resource`, `roll_death_save`, `cast_spell`, `manage_spellbook`, `spell_effect`, `add_enemy`, `start_combat`, `inflict_damage`. Hidden unless: `state.combat?.isActive` → `next_turn`, `end_combat`, `player_attack`; party has unused stat/skill points → `level_up`; party not at full → `short_rest`, `long_rest`; party has spells → `summon_creature`, `teleport_creature`, `polymorph_creature`, `cast_ritual`.
+**ToolFilter** (`services/llm/toolFilter.ts`): always visible: `roll_dice`, `check_skill`, `update_inventory`, `adjust_currency`, `move_to`, `upsert_quest`, `log_lore`, `narrate_turn`, `make_save`, `use_resource`, `roll_death_save`, `cast_spell`, `manage_spellbook`, `spell_effect`, `add_enemy`, `start_combat`, `inflict_damage`, `move_token`, `init_battle_map`. Hidden unless: `state.combat?.isActive` → `next_turn`, `end_combat`, `player_attack`; party has unused stat/skill points → `level_up`; party not at full → `short_rest`, `long_rest`; party has spells → `summon_creature`, `teleport_creature`, `polymorph_creature`, `cast_ritual`.
 
 ### Context pipeline (`services/llm/contextManager.ts`)
 - **Active window**: last 20 messages, sent verbatim.

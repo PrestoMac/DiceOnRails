@@ -4,6 +4,7 @@ import { isDebugMode } from '../../utils/debug';
 import { getHeavyArmorMasterReduction } from '../featsService';
 import { breakConcentration as engineBreakConcentration } from '../spellcastingEngine';
 import { awardEnemyDefeatXp } from './progressionService';
+import { markTokenDead } from '../gridService';
 
 function parseCost(srdCost: string): { gp: number; sp: number; cp: number } | null {
   if (!srdCost) return null;
@@ -158,6 +159,9 @@ export function createInventoryService(state: GameState, deps: InventoryDeps): I
           if (newHp === 0) {
             enemy.isDead = true;
             deps.updateInitiativeDeathStatus(enemy.id, true);
+            if (state.battleMap) {
+              state.battleMap = markTokenDead(state.battleMap, enemy.id);
+            }
             const xpLine = awardEnemyDefeatXp(state, enemy);
             const msg = `${enemy.name} took ${dmg} damage${damageType ? ' (' + damageType + ')' : ''}. ${enemy.name} is defeated!${xpLine ? ' ' + xpLine : ''}`;
             state.sessionLogs.push(msg);

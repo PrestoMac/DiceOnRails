@@ -9,6 +9,8 @@ const EXPECTED_TOOL_NAMES = [
   'level_up', 'cast_spell', 'use_resource', 'manage_spellbook',
   'summon_creature', 'teleport_creature', 'polymorph_creature',
   'cast_ritual', 'spell_effect', 'player_attack', 'narrate_turn',
+  // VTT grid tools (Phase 1 — battle map)
+  'move_token', 'init_battle_map',
 ];
 
 describe('Tool Contract', () => {

@@ -13,6 +13,8 @@ import { resolveLLMConfig, mapHistoryToMessages } from './llmApiClient';
 import { CONDITION_INFO } from '../../data/conditionInfo';
 import { calculateAc } from '../classEngine';
 import { MULTIPLAYER_PROMPT } from './prompts/multiplayerPrompt';
+import { MAP_PROMPT } from './prompts/mapPrompt';
+import { buildGridContextString } from '../gridService';
 
 const CRITICAL_TOOLS = new Set(['cast_spell', 'inflict_damage', 'roll_dice', 'player_attack']);
 // Canonical set of real tool names. Used to drop tool calls whose `function.name`
@@ -114,7 +116,7 @@ export async function runAgentLoop(
   const state = mcpServer.getFullState();
   const systemMessage = {
     role: "system" as const,
-    content: `${SYSTEM_INSTRUCTION}\n\n${PROGRESSION_SYSTEM_PROMPT}${options?.enableSuggestions ? '\n15. SUGGESTED ACTIONS: When ending a turn with narrate_turn, ALWAYS include 2-3 short suggested next actions in the suggestions field. Each must be ≤60 chars, in first person from the player\'s perspective (e.g. "I attack the goblin with my longsword", "I order a drink and sit down"). This is mandatory.\n' : ''}\n\n=== TOOL MODE ===\n${TOOL_MODE_INSTRUCTION}${state.party.length > 1 ? `\n\n${MULTIPLAYER_PROMPT}` : ''}`
+    content: `${SYSTEM_INSTRUCTION}\n\n${PROGRESSION_SYSTEM_PROMPT}${options?.enableSuggestions ? '\n15. SUGGESTED ACTIONS: When ending a turn with narrate_turn, ALWAYS include 2-3 short suggested next actions in the suggestions field. Each must be ≤60 chars, in first person from the player\'s perspective (e.g. "I attack the goblin with my longsword", "I order a drink and sit down"). This is mandatory.\n' : ''}\n\n=== TOOL MODE ===\n${TOOL_MODE_INSTRUCTION}${state.party.length > 1 ? `\n\n${MULTIPLAYER_PROMPT}` : ''}${state.battleMap ? `\n\n${MAP_PROMPT}` : ''}`
   };
   const gameTimeAtStart = state.gameTime ?? 0;
   const contextParts: string[] = [];
@@ -198,6 +200,12 @@ export async function runAgentLoop(
 
   if (options?.enableSuggestions) {
     contextParts.push('REMEMBER: Include 2-3 short suggested next actions in the suggestions field of narrate_turn. Each must be in FIRST PERSON from the player perspective.');
+  }
+
+  // VTT: inject grid context when a battle map is active.
+  // This gives the LLM full spatial awareness (positions, distances, range advisories).
+  if (state.battleMap && state.battleMap.tokens.length > 0) {
+    contextParts.push(buildGridContextString(state.battleMap, state));
   }
 
   const contextMessage = {
