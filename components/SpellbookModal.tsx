@@ -367,42 +367,49 @@ const SpellbookModal: React.FC<SpellbookModalProps> = ({
 
               {isWizard && (
                 <div>
-                  {pendingWizardSpellsCount > 0 && (
-                    <div className="bg-amber-950/40 border border-amber-800/50 rounded-lg p-2.5 mb-2.5 flex items-center justify-between text-xs text-amber-200">
-                      <div className="flex items-center gap-2">
-                        <i className="fas fa-book-bookmark text-amber-400"></i>
-                        <span>Level-Up Spells: You have <strong>{pendingWizardSpellsCount}</strong> free spell choice(s) for your spellbook!</span>
+                  {pendingWizardSpellsCount > 0 ? (
+                    <div>
+                      <div className="bg-amber-950/40 border border-amber-800/50 rounded-lg p-2.5 mb-2.5 flex items-center justify-between text-xs text-amber-200">
+                        <div className="flex items-center gap-2">
+                          <i className="fas fa-book-bookmark text-amber-400"></i>
+                          <span>Level-Up Spells: You have <strong>{pendingWizardSpellsCount}</strong> free spell choice(s) for your spellbook!</span>
+                        </div>
                       </div>
-                    </div>
-                  )}
-                  {availableToLearnSpellbook.length > 0 && (
-                    <div className="mb-4">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <p className="text-[10px] uppercase font-bold text-amber-600 tracking-widest">
-                          Add Spells to Spellbook {pendingWizardSpellsCount > 0 ? `(${pendingWizardSpellsCount} Free)` : ''}
-                        </p>
-                      </div>
-                      <div className="space-y-1.5 max-h-48 overflow-y-auto custom-scrollbar pr-1">
-                        {availableToLearnSpellbook.slice(0, 60).map(spell => (
-                          <div key={spell.id} className="flex items-center justify-between bg-stone-950/50 rounded-lg px-3 py-1.5 border border-stone-800/70">
-                            <button
-                              onClick={() => setViewingSpell(spell)}
-                              className="flex items-center gap-2 text-left hover:text-amber-400 transition-colors"
-                            >
-                              <i className={`fas ${SCHOOL_ICONS[spell.school] || 'fa-star'} text-[10px] text-stone-500 w-3`}></i>
-                              <span className="text-xs text-stone-300">{spell.name}</span>
-                              <span className="text-[9px] text-stone-600 uppercase">{levelLabel(spell.level)}</span>
-                            </button>
-                            <button
-                              onClick={() => handleLearn(spell.id)}
-                              disabled={busy || isCombatActive}
-                              className="text-[10px] px-2 py-0.5 rounded bg-stone-800 hover:bg-amber-900/40 text-stone-400 hover:text-amber-300 border border-stone-700 hover:border-amber-800/50 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                            >
-                              Add to Spellbook
-                            </button>
+                      {availableToLearnSpellbook.length > 0 && (
+                        <div className="mb-4">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <p className="text-[10px] uppercase font-bold text-amber-600 tracking-widest">
+                              Add Level-Up Spells to Spellbook ({pendingWizardSpellsCount} Remaining)
+                            </p>
                           </div>
-                        ))}
-                      </div>
+                          <div className="space-y-1.5 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+                            {availableToLearnSpellbook.slice(0, 60).map(spell => (
+                              <div key={spell.id} className="flex items-center justify-between bg-stone-950/50 rounded-lg px-3 py-1.5 border border-stone-800/70">
+                                <button
+                                  onClick={() => setViewingSpell(spell)}
+                                  className="flex items-center gap-2 text-left hover:text-amber-400 transition-colors"
+                                >
+                                  <i className={`fas ${SCHOOL_ICONS[spell.school] || 'fa-star'} text-[10px] text-stone-500 w-3`}></i>
+                                  <span className="text-xs text-stone-300">{spell.name}</span>
+                                  <span className="text-[9px] text-stone-600 uppercase">{levelLabel(spell.level)}</span>
+                                </button>
+                                <button
+                                  onClick={() => handleLearn(spell.id)}
+                                  disabled={busy || isCombatActive}
+                                  className="text-[10px] px-2 py-0.5 rounded bg-amber-900/40 hover:bg-amber-800/60 text-amber-300 border border-amber-800/50 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                  Add to Spellbook
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="bg-stone-950/40 border border-stone-800 rounded-lg px-3 py-2 mb-3 text-xs text-stone-400 flex items-center gap-2">
+                      <i className="fas fa-info-circle text-stone-500"></i>
+                      <span>Spells are added to your spellbook automatically on level-up (+2 spells per level) or when copied from scrolls found in your adventures.</span>
                     </div>
                   )}
                 </div>
