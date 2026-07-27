@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { SpellDefinition } from '../../types';
 import { StepProps } from './types';
 import { getSpellsForClass } from '../../utils/spells';
-import { getCantripsKnown, getSpellsKnown, getMaxPrepared } from '../../services/spellcastingEngine';
+import { getCantripsKnown, getSpellsKnown, getMaxPrepared, getWizardSpellbookCapacity } from '../../services/spellcastingEngine';
 import { StepH, SpellCard } from './SharedComponents';
 import SpellDetailModal from '../modals/SpellDetailModal';
 import Tooltip from '../ui/Tooltip';
@@ -43,8 +43,11 @@ const SpellsStep: React.FC<StepProps & { onBackToSubclass: () => void; onBackToF
   })();
   const leveledSpells = classSpells.filter(s => s.level > 0 && s.level <= maxCastableLevel);
   const maxCantrips = getCantripsKnown({ stats, class: selectedClass.id } as Parameters<typeof getCantripsKnown>[0], level);
+  const isWizard = selectedClass.id === 'wizard';
   const isPrepared = selectedClass.spellcasting?.prepMode === 'prepared';
-  const maxSpells = isPrepared
+  const maxSpells = isWizard
+    ? getWizardSpellbookCapacity(level)
+    : isPrepared
     ? getMaxPrepared({ stats, class: selectedClass.id, level } as Parameters<typeof getMaxPrepared>[0], level)
     : getSpellsKnown({ stats, class: selectedClass.id, level } as Parameters<typeof getSpellsKnown>[0], level);
   const preparedCount = selectedSpells.length;
@@ -67,17 +70,24 @@ const SpellsStep: React.FC<StepProps & { onBackToSubclass: () => void; onBackToF
     }
   };
 
+  const spellCategoryLabel = isWizard ? 'Spellbook' : isPrepared ? 'Prepared' : 'Known';
+  const spellCategoryTooltip = isWizard
+    ? 'Spellbook Spells: Wizards select 6 1st-level spells for their spellbook at level 1 (+2 per level gained). You can prepare up to INT mod + level of them.'
+    : isPrepared
+    ? 'Prepared spells (Cleric/Druid/Paladin): you can change your selection after a Long Rest. Limit = spellcasting modifier + level.'
+    : 'Known spells (Bard/Sorcerer/Warlock/Ranger): permanently learned. Only changed on level-up.';
+
   return (
     <div className={`${stepCls} max-h-[75vh] overflow-y-auto custom-scrollbar`}>
       <StepH>Choose Spells</StepH>
-      <p className="text-xs text-stone-400 text-center">Select your spells known or prepared.</p>
+      <p className="text-xs text-stone-400 text-center">
+        {isWizard ? 'Select spells to add to your wizard spellbook.' : 'Select your spells known or prepared.'}
+      </p>
       <div className="bg-stone-950/40 border border-stone-800 rounded-lg p-3 mb-3">
         <p className="text-xs text-stone-400">
           Cantrips: {selectedCantrips.length}/{maxCantrips} |{' '}
-          <Tooltip content={isPrepared
-            ? 'Prepared spells (Cleric/Druid/Paladin/Wizard): you can change your selection after a Long Rest. Limit = spellcasting modifier + level.'
-            : 'Known spells (Bard/Sorcerer/Warlock/Ranger): permanently learned. Only changed on level-up.'} side="top">
-            <span className="underline decoration-dotted">{isPrepared ? 'Prepared' : 'Known'}</span>
+          <Tooltip content={spellCategoryTooltip} side="top">
+            <span className="underline decoration-dotted">{spellCategoryLabel}</span>
           </Tooltip>
           : {preparedCount}/{maxSpells}
         </p>
@@ -133,7 +143,7 @@ const SpellsStep: React.FC<StepProps & { onBackToSubclass: () => void; onBackToF
         </button>
         <button
           onClick={onGoToGear}
-          disabled={selectedCantrips.length < maxCantrips || (!isPrepared && selectedSpells.length < maxSpells)}
+          disabled={selectedCantrips.length < maxCantrips || selectedSpells.length < maxSpells}
           className="w-2/3 py-3 bg-amber-700 hover:bg-amber-600 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg font-bold text-white transition-all uppercase tracking-wider text-xs shadow-lg shadow-amber-950/40"
         >
           Choose Gear

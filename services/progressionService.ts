@@ -87,6 +87,9 @@ export function awardExperience(
     if (classDef?.spellcasting?.prepMode === 'known') {
       updated.pendingSpellSwap = true;
     }
+    if (updated.class === 'wizard') {
+      updated.pendingWizardSpells = (updated.pendingWizardSpells ?? 0) + (levelsGained * 2);
+    }
 
     const oldMaxHp = character.hp.max;
     const newMaxHp = calculateMaxHp(updated);

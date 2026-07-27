@@ -90,10 +90,18 @@ describe('spellcastingEngine', () => {
       expect(result.ok).toBe(false);
     });
 
-    it('learnSpell adds to known list', () => {
-      const bard = makeBard();
-      learnSpell(bard, 'detect-magic');
-      expect(bard.knownSpells).toContain('detect-magic');
+    it('Wizard L1 cannot learn fireball (level 3 spell > max castable level 1)', () => {
+      const wiz = makeWizard({ level: 1, resources: [{ id: 'spell-slot-1', name: 'L1 Slots', current: 2, max: 2, resetOn: 'long', source: 'class', sourceId: 'wizard' }] });
+      const result = canLearnSpell(wiz, 'fireball');
+      expect(result.ok).toBe(false);
+      expect(result.reason).toContain('can only cast up to level 1');
+    });
+
+    it('learnSpell adds to known list and decrements pendingWizardSpells', () => {
+      const wiz = makeWizard({ pendingWizardSpells: 2 });
+      expect(learnSpell(wiz, 'feather-fall')).toBe(true);
+      expect(wiz.knownSpells).toContain('feather-fall');
+      expect(wiz.pendingWizardSpells).toBe(1);
     });
   });
 
@@ -103,6 +111,13 @@ describe('spellcastingEngine', () => {
       const result = prepareSpell(wiz, 'burning-hands');
       expect(result.ok).toBe(true);
       expect(wiz.preparedSpells).toContain('burning-hands');
+    });
+
+    it('Wizard cannot prepare a spell not in their spellbook (knownSpells)', () => {
+      const wiz = makeWizard({ knownSpells: ['magic-missile'], preparedSpells: [] });
+      const result = prepareSpell(wiz, 'shield');
+      expect(result.ok).toBe(false);
+      expect(result.reason).toContain('not in your spellbook');
     });
 
     it('Bard cannot prepare spells', () => {

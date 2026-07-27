@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Character, SpellDefinition } from '../types';
 import { SPELLS_BY_ID, getSpellsForClass } from '../utils/spells';
 import { getClassDef } from '../services/classEngine';
-import { getMaxPrepared, getCantripsKnown } from '../services/spellcastingEngine';
+import { getMaxPrepared, getCantripsKnown, getMaxCastableSlotLevel } from '../services/spellcastingEngine';
 import SpellDetailModal from './modals/SpellDetailModal';
 import Tooltip from './ui/Tooltip';
 
@@ -50,7 +50,10 @@ const SpellbookModal: React.FC<SpellbookModalProps> = ({
   const prepMode = classDef?.spellcasting?.prepMode;
   const isPrepared = prepMode === 'prepared';
   const isKnown = prepMode === 'known';
+  const isWizard = character.class === 'wizard';
   const hasPendingSwap = !!character.pendingSpellSwap;
+  const pendingWizardSpellsCount = character.pendingWizardSpells ?? 0;
+  const maxCastableLevel = useMemo(() => getMaxCastableSlotLevel(character), [character]);
 
   const maxPrepared = useMemo(
     () => isPrepared ? getMaxPrepared(character, character.level) : 0,
@@ -78,12 +81,23 @@ const SpellbookModal: React.FC<SpellbookModalProps> = ({
   const availableToPrepare = useMemo(
     () => isPrepared
       ? classCatalog
-          .filter(s => s.level > 0)
+          .filter(s => s.level > 0 && s.level <= maxCastableLevel)
+          .filter(s => isWizard ? (character.knownSpells ?? []).includes(s.id) : true)
           .filter(s => !(character.preparedSpells ?? []).includes(s.id))
           .filter(s => filter === 'all' || s.tags?.includes(filter))
           .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name))
       : [],
-    [isPrepared, classCatalog, character.preparedSpells, filter]
+    [isPrepared, isWizard, classCatalog, character.knownSpells, character.preparedSpells, maxCastableLevel, filter]
+  );
+  const availableToLearnSpellbook = useMemo(
+    () => isWizard
+      ? classCatalog
+          .filter(s => s.level > 0 && s.level <= maxCastableLevel)
+          .filter(s => !(character.knownSpells ?? []).includes(s.id))
+          .filter(s => filter === 'all' || s.tags?.includes(filter))
+          .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name))
+      : [],
+    [isWizard, classCatalog, character.knownSpells, maxCastableLevel, filter]
   );
 
   const cantripCap = useMemo(
@@ -351,9 +365,54 @@ const SpellbookModal: React.FC<SpellbookModalProps> = ({
                 )}
               </div>
 
+              {isWizard && (
+                <div>
+                  {pendingWizardSpellsCount > 0 && (
+                    <div className="bg-amber-950/40 border border-amber-800/50 rounded-lg p-2.5 mb-2.5 flex items-center justify-between text-xs text-amber-200">
+                      <div className="flex items-center gap-2">
+                        <i className="fas fa-book-bookmark text-amber-400"></i>
+                        <span>Level-Up Spells: You have <strong>{pendingWizardSpellsCount}</strong> free spell choice(s) for your spellbook!</span>
+                      </div>
+                    </div>
+                  )}
+                  {availableToLearnSpellbook.length > 0 && (
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <p className="text-[10px] uppercase font-bold text-amber-600 tracking-widest">
+                          Add Spells to Spellbook {pendingWizardSpellsCount > 0 ? `(${pendingWizardSpellsCount} Free)` : ''}
+                        </p>
+                      </div>
+                      <div className="space-y-1.5 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+                        {availableToLearnSpellbook.slice(0, 60).map(spell => (
+                          <div key={spell.id} className="flex items-center justify-between bg-stone-950/50 rounded-lg px-3 py-1.5 border border-stone-800/70">
+                            <button
+                              onClick={() => setViewingSpell(spell)}
+                              className="flex items-center gap-2 text-left hover:text-amber-400 transition-colors"
+                            >
+                              <i className={`fas ${SCHOOL_ICONS[spell.school] || 'fa-star'} text-[10px] text-stone-500 w-3`}></i>
+                              <span className="text-xs text-stone-300">{spell.name}</span>
+                              <span className="text-[9px] text-stone-600 uppercase">{levelLabel(spell.level)}</span>
+                            </button>
+                            <button
+                              onClick={() => handleLearn(spell.id)}
+                              disabled={busy || isCombatActive}
+                              className="text-[10px] px-2 py-0.5 rounded bg-stone-800 hover:bg-amber-900/40 text-stone-400 hover:text-amber-300 border border-stone-700 hover:border-amber-800/50 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                              Add to Spellbook
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <p className="text-[10px] uppercase font-bold text-stone-500 tracking-widest">Available to Prepare</p>
+                  <p className="text-[10px] uppercase font-bold text-stone-500 tracking-widest">
+                    {isWizard ? 'Prepare from Spellbook' : 'Available to Prepare'}
+                  </p>
                   <div className="flex flex-wrap gap-1">
                     {SPELL_FILTERS.map(f => (
                       <button

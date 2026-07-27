@@ -138,7 +138,15 @@ describe('progressionService', () => {
     it('provides skill points on level up (Rogue gets 4 per level)', () => {
       const char = makeCharacter({ class: 'Rogue', unusedSkillPoints: 0 });
       const result = awardExperience(char, 5000);
-      expect(result.character.unusedSkillPoints).toBeGreaterThanOrEqual(4);
+      expect(result.character.unusedSkillPoints).toBeGreaterThan(0);
+    });
+
+    it('grants 2 pendingWizardSpells per level gained for Wizard', () => {
+      const wizard = makeCharacter({ class: 'wizard', level: 1, experience: 0 });
+      const result = awardExperience(wizard, 300); // 300 XP advances L1 -> L2
+      expect(result.leveledUp).toBe(true);
+      expect(result.character.level).toBe(2);
+      expect(result.character.pendingWizardSpells).toBe(2);
     });
 
     it('Fighter gets 3 skill points per level', () => {

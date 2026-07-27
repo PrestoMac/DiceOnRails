@@ -38,7 +38,7 @@ export const PRESET_CHARACTERS: readonly PresetCharacterSpec[] = Object.freeze([
     allocatedSkills: { arcana: 1, investigation: 1 },
     asiFeatSlot: { type: 'asi', statAllocations: { int: 2 } },
     cantrips: ['fire-bolt', 'light', 'mage-hand'],
-    spells: ['magic-missile', 'shield', 'burning-hands', 'sleep'],
+    spells: ['magic-missile', 'shield', 'burning-hands', 'sleep', 'detect-magic', 'feather-fall'],
     goldPool: 10,
     alignment: 'ng',
     background: 'sage',

@@ -89,6 +89,28 @@ export function getMaxPrepared(character: Character, level: number): number {
   return Math.max(1, level + getAbilityMod(character, classDef.spellcasting.ability));
 }
 
+/** Returns the highest spell slot level a character can cast based on their class and level. */
+export function getMaxCastableSlotLevel(character: Character): number {
+  const classDef = getClassDef(character.class);
+  if (!classDef?.spellcasting) return 0;
+  const level = character.level;
+  if (character.class === 'warlock') {
+    return getMaxPactSlotLevel(character);
+  }
+  const slotsRow = classDef.spellcasting.spellSlots?.[Math.min(level - 1, classDef.spellcasting.spellSlots.length - 1)];
+  if (slotsRow) {
+    for (let i = slotsRow.length - 1; i >= 0; i--) {
+      if (slotsRow[i] > 0) return i + 1;
+    }
+  }
+  return 0;
+}
+
+/** Returns the total capacity of a Wizard's spellbook at a given level (6 at Level 1, +2 per level gained). */
+export function getWizardSpellbookCapacity(level: number): number {
+  return 6 + Math.max(0, (level - 1) * 2);
+}
+
 /** Validates whether a character can learn a specific spell (correct class, level-appropriate cantrip/spell count). */
 export function canLearnSpell(character: Character, spellId: string): { ok: boolean; reason?: string } {
   const spell = SPELLS_BY_ID[spellId.toLowerCase()];
@@ -106,6 +128,10 @@ export function canLearnSpell(character: Character, spellId: string): { ok: bool
     }
     return { ok: true };
   }
+  const maxSlot = getMaxCastableSlotLevel(character);
+  if (spell.level > maxSlot) {
+    return { ok: false, reason: `${spell.name} is a level ${spell.level} spell, but you can only cast up to level ${maxSlot} spells.` };
+  }
   if (classDef.spellcasting.prepMode === 'known') {
     const cap = getSpellsKnown(character, character.level);
     const currentKnown = (character.knownSpells ?? []).filter(sid => (SPELLS_BY_ID[sid]?.level ?? 1) !== 0).length;
@@ -122,7 +148,13 @@ export function learnSpell(character: Character, spellId: string): boolean {
   if (!check.ok) return false;
   const spell = SPELLS_BY_ID[spellId.toLowerCase()];
   character.knownSpells ??= [];
-  if (spell && !character.knownSpells.includes(spell.id)) character.knownSpells.push(spell.id);
+  if (spell && !character.knownSpells.includes(spell.id)) {
+    character.knownSpells.push(spell.id);
+    if (spell.level > 0 && character.class === 'wizard' && character.pendingWizardSpells && character.pendingWizardSpells > 0) {
+      character.pendingWizardSpells -= 1;
+      if (character.pendingWizardSpells <= 0) delete character.pendingWizardSpells;
+    }
+  }
   return true;
 }
 
@@ -138,6 +170,9 @@ export function prepareSpell(character: Character, spellId: string): { ok: boole
     return { ok: false, reason: `${classDef.name} cannot prepare ${spell.name}.` };
   }
   if (spell.level === 0) return { ok: true };
+  if (character.class === 'wizard' && !(character.knownSpells ?? []).includes(spell.id)) {
+    return { ok: false, reason: `${spell.name} is not in your spellbook.` };
+  }
   character.preparedSpells ??= [];
   if (character.preparedSpells.includes(spell.id)) return { ok: true };
   const max = getMaxPrepared(character, character.level);

@@ -212,10 +212,10 @@ describe('buildCharacterFromWizard', () => {
     const cantrips = ['fire-bolt', 'minor-illusion'];
     const spells = ['magic-missile', 'shield'];
 
-    it('prepared caster (wizard): knownSpells = cantrips only, preparedSpells = cantrips + spells', () => {
+    it('prepared caster without spellbook (cleric): knownSpells = cantrips only, preparedSpells = cantrips + spells', () => {
       const { character } = buildCharacterFromWizard(
         baseWizard({
-          selectedClass: CLASSES_BY_ID['wizard'],
+          selectedClass: CLASSES_BY_ID['cleric'],
           selectedCantrips: cantrips,
           selectedSpells: spells,
         }),
@@ -308,6 +308,22 @@ describe('buildCharacterFromWizard', () => {
       );
       expect(character?.knownSpells).toEqual([]);
       expect(character?.preparedSpells).toEqual([]);
+    });
+
+    it('populates knownSpells with spellbook choices and preparedSpells up to maxPrepared for Wizard', () => {
+      const { character } = buildCharacterFromWizard(
+        baseWizard({
+          selectedClass: CLASSES_BY_ID['wizard'],
+          stats: { str: 8, dex: 14, con: 12, int: 16, wis: 10, cha: 10 }, // intMod +3, L1 maxPrepared = 4
+          selectedCantrips: ['fire-bolt', 'light', 'mage-hand'],
+          selectedSpells: ['magic-missile', 'shield', 'burning-hands', 'sleep', 'detect-magic', 'feather-fall'],
+        }),
+        { isNewCampaign: true }
+      );
+      // knownSpells receives cantrips + all 6 spellbook choices
+      expect(character?.knownSpells).toEqual(['fire-bolt', 'light', 'mage-hand', 'magic-missile', 'shield', 'burning-hands', 'sleep', 'detect-magic', 'feather-fall']);
+      // preparedSpells receives cantrips + first 4 spellbook choices (maxPrepared = 4)
+      expect(character?.preparedSpells).toEqual(['fire-bolt', 'light', 'mage-hand', 'magic-missile', 'shield', 'burning-hands', 'sleep']);
     });
   });
 

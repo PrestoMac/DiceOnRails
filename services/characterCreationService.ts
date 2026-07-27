@@ -93,8 +93,18 @@ export function buildCharacterFromWizard(
       feats: collectedFeats, featSelections, featChoices, pendingFeatChoice: false,
       resources, racialTraits,
       conditionsImmunities: (selectedRace.id === 'elf' || selectedRace.id === 'half-elf') ? ['sleep'] : undefined,
-      knownSpells: !selectedClass.spellcasting ? [] : (selectedClass.spellcasting.prepMode === 'prepared' ? [...selectedCantrips] : [...selectedCantrips, ...selectedSpells]),
-      preparedSpells: !selectedClass.spellcasting ? [] : (selectedClass.spellcasting.prepMode === 'prepared' ? [...selectedCantrips, ...selectedSpells] : [...selectedCantrips]),
+      knownSpells: !selectedClass.spellcasting ? [] : (
+        selectedClass.id === 'wizard' || selectedClass.spellcasting.prepMode === 'known'
+          ? [...selectedCantrips, ...selectedSpells]
+          : [...selectedCantrips]
+      ),
+      preparedSpells: !selectedClass.spellcasting ? [] : (
+        selectedClass.id === 'wizard'
+          ? [...selectedCantrips, ...selectedSpells.slice(0, Math.max(1, level + getMod(fs.int)))]
+          : selectedClass.spellcasting.prepMode === 'prepared'
+          ? [...selectedCantrips, ...selectedSpells]
+          : [...selectedCantrips]
+      ),
       subclassId: selectedSubclassId || undefined,
       backstory: backstory || undefined,
       alignment: alignment || undefined,

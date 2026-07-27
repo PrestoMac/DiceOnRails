@@ -353,6 +353,15 @@ const LevelUpModal: React.FC<LevelUpModalProps> = ({ character, selectedAllocati
                 <span>You may swap one known spell for another. Use the "Manage Spells" button on your character sheet or input bar after closing this modal.</span>
               </div>
             )}
+            {character.class === 'wizard' && (
+              <div className="bg-amber-950/40 border border-amber-800/50 rounded-lg p-2.5 flex items-center gap-2 text-xs text-amber-200">
+                <i className="fas fa-book-bookmark text-amber-400"></i>
+                <span>
+                  Wizard Spellbook: You gain 2 new spells of your choice for your spellbook on level-up.
+                  {character.pendingWizardSpells ? ` (${character.pendingWizardSpells} pending)` : ''} Use the "Spellbook" button on your character sheet to learn them anytime.
+                </span>
+              </div>
+            )}
             {classDef?.spellcasting && <div className="bg-stone-950/40 border border-stone-850 rounded-lg p-3 space-y-2">
               <div className="flex justify-between items-center">
                 <span className="text-[10px] uppercase text-stone-400 font-bold">Spellcasting Ability</span>
@@ -381,16 +390,26 @@ const LevelUpModal: React.FC<LevelUpModalProps> = ({ character, selectedAllocati
               ))}
             </div>
             {classDef?.spellcasting && <div>
-              <h4 className="text-[10px] uppercase font-bold text-stone-400 tracking-widest mb-2 mt-3">Known / Prepared Spells</h4>
+              <h4 className="text-[10px] uppercase font-bold text-stone-400 tracking-widest mb-2 mt-3">
+                {character.class === 'wizard' ? 'Spellbook Spells (Known)' : classDef.spellcasting.prepMode === 'prepared' ? 'Prepared Spells' : 'Known Spells'}
+              </h4>
               <div className="max-h-40 overflow-y-auto space-y-1 custom-scrollbar">
-                {(classDef.spellcasting.prepMode === 'prepared' ? (character.preparedSpells || []) : (character.knownSpells || [])).map(sid => {
+                {(character.knownSpells || []).map(sid => {
                   const spell = SPELLS_BY_ID[sid];
+                  const isPrep = (character.preparedSpells || []).includes(sid);
                   return spell ? <div key={sid} className="flex items-center justify-between bg-stone-950/30 border border-stone-850 rounded p-2">
-                    <span className="text-xs text-stone-300">{spell.name}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-stone-300">{spell.name}</span>
+                      {character.class === 'wizard' && spell.level > 0 && (
+                        <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${isPrep ? 'bg-amber-900/40 text-amber-300 border border-amber-800/40' : 'bg-stone-800 text-stone-500'}`}>
+                          {isPrep ? 'Prepared' : 'In Spellbook'}
+                        </span>
+                      )}
+                    </div>
                     <span className="text-[10px] text-stone-500 capitalize">{spell.school} L{spell.level}</span>
                   </div> : null;
                 })}
-                {(classDef.spellcasting.prepMode === 'prepared' ? (character.preparedSpells || []).length : (character.knownSpells || []).length) === 0 && <p className="text-xs text-stone-500 text-center py-4 italic">Select spells at character creation or during level-up.</p>}
+                {(character.knownSpells || []).length === 0 && <p className="text-xs text-stone-500 text-center py-4 italic">Select spells at character creation or during level-up.</p>}
               </div>
             </div>}
           </div>}

@@ -598,7 +598,18 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
         return fail(`${spell.name} cannot be cast as a ritual.`);
       }
 
+      const isWizardSpellbookRitual = char.class === 'wizard' && (char.knownSpells ?? []).includes(spell.id) && !char.preparedSpells?.includes(spell.id);
+      if (isWizardSpellbookRitual) {
+        char.preparedSpells ??= [];
+        char.preparedSpells.push(spell.id);
+      }
+
       const result = engineCastSpell(char, spellId, spell.level as 0|1|2|3|4|5|6|7|8|9, []);
+
+      if (isWizardSpellbookRitual) {
+        const idx = char.preparedSpells?.indexOf(spell.id) ?? -1;
+        if (idx > -1) char.preparedSpells?.splice(idx, 1);
+      }
 
       state.sessionLogs.push(`${char.name} casts ${spell.name} as a ritual.`);
 
