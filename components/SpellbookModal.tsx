@@ -79,17 +79,22 @@ const SpellbookModal: React.FC<SpellbookModalProps> = ({
     () => classDef ? getSpellsForClass(classDef.id) : [],
     [classDef]
   );
-  const availableToPrepare = useMemo(
-    () => isPrepared
-      ? classCatalog
-          .filter(s => s.level > 0 && s.level <= maxCastableLevel)
-          .filter(s => isWizard ? (character.knownSpells ?? []).includes(s.id) : true)
-          .filter(s => !(character.preparedSpells ?? []).includes(s.id))
-          .filter(s => filter === 'all' || s.tags?.includes(filter))
-          .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name))
-      : [],
-    [isPrepared, isWizard, classCatalog, character.knownSpells, character.preparedSpells, maxCastableLevel, filter]
-  );
+  const masterSpellList = useMemo(() => {
+    if (!isPrepared) return [];
+    const source = isWizard
+      ? knownLeveled
+      : classCatalog.filter(s => s.level > 0 && s.level <= maxCastableLevel);
+
+    return source
+      .filter(s => filter === 'all' || s.tags?.includes(filter))
+      .sort((a, b) => {
+        const aPrep = (character.preparedSpells ?? []).includes(a.id);
+        const bPrep = (character.preparedSpells ?? []).includes(b.id);
+        if (aPrep !== bPrep) return aPrep ? -1 : 1;
+        return a.level - b.level || a.name.localeCompare(b.name);
+      });
+  }, [isPrepared, isWizard, knownLeveled, classCatalog, maxCastableLevel, filter, character.preparedSpells]);
+
   const availableToLearnSpellbook = useMemo(
     () => isWizard
       ? classCatalog
@@ -377,22 +382,22 @@ const SpellbookModal: React.FC<SpellbookModalProps> = ({
             </div>
           )}
 
-          {/* CONSOLIDATED PREPARED CASTER VIEW (Wizard, Cleric, Druid, Paladin) */}
+          {/* CONSOLIDATED 1-SECTION PREPARED CASTER VIEW (Wizard, Cleric, Druid, Paladin) */}
 
           {isPrepared && (
-            <div className="space-y-4">
-              {/* Preparation Slots Header */}
-              <div className="flex items-center justify-between bg-stone-950/50 border border-stone-800 rounded-lg px-3 py-2">
+            <div className="space-y-3">
+              {/* Preparation Slots Banner */}
+              <div className="flex items-center justify-between bg-stone-950/60 border border-stone-800 rounded-lg px-3 py-2">
                 <div className="flex items-center gap-2">
                   <span className="text-xs uppercase tracking-wider text-stone-400 font-bold">Preparation Slots</span>
                   {isWizard && (
                     <span className="text-[10px] px-1.5 py-0.5 bg-indigo-950/80 text-indigo-300 border border-indigo-800/60 rounded font-semibold flex items-center gap-1">
-                      <i className="fas fa-book text-[9px]"></i> Spellbook: {knownLeveled.length} Spells
+                      <i className="fas fa-book text-[9px]"></i> {knownLeveled.length} Spells in Book
                     </span>
                   )}
                 </div>
                 <span className={`font-mono text-sm font-bold ${preparedCount > maxPrepared ? 'text-red-500' : 'text-amber-400'}`}>
-                  {preparedCount} / {maxPrepared}
+                  {preparedCount} / {maxPrepared} Prepared
                 </span>
               </div>
 
@@ -431,46 +436,11 @@ const SpellbookModal: React.FC<SpellbookModalProps> = ({
                 </div>
               )}
 
-              {/* Currently Prepared Spells */}
+              {/* Single Master List Section with Toggle Buttons */}
               <div>
-                <p className="text-[10px] uppercase font-bold text-stone-500 tracking-widest mb-1.5">Currently Prepared Spells</p>
-                {preparedLeveled.length === 0 ? (
-                  <p className="text-xs text-stone-600 italic bg-stone-950/40 rounded-lg p-2.5 border border-stone-800/50">No leveled spells currently prepared.</p>
-                ) : (
-                  <div className="space-y-1.5">
-                    {preparedLeveled.map(spell => (
-                      <div key={spell.id} className="flex items-center justify-between bg-stone-950 rounded-lg px-3 py-1.5 border border-stone-800">
-                        <button
-                          onClick={() => setViewingSpell(spell)}
-                          className="flex items-center gap-2 text-left hover:text-amber-400 transition-colors"
-                        >
-                          <i className={`fas ${SCHOOL_ICONS[spell.school] || 'fa-star'} text-[10px] text-stone-500 w-3`}></i>
-                          <span className="text-xs text-stone-300">{spell.name}</span>
-                          <span className="text-[9px] text-stone-600 uppercase">{levelLabel(spell.level)}</span>
-                          {spell.ritual && (
-                            <span className="text-[9px] px-1.5 py-0.5 bg-indigo-950 text-indigo-300 border border-indigo-800/60 rounded font-semibold flex items-center gap-1">
-                              <i className="fas fa-sparkles text-[7px]"></i> Ritual
-                            </span>
-                          )}
-                        </button>
-                        <button
-                          onClick={() => handleUnprepare(spell.id)}
-                          disabled={busy || isCombatActive}
-                          className="text-[10px] px-2 py-0.5 rounded bg-stone-800 hover:bg-red-900/40 text-stone-400 hover:text-red-300 border border-stone-700 hover:border-red-800/50 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                          Unprepare
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Available to Prepare */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center justify-between mb-2">
                   <p className="text-[10px] uppercase font-bold text-stone-500 tracking-widest">
-                    {isWizard ? 'Prepare from Spellbook' : 'Available to Prepare'}
+                    {isWizard ? 'Spellbook Spells (Toggle Prepared State)' : 'Class Spells (Toggle Prepared State)'}
                   </p>
                   <div className="flex flex-wrap gap-1">
                     {SPELL_FILTERS.map(f => (
@@ -488,38 +458,61 @@ const SpellbookModal: React.FC<SpellbookModalProps> = ({
                     ))}
                   </div>
                 </div>
-                {availableToPrepare.length === 0 ? (
-                  <p className="text-xs text-stone-600 italic bg-stone-950/40 rounded-lg p-2.5 border border-stone-800/50">No matching unprepared spells available.</p>
+
+                {masterSpellList.length === 0 ? (
+                  <p className="text-xs text-stone-600 italic bg-stone-950/40 rounded-lg p-2.5 border border-stone-800/50">No spells found matching the selected filter.</p>
                 ) : (
-                  <div className="space-y-1.5 max-h-64 overflow-y-auto custom-scrollbar pr-1">
-                    {availableToPrepare.slice(0, 60).map(spell => {
+                  <div className="space-y-1.5 max-h-80 overflow-y-auto custom-scrollbar pr-1">
+                    {masterSpellList.map(spell => {
+                      const isPrep = (character.preparedSpells ?? []).includes(spell.id);
                       const atCap = preparedCount >= maxPrepared;
                       return (
-                        <div key={spell.id} className="flex items-center justify-between bg-stone-950/50 rounded-lg px-3 py-1.5 border border-stone-800/70">
+                        <div
+                          key={spell.id}
+                          className={`flex items-center justify-between rounded-lg px-3 py-1.5 border transition-all ${
+                            isPrep
+                              ? 'bg-emerald-950/30 border-emerald-800/60 text-emerald-200'
+                              : 'bg-stone-950/60 border-stone-800/80 text-stone-300'
+                          }`}
+                        >
                           <button
                             onClick={() => setViewingSpell(spell)}
                             className="flex items-center gap-2 text-left hover:text-amber-400 transition-colors"
                           >
-                            <i className={`fas ${SCHOOL_ICONS[spell.school] || 'fa-star'} text-[10px] text-stone-500 w-3`}></i>
-                            <span className="text-xs text-stone-300">{spell.name}</span>
-                            <span className="text-[9px] text-stone-600 uppercase">{levelLabel(spell.level)}</span>
+                            <i className={`fas ${SCHOOL_ICONS[spell.school] || 'fa-star'} text-[10px] ${isPrep ? 'text-emerald-400' : 'text-stone-500'} w-3`}></i>
+                            <span className={`text-xs ${isPrep ? 'font-semibold text-emerald-200' : 'text-stone-300'}`}>{spell.name}</span>
+                            <span className="text-[9px] text-stone-500 uppercase">{levelLabel(spell.level)}</span>
                             {spell.ritual && (
-                              <Tooltip content={isWizard ? "Wizards can cast ritual spells directly from their spellbook without preparing them!" : "Ritual spell"} side="top">
+                              <Tooltip content={isWizard ? "Wizards can cast ritual spells directly from their spellbook without preparing them!" : "Ritual spell (10 min cast, 0 slots)"} side="top">
                                 <span className="text-[9px] px-1.5 py-0.5 bg-indigo-950 text-indigo-300 border border-indigo-800/60 rounded font-semibold flex items-center gap-1">
                                   <i className="fas fa-sparkles text-[7px]"></i> Ritual
                                 </span>
                               </Tooltip>
                             )}
                           </button>
-                          <Tooltip content={atCap ? `Cap reached (${maxPrepared}). Unprepare a spell first.` : ''} side="left">
+
+                          {isPrep ? (
                             <button
-                              onClick={() => handlePrepare(spell.id)}
-                              disabled={busy || isCombatActive || atCap}
-                              className="text-[10px] px-2 py-0.5 rounded bg-stone-800 hover:bg-amber-900/40 text-stone-400 hover:text-amber-300 border border-stone-700 hover:border-amber-800/50 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                              onClick={() => handleUnprepare(spell.id)}
+                              disabled={busy || isCombatActive}
+                              className="text-[10px] px-2.5 py-0.5 rounded bg-emerald-900/60 hover:bg-red-900/60 text-emerald-200 hover:text-red-200 border border-emerald-700 hover:border-red-700 transition-all font-semibold flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed group"
+                              title="Click to unprepare"
                             >
-                              Prepare
+                              <i className="fas fa-check text-[8px] group-hover:hidden"></i>
+                              <i className="fas fa-times text-[8px] hidden group-hover:inline"></i>
+                              <span>Prepared</span>
                             </button>
-                          </Tooltip>
+                          ) : (
+                            <Tooltip content={atCap ? `Preparation cap reached (${maxPrepared}). Unprepare another spell first.` : ''} side="left">
+                              <button
+                                onClick={() => handlePrepare(spell.id)}
+                                disabled={busy || isCombatActive || atCap}
+                                className="text-[10px] px-2.5 py-0.5 rounded bg-stone-800 hover:bg-amber-900/50 text-stone-400 hover:text-amber-200 border border-stone-700 hover:border-amber-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                              >
+                                + Prepare
+                              </button>
+                            </Tooltip>
+                          )}
                         </div>
                       );
                     })}
@@ -530,6 +523,7 @@ const SpellbookModal: React.FC<SpellbookModalProps> = ({
           )}
 
           {/* KNOWN CASTER PATH */}
+
 
           {isKnown && (
             <>

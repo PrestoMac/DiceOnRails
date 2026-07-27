@@ -692,7 +692,8 @@ Differences:
 | `DiceRollModal` | Big animated dice popup for skill checks / attacks. |
 | `LevelUpModal` | Allocates stat points, picks ASI vs. Feat, picks subclass features. |
 | `ArcaneRecoveryModal` | Wizard-only modal for choosing which spell slots to recover via Arcane Recovery (once per long rest). Opens from InputArea. |
-| `SpellbookModal` | Caster spell management with class archetype badges (`Prepared (Spellbook)`, `Prepared (Full List)`, `Known Spontaneous`), dynamic rule banners, and tooltip guidance. Prepared casters (including Wizards) use a consolidated two-pane layout ("Currently Prepared" vs "Available to Prepare" from spellbook/catalog). Known casters use a 2-column Swap Tracker Grid ("Leveled Swap" and "Cantrip Swap") to swap spells per level-up (Tasha's rule) or long rest (2024 cantrip rule). Opens from CharacterSheet "Manage" button + InputArea Quick Action. Locked in combat. |
+| `SpellbookModal` | Caster spell management with class archetype badges (`Prepared (Spellbook)`, `Prepared (Full List)`, `Known Spontaneous`), dynamic rule banners, and tooltip guidance. Prepared casters (including Wizards) use a consolidated 1-section master list layout with 1-click toggle buttons (`[ ✓ Prepared ]` / `[ + Prepare ]`), with prepared spells sorted to the top. Known casters use a 2-column Swap Tracker Grid ("Leveled Swap" and "Cantrip Swap") to swap spells per level-up (Tasha's rule) or long rest (2024 cantrip rule). Opens from CharacterSheet "Manage" button + InputArea Quick Action. Locked in combat. |
+
 
 | `FeatDetailModal` | Reference modal for feat definitions. |
 | `ErrorBoundary` | Wraps the Play layout; catches render errors so a single bad turn doesn't kill the session. |
