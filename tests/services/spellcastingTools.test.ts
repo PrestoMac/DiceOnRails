@@ -552,14 +552,30 @@ describe('cast_ritual', () => {
     server = new MockMCPServer();
   });
 
-  it('casts a valid spell as ritual without auto-advancing time', async () => {
+  it('casts a valid spell as ritual without consuming spell slots', async () => {
     const wizard = makeWizard();
+    server.joinParty(wizard);
+    const slot = wizard.resources?.find(r => r.id === 'spell-slot-1');
+    const initialSlots = slot?.current ?? 0;
+
+    const result = await server.cast_ritual('wizard-1', 'detect-magic');
+
+    expect(result.success).toBe(true);
+    expect(result.data?.ritual).toBe(true);
+    expect(slot?.current).toBe(initialSlots);
+  });
+
+  it('casts a ritual spell even when 0 spell slots remain', async () => {
+    const wizard = makeWizard();
+    const slot = wizard.resources?.find(r => r.id === 'spell-slot-1');
+    if (slot) slot.current = 0;
     server.joinParty(wizard);
 
     const result = await server.cast_ritual('wizard-1', 'detect-magic');
 
     expect(result.success).toBe(true);
     expect(result.data?.ritual).toBe(true);
+    expect(slot?.current).toBe(0);
   });
 
   it('invalid spell returns fail', async () => {

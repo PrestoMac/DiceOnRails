@@ -604,7 +604,7 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
         char.preparedSpells.push(spell.id);
       }
 
-      const result = engineCastSpell(char, spellId, spell.level as 0|1|2|3|4|5|6|7|8|9, []);
+      const result = engineCastSpell(char, spellId, spell.level as 0|1|2|3|4|5|6|7|8|9, [], undefined, { isRitual: true });
 
       if (isWizardSpellbookRitual) {
         const idx = char.preparedSpells?.indexOf(spell.id) ?? -1;

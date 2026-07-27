@@ -225,17 +225,22 @@ export function castSpell(
   spellId: string,
   slotLevel: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9,
   targets: { id: string; ac?: number; saveBonus?: number }[] = [],
-  combat?: { enemies: { id: string; hp: { current: number; max: number }; name?: string }[]; party?: { id: string; hp: { current: number; max: number }; name?: string }[] }
+  combat?: { enemies: { id: string; hp: { current: number; max: number }; name?: string }[]; party?: { id: string; hp: { current: number; max: number }; name?: string }[] },
+  options?: { isRitual?: boolean }
 ): CastResult {
   const spell = SPELLS_BY_ID[spellId.toLowerCase()];
   if (!spell) return { success: false, reason: 'Unknown spell.' };
   const classDef = getClassDef(character.class);
   if (!classDef?.spellcasting) return { success: false, reason: `${classDef?.name || 'This class'} cannot cast spells.` };
 
-  if (spell.level === 0) {
+  if (spell.level === 0 || options?.isRitual) {
     const known = character.knownSpells ?? [];
     const prepared = character.preparedSpells ?? [];
-    if (!known.includes(spell.id) && !prepared.includes(spell.id)) {
+    if (character.class === 'wizard' && options?.isRitual) {
+      if (!known.includes(spell.id)) {
+        return { success: false, reason: `${spell.name} is not in your spellbook.` };
+      }
+    } else if (!known.includes(spell.id) && !prepared.includes(spell.id)) {
       return { success: false, reason: `${spell.name} is not in your known/prepared spell list.` };
     }
   } else {
@@ -255,6 +260,7 @@ export function castSpell(
     }
     consumeSpellSlot(character, slotLevel as 1|2|3|4|5|6|7|8|9);
   }
+
 
   let concentrationStarted = false;
   let concentrationEnded = false;
