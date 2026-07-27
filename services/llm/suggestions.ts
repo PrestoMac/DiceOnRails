@@ -49,6 +49,10 @@ export function pickSuggestionsForCharacter(
     if (characterId && state.lastSuggestionsByCharacter) {
         const entry = state.lastSuggestionsByCharacter[characterId];
         if (entry && entry.length > 0) return entry;
+        // Per-character map is authoritative when it exists — don't fall through
+        // to the deprecated lastSuggestions (which the agent loop may mutate on
+        // the same object reference during processing, causing chips to reappear).
+        return [];
     }
     return state.lastSuggestions;
 }

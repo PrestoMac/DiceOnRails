@@ -72,12 +72,12 @@ describe('pickSuggestionsForCharacter', () => {
         });
         expect(pickSuggestionsForCharacter(s, 'hero-1')).toEqual(['A', 'B']);
     });
-    it('falls back to lastSuggestions when the per-character entry is absent', () => {
+    it('returns empty when the per-character entry is absent (map is authoritative)', () => {
         const s = makeGameState({
             lastSuggestionsByCharacter: { 'other-char': ['X'] },
             lastSuggestions: ['legacy'],
         });
-        expect(pickSuggestionsForCharacter(s, 'hero-1')).toEqual(['legacy']);
+        expect(pickSuggestionsForCharacter(s, 'hero-1')).toEqual([]);
     });
     it('falls back to lastSuggestions when no characterId is supplied', () => {
         const s = makeGameState({ lastSuggestions: ['legacy'] });
@@ -87,12 +87,12 @@ describe('pickSuggestionsForCharacter', () => {
         const s = makeGameState({});
         expect(pickSuggestionsForCharacter(s, 'hero-1')).toBeUndefined();
     });
-    it('ignores empty per-character arrays and falls through', () => {
+    it('returns empty when the per-character array is empty (no fallthrough)', () => {
         const s = makeGameState({
             lastSuggestionsByCharacter: { 'hero-1': [] },
             lastSuggestions: ['legacy'],
         });
-        expect(pickSuggestionsForCharacter(s, 'hero-1')).toEqual(['legacy']);
+        expect(pickSuggestionsForCharacter(s, 'hero-1')).toEqual([]);
     });
 });
 
