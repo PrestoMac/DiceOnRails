@@ -257,7 +257,12 @@ export interface Character {
    *  long_rest for all spellcasting characters. Consumed (set false) by
    *  swap_known_spell when swapping a cantrip. */
   cantripSwapAvailable?: boolean;
+  /** 2024 SRD rule: allows swapping 1 prepared spell per short rest for prepared casters. */
+  shortRestSpellSwapAvailable?: boolean;
+  /** Full spell preparation mode (available after a long rest or on fresh character setup). */
+  longRestPrepAvailable?: boolean;
   raging?: boolean;
+
   tempHp?: number;
   conditionsImmunities?: string[];
   conditions?: ActiveCondition[];

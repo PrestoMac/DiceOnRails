@@ -380,6 +380,40 @@ describe('manage_spellbook', () => {
 
     expect(result.success).toBe(false);
   });
+
+  it('allows 1 spell swap on short rest per 2024 SRD rule', async () => {
+    const wizard = makeWizard();
+    wizard.knownSpells = ['fireball', 'detect-magic', 'shield', 'magic-missile'];
+    wizard.preparedSpells = ['fireball'];
+    wizard.longRestPrepAvailable = false;
+    wizard.shortRestSpellSwapAvailable = true;
+    server.joinParty(wizard);
+
+    const result = await server.manage_spellbook('wizard-1', 'prepare', 'shield');
+
+    expect(result.success).toBe(true);
+    expect(wizard.preparedSpells).toContain('shield');
+    expect(wizard.shortRestSpellSwapAvailable).toBe(false);
+
+    // Second swap without another rest fails
+    const result2 = await server.manage_spellbook('wizard-1', 'prepare', 'magic-missile');
+    expect(result2.success).toBe(false);
+    expect(result2.message).toContain('Rest');
+  });
+
+  it('rejects preparing spells when no rest is active', async () => {
+    const wizard = makeWizard();
+    wizard.knownSpells = ['fireball', 'detect-magic', 'shield'];
+    wizard.preparedSpells = ['fireball'];
+    wizard.longRestPrepAvailable = false;
+    wizard.shortRestSpellSwapAvailable = false;
+    server.joinParty(wizard);
+
+    const result = await server.manage_spellbook('wizard-1', 'prepare', 'shield');
+
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('Rest');
+  });
 });
 
 describe('summon_creature', () => {

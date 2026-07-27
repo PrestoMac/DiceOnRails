@@ -383,22 +383,49 @@ const SpellbookModal: React.FC<SpellbookModalProps> = ({
           )}
 
           {/* CONSOLIDATED 1-SECTION PREPARED CASTER VIEW (Wizard, Cleric, Druid, Paladin) */}
-
           {isPrepared && (
+
             <div className="space-y-3">
-              {/* Preparation Slots Banner */}
-              <div className="flex items-center justify-between bg-stone-950/60 border border-stone-800 rounded-lg px-3 py-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs uppercase tracking-wider text-stone-400 font-bold">Preparation Slots</span>
-                  {isWizard && (
-                    <span className="text-[10px] px-1.5 py-0.5 bg-indigo-950/80 text-indigo-300 border border-indigo-800/60 rounded font-semibold flex items-center gap-1">
-                      <i className="fas fa-book text-[9px]"></i> {knownLeveled.length} Spells in Book
-                    </span>
+              {/* Preparation Slots & SRD Rest Gating Banner */}
+              <div className="flex flex-col gap-2 bg-stone-950/60 border border-stone-800 rounded-lg p-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs uppercase tracking-wider text-stone-400 font-bold">Preparation Slots</span>
+                    {isWizard && (
+                      <span className="text-[10px] px-1.5 py-0.5 bg-indigo-950/80 text-indigo-300 border border-indigo-800/60 rounded font-semibold flex items-center gap-1">
+                        <i className="fas fa-book text-[9px]"></i> {knownLeveled.length} Spells in Book
+                      </span>
+                    )}
+                  </div>
+                  <span className={`font-mono text-sm font-bold ${preparedCount > maxPrepared ? 'text-red-500' : 'text-amber-400'}`}>
+                    {preparedCount} / {maxPrepared} Prepared
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t border-stone-800/60 text-xs">
+                  <span className="text-[11px] text-stone-400 font-medium flex items-center gap-1.5">
+                    <i className="fas fa-hourglass-half text-stone-500"></i> Rest Prep Status:
+                  </span>
+                  {(character.longRestPrepAvailable ?? true) ? (
+                    <Tooltip content="Full Spell Preparation active (Long Rest). Modify your prepared spells freely." side="top">
+                      <span className="text-[9px] px-2 py-0.5 rounded font-bold uppercase bg-emerald-950/80 text-emerald-300 border border-emerald-800/60 flex items-center gap-1">
+                        <i className="fas fa-sun text-emerald-400 text-[8px]"></i> Full Prep (Long Rest)
+                      </span>
+                    </Tooltip>
+                  ) : character.shortRestSpellSwapAvailable ? (
+                    <Tooltip content="2024 SRD rule: You can swap 1 prepared spell per short rest." side="top">
+                      <span className="text-[9px] px-2 py-0.5 rounded font-bold uppercase bg-amber-950/80 text-amber-300 border border-amber-800/60 flex items-center gap-1">
+                        <i className="fas fa-campground text-amber-400 text-[8px]"></i> 1 Swap Ready (Short Rest)
+                      </span>
+                    </Tooltip>
+                  ) : (
+                    <Tooltip content="Take a Short Rest (swap 1 spell) or Long Rest (full re-prepare) to change spells." side="top">
+                      <span className="text-[9px] px-2 py-0.5 rounded font-bold uppercase bg-stone-900 text-stone-500 border border-stone-800 flex items-center gap-1">
+                        <i className="fas fa-lock text-[8px]"></i> Locked (Rest Required)
+                      </span>
+                    </Tooltip>
                   )}
                 </div>
-                <span className={`font-mono text-sm font-bold ${preparedCount > maxPrepared ? 'text-red-500' : 'text-amber-400'}`}>
-                  {preparedCount} / {maxPrepared} Prepared
-                </span>
               </div>
 
               {/* Pending Wizard Level-Up Additions (if any) */}
@@ -466,6 +493,16 @@ const SpellbookModal: React.FC<SpellbookModalProps> = ({
                     {masterSpellList.map(spell => {
                       const isPrep = (character.preparedSpells ?? []).includes(spell.id);
                       const atCap = preparedCount >= maxPrepared;
+                      const hasPrepAccess = (character.longRestPrepAvailable ?? true) || character.shortRestSpellSwapAvailable;
+                      const prepDisabled = busy || isCombatActive || !hasPrepAccess || (!isPrep && atCap);
+                      const disabledReason = isCombatActive
+                        ? 'Cannot change spells in combat.'
+                        : !hasPrepAccess
+                          ? 'Modifying prepared spells requires a Short Rest (swap 1) or Long Rest (full prep).'
+                          : atCap && !isPrep
+                            ? `Preparation cap reached (${maxPrepared}). Unprepare another spell first.`
+                            : '';
+
                       return (
                         <div
                           key={spell.id}
@@ -492,21 +529,22 @@ const SpellbookModal: React.FC<SpellbookModalProps> = ({
                           </button>
 
                           {isPrep ? (
-                            <button
-                              onClick={() => handleUnprepare(spell.id)}
-                              disabled={busy || isCombatActive}
-                              className="text-[10px] px-2.5 py-0.5 rounded bg-emerald-900/60 hover:bg-red-900/60 text-emerald-200 hover:text-red-200 border border-emerald-700 hover:border-red-700 transition-all font-semibold flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed group"
-                              title="Click to unprepare"
-                            >
-                              <i className="fas fa-check text-[8px] group-hover:hidden"></i>
-                              <i className="fas fa-times text-[8px] hidden group-hover:inline"></i>
-                              <span>Prepared</span>
-                            </button>
+                            <Tooltip content={prepDisabled ? disabledReason : 'Click to unprepare'} side="left">
+                              <button
+                                onClick={() => handleUnprepare(spell.id)}
+                                disabled={prepDisabled}
+                                className="text-[10px] px-2.5 py-0.5 rounded bg-emerald-900/60 hover:bg-red-900/60 text-emerald-200 hover:text-red-200 border border-emerald-700 hover:border-red-700 transition-all font-semibold flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed group"
+                              >
+                                <i className="fas fa-check text-[8px] group-hover:hidden"></i>
+                                <i className="fas fa-times text-[8px] hidden group-hover:inline"></i>
+                                <span>Prepared</span>
+                              </button>
+                            </Tooltip>
                           ) : (
-                            <Tooltip content={atCap ? `Preparation cap reached (${maxPrepared}). Unprepare another spell first.` : ''} side="left">
+                            <Tooltip content={prepDisabled ? disabledReason : ''} side="left">
                               <button
                                 onClick={() => handlePrepare(spell.id)}
-                                disabled={busy || isCombatActive || atCap}
+                                disabled={prepDisabled}
                                 className="text-[10px] px-2.5 py-0.5 rounded bg-stone-800 hover:bg-amber-900/50 text-stone-400 hover:text-amber-200 border border-stone-700 hover:border-amber-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                               >
                                 + Prepare
@@ -523,6 +561,7 @@ const SpellbookModal: React.FC<SpellbookModalProps> = ({
           )}
 
           {/* KNOWN CASTER PATH */}
+
 
 
           {isKnown && (

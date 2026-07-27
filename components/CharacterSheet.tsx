@@ -314,7 +314,8 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ character, onUpdateInve
 
       {classDef?.spellcasting && (() => {
         const maxPreparedCount = isPreparedCaster ? getMaxPrepared(character, character.level) : 0;
-        const hasPendingChoice = !!(character.pendingSpellSwap || (character.pendingWizardSpells && character.pendingWizardSpells > 0) || character.cantripSwapAvailable);
+        const hasPendingChoice = !!(character.pendingSpellSwap || (character.pendingWizardSpells && character.pendingWizardSpells > 0) || character.cantripSwapAvailable || character.shortRestSpellSwapAvailable);
+
         return (
           <div className="mt-4 space-y-2">
             <div className="flex items-center justify-between border-b border-stone-850 pb-1">

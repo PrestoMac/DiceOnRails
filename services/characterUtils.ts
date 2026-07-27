@@ -26,6 +26,9 @@ export function ensureCharacterFields(char: Character): void {
   char.pendingSubclassFeature ??= false;
   char.pendingSpellSwap ??= false;
   char.cantripSwapAvailable ??= false;
+  char.shortRestSpellSwapAvailable ??= false;
+  char.longRestPrepAvailable ??= true;
+
   // Background & persona (SRD 5.1 narrative fields). Initialized so the UI/LLM
   // never crashes on `.length`/`.trim()` against undefined; empty = "unset".
   char.alignment ??= '';

@@ -693,20 +693,37 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
           return fail(check.reason || 'Cannot learn spell.');
         }
         return { success: true, data: { spell: spell.name }, message: `${char.name} learned ${spell.name}.` };
-      } else if (action === 'prepare') {
-        const result = enginePrepareSpell(char, spellId);
-        if (!result.ok) return fail(result.reason || 'Cannot prepare spell.');
-        return { success: true, data: { spell: spell.name }, message: `${spell.name} prepared.` };
-      } else if (action === 'unprepare' || action === 'forget') {
-        if (action === 'unprepare') {
-          engineUnprepareSpell(char, spellId);
+      } else if (action === 'prepare' || action === 'unprepare') {
+        const classDef = getClassDef(char.class);
+        if (classDef?.spellcasting?.prepMode === 'prepared') {
+          const hasLongRestPrep = char.longRestPrepAvailable ?? true;
+          const hasShortRestSwap = char.shortRestSpellSwapAvailable ?? false;
+
+          if (!hasLongRestPrep && !hasShortRestSwap) {
+            return fail(`Modifying prepared spells requires a Long Rest (to re-prepare spells) or a Short Rest (2024 SRD: to swap 1 spell). Take a rest first.`);
+          }
+
+          if (action === 'prepare') {
+            const result = enginePrepareSpell(char, spellId);
+            if (!result.ok) return fail(result.reason || 'Cannot prepare spell.');
+            if (!hasLongRestPrep && hasShortRestSwap) {
+              char.shortRestSpellSwapAvailable = false;
+            }
+            return { success: true, data: { spell: spell.name }, message: `${spell.name} prepared.` };
+          } else {
+            engineUnprepareSpell(char, spellId);
+            return { success: true, data: {}, message: `${spell.name} unprepared.` };
+          }
         } else {
-          const idx = char.knownSpells.indexOf(spell.id);
-          if (idx === -1) return fail(`${spell.name} is not known by ${char.name}.`);
-          char.knownSpells.splice(idx, 1);
+          return fail(`${classDef?.name || 'This class'} does not prepare spells.`);
         }
+      } else if (action === 'forget') {
+        const idx = char.knownSpells.indexOf(spell.id);
+        if (idx === -1) return fail(`${spell.name} is not known by ${char.name}.`);
+        char.knownSpells.splice(idx, 1);
         return { success: true, data: {}, message: `${spell.name} removed.` };
       }
+
       return fail('Unknown action.');
     },
 

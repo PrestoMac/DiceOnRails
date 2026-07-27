@@ -21,7 +21,8 @@ const SpellPanel: React.FC<SpellPanelProps> = ({ character, onViewSpell, onOpenS
   const isPreparedCaster = classDef.spellcasting.prepMode === 'prepared';
   const spellList = isPreparedCaster ? character.preparedSpells : character.knownSpells;
   const maxPreparedCount = isPreparedCaster ? getMaxPrepared(character, character.level) : 0;
-  const hasPendingChoice = !!(character.pendingSpellSwap || (character.pendingWizardSpells && character.pendingWizardSpells > 0) || character.cantripSwapAvailable);
+  const hasPendingChoice = !!(character.pendingSpellSwap || (character.pendingWizardSpells && character.pendingWizardSpells > 0) || character.cantripSwapAvailable || character.shortRestSpellSwapAvailable);
+
 
   return (
     <div className="mt-4 space-y-2">

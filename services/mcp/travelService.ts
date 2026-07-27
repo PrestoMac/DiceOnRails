@@ -611,8 +611,13 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
           hitDiceMax: char.hitDice.max,
         });
         classEngineRecoverResources(char, 'long');
-        // 2024 rule: each caster can replace one cantrip after a long rest.
-        if (classDef?.spellcasting) char.cantripSwapAvailable = true;
+        // 2024 rule: each caster can replace one cantrip after a long rest, and prepared casters can re-prepare spells.
+        if (classDef?.spellcasting) {
+          char.cantripSwapAvailable = true;
+          char.shortRestSpellSwapAvailable = true;
+          char.longRestPrepAvailable = true;
+        }
+
         for (const slot of char.resources) {
           if (slot.id.startsWith('spell-slot-')) slot.current = slot.max;
         }
@@ -690,11 +695,16 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
       ensureAllCharacterFields(state.party);
       for (const char of state.party) {
         classEngineRecoverResources(char, 'short');
+        const classDef = getClassDef(char.class);
+        if (classDef?.spellcasting) {
+          char.shortRestSpellSwapAvailable = true;
+        }
         for (const slot of char.resources) {
           if (slot.id.startsWith('spell-slot-') && slot.resetOn === 'short') slot.current = slot.max;
         }
         clearNonMinuteConditions(char);
       }
+
       const resultMsg = 'Short rest completed. Short-rest resources recovered.';
 
       if (narration || autoAdvanceTime) {
