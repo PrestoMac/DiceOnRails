@@ -1425,7 +1425,7 @@ describe('MockMCPServer', () => {
     });
 
     it('prepares a spell for prepared caster', async () => {
-      const char = makeCharacter({ class: 'wizard', stats: { str: 8, dex: 14, con: 12, int: 15, wis: 10, cha: 10 }, level: 3, knownSpells: ['fireball', 'magic-missile'], preparedSpells: ['magic-missile'] });
+      const char = makeCharacter({ class: 'wizard', stats: { str: 8, dex: 14, con: 12, int: 15, wis: 10, cha: 10 }, level: 5, knownSpells: ['fireball', 'magic-missile'], preparedSpells: ['magic-missile'] });
       const server = new MockMCPServer();
       server.joinParty(char);
       const result = await server.manage_spellbook('hero-1', 'prepare', 'fireball');

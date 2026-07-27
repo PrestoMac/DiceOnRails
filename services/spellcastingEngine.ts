@@ -173,6 +173,10 @@ export function prepareSpell(character: Character, spellId: string): { ok: boole
   if (character.class === 'wizard' && !(character.knownSpells ?? []).includes(spell.id)) {
     return { ok: false, reason: `${spell.name} is not in your spellbook.` };
   }
+  const maxSlot = getMaxCastableSlotLevel(character);
+  if (spell.level > maxSlot) {
+    return { ok: false, reason: `${spell.name} is a level ${spell.level} spell, but you can only cast up to level ${maxSlot} spells.` };
+  }
   character.preparedSpells ??= [];
   if (character.preparedSpells.includes(spell.id)) return { ok: true };
   const max = getMaxPrepared(character, character.level);

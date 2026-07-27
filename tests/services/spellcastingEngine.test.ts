@@ -120,6 +120,17 @@ describe('spellcastingEngine', () => {
       expect(result.reason).toContain('not in your spellbook');
     });
 
+    it('Wizard cannot prepare a spell above their max castable slot level', () => {
+      const wiz = makeWizard({ level: 3, resources: [
+        { id: 'spell-slot-1', name: 'L1 Slots', current: 4, max: 4, resetOn: 'long', source: 'class', sourceId: 'wizard' },
+        { id: 'spell-slot-2', name: 'L2 Slots', current: 2, max: 2, resetOn: 'long', source: 'class', sourceId: 'wizard' },
+      ]});
+      wiz.knownSpells = ['magic-missile', 'fireball', 'burning-hands'];
+      const result = prepareSpell(wiz, 'fireball');
+      expect(result.ok).toBe(false);
+      expect(result.reason).toContain('only cast up to level 2');
+    });
+
     it('Bard cannot prepare spells', () => {
       const result = prepareSpell(makeBard(), 'cure-wounds');
       expect(result.ok).toBe(false);
