@@ -160,7 +160,7 @@ const DesktopLayout: React.FC = () => {
           onScrollChange={setIsChatScrolledUp}
           showWelcomeChips={onboarding.shouldShowWelcomeChips}
           onPrefillInput={(text) => { onboarding.markWelcomeSeen(); handleSendMessage(text); }}
-          suggestions={settings.enableSuggestions ? pickSuggestionsForCharacter(gameState, myCharacterId) : undefined}
+          suggestions={settings.enableSuggestions && !gameState.isProcessing ? pickSuggestionsForCharacter(gameState, myCharacterId) : undefined}
           onPickSuggestion={(text) => handleSendMessage(text)}
           onDismissSuggestion={() => {
               // Clear only the local player's entry so other players keep theirs.
