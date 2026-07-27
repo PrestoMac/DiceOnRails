@@ -14,6 +14,7 @@ import { rollDice, rollDeathSave } from '../diceEngine';
 import { parseDiceFormula } from '../../utils/dice';
 import { resolveAdvantage } from '../../utils/combatUtils';
 import { breakConcentration as engineBreakConcentration, checkConcentrationExpiry } from '../spellcastingEngine';
+import { initBattleMap, autoPlaceParty, autoPlaceEnemies, placeToken, findFreeCell } from '../gridService';
 
 /** Dependencies required by the CombatService. */
 export interface CombatDeps {
@@ -355,6 +356,16 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
         state.combat.initiative.sort((a, b) => b.initiative - a.initiative);
         const newCurrentIdx = state.combat.initiative.findIndex(e => e.id === currentActorId);
         if (newCurrentIdx >= 0) state.combat.turnIndex = newCurrentIdx;
+
+        if (state.battleMap) {
+          const spawnPos = findFreeCell(state.battleMap, { x: Math.floor((state.battleMap.width * 2) / 3), y: Math.floor(state.battleMap.height / 2) });
+          state.battleMap = placeToken(state.battleMap, {
+            id: enemy.id,
+            name: enemy.name,
+            type: 'enemy',
+            pos: spawnPos,
+          });
+        }
       }
 
       state.sessionLogs.push(`${cleanName} joins the fray!${sourceInfo}`);
@@ -430,6 +441,15 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       state.combat.isActive = true;
       state.combat.round = 1;
       state.combat.turnIndex = 0;
+
+      // Auto-initialize VTT Battle Map every time combat starts
+      if (!state.battleMap) {
+        const label = state.party[0]?.location ?? 'Battle';
+        let bmap = initBattleMap(20, 15, label);
+        bmap = autoPlaceParty(bmap, state.party.map(c => ({ id: c.id, name: c.name })));
+        bmap = autoPlaceEnemies(bmap, state.combat.enemies.filter(e => !e.isDead).map(e => ({ id: e.id, name: e.name })));
+        state.battleMap = bmap;
+      }
 
       for (const c of state.party) {
         if (c.concentrationSpellId && c.runtime && c.runtime.concentrationStartRound == null) {
@@ -672,6 +692,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
         cleared.push(...clearEndOfCombatConditions(e));
       }
       delete (state as { combat?: unknown }).combat;
+      delete (state as { battleMap?: unknown }).battleMap;
       const clearedMsg = cleared.length ? ` Cleared: ${[...new Set(cleared)].join(', ')}.` : '';
       return {
         success: true,

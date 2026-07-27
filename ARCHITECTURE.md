@@ -524,11 +524,12 @@ Pure-function grid service for the Virtual Tabletop integration. Zero side-effec
 
 **Integration points:**
 - `GameState.battleMap?: BattleMap` — optional additive field; absent in existing saves = VTT inactive.
+- `combatService.ts`: `start_combat` automatically initializes `state.battleMap` (auto-placing party & enemies) every time combat starts. `end_combat` clears it.
 - `mcpService.ts` dispatches `move_token` and `init_battle_map` tool calls.
-- `agentLoop.ts` injects `buildGridContextString()` into `contextParts` when `battleMap` is present.
-- `services/llm/prompts/mapPrompt.ts` is appended to the system message, teaching the LLM range rules and turn flow.
+- `agentLoop.ts` injects `buildGridContextString()` into `contextParts` whenever `battleMap` is present.
+- `services/llm/prompts/mapPrompt.ts` is appended to the system message, strictly enforcing Chebyshev movement budgets and 5e attack ranges.
 - `components/BattleMapPanel.tsx` renders the canvas and handles drag-and-drop (host only).
-- `components/layouts/DesktopLayout.tsx` embeds `BattleMapPanel` as a collapsible panel below `CombatTracker`.
+- `components/layouts/DesktopLayout.tsx` and `MobileLayout.tsx` embed `BattleMapPanel` as a collapsible panel below `CombatTracker`.
 
 ### `progressionService.ts`
 
