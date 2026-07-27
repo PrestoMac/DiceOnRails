@@ -283,7 +283,6 @@ const BattleMapPanel: React.FC<BattleMapPanelProps> = ({
       ctx.fillText(isDead ? '✕' : getInitials(token.name), cx, cy);
 
       // Size indicator dot for Large+ creatures
-      const size = token.size ?? 1;
       if (size > 1) {
         ctx.beginPath();
         ctx.arc(cx + radius - 3, cy - radius + 3, 3, 0, Math.PI * 2);
