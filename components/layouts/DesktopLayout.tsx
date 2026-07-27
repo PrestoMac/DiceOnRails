@@ -21,7 +21,6 @@ import { useOnboarding } from '../../hooks/useOnboarding';
 import { formatGameTime } from '../../utils/timeUtils';
 import { mcpServer } from '../../services/mcpService';
 import { pickSuggestionsForCharacter } from '../../services/llm/suggestions';
-import { generateMapImage } from '../../services/llm/mapGeneration';
 import { initBattleMap, autoPlaceParty, autoPlaceEnemies } from '../../services/gridService';
 
 /** Primary desktop layout with resizable sidebar, chat log, input area, and full header controls. */
@@ -115,31 +114,6 @@ const DesktopLayout: React.FC = () => {
     );
     syncState();
   }, [gameState.battleMap, syncState]);
-
-  const handleGenerateMap = useCallback(async () => {
-    if (!gameState.battleMap) return;
-    mcpServer.setBattleMapImageUrl(''); // clear old image & set isGenerating
-    if (gameState.battleMap) {
-      mcpServer.getFullState().battleMap!.isGenerating = true;
-    }
-    syncState();
-    try {
-      const url = await generateMapImage(gameState, gameState.battleMap.label);
-      if (url) {
-        mcpServer.setBattleMapImageUrl(url);
-      } else {
-        // If generation failed, just clear the generating flag
-        if (mcpServer.getFullState().battleMap) {
-          mcpServer.getFullState().battleMap!.isGenerating = false;
-        }
-      }
-    } catch {
-      if (mcpServer.getFullState().battleMap) {
-        mcpServer.getFullState().battleMap!.isGenerating = false;
-      }
-    }
-    syncState();
-  }, [gameState]);
 
   const handleClearMap = useCallback(() => {
     if (!confirm('Remove the battle map?')) return;
@@ -237,7 +211,6 @@ const DesktopLayout: React.FC = () => {
                 isHost={isHost}
                 isProcessing={isLoading || !!gameState.isProcessing}
                 onTokenMove={handleTokenMove}
-                onGenerateMap={handleGenerateMap}
                 onClearMap={handleClearMap}
                 onInitMap={handleInitMap}
               />

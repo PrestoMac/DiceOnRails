@@ -527,7 +527,6 @@ Pure-function grid service for the Virtual Tabletop integration. Zero side-effec
 - `mcpService.ts` dispatches `move_token` and `init_battle_map` tool calls.
 - `agentLoop.ts` injects `buildGridContextString()` into `contextParts` when `battleMap` is present.
 - `services/llm/prompts/mapPrompt.ts` is appended to the system message, teaching the LLM range rules and turn flow.
-- `services/llm/mapGeneration.ts` generates top-down map images via the existing ImageRouter API.
 - `components/BattleMapPanel.tsx` renders the canvas and handles drag-and-drop (host only).
 - `components/layouts/DesktopLayout.tsx` embeds `BattleMapPanel` as a collapsible panel below `CombatTracker`.
 

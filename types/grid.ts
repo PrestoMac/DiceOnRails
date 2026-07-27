@@ -45,14 +45,10 @@ export interface BattleMap {
   height: number;
   /** Pixels per cell when rendered. Affects canvas drawing only, not game distances. */
   cellSize: number;
-  /** URL of the generated background map image (from ImageRouter). */
-  imageUrl?: string;
   /** All tokens currently on the map. */
   tokens: GridToken[];
   /** Optional terrain obstacles for future phases. */
   terrain?: TerrainCell[];
   /** Human-readable label for the location (e.g. "Goblin Cave — Chamber 3"). */
   label?: string;
-  /** True while the map image is being generated (UI shows spinner). */
-  isGenerating?: boolean;
 }

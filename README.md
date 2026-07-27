@@ -15,7 +15,7 @@ DiceOnRails pairs a **large language model** (for narration, roleplay, and inten
 - **Character portraits** — Each hero gets an auto-generated portrait on creation (seeded from their appearance text), shown in the sheet, the input bar, and beside their chat bubbles. Regenerate anytime from the persona modal.
 - **Voice narration** — In-browser text-to-speech reads the GM's prose aloud.
 - **Solo or multiplayer** — Play alone (anonymous/local) or invite friends to a shared cloud campaign with realtime sync.
-- **Interactive Virtual Tabletop (VTT)** — Live 5e tactical grid map featuring drag-and-drop tokens, Chebyshev distance calculations, LLM spatial awareness, and AI-generated top-down battle map backgrounds.
+- **Interactive Virtual Tabletop (VTT)** — Live 5e tactical grid map featuring drag-and-drop tokens, Chebyshev distance calculations, and LLM spatial awareness.
 - **Cross-platform UI** — Responsive layouts for desktop and mobile, voice input, action queueing, dice popups, and a searchable / exportable chat log.
 - **Cloud saves & campaigns** — Powered by Supabase (Postgres + Realtime + Auth).
 - **Works with any OpenAI-compatible provider** — Default is OpenRouter; bring your own API key.

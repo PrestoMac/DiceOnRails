@@ -22,7 +22,6 @@ import { calculateAc } from '../../services/classEngine';
 import { formatGameTime } from '../../utils/timeUtils';
 import { mcpServer } from '../../services/mcpService';
 import { pickSuggestionsForCharacter } from '../../services/llm/suggestions';
-import { generateMapImage } from '../../services/llm/mapGeneration';
 import { initBattleMap, autoPlaceParty, autoPlaceEnemies } from '../../services/gridService';
 
 /** Compact HP/AC status bar displayed below the chat area on mobile. */
@@ -95,30 +94,6 @@ const MobileLayout: React.FC = () => {
     syncState();
   }, [gameState.battleMap, syncState]);
 
-  const handleGenerateMap = useCallback(async () => {
-    if (!gameState.battleMap) return;
-    mcpServer.setBattleMapImageUrl('');
-    if (gameState.battleMap) {
-      mcpServer.getFullState().battleMap!.isGenerating = true;
-    }
-    syncState();
-    try {
-      const url = await generateMapImage(gameState, gameState.battleMap.label);
-      if (url) {
-        mcpServer.setBattleMapImageUrl(url);
-      } else {
-        if (mcpServer.getFullState().battleMap) {
-          mcpServer.getFullState().battleMap!.isGenerating = false;
-        }
-      }
-    } catch {
-      if (mcpServer.getFullState().battleMap) {
-        mcpServer.getFullState().battleMap!.isGenerating = false;
-      }
-    }
-    syncState();
-  }, [gameState, syncState]);
-
   const handleClearMap = useCallback(() => {
     if (!confirm('Remove the battle map?')) return;
     mcpServer.clearBattleMap();
@@ -186,7 +161,6 @@ const MobileLayout: React.FC = () => {
                 isHost={isHost}
                 isProcessing={isLoading || !!gameState.isProcessing}
                 onTokenMove={handleTokenMove}
-                onGenerateMap={handleGenerateMap}
                 onClearMap={handleClearMap}
                 onInitMap={handleInitMap}
               />

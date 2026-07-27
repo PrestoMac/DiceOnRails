@@ -41,7 +41,6 @@ export function initBattleMap(
     tokens: [],
     terrain: [],
     label,
-    isGenerating: false,
   };
 }
 

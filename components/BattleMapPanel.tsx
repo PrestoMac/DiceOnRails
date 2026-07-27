@@ -4,12 +4,12 @@
  * Zero new npm packages: uses plain HTML5 Canvas API + React.
  *
  * Features:
- * - Background map image (generated or plain dark grid)
+ * - Plain dark tactical grid background
  * - Colour-coded player (gold) and enemy (red) tokens with initials
  * - Drag-and-drop token repositioning (mouse events only)
  * - Current-turn highlight ring
  * - Dead token greying with ✕
- * - GM toolbar: grid size, generate map, clear map, toggle panel
+ * - GM toolbar: grid size, clear map
  * - Multiplayer-safe: token moves call onTokenMove → syncs via GameState
  */
 
@@ -35,7 +35,6 @@ interface BattleMapPanelProps {
   isHost: boolean;              // only hosts can drag tokens / use GM toolbar
   isProcessing: boolean;
   onTokenMove: (tokenId: string, x: number, y: number) => void;
-  onGenerateMap: () => void;
   onClearMap: () => void;
   onInitMap: (width: number, height: number) => void;
 }
@@ -105,7 +104,6 @@ const BattleMapPanel: React.FC<BattleMapPanelProps> = ({
   isHost,
   isProcessing,
   onTokenMove,
-  onGenerateMap,
   onClearMap,
   onInitMap,
 }) => {
@@ -127,10 +125,6 @@ const BattleMapPanel: React.FC<BattleMapPanelProps> = ({
   const [pendingWidth,  setPendingWidth]  = useState(String(battleMap.width));
   const [pendingHeight, setPendingHeight] = useState(String(battleMap.height));
 
-  // Background image cache
-  const bgImageRef = useRef<HTMLImageElement | null>(null);
-  const [bgLoaded, setBgLoaded] = useState(false);
-
   // ---------------------------------------------------------------------------
   // Resize observer — recompute cell size when container changes
   // ---------------------------------------------------------------------------
@@ -151,18 +145,6 @@ const BattleMapPanel: React.FC<BattleMapPanelProps> = ({
     ro.observe(el);
     return () => ro.disconnect();
   }, [battleMap.width, battleMap.height]);
-
-  // ---------------------------------------------------------------------------
-  // Background image loader
-  // ---------------------------------------------------------------------------
-
-  useEffect(() => {
-    if (!battleMap.imageUrl) { bgImageRef.current = null; setBgLoaded(false); return; }
-    const img = new Image();
-    img.onload  = () => { bgImageRef.current = img; setBgLoaded(true); };
-    img.onerror = () => { bgImageRef.current = null; setBgLoaded(false); };
-    img.src = battleMap.imageUrl;
-  }, [battleMap.imageUrl]);
 
   // ---------------------------------------------------------------------------
   // Build HP lookup maps for tooltips
@@ -196,19 +178,11 @@ const BattleMapPanel: React.FC<BattleMapPanelProps> = ({
     canvas.height = H;
 
     // --- Background ---
-    if (bgLoaded && bgImageRef.current) {
-      ctx.drawImage(bgImageRef.current, 0, 0, W, H);
-      // Semi-transparent dark overlay so grid is visible
-      ctx.fillStyle = 'rgba(0,0,0,0.35)';
-      ctx.fillRect(0, 0, W, H);
-    } else {
-      // Plain dark gradient background
-      const grad = ctx.createLinearGradient(0, 0, W, H);
-      grad.addColorStop(0, '#1c1a14');
-      grad.addColorStop(1, '#0d0c0a');
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, W, H);
-    }
+    const grad = ctx.createLinearGradient(0, 0, W, H);
+    grad.addColorStop(0, '#1c1a14');
+    grad.addColorStop(1, '#0d0c0a');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
 
     // --- Grid lines ---
     ctx.strokeStyle = 'rgba(160,130,80,0.18)';
@@ -384,14 +358,6 @@ const BattleMapPanel: React.FC<BattleMapPanelProps> = ({
         </div>
         {isHost && (
           <div className="flex items-center gap-1">
-            <button
-              onClick={onGenerateMap}
-              disabled={isProcessing || battleMap.isGenerating}
-              title="Generate AI map background"
-              className="px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-violet-900/40 hover:bg-violet-800/60 text-violet-300 disabled:opacity-40 transition-colors"
-            >
-              {battleMap.isGenerating ? '⏳ Generating…' : '✨ Gen Map'}
-            </button>
             <button
               onClick={() => setSettingsOpen(!settingsOpen)}
               title="Grid settings"

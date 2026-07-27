@@ -48,7 +48,6 @@ describe('initBattleMap', () => {
     expect(map.height).toBe(15);
     expect(map.label).toBe('Dungeon');
     expect(map.tokens).toHaveLength(0);
-    expect(map.isGenerating).toBe(false);
   });
 
   it('defaults to 20×15 when no args given', () => {

@@ -48,10 +48,6 @@ export const tools = [
                     height: {
                         type: 'integer',
                         description: 'Grid rows. Defaults to 15.'
-                    },
-                    generateImage: {
-                        type: 'boolean',
-                        description: 'Set true to request a AI-generated map background image. Defaults to false.'
                     }
                 },
                 required: []

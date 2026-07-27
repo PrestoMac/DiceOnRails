@@ -206,14 +206,6 @@ export class MockMCPServer {
     delete (this.state as { battleMap?: unknown }).battleMap;
   }
 
-  /** Sets the generated background image URL on the active battle map. */
-  public setBattleMapImageUrl(url: string): void {
-    if (this.state.battleMap) {
-      this.state.battleMap.imageUrl = url;
-      this.state.battleMap.isGenerating = false;
-    }
-  }
-
   /** Replaces the full token array on the active battle map (used by UI drag-and-drop). */
   public updateBattleMapTokens(tokens: import('../types/grid').GridToken[]): void {
     if (this.state.battleMap) {
@@ -512,14 +504,11 @@ export class MockMCPServer {
           if (this.state.combat?.enemies) {
             bmap = autoPlaceEnemies(bmap, this.state.combat.enemies.filter(e => !e.isDead).map(e => ({ id: e.id, name: e.name })));
           }
-          if (args.generateImage === true) {
-            bmap.isGenerating = true;
-          }
           this.state.battleMap = bmap;
           res = {
             success: true,
-            data: { width: mapWidth, height: mapHeight, label: mapLabel, tokenCount: bmap.tokens.length, generateImage: args.generateImage === true },
-            message: `Battle map "${mapLabel}" initialised (${mapWidth}×${mapHeight}). ${bmap.tokens.length} tokens placed.${args.generateImage === true ? ' Map image generation requested.' : ''}`,
+            data: { width: mapWidth, height: mapHeight, label: mapLabel, tokenCount: bmap.tokens.length },
+            message: `Battle map "${mapLabel}" initialised (${mapWidth}×${mapHeight}). ${bmap.tokens.length} tokens placed.`,
           };
           break;
         }

@@ -30,7 +30,5 @@ TURN FLOW (when map is active):
 4. narrate_turn (prose — include the distance/positioning details)
 
 INIT BATTLE MAP:
-- Call init_battle_map at the start of a combat encounter to place all tokens automatically.
-- Pass generateImage: true to request an AI-generated map background (async, shows spinner).
-- Omit generateImage or set false for instant placement with a plain grid.
+- Call init_battle_map at the start of a combat encounter to place all tokens automatically on the tactical grid.
 `;
