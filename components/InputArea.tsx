@@ -15,6 +15,8 @@ interface QuickAction {
   fillText: string;
   tooltip?: string;
   category: 'spell' | 'weapon' | 'feature' | 'rest' | 'skill' | 'item' | 'death';
+  badge?: string;
+  customStyle?: string;
 }
 
 interface InputAreaProps {
@@ -95,15 +97,42 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onQueueAction, onR
       const concStr = spell.requiresConcentration ? 'Concentration' : '';
       const extras = [damageStr, healStr, saveStr, atkStr, concStr].filter(Boolean).join(', ');
       const shortDesc = spell.shortDescription || spell.description;
+
+      const isRitual = !!spell.ritual;
+      const isPrepared = (character.preparedSpells || []).includes(spellId);
+      const isPreparedCaster = CLASSES_BY_ID[character.class]?.spellcasting?.prepMode === 'prepared';
+      const isUnpreparedRitual = isRitual && isPreparedCaster && !isPrepared;
+
+      let customStyle: string | undefined;
+      let badge: string | undefined;
+
+      if (isRitual) {
+        badge = 'Ritual';
+        if (isUnpreparedRitual) {
+          customStyle = 'bg-indigo-950/70 text-indigo-300 border border-indigo-700/80 hover:bg-indigo-900/80 hover:text-indigo-100 shadow-sm shadow-indigo-950/60';
+        } else {
+          customStyle = 'bg-indigo-900/50 text-indigo-200 border border-indigo-600/70 hover:bg-indigo-800/60 hover:text-white shadow-sm shadow-indigo-950/60';
+        }
+      }
+
+      const ritualNote = isRitual
+        ? isUnpreparedRitual
+          ? ` [Ritual — Unprepared. ${character.class === 'wizard' ? 'Wizards can cast rituals directly from their spellbook without preparing!' : 'Prepare this spell to cast it.'}]`
+          : ' [Ritual — 10 min cast time, costs 0 slots]'
+        : '';
+
       actions.push({
         id: `spell-${spellId}`,
         label: spell.name,
         icon: SCHOOL_ICONS[spell.school] || 'fa-hat-wizard',
-        fillText: `Cast ${spell.name}`,
-        tooltip: `${spell.name} — ${levelLabel} ${spell.school.charAt(0).toUpperCase() + spell.school.slice(1)}. ${spell.castingTime}, ${spell.range}${extras ? `. ${extras}` : ''}. ${shortDesc.slice(0, 120)}${shortDesc.length > 120 ? '...' : ''}`,
+        fillText: isUnpreparedRitual && character.class === 'wizard' ? `Cast ${spell.name} as a ritual` : `Cast ${spell.name}`,
+        tooltip: `${spell.name} — ${levelLabel}${ritualNote}. ${spell.school.charAt(0).toUpperCase() + spell.school.slice(1)}. ${spell.castingTime}, ${spell.range}${extras ? `. ${extras}` : ''}. ${shortDesc.slice(0, 120)}${shortDesc.length > 120 ? '...' : ''}`,
         category: 'spell',
+        badge,
+        customStyle,
       });
     }
+
 
     const equippedWeapons = (character.inventory || []).filter(
       i => i.equipped && i.type === 'weapon'
@@ -314,9 +343,15 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onQueueAction, onR
 };
 
 const QuickActionBtn: React.FC<{ action: QuickAction; locked: boolean; onClick: () => void; extraTitle?: string }> = ({ action, locked, onClick, extraTitle }) => (
-  <button type="button" disabled={locked} onClick={onClick} className={`${QUICK_BTN} ${locked ? DISABLED_STYLE : CATEGORY_STYLES[action.category]}`} title={extraTitle || action.fillText}>
+  <button type="button" disabled={locked} onClick={onClick} className={`${QUICK_BTN} ${locked ? DISABLED_STYLE : (action.customStyle || CATEGORY_STYLES[action.category])}`} title={extraTitle || action.fillText}>
     <i className={`fas ${action.icon} text-[9px]`}></i> {action.label}
+    {action.badge && (
+      <span className="text-[8px] font-bold px-1 py-0.5 rounded uppercase tracking-tighter bg-indigo-950/90 text-indigo-300 border border-indigo-700/60 ml-0.5 inline-flex items-center gap-0.5">
+        <i className="fas fa-sparkles text-[7px]"></i> {action.badge}
+      </span>
+    )}
   </button>
 );
 
 export default InputArea;
+
