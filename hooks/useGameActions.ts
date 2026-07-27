@@ -311,10 +311,16 @@ export const useGameActions = (
             // turn restores the previous turn's chips rather than an empty tray.
             mcpServer.saveRewindPoint(currentState, [...currentMessages, userMsg]);
             mcpServer.saveEmergencySnapshot(currentState);
+            // Clear the local player's chips so they vanish the moment one is clicked.
+            // Must delete from lastSuggestionsByCharacter (the source the UI reads via
+            // pickSuggestionsForCharacter); setLastSuggestions([]) alone is a no-op now.
+            // Snapshots above still hold the prior chips so undo restores them.
+            if (myCharacterId && currentState.lastSuggestionsByCharacter && currentState.lastSuggestionsByCharacter[myCharacterId]) {
+                const updated = { ...currentState.lastSuggestionsByCharacter };
+                delete updated[myCharacterId];
+                mcpServer.setLastSuggestionsByCharacter(updated);
+            }
             mcpServer.setLastSuggestions([]);
-            // Push the cleared tray to React immediately so suggestion chips vanish
-            // the moment one is clicked. Snapshot capture above still holds the prior
-            // chips, so undo restores them.
             syncState();
             const allMessagesWithUser = [...messagesRef.current, userMsg];
             const ctxPrep = prepContext(ctxRef.current, allMessagesWithUser, buildContextString(myCharacterId));
@@ -493,9 +499,18 @@ export const useGameActions = (
         try {
             mcpServer.saveRewindPoint(mcpServer.getFullState(), [...currentMessages, userMsg]);
             mcpServer.saveEmergencySnapshot(mcpServer.getFullState());
-            // Clear the suggestion tray immediately when a batch starts processing
-            // (mirrors the solo path). Snapshots above still hold the prior chips so
-            // undo restores them per-player.
+            // Clear the local player's chips immediately (mirrors the solo path).
+            // Delete from lastSuggestionsByCharacter so the UI tray vanishes; the
+            // deprecated setLastSuggestions([]) alone was a no-op. Snapshots above
+            // still hold prior chips so undo restores them per-player.
+            if (myCharacterId) {
+                const map = mcpServer.getFullState().lastSuggestionsByCharacter;
+                if (map && map[myCharacterId]) {
+                    const updated = { ...map };
+                    delete updated[myCharacterId];
+                    mcpServer.setLastSuggestionsByCharacter(updated);
+                }
+            }
             mcpServer.setLastSuggestions([]);
             syncState();
 

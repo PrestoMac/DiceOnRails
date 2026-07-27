@@ -34,6 +34,7 @@ const mcpServerMock = {
   roll_dice: vi.fn(),
   loadState: vi.fn(),
   setLastSuggestions: vi.fn(),
+  setLastSuggestionsByCharacter: vi.fn(),
 };
 
 vi.mock('../../services/mcpService', () => ({
@@ -908,6 +909,63 @@ describe('useGameActions', () => {
       expect(storageService.isCampaignProcessing).toHaveBeenCalledWith('camp-mp-1');
       expect(mockRunAgentLoop).not.toHaveBeenCalled();
       expect(setIsLoading).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('suggestion clear on send (disappear-on-select)', () => {
+    it('deletes the local character entry from lastSuggestionsByCharacter when a message is sent', async () => {
+      // Regression: the pre-turn clear previously called only setLastSuggestions([])
+      // (the deprecated field), but the UI reads lastSuggestionsByCharacter first via
+      // pickSuggestionsForCharacter — so chips never vanished on click.
+      const stateWithChips: GameState = {
+        ...makeBaseState(),
+        lastSuggestionsByCharacter: { 'hero-1': ['Attack the goblin', 'Defend'] },
+      };
+      mcpServerMock.getFullState.mockReturnValue(stateWithChips);
+
+      const { result } = renderHook(() => useGameActions(
+        stateWithChips, setGameState, [], setMessages,
+        undefined, undefined, 'hero-1', defaultProps.settings,
+        setIsLoading, onCloseLevelUp, syncState, performAtmosphereUpdate,
+        setStage, setViewingCharacterId, setMyCharacterId,
+        false, undefined, setIsNewCampaign, getSenderName, undefined,
+      ));
+
+      await act(async () => {
+        await result.current.handleSendMessage('I attack the goblin');
+      });
+
+      // The local player's entry must be removed from the per-character map.
+      expect(mcpServerMock.setLastSuggestionsByCharacter).toHaveBeenCalled();
+      const clearedMap = mcpServerMock.setLastSuggestionsByCharacter.mock.calls[0][0] as Record<string, string[]>;
+      expect(clearedMap['hero-1']).toBeUndefined();
+    });
+
+    it('preserves other players entries when clearing the local player chips (multiplayer)', async () => {
+      const stateWithChips: GameState = {
+        ...makeBaseState(),
+        lastSuggestionsByCharacter: {
+          'hero-1': ['Attack'],
+          'cleric-2': ['Heal', 'Cast Bless'],
+        },
+      };
+      mcpServerMock.getFullState.mockReturnValue(stateWithChips);
+
+      const { result } = renderHook(() => useGameActions(
+        stateWithChips, setGameState, [], setMessages,
+        'camp-mp-1', 'user-1', 'hero-1', defaultProps.settings,
+        setIsLoading, onCloseLevelUp, syncState, performAtmosphereUpdate,
+        setStage, setViewingCharacterId, setMyCharacterId,
+        false, undefined, setIsNewCampaign, getSenderName, undefined,
+      ));
+
+      await act(async () => {
+        await result.current.handleSendMessage('I attack');
+      });
+
+      const clearedMap = mcpServerMock.setLastSuggestionsByCharacter.mock.calls[0][0] as Record<string, string[]>;
+      expect(clearedMap['hero-1']).toBeUndefined();
+      expect(clearedMap['cleric-2']).toEqual(['Heal', 'Cast Bless']);
     });
   });
 });
