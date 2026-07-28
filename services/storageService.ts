@@ -136,10 +136,10 @@ export const storageService = {
 
             const { data: legacySaves, error: legacyError } = await supabase
                 .from('game_saves')
-                .select('id, name, created_at, game_state, updated_at')
+                .select('*')
                 .eq('user_id', userId);
 
-            if (isDebugMode) console.warn('Legacy saves query failed (may be expected if table does not exist):', legacyError.message);
+            if (legacyError && isDebugMode) console.warn('Legacy saves query failed (may be expected if table does not exist):', legacyError.message);
 
             const list: Campaign[] = [];
 

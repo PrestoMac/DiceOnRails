@@ -1,6 +1,6 @@
 import { Character, Enemy, ActiveCondition } from '../types';
 import { cryptoRoll } from '../utils/random';
-import { getMod } from './classEngine';
+import { getMod } from '../utils/dice';
 
 type Target = Character | Enemy;
 

@@ -13,6 +13,12 @@ export function parseDiceFormula(dice: string): { count: number; sides: number; 
   };
 }
 
+/** Calculates the ability modifier for a given score. */
+export function getMod(score: number): number {
+  const s = typeof score === 'number' && !Number.isNaN(score) ? score : 10;
+  return Math.floor((s - 10) / 2);
+}
+
 export interface ParsedDamageRoll {
   count: number;
   sides: number;

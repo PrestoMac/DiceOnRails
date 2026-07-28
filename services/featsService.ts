@@ -4,8 +4,8 @@ import {
   FeatDefinition,
   getFeatById
 } from '../utils/feats';
-import { calculateMaxHp } from './progressionService';
-import { getMod, getProficiencyBonus as ceProficiencyBonus } from './classEngine';
+import { getMod } from '../utils/dice';
+import { calculateMaxHp, getProficiencyBonus as ceProficiencyBonus } from './classEngine';
 import { ASI_LEVELS } from '../constants';
 export { ASI_LEVELS };
 

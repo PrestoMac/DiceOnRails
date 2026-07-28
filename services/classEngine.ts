@@ -2,22 +2,16 @@ import { Character, ResourcePool, InventoryItem } from '../types';
 import { CLASSES_CATALOG, ClassDefinition } from '../utils/classes';
 import { RACES_CATALOG, RaceDefinition } from '../utils/races';
 import { SubclassSummary } from '../types';
+import { getMod } from '../utils/dice';
 import { getExhaustionPenalty } from './conditionEngine';
-import { getResilientSaveBonus } from './featsService';
 
-/** Calculates the ability modifier for a given score. */
-function abilityMod(score: number): number {
-  const s = typeof score === 'number' && !Number.isNaN(score) ? score : 10;
-  return Math.floor((s - 10) / 2);
-}
-
-/** Returns the ability modifier for a given stat value. */
-export const getMod = abilityMod;
+const abilityMod = getMod;
+export { getMod };
 
 /** Returns the spellcasting ability modifier value for the character's class, or null if not a spellcaster. */
 function spellAbilityValue(character: Character): number | null {
   const classDef = getClassDef(character.class);
-  return classDef?.spellcasting ? abilityMod(character.stats[classDef.spellcasting.ability]) : null;
+  return classDef?.spellcasting ? getMod(character.stats[classDef.spellcasting.ability]) : null;
 }
 
 /** Looks up a class definition by its lowercase ID from the classes catalog. */
@@ -40,7 +34,7 @@ export function getSubclassDef(classId: string, subclassId: string): SubclassSum
 export function calculateMaxHp(character: Character): number {
   const classDef = getClassDef(character.class);
   if (!classDef) return character.hp?.max ?? 10;
-  const conMod = abilityMod(character.stats.con);
+  const conMod = getMod(character.stats.con);
   const draconicBonus = character.sorcerousOrigin === 'draconic-bloodline' ? character.level : 0;
   const toughBonus = character.feats?.includes('tough') ? 2 * character.level : 0;
   const total = classDef.hpBase + conMod + (classDef.hpPerLevel + conMod) * (character.level - 1)

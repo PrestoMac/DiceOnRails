@@ -14,6 +14,7 @@ import { createProgressionService, ProgressionService } from './mcp/progressionS
 import { createStateService, StateService } from './mcp/stateService';
 import { createContentService, ContentService } from './mcp/contentService';
 import { createTravelService, TravelService, validateTravelTimeAdvance } from './mcp/travelService';
+import { getClassDef } from './classEngine';
 
 export { generateId };
 
@@ -285,7 +286,6 @@ export class MockMCPServer {
     const { BEAST_FORMS, applyPolymorph } = await import('./transformationEngine');
     const beast = BEAST_FORMS[beastFormName.toLowerCase()];
     if (!beast) return fail(`Unknown beast form: ${beastFormName}.`);
-    const { getClassDef } = await import('./classEngine');
     const classDef = getClassDef(char.class);
     if (classDef?.spellcasting && beast.cr > char.level) {
       return fail(`Cannot polymorph into ${beast.name} (CR ${beast.cr}) - exceeds character level ${char.level}.`);

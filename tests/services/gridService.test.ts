@@ -66,7 +66,7 @@ describe('placeToken', () => {
     const map = placeToken(makeMap(), playerA);
     expect(map.tokens).toHaveLength(1);
     expect(getToken(map, 'p1')).toBeDefined();
-    expect(getToken(map, 'p1')!.name).toBe('Aria');
+    expect(getToken(map, 'p1')?.name).toBe('Aria');
   });
 
   it('replaces a token with the same id', () => {
@@ -74,17 +74,17 @@ describe('placeToken', () => {
     const updated = { ...playerA, pos: { x: 3, y: 3 } };
     map = placeToken(map, updated);
     expect(map.tokens).toHaveLength(1);
-    expect(getToken(map, 'p1')!.pos).toEqual({ x: 3, y: 3 });
+    expect(getToken(map, 'p1')?.pos).toEqual({ x: 3, y: 3 });
   });
 
   it('auto-assigns a color when not provided', () => {
     const map = placeToken(makeMap(), { id: 'p1', name: 'X', type: 'player', pos: { x: 0, y: 0 } });
-    expect(getToken(map, 'p1')!.color).toBeTruthy();
+    expect(getToken(map, 'p1')?.color).toBeTruthy();
   });
 
   it('preserves provided color', () => {
     const map = placeToken(makeMap(), { ...playerA, color: '#ff0000' });
-    expect(getToken(map, 'p1')!.color).toBe('#ff0000');
+    expect(getToken(map, 'p1')?.color).toBe('#ff0000');
   });
 });
 
@@ -96,13 +96,13 @@ describe('moveToken', () => {
   it('moves a token to the target cell', () => {
     let map = placeToken(makeMap(), playerA);
     map = moveToken(map, 'p1', { x: 5, y: 3 });
-    expect(getToken(map, 'p1')!.pos).toEqual({ x: 5, y: 3 });
+    expect(getToken(map, 'p1')?.pos).toEqual({ x: 5, y: 3 });
   });
 
   it('clamps to map bounds', () => {
     let map = placeToken(makeMap(10, 8), playerA);
     map = moveToken(map, 'p1', { x: 99, y: 99 });
-    expect(getToken(map, 'p1')!.pos).toEqual({ x: 9, y: 7 }); // clamped to max
+    expect(getToken(map, 'p1')?.pos).toEqual({ x: 9, y: 7 }); // clamped to max
   });
 
   it('is a no-op for unknown id', () => {
@@ -120,7 +120,7 @@ describe('markTokenDead', () => {
   it('marks token as dead without removing it', () => {
     let map = placeToken(makeMap(), enemy1);
     map = markTokenDead(map, 'e1');
-    expect(getToken(map, 'e1')!.isDead).toBe(true);
+    expect(getToken(map, 'e1')?.isDead).toBe(true);
     expect(map.tokens).toHaveLength(1);
   });
 });
@@ -217,7 +217,7 @@ describe('findFreeCell', () => {
   });
 
   it('finds adjacent cell when target is occupied', () => {
-    let map = placeToken(makeMap(), { ...playerA, pos: { x: 3, y: 3 } });
+    const map = placeToken(makeMap(), { ...playerA, pos: { x: 3, y: 3 } });
     const pos = findFreeCell(map, { x: 3, y: 3 });
     expect(pos).not.toEqual({ x: 3, y: 3 });
   });

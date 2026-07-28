@@ -273,7 +273,8 @@ const BattleMapPanel: React.FC<BattleMapPanelProps> = ({
   // ---------------------------------------------------------------------------
 
   const getCanvasPos = (e: React.MouseEvent<HTMLCanvasElement>): { px: number; py: number } => {
-    const rect = canvasRef.current!.getBoundingClientRect();
+    if (!canvasRef.current) return { px: 0, py: 0 };
+    const rect = canvasRef.current.getBoundingClientRect();
     return { px: e.clientX - rect.left, py: e.clientY - rect.top };
   };
 
@@ -311,7 +312,8 @@ const BattleMapPanel: React.FC<BattleMapPanelProps> = ({
         const ft = distanceFeet(token.pos, f.pos);
         return `→ ${f.name}: ${ft} ft`;
       }).slice(0, 4);
-      const rect = canvasRef.current!.getBoundingClientRect();
+      if (!canvasRef.current) return;
+      const rect = canvasRef.current.getBoundingClientRect();
       setTooltip({ name: token.name, hp: hp ? `HP ${hp}` : undefined, distances, px: e.clientX - rect.left, py: e.clientY - rect.top });
     } else {
       setTooltip(null);

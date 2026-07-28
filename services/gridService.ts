@@ -5,7 +5,7 @@
  * Follows the existing deep-clone (JSON.parse/JSON.stringify) pattern for mutations.
  */
 
-import { BattleMap, GridPosition, GridToken, TerrainCell } from '../types/grid';
+import { BattleMap, GridPosition, GridToken } from '../types/grid';
 import { GameState } from '../types/game';
 
 // ---------------------------------------------------------------------------
