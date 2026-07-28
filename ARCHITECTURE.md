@@ -739,6 +739,8 @@ The story view. Notable features:
 - Parses `[System:*]` log prefixes and renders them as bordered "System Log" cards.
 - Two regex-based roll parsers (`ATTACK_ROLL_RE`, `SKILL_ROLL_RE`) extract roll data from older message text and render `RollCard` components inline.
 - Modern messages carry `msg.rollData` directly (set by `extractRollData` in `narration.ts`) and render via `DiceRollCard`.
+- **Dice roll replay**: clicking any `DiceRollCard` opens the `DiceRollModal` popup with the roll data — this lets all clients view dice roll results even though only the submitting client auto-triggers the modal during `dispatchToolRolls`.
+- **"The Fates are deciding..."** loading indicator is shown when `isProcessing={isLoading || !!gameState.isProcessing}` — the `gameState.isProcessing` part ensures remote clients see the indicator when Supabase realtime delivers the lock state.
 - Filters: All / Narration / Player / System; plus full-text search.
 - Export menu: copy to clipboard or download `.txt`.
 - Per-message TTS button.
