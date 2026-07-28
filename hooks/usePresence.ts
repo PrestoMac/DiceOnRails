@@ -22,9 +22,8 @@ interface PresenceProfile {
   lastActive: number;
 }
 
-const TYPING_TIMEOUT_MS = 2500;
 const PRESENCE_KEY = 'typing';
-const STALE_THRESHOLD_MS = TYPING_TIMEOUT_MS * 2;
+const STALE_THRESHOLD_MS = 30_000;
 const HEARTBEAT_INTERVAL_MS = 10_000;
 const RECONNECT_BASE_MS = 1000;
 const RECONNECT_MAX_MS = 30_000;
@@ -36,20 +35,20 @@ const RECONNECT_MAX_MS = 30_000;
  * table, requires no migrations, and survives no restarts — perfect for "is
  * writing…" indicators. Each client tracks a profile `{ userId, characterId,
  * name, portraitUrl, isTyping, lastActive }`. Typing is announced on input
- * (debounced via timeout) and auto-clears after `TYPING_TIMEOUT_MS` of
- * silence, plus a hard 2× safety timeout.
+ * and stays active as long as text remains in the input field (no auto-clear
+ * timers — the InputArea controls the state directly).
  *
  * Hardened against:
  *  - WebSocket drops → auto-reconnect with exponential backoff (1s→30s cap)
  *  - Network offline → re-subscribe on `navigator.online`
  *  - Tab backgrounding → re-broadcast on visibility change
- *  - Stale entries → periodic heartbeat re-broadcast every 10s
+ *  - Stale entries → periodic heartbeat re-broadcast every 10s (only when typing)
  *  - Track failures → awaited + retried with short delay
  *  - Join/leave events → immediate indicator updates (not just sync cycles)
  *
  * Returns `{ typingUsers, setTyping }` where `typingUsers` excludes the local
- * user (you never see your own indicator) and prunes stale (>2× timeout)
- * entries defensively.
+ * user (you never see your own indicator) and prunes stale (>30s) entries
+ * defensively.
  *
  * No-op for solo (`isMultiplayer=false`) or anonymous campaigns — returns
  * an empty list and a no-op setter.
@@ -63,8 +62,6 @@ export function usePresence(
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
   const profileRef = useRef<PresenceProfile | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
-  const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const hardTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const reconnectAttemptsRef = useRef(0);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -144,27 +141,15 @@ export function usePresence(
     }
   }, []);
 
-  // Public setter invoked by the InputArea. Flips `isTyping` on input and
-  // schedules an auto-clear timeout. A second "hard" timeout guards against
-  // a missed clear event.
+  // Public setter invoked by the InputArea. Directly sets `isTyping` —
+  // no auto-clear timers. The InputArea controls the state: it calls
+  // setTyping(true) when text is entered and setTyping(false) on send/clear.
   const setTyping = useCallback((isTyping: boolean) => {
     if (!isMultiplayer || !isSyncableCampaign(campaignId)) return;
     const base = profileRef.current ?? buildProfile(false);
     if (!base) return;
     const next: PresenceProfile = { ...base, isTyping, lastActive: Date.now() };
     void track(next);
-    if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
-    if (hardTimerRef.current) clearTimeout(hardTimerRef.current);
-    if (isTyping) {
-      clearTimerRef.current = setTimeout(() => {
-        const cur = profileRef.current;
-        if (cur) void track({ ...cur, isTyping: false, lastActive: Date.now() });
-      }, TYPING_TIMEOUT_MS);
-      hardTimerRef.current = setTimeout(() => {
-        const cur = profileRef.current;
-        if (cur) void track({ ...cur, isTyping: false, lastActive: Date.now() });
-      }, TYPING_TIMEOUT_MS * 2);
-    }
   }, [isMultiplayer, campaignId, buildProfile, track]);
 
   // Build a channel, subscribe, and wire up presence event handlers.
@@ -187,10 +172,12 @@ export function usePresence(
             profileRef.current = initial;
             await track(initial);
           }
-          // Start heartbeat to keep presence entries fresh.
+          // Start heartbeat to keep presence entries fresh (only when typing).
           heartbeatRef.current = setInterval(() => {
             const cur = profileRef.current;
-            if (cur) void track({ ...cur, lastActive: Date.now() });
+            if (cur && cur.isTyping) {
+              void track({ ...cur, lastActive: Date.now() });
+            }
           }, HEARTBEAT_INTERVAL_MS);
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
           if (isDebugMode) console.warn('[Presence] channel', status, '- scheduling reconnect');
@@ -243,8 +230,6 @@ export function usePresence(
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
-      if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
-      if (hardTimerRef.current) clearTimeout(hardTimerRef.current);
       if (heartbeatRef.current) clearInterval(heartbeatRef.current);
       if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
       unsub();
