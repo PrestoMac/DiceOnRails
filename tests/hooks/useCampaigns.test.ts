@@ -188,7 +188,7 @@ describe('useCampaigns', () => {
     vi.unstubAllGlobals();
   });
 
-  it('handleJoinCampaign with joinAsNewMember routes to the character creation wizard', async () => {
+  it('handleJoinCampaign with joinAsNewMember routes to START_MODE so the joiner can pick Quick Start or Custom (Bug 4)', async () => {
     vi.mocked(loadGameCallback).mockResolvedValue(true);
 
     const { result } = render();
@@ -197,7 +197,22 @@ describe('useCampaigns', () => {
     });
 
     expect(setIsNewCampaign).toHaveBeenCalledWith(false);
-    expect(setStage).toHaveBeenCalledWith(AppStage.CREATION);
+    // Joiners now get the same Quick Start / Customize choice as the host.
+    // Previously they were routed straight to CREATION (full wizard) with no
+    // preset option. START_MODE → QuickStartFlow(isNewCampaign=false) skips
+    // the starting-grounds step but offers preset heroes.
+    expect(setStage).toHaveBeenCalledWith(AppStage.START_MODE);
+  });
+
+  it('handleJoinCampaign with joinAsNewMember does NOT route straight to CREATION (Bug 4 regression)', async () => {
+    vi.mocked(loadGameCallback).mockResolvedValue(true);
+
+    const { result } = render();
+    await act(async () => {
+      await result.current.handleJoinCampaign('campaign-id-123', loadGameCallback, true);
+    });
+
+    expect(setStage).not.toHaveBeenCalledWith(AppStage.CREATION);
   });
 
   it('handleJoinCampaign with joinAsNewMember alerts when campaign is not found', async () => {
@@ -211,7 +226,7 @@ describe('useCampaigns', () => {
     });
 
     expect(alertMock).toHaveBeenCalledWith(expect.stringContaining('not found'));
-    expect(setStage).not.toHaveBeenCalledWith(AppStage.CREATION);
+    expect(setStage).not.toHaveBeenCalledWith(AppStage.START_MODE);
     expect(setIsNewCampaign).not.toHaveBeenCalledWith(false);
     vi.unstubAllGlobals();
   });
@@ -228,7 +243,7 @@ describe('useCampaigns', () => {
     });
 
     // loadGameData already set stage to PLAY + myCharacterId; skip the wizard.
-    expect(setStage).not.toHaveBeenCalledWith(AppStage.CREATION);
+    expect(setStage).not.toHaveBeenCalledWith(AppStage.START_MODE);
     expect(setIsNewCampaign).not.toHaveBeenCalledWith(false);
 
     // Restore default mock for subsequent tests.

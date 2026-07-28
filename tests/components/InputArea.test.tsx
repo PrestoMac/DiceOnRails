@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, cleanup } from '@testing-library/react';
+import { render, cleanup, fireEvent } from '@testing-library/react';
 import InputArea from '../../components/InputArea';
 
 vi.mock('../../services/supabaseClient', () => ({ supabaseClient: {} }));
@@ -66,5 +66,39 @@ describe('<InputArea> expanded Quick Actions', () => {
   it('hides Arcane Recovery button for non-wizard characters', () => {
     const { queryByText } = render(<InputArea onSendMessage={vi.fn()} isLoading={false} character={baseCharacter as never} onArcaneRecovery={vi.fn()} />);
     expect(queryByText('Arcane Recovery')).toBeNull();
+  });
+});
+
+describe('<InputArea> typing indicator sync (Bug 3)', () => {
+  afterEach(() => cleanup());
+
+  it('calls onInputChanged("") on send so the typing indicator clears immediately', () => {
+    const onInputChanged = vi.fn();
+    const onSendMessage = vi.fn();
+    const { getByPlaceholderText, getByRole } = render(
+      <InputArea onSendMessage={onSendMessage} isLoading={false} character={baseCharacter as never} onInputChanged={onInputChanged} />,
+    );
+    const input = getByPlaceholderText('What do you do, adventurer?');
+    // Type via RTL's fireEvent so React's synthetic onChange fires (raw
+    // dispatchEvent('input') doesn't trigger React's onChange in jsdom).
+    fireEvent.change(input, { target: { value: 'I attack the goblin' } });
+    expect(onInputChanged).toHaveBeenLastCalledWith('I attack the goblin');
+    // Click the submit button to fire the form submit.
+    fireEvent.click(getByRole('button', { name: /Act Now/i }));
+    expect(onSendMessage).toHaveBeenCalledWith('I attack the goblin');
+    expect(onInputChanged).toHaveBeenLastCalledWith('');
+  });
+
+  it('does NOT call onSendMessage or onInputChanged("") when input is empty', () => {
+    const onInputChanged = vi.fn();
+    const onSendMessage = vi.fn();
+    const { getByRole } = render(
+      <InputArea onSendMessage={onSendMessage} isLoading={false} character={baseCharacter as never} onInputChanged={onInputChanged} />,
+    );
+    // When input is empty the "Act Now" submit button is disabled.
+    const submitBtn = getByRole('button', { name: /Act Now/i });
+    expect((submitBtn as HTMLButtonElement).disabled).toBe(true);
+    expect(onSendMessage).not.toHaveBeenCalled();
+    expect(onInputChanged).not.toHaveBeenCalledWith('');
   });
 });

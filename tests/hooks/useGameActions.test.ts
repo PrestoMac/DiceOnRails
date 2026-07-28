@@ -356,6 +356,65 @@ describe('useGameActions', () => {
     expect(setMessagesCall[0].text).toContain('Greetings');
   });
 
+  it('handleCharacterCreated always overrides character.location with the campaign starting location (Bug 1a)', async () => {
+    // Simulate a character built via QuickStart whose build service left a
+    // fallback "The Rusty Tankard Tavern" location baked in. The engine's
+    // startingLocation is the LLM-generated one. The safety net must override
+    // the baked-in fallback so the host spawns at the chosen ground.
+    const charWithBadLocation = {
+      ...makeBaseState().party[0],
+      location: 'The Rusty Tankard Tavern',
+    };
+    const generatedStartingLoc = {
+      name: 'The Whispering Mastodon',
+      description: 'A sprawling hall of bone and candlelight.',
+      introHook: 'A barkeep with ivory tusks nods at you from across the room.',
+    };
+    mcpServerMock.getFullState.mockReturnValue({
+      ...makeBaseState(),
+      party: [], // new campaign → party empty before joinParty
+      startingLocation: generatedStartingLoc,
+    });
+    const { result } = render();
+
+    await act(async () => {
+      await result.current.handleCharacterCreated(charWithBadLocation);
+    });
+
+    // The character passed to joinParty must have the overridden location.
+    const joined = vi.mocked(mcpServerMock.joinParty).mock.calls[0][0] as { location: string };
+    expect(joined.location).toBe('The Whispering Mastodon');
+    expect(joined.location).not.toBe('The Rusty Tankard Tavern');
+
+    // Restore default mock for subsequent tests.
+    mcpServerMock.getFullState.mockReturnValue(makeBaseState());
+  });
+
+  it('handleCharacterCreated welcome message uses the generated introHook, not the hooded-figure fallback (Bug 1b)', async () => {
+    const char = makeBaseState().party[0];
+    mcpServerMock.getFullState.mockReturnValue({
+      ...makeBaseState(),
+      party: [],
+      startingLocation: {
+        name: 'The Saltwind Inn',
+        description: 'A driftwood tavern perched over a restless harbor.',
+        introHook: 'A one-eyed sailor waves you over to a corner booth.',
+      },
+    });
+    const { result } = render();
+
+    await act(async () => {
+      await result.current.handleCharacterCreated(char);
+    });
+
+    const setMessagesCall = vi.mocked(setMessages).mock.calls[0][0];
+    expect(setMessagesCall[0].text).toContain('A one-eyed sailor waves you over to a corner booth.');
+    expect(setMessagesCall[0].text).not.toContain('hooded figure');
+
+    // Restore default mock for subsequent tests.
+    mcpServerMock.getFullState.mockReturnValue(makeBaseState());
+  });
+
   it('handleCharacterCreated appends join notice and preserves chat history when joining an existing party', async () => {
     const existingMessages = [
       { id: 'msg-1', role: MessageRole.MODEL, text: 'The party explores a dungeon.', timestamp: 0 },

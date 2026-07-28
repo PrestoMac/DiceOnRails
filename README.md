@@ -111,8 +111,8 @@ Create a campaign → choose **Quick Start** (a pre-made hero) or **Custom** cre
 | **Journal tab** | Active quests + categorized lore (NPCs, Locations, History, Items) the GM has logged. |
 | **Compendium (📖)** | In-app reference browser: glossary, all conditions + exhaustion levels, rules tables, the full spell catalog, and SRD items. Read-only, pulls from the same data the engine uses. |
 | **Combat Tracker** | Slides in during fights — shows initiative order, current turn, HP bars, conditions. |
-| **Atmosphere image** | Generated scene art behind the chat. Click to expand fullscreen. |
-| **Action Queue** (multiplayer) | Queue up actions/dialogue and resolve them as a batched "party turn". Only shown when 2+ party members are present. |
+| **Atmosphere image** | Generated scene art behind the chat, tracking the LOCAL player's location. Click to expand fullscreen. In multiplayer, each player sees the atmosphere for their own character's location, so a traveling companion's move won't flip your background. |
+| **Pending-batch chat** (multiplayer) | Each player types into the chat to add a pending message; any player presses **"Take the Turn"** to flush the batch through one GM response. Only shown when 2+ party members are present. |
 | **Quick Actions** | One-tap buttons for your prepared spells, equipped weapons, class resources, skills, saves, and potions. |
 | **Suggested Actions** (opt-in) | 2-3 clickable next-action chips after each turn. A 4-tier fallback chain (inline → opt-in LLM call → deterministic → generic) keeps the tray populated; never blank when enabled. |
 | **Onboarding tour** | Auto-launches once on first play; replayable from Settings. |
@@ -172,10 +172,10 @@ When signed in via Supabase:
 
 - **Create a campaign** from the dashboard — you become the host.
 - **Share the Campaign ID** (copy button in the header) with friends.
-- **They join** by entering the ID at the dashboard.
+- **They join** by entering the ID at the dashboard, then pick **Quick Start** (a pre-made hero) or **Custom** creation — same choice the host sees, but the campaign's starting ground is already chosen by the host.
 - Every action **syncs to Supabase in realtime** — all players see the same narration, dice, and state.
 - The active player's turn **locks the campaign** to prevent race conditions; in multiplayer, each player types into the chat to add a pending message, then any player presses **"Take the Turn"** to flush the batch through one GM response.
-- Live **typing indicators** ("NAME is writing…") show when other players are composing their next move.
+- Live **typing indicators** ("NAME is writing…") show when other players are composing their next move, and clear the instant a message is sent (no lingering "is writing" after send).
 - Each player has **private character notes** (visible only to your own character's owner); notes are never sent to the GM/LLM.
 - Delete / rename campaigns from the dashboard.
 

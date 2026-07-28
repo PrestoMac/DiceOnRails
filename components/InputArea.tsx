@@ -59,6 +59,10 @@ const DISABLED_STYLE = 'bg-stone-800/50 text-stone-600 cursor-not-allowed';
 const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onResolveEnemyTurn, isLoading, combat, character, onInputChanged, onArcaneRecovery, onManageSpellbook, onSwapKnownSpell }) => {
   const [input, setInput] = useState('');
   const [isListening, setIsListening] = useState(false);
+  // Ref mirror so the speech-recognition effect (mount-only deps) can read the
+  // latest onInputChanged without re-subscribing to the SpeechRecognition API.
+  const onInputChangedRef = React.useRef(onInputChanged);
+  onInputChangedRef.current = onInputChanged;
   const [recognition, setRecognition] = useState<{ continuous: boolean; interimResults: boolean; lang: string; onresult: (e: unknown) => void; onerror: (e: unknown) => void; onend: () => void; start: () => void; abort: () => void } | null>(null);
   const [showArcaneRecovery, setShowArcaneRecovery] = useState(false);
   const [showSpellbook, setShowSpellbook] = useState(false);
@@ -217,7 +221,17 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onResolveEnemyTurn
     if (SR) {
       const rec = new SR();
       rec.continuous = false; rec.interimResults = false; rec.lang = 'en-US';
-      rec.onresult = (e: { results: Array<Array<{ transcript: string }>> }) => { setInput(p => p ? `${p} ${e.results[0][0].transcript}` : e.results[0][0].transcript); setIsListening(false); };
+      rec.onresult = (e: { results: Array<Array<{ transcript: string }>> }) => {
+        const transcript = e.results[0][0].transcript;
+        // Functional update ensures we join onto the latest input value even
+        // though this effect captures the mount-time closure.
+        setInput(p => {
+          const joined = p ? `${p} ${transcript}` : transcript;
+          onInputChangedRef.current?.(joined);
+          return joined;
+        });
+        setIsListening(false);
+      };
       rec.onerror = (e: { error: string }) => { if (isDebugMode) console.error("Speech recognition error", e.error); setIsListening(false); };
       rec.onend = () => setIsListening(false);
       setRecognition(rec);
@@ -231,7 +245,16 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onResolveEnemyTurn
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (input.trim() && !effectivelyLocked) { onSendMessage(input.trim()); setInput(''); if (isListening) recognition.stop(); }
+    // Clear typing indicator on send: setInput('') alone doesn't fire onChange,
+    // so we must explicitly notify the parent that the input is now empty.
+    // Otherwise the remote "is writing…" chip lingers until the 2.5s/5s
+    // auto-clear timers fire.
+    if (input.trim() && !effectivelyLocked) {
+      onSendMessage(input.trim());
+      setInput('');
+      onInputChanged?.('');
+      if (isListening) recognition.stop();
+    }
   };
 
   const btnCls = (disabled: boolean, accent = false, danger = false) =>
@@ -260,14 +283,14 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onResolveEnemyTurn
           )}
           {quickActions.map(action => (
             <Tooltip key={action.id} content={action.tooltip} side="top">
-              <QuickActionBtn action={action} locked={effectivelyLocked} onClick={() => setInput(action.fillText)} />
+              <QuickActionBtn action={action} locked={effectivelyLocked} onClick={() => { setInput(action.fillText); onInputChanged?.(action.fillText); }} />
             </Tooltip>
           ))}
           <Tooltip content="Short Rest (1h): spend Hit Dice to recover HP. Refreshes Fighter Second Wind, Warlock pact slots, and other short-rest resources. No automatic HP." side="top">
-            <QuickActionBtn action={{ id: 'shortrest', label: 'Short Rest', icon: 'fa-campground', fillText: '/shortrest', category: 'rest' }} locked={effectivelyLocked} onClick={() => setInput('/shortrest')} extraTitle="Pre-fill Short Rest command" />
+            <QuickActionBtn action={{ id: 'shortrest', label: 'Short Rest', icon: 'fa-campground', fillText: '/shortrest', category: 'rest' }} locked={effectivelyLocked} onClick={() => { setInput('/shortrest'); onInputChanged?.('/shortrest'); }} extraTitle="Pre-fill Short Rest command" />
           </Tooltip>
           <Tooltip content="Long Rest (8h, 24h cooldown): restores all HP, half of Hit Dice, all spell slots (except Warlock pact slots), and reduces exhaustion by 1 level. Must have ≥1 HP." side="top">
-            <QuickActionBtn action={{ id: 'longrest', label: 'Long Rest', icon: 'fa-bed', fillText: '/longrest', category: 'rest' }} locked={effectivelyLocked} onClick={() => setInput('/longrest')} extraTitle="Pre-fill Long Rest command" />
+            <QuickActionBtn action={{ id: 'longrest', label: 'Long Rest', icon: 'fa-bed', fillText: '/longrest', category: 'rest' }} locked={effectivelyLocked} onClick={() => { setInput('/longrest'); onInputChanged?.('/longrest'); }} extraTitle="Pre-fill Long Rest command" />
           </Tooltip>
         </div>
       </div>

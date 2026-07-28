@@ -107,12 +107,13 @@ export const useCampaigns = (
             if (userId && loadedParty.some(c => c.ownerId === userId)) {
                 return;
             }
-            // Route to the character creation wizard. isNewCampaign=false hides the
-            // starting-grounds step (the campaign already has a starting location) and
-            // ends on the Review step. The new character is added via joinParty in
-            // handleCharacterCreated.
+            // Route the joiner through START_MODE so they can choose Quick Start
+            // (preset hero) or Customize (full wizard). isNewCampaign=false hides
+            // the starting-grounds step in both sub-paths (the campaign already
+            // has a starting location, chosen by the host). The new character is
+            // added via joinParty in handleCharacterCreated.
             setIsNewCampaign(false);
-            setStage(AppStage.CREATION);
+            setStage(AppStage.START_MODE);
         }
     };
 

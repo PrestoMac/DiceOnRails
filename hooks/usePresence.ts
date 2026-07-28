@@ -53,19 +53,31 @@ export function usePresence(
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hardTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Ref mirror of myCharacter so the mount-stable channel effect and
+  // buildProfile can read the latest character data WITHOUT including the
+  // deep-cloned Character object in their dependency arrays. The layouts
+  // deep-clone gameState on every sync, so the object identity flips every
+  // render — depending on it would tear down + rebuild the entire Presence
+  // channel on nearly every game-state update, dropping in-flight
+  // track({isTyping:false}) calls and re-broadcasting mid-compose. We depend
+  // only on the primitive character id instead.
+  const myCharacterRef = useRef<Character | undefined>(myCharacter);
+  useEffect(() => { myCharacterRef.current = myCharacter; }, [myCharacter]);
 
-  // Build the local profile we broadcast. Recomputed when identity changes.
+  // Build the local profile we broadcast. Reads the latest character from the
+  // ref so the callback identity is stable (depends only on userId).
   const buildProfile = useCallback((isTyping: boolean): PresenceProfile | null => {
-    if (!userId || !myCharacter) return null;
+    const ch = myCharacterRef.current;
+    if (!userId || !ch) return null;
     return {
       userId,
-      characterId: myCharacter.id,
-      name: myCharacter.name,
-      portraitUrl: myCharacter.portraitUrl,
+      characterId: ch.id,
+      name: ch.name,
+      portraitUrl: ch.portraitUrl,
       isTyping,
       lastActive: Date.now(),
     };
-  }, [userId, myCharacter]);
+  }, [userId]);
 
   // Publish the latest profile (or clear typing) to the channel.
   const track = useCallback((profile: PresenceProfile | null) => {
@@ -104,11 +116,15 @@ export function usePresence(
   }, [isMultiplayer, campaignId, buildProfile, track]);
 
   useEffect(() => {
-    if (!isMultiplayer || !isSyncableCampaign(campaignId) || !userId || !myCharacter) {
+    // Depend on the primitive character id, NOT the Character object. The
+    // layouts deep-clone gameState on every sync, so myCharacter's identity
+    // flips every render — depending on it would tear down + rebuild the
+    // Presence channel constantly, dropping in-flight track() calls.
+    const myCharacterId = myCharacter?.id;
+    if (!isMultiplayer || !isSyncableCampaign(campaignId) || !userId || !myCharacterId) {
       setTypingUsers([]);
       return;
     }
-
     const channel = supabase.channel(`presence-${campaignId}-${PRESENCE_KEY}`);
     channelRef.current = channel;
 
@@ -163,7 +179,7 @@ export function usePresence(
       profileRef.current = null;
       setTypingUsers([]);
     };
-  }, [isMultiplayer, campaignId, userId, myCharacter, buildProfile]);
+  }, [isMultiplayer, campaignId, userId, myCharacter?.id, buildProfile]);
 
   return { typingUsers, setTyping };
 }

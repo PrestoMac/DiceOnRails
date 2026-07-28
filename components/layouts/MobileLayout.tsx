@@ -66,7 +66,7 @@ const MobileLayout: React.FC = () => {
 
   useEffect(() => {
     setIsAtmosphereExpanded(false);
-  }, [gameState.currentAtmosphereUrl]);
+  }, [myAtmosphereUrl]);
 
   const [showQueue, setShowQueue] = useState(false);
   void showQueue; void setShowQueue; // legacy state retained for ref stability; queue UI removed
@@ -79,6 +79,11 @@ const MobileLayout: React.FC = () => {
 
   const charToShow = gameState.party.find((c: Character) => c.id === viewingCharacterId) || gameState.party[0];
   const isMultiplayer = gameState.party.length > 1;
+  // Per-character display identity (see DesktopLayout for rationale). Solo
+  // collapses: myCharacterId === party[0].id → byte-identical to before.
+  const myCharacter = gameState.party.find(c => c.id === myCharacterId) ?? gameState.party[0];
+  const myLocation = myCharacter?.location;
+  const myAtmosphereUrl = (myLocation && gameState.locationImages?.[myLocation]) || gameState.currentAtmosphereUrl;
   const isHost = !!userId && userId === hostId;
   const handleBackOrReset = () => userId ? confirm('Return to dashboard?') && setStage(AppStage.DASHBOARD) : confirm('Are you sure you want to reset the game? All progress will be lost.') && resetGame();
   const { recentActivity } = useActivityTracking(gameState, messages, userId);
@@ -105,7 +110,7 @@ const MobileLayout: React.FC = () => {
   }, [syncState]);
 
   const handleInitMap = useCallback((width: number, height: number) => {
-    let bmap = initBattleMap(width, height, gameState.party[0]?.location ?? 'Battle');
+    let bmap = initBattleMap(width, height, myLocation ?? 'Battle');
     bmap = autoPlaceParty(bmap, gameState.party.map(c => ({ id: c.id, name: c.name })));
     if (gameState.combat?.enemies) {
       bmap = autoPlaceEnemies(bmap, gameState.combat.enemies.filter(e => !e.isDead).map(e => ({ id: e.id, name: e.name })));
@@ -175,8 +180,8 @@ const MobileLayout: React.FC = () => {
       <div className="flex-1 overflow-hidden relative flex flex-col pb-16 min-h-0">
         {mobileTab==='adventure'&&<>
           {settings.enableAtmosphere&&<div className="w-full h-32 relative shrink-0 border-b border-stone-800 bg-stone-900">
-            {gameState.currentAtmosphereUrl?<img src={gameState.currentAtmosphereUrl} alt="Atmosphere" className="w-full h-full object-cover opacity-70" onClick={()=>setIsAtmosphereExpanded(true)}/>:<div className="w-full h-full flex items-center justify-center text-stone-700"><i className="fas fa-compass text-2xl"></i></div>}
-            <div className="absolute bottom-2 left-3 flex items-center gap-2"><div className="bg-stone-950/70 backdrop-blur-sm px-2 py-0.5 rounded-full flex items-center gap-1.5 border border-stone-800/50"><i className="fas fa-eye text-amber-600/60 text-[10px]"></i><span className="fantasy-font text-stone-300 text-xs tracking-widest uppercase text-shadow-sm leading-tight line-clamp-2">{gameState.party[0]?.location||"Unknown"}</span></div></div>
+            {myAtmosphereUrl?<img src={myAtmosphereUrl} alt="Atmosphere" className="w-full h-full object-cover opacity-70" onClick={()=>setIsAtmosphereExpanded(true)}/>:<div className="w-full h-full flex items-center justify-center text-stone-700"><i className="fas fa-compass text-2xl"></i></div>}
+            <div className="absolute bottom-2 left-3 flex items-center gap-2"><div className="bg-stone-950/70 backdrop-blur-sm px-2 py-0.5 rounded-full flex items-center gap-1.5 border border-stone-800/50"><i className="fas fa-eye text-amber-600/60 text-[10px]"></i><span className="fantasy-font text-stone-300 text-xs tracking-widest uppercase text-shadow-sm leading-tight line-clamp-2">{myLocation||"Unknown"}</span></div></div>
           </div>}
           <div ref={chatScrollRef} onScroll={handleChatScroll} className="flex-1 overflow-y-auto relative"><ChatLog messages={messages} settings={settings} onRewind={handleRewind} onUndo={handleUndo} isProcessing={isLoading} scrollRef={chatScrollRef} onScrollChange={setIsScrolledUp} disableInternalScroll showWelcomeChips={onboarding.shouldShowWelcomeChips} onPrefillInput={(text) => { onboarding.markWelcomeSeen(); handleSendMessage(text); }} suggestions={settings.enableSuggestions && !gameState.isProcessing ? pickSuggestionsForCharacter(gameState, myCharacterId) : undefined} onPickSuggestion={(text) => handleSendMessage(text)} onDismissSuggestion={() => { if (myCharacterId && gameState.lastSuggestionsByCharacter) { const updated = { ...gameState.lastSuggestionsByCharacter }; delete updated[myCharacterId]; mcpServer.setLastSuggestionsByCharacter(updated); } else { mcpServer.setLastSuggestions([]); } syncState(); }} portraitMap={gameState.party.reduce((m, c) => { if (c.portraitUrl) m[c.id] = c.portraitUrl; return m; }, {} as Record<string, string>)} isMultiplayer={isMultiplayer} myCharacterId={myCharacterId} pendingCount={messages.filter(m => m.pending).length} onProcessBatch={handleProcessBatch} onRemovePendingMessage={handleRemovePendingMessage} /></div>
           <button
@@ -209,9 +214,9 @@ const MobileLayout: React.FC = () => {
         </button>
         <button onClick={()=>setSettingsOpen(true)} className="flex flex-col items-center gap-1 p-2 transition-colors text-stone-600 hover:text-stone-400"><i className="fas fa-cog text-lg"></i><span className="text-[10px] uppercase font-bold tracking-wider">Settings</span></button>
       </nav>
-      {isAtmosphereExpanded&&gameState.currentAtmosphereUrl&&<div className="fixed inset-0 z-[110] bg-black/95 backdrop-blur-2xl flex flex-col items-center justify-center p-4 animate-in fade-in zoom-in-95 duration-300" onClick={()=>setIsAtmosphereExpanded(false)}>
+      {isAtmosphereExpanded&&myAtmosphereUrl&&<div className="fixed inset-0 z-[110] bg-black/95 backdrop-blur-2xl flex flex-col items-center justify-center p-4 animate-in fade-in zoom-in-95 duration-300" onClick={()=>setIsAtmosphereExpanded(false)}>
         <button className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center bg-stone-900/50 rounded-full text-white" onClick={e=>{e.stopPropagation();setIsAtmosphereExpanded(false);}}><i className="fas fa-times"></i></button>
-        <img src={gameState.currentAtmosphereUrl} alt="Atmosphere Fullscreen" className="w-full max-h-[70vh] object-contain rounded-lg border border-stone-800"/>
+        <img src={myAtmosphereUrl} alt="Atmosphere Fullscreen" className="w-full max-h-[70vh] object-contain rounded-lg border border-stone-800"/>
         <p className="mt-4 text-stone-500 italic fantasy-font text-center">{gameState.worldDescription}</p>
       </div>}
       {showLevelUpModal&&levelUpCharacter&&<LevelUpModal character={levelUpCharacter} selectedAllocations={selectedAllocations} remainingPoints={remainingPoints} previewHp={previewHp} error={allocationError} onAllocate={handleAllocateStat} onConfirm={handleConfirmAllocation} onCancel={handleCloseLevelUp} onConfirmAsi={handleConfirmAsiChoice} onConfirmFeat={handleConfirmFeatChoice} onAcknowledgeSubclass={handleAcknowledgeSubclass}/>}

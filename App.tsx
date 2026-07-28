@@ -168,7 +168,7 @@ const AppContent: React.FC = () => {
       return <StartModeScreen onQuickStart={() => setStage(AppStage.QUICK_START)} onCustom={() => setStage(AppStage.CREATION)} />;
     }
     if (stage === AppStage.QUICK_START) {
-      return <QuickStartFlow onComplete={handleCharacterCreated} onGenerateStartingLocations={handleGenerateStartingLocations} onSetStartingLocation={handleSetStartingLocation} onSwitchToCustom={() => setStage(AppStage.CREATION)} />;
+      return <QuickStartFlow onComplete={handleCharacterCreated} onGenerateStartingLocations={handleGenerateStartingLocations} onSetStartingLocation={handleSetStartingLocation} onSwitchToCustom={() => setStage(AppStage.CREATION)} isNewCampaign={isNewCampaign} campaignStartingLocation={gameState.startingLocation} campaignName={campaignName} />;
     }
     if (stage === AppStage.CREATION) {
       // When joining an existing party (!isNewCampaign), default the wizard's level to

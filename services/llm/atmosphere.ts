@@ -83,9 +83,9 @@ export const STARTING_LOCATIONS_PROMPT = `You are a fantasy world-building assis
 Return a valid JSON array with exactly 4 objects. Each object must have:
 - "name": a creative fantasy tavern or inn name (string)
 - "description": a vivid 2-3 sentence atmosphere description focusing on sensory details like lighting, sounds, smells, architecture, and mood (string)
-- "introHook": a 2-3 sentence atmospheric scene that paints a picture of the surroundings — describe an NPC interaction, a notable detail in the room, the weather outside, ambient sounds, or a mysterious presence. Make it feel alive and immersive. (string)
+- "introHook": MANDATORY — a non-empty 2-3 sentence atmospheric scene that paints a picture of the surroundings. Describe a specific NPC interaction, a notable detail in the room, the weather outside, ambient sounds, or a mysterious presence. Make it feel alive and immersive. NEVER leave this field empty or omit it. (string)
 
-Make each location feel distinct in architecture, atmosphere, and implied region. Vary the names tonally (some warm and rustic, some mysterious, some bustling). The introHook should feel like the opening of a story, drawing the player in with vivid sensory detail.`;
+Make each location feel distinct in architecture, atmosphere, and implied region. Vary the names tonally (some warm and rustic, some mysterious, some bustling). The introHook must always be present and feel like the opening of a story, drawing the player in with vivid sensory detail. Do not return a location with an empty or missing introHook.`;
 
 /**
  * Generates up to 4 unique starting locations for a new character via the LLM.
@@ -152,7 +152,9 @@ export async function generateStartingLocations(
     return locations.slice(0, 4).map((l: { name: string; imageUrl?: string }, i: number) => ({
       name: l.name || `Unnamed Location ${i + 1}`,
       description: l.description || "",
-      introHook: l.introHook || l.hook || "",
+      // Guarantee a non-empty hook: prefer the LLM introHook, then the alias,
+      // then fall back to the description (also thematic) rather than empty.
+      introHook: l.introHook || l.hook || l.description || "",
     }));
   } catch (e) {
     console.warn("[generateStartingLocations] Failed:", e);

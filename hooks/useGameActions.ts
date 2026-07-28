@@ -646,7 +646,12 @@ export const useGameActions = (
         if (userId) character.ownerId = userId;
         setMyCharacterId(character.id); setViewingCharacterId(character.id);
         const startingLoc = mcpServer.getFullState().startingLocation;
-        if (!character.location && startingLoc) character.location = startingLoc.name;
+        // Always align the character's starting location with the campaign's
+        // engine starting location. Both the QuickStart preset path and the
+        // custom wizard path may leave a fallback location (e.g. "The Rusty
+        // Tankard Tavern") baked into the built character; override it here so
+        // a freshly-created host or joiner spawns at the actual chosen ground.
+        if (startingLoc) character.location = startingLoc.name;
         // Detect "join existing party": the party already has members before joinParty
         // runs (new campaigns always reset to an empty party before the wizard runs).
         const isJoiningParty = mcpServer.getFullState().party.length > 0;
@@ -660,10 +665,13 @@ export const useGameActions = (
             const joinMsg: Message = { id: 'join-' + Date.now(), role: MessageRole.SYSTEM, text: `${character.name} has joined the party.`, timestamp: Date.now() };
             messagesToSync = [...messages, joinMsg];
         } else {
-            const locName = startingLoc?.name || 'the Rusty Tankard Tavern';
-            const desc = startingLoc?.description || 'The air is thick with smoke and the smell of roasted meats.';
-            const hook = startingLoc?.introHook || 'A hooded figure at the corner table catches your eye as you settle into a chair.';
-            const introMsg: Message = { id: 'welcome-' + Date.now(), role: MessageRole.MODEL, text: `Greetings, ${character.name}. Your journey begins in ${locName}. ${desc} ${hook} What do you do?`, timestamp: Date.now() };
+            const locName = startingLoc?.name || 'an unknown land';
+            const desc = startingLoc?.description || '';
+            // Prefer the LLM-generated atmospheric introHook; fall back to the
+            // location description (also LLM-generated and thematic) rather than
+            // injecting a generic tavern hook that doesn't match the scene.
+            const hook = startingLoc?.introHook || startingLoc?.description || '';
+            const introMsg: Message = { id: 'welcome-' + Date.now(), role: MessageRole.MODEL, text: `Greetings, ${character.name}. Your journey begins in ${locName}. ${desc}${hook ? ` ${hook}` : ''} What do you do?`, timestamp: Date.now() };
             messagesToSync = [introMsg];
             spokenText = introMsg.text;
         }

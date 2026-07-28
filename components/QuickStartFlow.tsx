@@ -10,6 +10,12 @@ interface QuickStartFlowProps {
   onGenerateStartingLocations: (charInfo: { name: string; race: string; class: string }) => Promise<StartingLocation[]>;
   onSetStartingLocation: (location: StartingLocation) => void;
   onSwitchToCustom: () => void;
+  /** true = host new campaign (preset → starting grounds). false = joining existing party (preset only; campaign starting location is fixed by host). */
+  isNewCampaign?: boolean;
+  /** When joining, the campaign's existing starting location (for preview + finalization). */
+  campaignStartingLocation?: StartingLocation | null;
+  /** Campaign name for the joiner banner. */
+  campaignName?: string;
 }
 
 type Step = 'select' | 'grounds';
@@ -29,7 +35,8 @@ const TopStats: React.FC<{ spec: PresetCharacterSpec }> = ({ spec }) => {
 };
 
 /** Two-step quick-start flow: (1) pick a preset hero, (2) pick a starting ground. Mirrors the wizard's starting-grounds UI but decoupled from WizardState. */
-const QuickStartFlow: React.FC<QuickStartFlowProps> = ({ onComplete, onGenerateStartingLocations, onSetStartingLocation, onSwitchToCustom }) => {
+const QuickStartFlow: React.FC<QuickStartFlowProps> = ({ onComplete, onGenerateStartingLocations, onSetStartingLocation, onSwitchToCustom, isNewCampaign = true, campaignStartingLocation, campaignName }) => {
+  const isJoining = !isNewCampaign;
   const [step, setStep] = useState<Step>('select');
   const [selectedSpec, setSelectedSpec] = useState<PresetCharacterSpec | null>(null);
   const [generatedLocations, setGeneratedLocations] = useState<StartingLocation[]>([]);
@@ -64,10 +71,18 @@ const QuickStartFlow: React.FC<QuickStartFlowProps> = ({ onComplete, onGenerateS
 
   const handleSelectPreset = useCallback((spec: PresetCharacterSpec) => {
     setSelectedSpec(spec);
+    // Joiners don't choose a starting ground — the host already picked one.
+    // Skip the grounds step entirely and immediately finalize the preset.
+    if (isJoining) {
+      if (campaignStartingLocation) onSetStartingLocation(campaignStartingLocation);
+      const character = buildPresetCharacter(spec);
+      onComplete(character);
+      return;
+    }
     setSelectedLocation(null);
     setGeneratedLocations([]);
     setStep('grounds');
-  }, []);
+  }, [isJoining, campaignStartingLocation, onSetStartingLocation, onComplete]);
 
   // Auto-trigger location generation when entering the grounds step.
   useEffect(() => {
@@ -104,9 +119,20 @@ const QuickStartFlow: React.FC<QuickStartFlowProps> = ({ onComplete, onGenerateS
         {step === 'select' && (
           <div className="space-y-6 animate-in fade-in duration-500">
             <div className="text-center">
-              <h2 className="fantasy-font text-3xl text-amber-600 mb-2">Choose Your Hero</h2>
-              <p className="text-stone-400 text-xs md:text-sm">Ten pre-made level-1 adventurers. Pick one to begin your journey.</p>
+              <h2 className="fantasy-font text-3xl text-amber-600 mb-2">{isJoining ? 'Join the Party' : 'Choose Your Hero'}</h2>
+              <p className="text-stone-400 text-xs md:text-sm">
+                {isJoining
+                  ? (campaignName ? `Joining "${campaignName}" — pick a pre-made hero or build your own.` : 'Pick a pre-made hero or build your own to join the party.')
+                  : 'Ten pre-made level-1 adventurers. Pick one to begin your journey.'}
+              </p>
             </div>
+            {isJoining && campaignStartingLocation && (
+              <div className="text-center bg-stone-900/60 border border-stone-800 rounded-lg p-3">
+                <p className="text-[10px] text-stone-500 uppercase tracking-widest font-bold mb-1">Campaign Starting Ground</p>
+                <p className="fantasy-font text-sm text-amber-400">{campaignStartingLocation.name}</p>
+                <p className="text-[10px] text-stone-500 mt-1 line-clamp-2">{campaignStartingLocation.description}</p>
+              </div>
+            )}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
               {PRESET_CHARACTERS.map((spec) => {
                 const race = RACES_BY_ID[spec.raceId];

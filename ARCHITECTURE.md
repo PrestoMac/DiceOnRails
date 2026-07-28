@@ -137,7 +137,7 @@ The order matters: each provider consumes the contexts above it.
 | `AUTH` | `<AuthScreen />` | No user id and not anonymous |
 | `DASHBOARD` | `<CampaignDashboard />` | User signed in, not yet in a campaign |
 | `START_MODE` | `<StartModeScreen />` | New/joined campaign, choosing Quick Start vs. Custom |
-| `QUICK_START` | `<QuickStartFlow />` | Quick Start path — pick a preset character, then starting grounds |
+| `QUICK_START` | `<QuickStartFlow />` | Quick Start path — host: pick preset → starting grounds; joiner (`isNewCampaign={false}`): pick preset only (campaign starting ground is fixed by host) |
 | `CREATION` | `<WizardShell />` | Custom path — full character creation wizard |
 | `PLAY` | `<DesktopLayout />` or `<MobileLayout />` (wrapped in `<ErrorBoundary>`) | Active game |
 
@@ -431,9 +431,9 @@ The engine trusts the LLM to pass the correct actor id per tool call, silently d
 
 ### Multiplayer presence (typing indicators)
 Built on Supabase Presence (ephemeral, broadcast-only — no DB writes, no migrations). Active only for syncable multiplayer campaigns.
-- **`hooks/usePresence.ts`**: subscribes to `presence-${campaignId}-typing`. Each client tracks `{ userId, characterId, name, portraitUrl, isTyping, lastActive }`. Typing is announced on input (debounced), auto-clears after 2500ms idle, hard-clears at 5000ms. Excludes the local user; dedups by `userId`.
+- **`hooks/usePresence.ts`**: subscribes to `presence-${campaignId}-typing`. Each client tracks `{ userId, characterId, name, portraitUrl, isTyping, lastActive }`. Typing is announced on input (debounced), auto-clears after 2500ms idle, hard-clears at 5000ms. Excludes the local user; dedups by `userId`. **Stable channel lifetime**: the channel effect depends on the primitive `myCharacter?.id` (NOT the deep-cloned `Character` object, whose identity flips every `gameState` sync); fresh character data is read inside `buildProfile` via a `myCharacterRef` updated in a separate small effect.
 - **`components/shared/TypingIndicator.tsx`**: row of "NAME is writing…" chips with portrait + bouncing dots. Hidden when empty. Rendered above `InputArea` in both layouts.
-- **Wiring**: layouts pass `setTyping` to `<InputArea onInputChanged={(v) => setTyping(v.length > 0)} />`.
+- **Wiring**: layouts pass `setTyping` to `<InputArea onInputChanged={(v) => setTyping(v.length > 0)} />`. The InputArea fires `onInputChanged?.('')` on send (`handleSubmit`, after `setInput('')`) and on quick-action/speech-to-text pre-fills so the remote indicator reflects the true input state immediately.
 
 ### Rewind flow (`handleRewind`)
 
@@ -682,7 +682,7 @@ components/wizard/
 
 1. Tag character with `ownerId = userId`.
 2. Set `myCharacterId`, `viewingCharacterId`.
-3. Read starting location from state, set character location.
+3. Read starting location from state, **always** set character location to `startingLoc.name` (override — the build can leave a fallback like "The Rusty Tankard Tavern" baked in).
 4. **Join detection**: if `party.length > 0` before `joinParty` (party already has members, meaning the campaign was loaded from storage rather than created fresh), the handler takes the **join path**:
    - Append a `[System]` join notice (`"<Name> has joined the party."`) to existing messages — preserves the campaign's chat history.
    - Skip the intro welcome message and auto-speak.
@@ -703,6 +703,7 @@ components/wizard/
 - Pull state from all 6 contexts.
 - Render `<ChatLog>`, `<InputArea>`, `<CharacterSheet>`, `<Journal>`, `<LevelUpModal>`, `<CombatTracker>`, `<ActivityBell>`, `<AtmosphereOverlay>`.
 - Use `useActivityTracking` to summarize recent events for the bell.
+- **Per-character location & atmosphere**: compute `myCharacter = party.find(c => c.id === myCharacterId) ?? party[0]`, then `myLocation` + `myAtmosphereUrl = locationImages?.[myLocation] ?? currentAtmosphereUrl`. The location banner, fullscreen overlay, battle-map label, and `<AtmosphereOverlay>` all track the local player's character, not `party[0]`. When one party member travels away, the others' title and background stay put. Solo collapses to `party[0]` (byte-identical).
 
 Differences:
 
@@ -718,7 +719,7 @@ Differences:
 | `CampaignDashboard` | Lists campaigns; create / join (by ID) / delete / rename. |
 | `CampaignModal` | Modal for naming a new campaign. |
 | `StartModeScreen` | Choose Quick Start (preset) vs. Custom character creation. |
-| `QuickStartFlow` | Pick a preset character, then a starting ground; can switch to Custom. |
+| `QuickStartFlow` | Host: pick preset → starting ground. Joiner (`isNewCampaign={false}`): pick preset only (campaign starting ground fixed by host). Can switch to Custom. |
 | `CompendiumModal` | Tabbed reference browser: Glossary, Conditions, Rules, Spells, Items (read-only). |
 | _(suggestion chips)_ | Inline in `ChatLog` — 2-3 clickable next-action chips below the last narration. Populated by the 4-tier suggestion fallback chain (`services/llm/suggestions.ts`), opt-in via `enableSuggestions`. |
 | `SetupWizard` | First-run installer; writes `.env` via dev-server middleware or pastes SQL into Supabase. |

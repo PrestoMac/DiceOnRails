@@ -52,7 +52,7 @@ const DesktopLayout: React.FC = () => {
 
   useEffect(() => {
     setIsAtmosphereExpanded(false);
-  }, [gameState.currentAtmosphereUrl]);
+  }, [myAtmosphereUrl]);
 
   const [hasScrollOverflow, setHasScrollOverflow] = useState(false);
   const [, setIsChatScrolledUp] = useState(false);
@@ -69,6 +69,18 @@ const DesktopLayout: React.FC = () => {
   const isMultiplayer = gameState.party.length > 1;
   const isHost = !!userId && userId === hostId;
   const handleBackOrReset = () => userId ? confirm('Return to dashboard?') && setStage(AppStage.DASHBOARD) : confirm('Are you sure you want to reset the game? All progress will be lost.') && resetGame();
+
+  // Per-character display identity. In multiplayer, the location title and
+  // atmosphere image should track the LOCAL player's character, not party[0]
+  // (which may be a different character a traveling companion left behind).
+  // Solo collapses: myCharacterId === party[0].id → byte-identical to before.
+  const myCharacter = gameState.party.find(c => c.id === myCharacterId) ?? gameState.party[0];
+  const myLocation = myCharacter?.location;
+  // Atmosphere: prefer the cached image for MY location (already populated by
+  // setStartingLocation + performAtmosphereUpdate's cacheLocationImage), so
+  // another player's travel no longer flips our background. Falls back to the
+  // global currentAtmosphereUrl when our location has no cached image yet.
+  const myAtmosphereUrl = (myLocation && gameState.locationImages?.[myLocation]) || gameState.currentAtmosphereUrl;
 
   // Multiplayer presence (typing indicators). Skipped for solo / anonymous hot-seat.
   const myCharacterForPresence = isMultiplayer ? (charToShow ?? gameState.party[0]) : undefined;
@@ -125,7 +137,7 @@ const DesktopLayout: React.FC = () => {
   }, [syncState]);
 
   const handleInitMap = useCallback((width: number, height: number) => {
-    let bmap = initBattleMap(width, height, gameState.party[0]?.location ?? 'Battle');
+    let bmap = initBattleMap(width, height, myLocation ?? 'Battle');
     bmap = autoPlaceParty(bmap, gameState.party.map(c => ({ id: c.id, name: c.name })));
     if (gameState.combat?.enemies) {
       bmap = autoPlaceEnemies(bmap, gameState.combat.enemies.filter(e => !e.isDead).map(e => ({ id: e.id, name: e.name })));
@@ -162,11 +174,11 @@ const DesktopLayout: React.FC = () => {
       {sidebarOpen && <div onMouseDown={handleDragStart} className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-amber-600/40 transition-colors z-30" />}
     </aside>
     <main className="flex-1 flex flex-col relative">
-      <AtmosphereOverlay url={gameState.currentAtmosphereUrl} enabled={settings.enableAtmosphere} />
+      <AtmosphereOverlay url={myAtmosphereUrl} enabled={settings.enableAtmosphere} />
       <header className="h-16 border-b border-stone-800 bg-stone-950/80 backdrop-blur-md flex items-center justify-between px-6 z-10 relative">
         <div className="flex items-center gap-4">
           <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 hover:bg-stone-900 rounded-lg text-stone-400 transition-colors"><i className={`fas ${sidebarOpen ? 'fa-indent' : 'fa-outdent'} text-xl`} /></button>
-          {settings.enableAtmosphere && gameState.party[0]?.location && <div className="flex items-center gap-2">
+          {settings.enableAtmosphere && myLocation && <div className="flex items-center gap-2">
             <i className="fas fa-location-dot text-amber-600/60 text-xs" />
             <span className="fantasy-font text-stone-300 text-sm tracking-widest uppercase">{gameState.party[0].location}</span>
           </div>}
@@ -226,7 +238,7 @@ const DesktopLayout: React.FC = () => {
           onUndo={handleUndo}
           isProcessing={isLoading}
           onExpandAtmosphere={() => setIsAtmosphereExpanded(true)}
-          atmosphereUrl={gameState.currentAtmosphereUrl}
+          atmosphereUrl={myAtmosphereUrl}
           scrollRef={chatScrollRef}
           onScrollChange={setIsChatScrolledUp}
           showWelcomeChips={onboarding.shouldShowWelcomeChips}
@@ -261,9 +273,9 @@ const DesktopLayout: React.FC = () => {
         <InputArea onSendMessage={handleSendMessage} onResolveEnemyTurn={handleResolveEnemyTurn} isLoading={isLoading || gameState.isProcessing} combat={gameState.combat} character={charToShow} onInputChanged={(v) => setTyping(v.length > 0)} onArcaneRecovery={(id, sel) => handleArcaneRecovery(id, sel)} onManageSpellbook={handleManageSpellbook} onSwapKnownSpell={handleSwapKnownSpell} />
       </div>
     </main>
-    {isAtmosphereExpanded && gameState.currentAtmosphereUrl && <div className="fixed inset-0 z-[110] bg-black/95 backdrop-blur-2xl flex flex-col items-center justify-center p-4 md:p-12 animate-in fade-in zoom-in-95 duration-300" onClick={() => setIsAtmosphereExpanded(false)}>
-      <div className="absolute top-8 right-8 flex items-center gap-4"><span className="fantasy-font text-stone-400 text-lg tracking-widest uppercase opacity-80 hidden md:block">{gameState.party[0]?.location || "Unknown"}</span><button className="w-12 h-12 flex items-center justify-center bg-stone-900/50 hover:bg-stone-800 rounded-full text-stone-400 hover:text-white transition-all" onClick={e => { e.stopPropagation(); setIsAtmosphereExpanded(false); }}><i className="fas fa-times text-2xl" /></button></div>
-      <div className="w-full max-w-6xl aspect-square md:aspect-video rounded-xl overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.8)] border border-stone-800" onClick={e => e.stopPropagation()}><img src={gameState.currentAtmosphereUrl} alt="Atmosphere Fullscreen" className="w-full h-full object-cover" /></div>
+    {isAtmosphereExpanded && myAtmosphereUrl && <div className="fixed inset-0 z-[110] bg-black/95 backdrop-blur-2xl flex flex-col items-center justify-center p-4 md:p-12 animate-in fade-in zoom-in-95 duration-300" onClick={() => setIsAtmosphereExpanded(false)}>
+      <div className="absolute top-8 right-8 flex items-center gap-4"><span className="fantasy-font text-stone-400 text-lg tracking-widest uppercase opacity-80 hidden md:block">{myLocation || "Unknown"}</span><button className="w-12 h-12 flex items-center justify-center bg-stone-900/50 hover:bg-stone-800 rounded-full text-stone-400 hover:text-white transition-all" onClick={e => { e.stopPropagation(); setIsAtmosphereExpanded(false); }}><i className="fas fa-times text-2xl" /></button></div>
+      <div className="w-full max-w-6xl aspect-square md:aspect-video rounded-xl overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.8)] border border-stone-800" onClick={e => e.stopPropagation()}><img src={myAtmosphereUrl} alt="Atmosphere Fullscreen" className="w-full h-full object-cover" /></div>
       <p className="mt-8 text-stone-500 italic fantasy-font text-xl text-center max-w-2xl px-4">{gameState.worldDescription}</p>
     </div>}
     {showLevelUpModal && levelUpCharacter && <LevelUpModal character={levelUpCharacter} selectedAllocations={selectedAllocations} remainingPoints={remainingPoints} previewHp={previewHp} error={allocationError} onAllocate={handleAllocateStat} onConfirm={handleConfirmAllocation} onCancel={handleCloseLevelUp} onConfirmAsi={handleConfirmAsiChoice} onConfirmFeat={handleConfirmFeatChoice} onAcknowledgeSubclass={handleAcknowledgeSubclass} />}
