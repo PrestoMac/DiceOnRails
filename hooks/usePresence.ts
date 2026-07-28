@@ -24,6 +24,10 @@ interface PresenceProfile {
 
 const TYPING_TIMEOUT_MS = 2500;
 const PRESENCE_KEY = 'typing';
+const STALE_THRESHOLD_MS = TYPING_TIMEOUT_MS * 2;
+const HEARTBEAT_INTERVAL_MS = 10_000;
+const RECONNECT_BASE_MS = 1000;
+const RECONNECT_MAX_MS = 30_000;
 
 /**
  * Multiplayer typing-indicator hook built on Supabase Presence.
@@ -34,6 +38,14 @@ const PRESENCE_KEY = 'typing';
  * name, portraitUrl, isTyping, lastActive }`. Typing is announced on input
  * (debounced via timeout) and auto-clears after `TYPING_TIMEOUT_MS` of
  * silence, plus a hard 2× safety timeout.
+ *
+ * Hardened against:
+ *  - WebSocket drops → auto-reconnect with exponential backoff (1s→30s cap)
+ *  - Network offline → re-subscribe on `navigator.online`
+ *  - Tab backgrounding → re-broadcast on visibility change
+ *  - Stale entries → periodic heartbeat re-broadcast every 10s
+ *  - Track failures → awaited + retried with short delay
+ *  - Join/leave events → immediate indicator updates (not just sync cycles)
  *
  * Returns `{ typingUsers, setTyping }` where `typingUsers` excludes the local
  * user (you never see your own indicator) and prunes stale (>2× timeout)
@@ -53,6 +65,9 @@ export function usePresence(
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hardTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const reconnectAttemptsRef = useRef(0);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Ref mirror of myCharacter so the mount-stable channel effect and
   // buildProfile can read the latest character data WITHOUT including the
   // deep-cloned Character object in their dependency arrays. The layouts
@@ -79,15 +94,53 @@ export function usePresence(
     };
   }, [userId]);
 
+  // Convert the channel's presence state into the deduped typing-users list.
+  const syncTypingUsers = useCallback(() => {
+    const channel = channelRef.current;
+    if (!channel) return;
+    const state = channel.presenceState<PresenceProfile>();
+    const now = Date.now();
+    const next: TypingUser[] = [];
+    for (const [presenceKey, entries] of Object.entries(state)) {
+      for (const entry of entries) {
+        if (now - (entry.lastActive ?? 0) > STALE_THRESHOLD_MS) continue;
+        if (entry.userId === userId) continue;
+        if (!entry.isTyping) continue;
+        next.push({
+          userId: entry.userId,
+          characterId: entry.characterId,
+          name: entry.name,
+          portraitUrl: entry.portraitUrl,
+        });
+        void presenceKey;
+      }
+    }
+    const seen = new Set<string>();
+    const deduped = next.filter(u => {
+      if (seen.has(u.userId)) return false;
+      seen.add(u.userId);
+      return true;
+    });
+    setTypingUsers(deduped);
+  }, [userId]);
+
   // Publish the latest profile (or clear typing) to the channel.
-  const track = useCallback((profile: PresenceProfile | null) => {
+  // Awaits the track call and retries once on failure.
+  const track = useCallback(async (profile: PresenceProfile | null) => {
     const channel = channelRef.current;
     if (!channel || !profile) return;
     profileRef.current = profile;
     try {
-      void channel.track(profile);
+      await channel.track(profile);
     } catch (err) {
-      if (isDebugMode) console.warn('[Presence] track failed', err);
+      if (isDebugMode) console.warn('[Presence] track failed, retrying…', err);
+      // One retry after a short delay.
+      await new Promise(r => setTimeout(r, 200));
+      try {
+        await channel.track(profile);
+      } catch (err2) {
+        if (isDebugMode) console.warn('[Presence] track retry failed', err2);
+      }
     }
   }, []);
 
@@ -99,87 +152,109 @@ export function usePresence(
     const base = profileRef.current ?? buildProfile(false);
     if (!base) return;
     const next: PresenceProfile = { ...base, isTyping, lastActive: Date.now() };
-    track(next);
+    void track(next);
     if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
     if (hardTimerRef.current) clearTimeout(hardTimerRef.current);
     if (isTyping) {
       clearTimerRef.current = setTimeout(() => {
-        // Auto-clear after idle.
         const cur = profileRef.current;
-        if (cur) track({ ...cur, isTyping: false, lastActive: Date.now() });
+        if (cur) void track({ ...cur, isTyping: false, lastActive: Date.now() });
       }, TYPING_TIMEOUT_MS);
       hardTimerRef.current = setTimeout(() => {
         const cur = profileRef.current;
-        if (cur) track({ ...cur, isTyping: false, lastActive: Date.now() });
+        if (cur) void track({ ...cur, isTyping: false, lastActive: Date.now() });
       }, TYPING_TIMEOUT_MS * 2);
     }
   }, [isMultiplayer, campaignId, buildProfile, track]);
 
+  // Build a channel, subscribe, and wire up presence event handlers.
+  // Returns an unsubscribe function.
+  const createChannel = useCallback(() => {
+    const channel = supabase.channel(`presence-${campaignId}-${PRESENCE_KEY}`);
+    channelRef.current = channel;
+
+    // Listen to all three presence event types for immediate updates.
+    channel
+      .on('presence', { event: 'sync' }, () => syncTypingUsers())
+      .on('presence', { event: 'join' }, () => syncTypingUsers())
+      .on('presence', { event: 'leave' }, () => syncTypingUsers())
+      .subscribe(async (status) => {
+        if (isDebugMode) console.log('[Presence] subscribe status:', status);
+        if (status === 'SUBSCRIBED') {
+          reconnectAttemptsRef.current = 0;
+          const initial = buildProfile(false);
+          if (initial) {
+            profileRef.current = initial;
+            await track(initial);
+          }
+          // Start heartbeat to keep presence entries fresh.
+          heartbeatRef.current = setInterval(() => {
+            const cur = profileRef.current;
+            if (cur) void track({ ...cur, lastActive: Date.now() });
+          }, HEARTBEAT_INTERVAL_MS);
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          if (isDebugMode) console.warn('[Presence] channel', status, '- scheduling reconnect');
+          // Clear any pending reconnect.
+          if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+          const delay = Math.min(
+            RECONNECT_BASE_MS * 2 ** reconnectAttemptsRef.current,
+            RECONNECT_MAX_MS,
+          );
+          reconnectAttemptsRef.current += 1;
+          reconnectTimerRef.current = setTimeout(() => {
+            if (isDebugMode) console.log('[Presence] reconnecting…');
+            const unsub = createChannel();
+            void unsub;
+          }, delay);
+        }
+      });
+
+    return () => {
+      try { supabase.removeChannel(channel); } catch { /* ignore */ }
+    };
+  }, [campaignId, buildProfile, track, syncTypingUsers]);
+
   useEffect(() => {
-    // Depend on the primitive character id, NOT the Character object. The
-    // layouts deep-clone gameState on every sync, so myCharacter's identity
-    // flips every render — depending on it would tear down + rebuild the
-    // Presence channel constantly, dropping in-flight track() calls.
     const myCharacterId = myCharacter?.id;
     if (!isMultiplayer || !isSyncableCampaign(campaignId) || !userId || !myCharacterId) {
       setTypingUsers([]);
       return;
     }
-    const channel = supabase.channel(`presence-${campaignId}-${PRESENCE_KEY}`);
-    channelRef.current = channel;
 
-    channel
-      .on('presence', { event: 'sync' }, () => {
-        const state = channel.presenceState<PresenceProfile>();
-        const now = Date.now();
-        const next: TypingUser[] = [];
-        for (const [presenceKey, entries] of Object.entries(state)) {
-          // Each presence key maps to an array of profiles (usually one per client).
-          for (const entry of entries) {
-            // Exclude stale entries defensively (>2× timeout since lastActive).
-            if (now - (entry.lastActive ?? 0) > TYPING_TIMEOUT_MS * 2) continue;
-            // Exclude the local user — you never see your own indicator.
-            if (entry.userId === userId) continue;
-            if (!entry.isTyping) continue;
-            // Use presenceKey as a tiebreaker id for dedup across multi-client users.
-            next.push({
-              userId: entry.userId,
-              characterId: entry.characterId,
-              name: entry.name,
-              portraitUrl: entry.portraitUrl,
-            });
-            void presenceKey;
-          }
-        }
-        // Dedup by userId (a player with multiple tabs open counts once).
-        const seen = new Set<string>();
-        const deduped = next.filter(u => {
-          if (seen.has(u.userId)) return false;
-          seen.add(u.userId);
-          return true;
-        });
-        setTypingUsers(deduped);
-      })
-      .subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') {
-          const initial = buildProfile(false);
-          if (initial) {
-            profileRef.current = initial;
-            try { await channel.track(initial); } catch { /* ignore */ }
-          }
-        }
-      });
+    let unsub = createChannel();
+
+    // Re-subscribe when network connectivity is restored.
+    const handleOnline = () => {
+      if (isDebugMode) console.log('[Presence] network online - reconnecting');
+      unsub();
+      unsub = createChannel();
+    };
+    window.addEventListener('online', handleOnline);
+
+    // Re-broadcast current typing state when the tab regains focus.
+    // Browsers may drop the WebSocket while backgrounded; this ensures
+    // other clients see an accurate state when the user returns.
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const cur = profileRef.current;
+        if (cur) void track({ ...cur, lastActive: Date.now() });
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
       if (hardTimerRef.current) clearTimeout(hardTimerRef.current);
-      try { void channel.untrack(); } catch { /* ignore */ }
-      try { supabase.removeChannel(channel); } catch { /* ignore */ }
+      if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+      unsub();
       channelRef.current = null;
       profileRef.current = null;
       setTypingUsers([]);
+      window.removeEventListener('online', handleOnline);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [isMultiplayer, campaignId, userId, myCharacter?.id, buildProfile]);
+  }, [isMultiplayer, campaignId, userId, myCharacter?.id, buildProfile, createChannel, track]);
 
   return { typingUsers, setTyping };
 }
