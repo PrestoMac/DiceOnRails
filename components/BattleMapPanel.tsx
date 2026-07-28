@@ -344,8 +344,10 @@ const BattleMapPanel: React.FC<BattleMapPanelProps> = ({
     const { px, py } = getCanvasPos(e);
     const token = tokenAtPos(px, py);
     if (!token) return;
-    // Host can drag any token; non-hosts can only drag their own player token
-    if (!isHost && (token.type !== 'player' || token.id !== myCharacterId)) return;
+    // Players can only drag their own character token.
+    // Hosts can also only drag their own character token (use move_token tool or
+    // init_battle_map to position enemies/NPCs).
+    if (token.type !== 'player' || token.id !== myCharacterId) return;
     dragging.current = { tokenId: token.id, startPos: token.pos };
     e.currentTarget.style.cursor = 'grabbing';
   };
@@ -505,7 +507,7 @@ const BattleMapPanel: React.FC<BattleMapPanelProps> = ({
             width={canvasW}
             height={canvasH}
             style={{
-              cursor: isHost && !isProcessing ? 'crosshair' : 'default',
+              cursor: !isProcessing ? 'pointer' : 'default',
               display: 'block',
             }}
             onMouseDown={handleMouseDown}
@@ -546,9 +548,7 @@ const BattleMapPanel: React.FC<BattleMapPanelProps> = ({
           <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-600/70" />
           Enemies
         </div>
-        {isHost && (
-          <span className="ml-auto italic">Drag tokens to reposition</span>
-        )}
+        <span className="ml-auto italic">Drag your token to move</span>
         <span className="text-stone-700">1 cell = 5 ft</span>
       </div>
     </div>
