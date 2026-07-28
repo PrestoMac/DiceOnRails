@@ -14,7 +14,7 @@ import { CONDITION_INFO } from '../../data/conditionInfo';
 import { calculateAc, calculateSpeed } from '../classEngine';
 import { MULTIPLAYER_PROMPT } from './prompts/multiplayerPrompt';
 import { MAP_PROMPT } from './prompts/mapPrompt';
-import { buildGridContextString } from '../gridService';
+import { buildGridContextString, distanceCells } from '../gridService';
 
 const CRITICAL_TOOLS = new Set(['cast_spell', 'inflict_damage', 'roll_dice', 'player_attack']);
 // Canonical set of real tool names. Used to drop tool calls whose `function.name`
@@ -217,6 +217,15 @@ export async function runAgentLoop(
       }
     }
     contextParts.push(buildGridContextString(state.battleMap, state, speeds));
+    // Inject player-driven token movement context (from drag-and-drop or move_token tool)
+    if (state.lastTokenMove) {
+      const { tokenId, from, to } = state.lastTokenMove;
+      const token = state.battleMap.tokens.find(t => t.id === tokenId);
+      const tokenName = token?.name ?? tokenId;
+      const dist = distanceCells(from, to);
+      const ft = dist * 5;
+      contextParts.push(`PLAYER MOVEMENT: ${tokenName} moved from (${from.x},${from.y}) to (${to.x},${to.y}) (${dist} cells, ${ft} ft)`);
+    }
   }
 
   const contextMessage = {

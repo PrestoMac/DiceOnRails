@@ -102,4 +102,15 @@ export interface GameState {
    * GameState — multiplayer sync is free via the existing Supabase path.
    */
   battleMap?: BattleMap;
+  /**
+   * Tracks the most recent token movement on the VTT battle map (from either
+   * drag-and-drop or the move_token tool). Injected into the LLM context as a
+   * PLAYER MOVEMENT: line so the AI is aware of player-driven movement without
+   * requiring an LLM call. Cleared when combat ends or the map is dismissed.
+   */
+  lastTokenMove?: {
+    tokenId: string;
+    from: { x: number; y: number };
+    to: { x: number; y: number };
+  };
 }

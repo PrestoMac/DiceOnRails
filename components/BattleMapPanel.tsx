@@ -21,7 +21,7 @@ import React, {
   useMemo,
 } from 'react';
 import { BattleMap, GridToken, GridPosition, Character, CombatState } from '../types';
-import { distanceFeet } from '../services/gridService';
+import { distanceFeet, distanceCells } from '../services/gridService';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -34,6 +34,8 @@ interface BattleMapPanelProps {
   currentTurnId?: string;       // id of the combatant whose turn it is
   isHost: boolean;              // only hosts can drag tokens / use GM toolbar
   isProcessing: boolean;
+  myCharacterId?: string;       // current player's character id (for drag ownership)
+  speeds?: Record<string, number>; // token id -> speed in ft (for movement validation)
   onTokenMove: (tokenId: string, x: number, y: number) => void;
   onClearMap: () => void;
   onInitMap: (width: number, height: number) => void;
@@ -103,6 +105,8 @@ const BattleMapPanel: React.FC<BattleMapPanelProps> = ({
   currentTurnId,
   isHost,
   isProcessing,
+  myCharacterId,
+  speeds,
   onTokenMove,
   onClearMap,
   onInitMap,
@@ -116,6 +120,7 @@ const BattleMapPanel: React.FC<BattleMapPanelProps> = ({
   // Drag state
   const dragging = useRef<{ tokenId: string; startPos: GridPosition } | null>(null);
   const [dragOverCell, setDragOverCell] = useState<GridPosition | null>(null);
+  const [invalidDropCell, setInvalidDropCell] = useState<GridPosition | null>(null);
 
   // Hover state (for melee-range ring)
   const [hoveredTokenId, setHoveredTokenId] = useState<string | null>(null);
@@ -222,13 +227,25 @@ const BattleMapPanel: React.FC<BattleMapPanelProps> = ({
 
     // --- Drag hover highlight ---
     if (dragOverCell) {
-      ctx.fillStyle = 'rgba(251,191,36,0.18)';
+      const isInvalid = invalidDropCell !== null;
+      ctx.fillStyle = isInvalid ? 'rgba(239,68,68,0.25)' : 'rgba(251,191,36,0.18)';
       ctx.fillRect(
         dragOverCell.x * cellSize + 1,
         dragOverCell.y * cellSize + 1,
         cellSize - 2,
         cellSize - 2,
       );
+      // Red border for invalid drop
+      if (isInvalid) {
+        ctx.strokeStyle = 'rgba(239,68,68,0.6)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(
+          dragOverCell.x * cellSize + 1,
+          dragOverCell.y * cellSize + 1,
+          cellSize - 2,
+          cellSize - 2,
+        );
+      }
     }
 
     // --- Melee-range ring for hovered token ---
@@ -300,7 +317,7 @@ const BattleMapPanel: React.FC<BattleMapPanelProps> = ({
         ctx.fill();
       }
     }
-  }, [battleMap, cellSize, currentTurnId, dragOverCell, hoveredTokenId]);
+  }, [battleMap, cellSize, currentTurnId, dragOverCell, hoveredTokenId, invalidDropCell]);
 
   useEffect(() => { draw(); }, [draw]);
 
@@ -323,13 +340,14 @@ const BattleMapPanel: React.FC<BattleMapPanelProps> = ({
   };
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isHost || isProcessing) return;
+    if (isProcessing) return;
     const { px, py } = getCanvasPos(e);
     const token = tokenAtPos(px, py);
-    if (token) {
-      dragging.current = { tokenId: token.id, startPos: token.pos };
-      e.currentTarget.style.cursor = 'grabbing';
-    }
+    if (!token) return;
+    // Host can drag any token; non-hosts can only drag their own player token
+    if (!isHost && (token.type !== 'player' || token.id !== myCharacterId)) return;
+    dragging.current = { tokenId: token.id, startPos: token.pos };
+    e.currentTarget.style.cursor = 'grabbing';
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -337,6 +355,17 @@ const BattleMapPanel: React.FC<BattleMapPanelProps> = ({
     if (dragging.current) {
       const cell = canvasToCell(px, py, cellSize, battleMap);
       setDragOverCell(cell);
+      // Validate movement against speed limit
+      const dragInfo = dragging.current;
+      const dist = distanceCells(dragInfo.startPos, cell);
+      const token = battleMap.tokens.find(t => t.id === dragInfo.tokenId);
+      const speed = token ? (speeds?.[token.id] ?? 30) : 30;
+      const maxCells = Math.max(0, Math.round(speed / 5));
+      if (dist > maxCells) {
+        setInvalidDropCell(cell);
+      } else {
+        setInvalidDropCell(null);
+      }
       return;
     }
     // Tooltip on hover
@@ -363,9 +392,18 @@ const BattleMapPanel: React.FC<BattleMapPanelProps> = ({
     if (!dragging.current) return;
     const { px, py } = getCanvasPos(e);
     const cell = canvasToCell(px, py, cellSize, battleMap);
-    onTokenMove(dragging.current.tokenId, cell.x, cell.y);
+    // Validate movement inline (don't rely on async state)
+    const dist = distanceCells(dragging.current.startPos, cell);
+    const token = battleMap.tokens.find(t => t.id === dragging.current.tokenId);
+    const speed = token ? (speeds?.[token.id] ?? 30) : 30;
+    const maxCells = Math.max(0, Math.round(speed / 5));
+    if (dist <= maxCells) {
+      onTokenMove(dragging.current.tokenId, cell.x, cell.y);
+    }
+    // If invalid, token naturally snaps back to original position (no move applied)
     dragging.current = null;
     setDragOverCell(null);
+    setInvalidDropCell(null);
     e.currentTarget.style.cursor = 'default';
   };
 
@@ -373,6 +411,7 @@ const BattleMapPanel: React.FC<BattleMapPanelProps> = ({
     if (dragging.current) {
       dragging.current = null;
       setDragOverCell(null);
+      setInvalidDropCell(null);
     }
     setHoveredTokenId(null);
     setTooltip(null);

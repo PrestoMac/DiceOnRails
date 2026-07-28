@@ -735,6 +735,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       }
       delete (state as { combat?: unknown }).combat;
       delete (state as { battleMap?: unknown }).battleMap;
+      delete (state as { lastTokenMove?: unknown }).lastTokenMove;
       const clearedMsg = cleared.length ? ` Cleared: ${[...new Set(cleared)].join(', ')}.` : '';
       return {
         success: true,

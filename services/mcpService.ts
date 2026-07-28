@@ -204,6 +204,12 @@ export class MockMCPServer {
   /** Removes the active battle map entirely (e.g. after combat ends). */
   public clearBattleMap(): void {
     delete (this.state as { battleMap?: unknown }).battleMap;
+    delete (this.state as { lastTokenMove?: unknown }).lastTokenMove;
+  }
+
+  /** Records the most recent token movement for LLM context injection. */
+  public setLastTokenMove(move: { tokenId: string; from: { x: number; y: number }; to: { x: number; y: number } }): void {
+    this.state.lastTokenMove = move;
   }
 
   /** Replaces the full token array on the active battle map (used by UI drag-and-drop). */
@@ -480,6 +486,8 @@ export class MockMCPServer {
             if (!resolvedToken) {
               res = { success: false, data: {}, message: `Token "${tokenIdRaw}" not found on battle map.` };
             } else {
+              // Capture from-position before mutating
+              const fromPos = { ...resolvedToken.pos };
               // Movement validation: warn if the move exceeds the creature's speed.
               const dist = distanceCells(resolvedToken.pos, { x: targetX, y: targetY });
               let speed = 30; // default medium creature
@@ -498,6 +506,12 @@ export class MockMCPServer {
                 success: true,
                 data: { tokenId: resolvedToken.id, name: resolvedToken.name, x: moved?.pos.x, y: moved?.pos.y },
                 message: moveMsg,
+              };
+              // Record movement for LLM context (persists until next move or combat end)
+              this.state.lastTokenMove = {
+                tokenId: resolvedToken.id,
+                from: fromPos,
+                to: { x: targetX, y: targetY },
               };
             }
           }

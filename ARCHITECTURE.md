@@ -535,12 +535,13 @@ Pure-function grid service for the Virtual Tabletop integration. Zero side-effec
 
 **Integration points:**
 - `GameState.battleMap?: BattleMap` — optional additive field; absent in existing saves = VTT inactive.
-- `combatService.ts`: `start_combat` automatically initializes `state.battleMap` (auto-placing party & enemies) every time combat starts. `end_combat` clears it.
-- `mcpService.ts` dispatches `move_token` and `init_battle_map` tool calls. `move_token` includes a **movement validation warning** when the move exceeds the creature's speed (warn-stamp pattern, does not block).
-- `agentLoop.ts` injects `buildGridContextString()` into `contextParts` whenever `battleMap` is present, passing a speeds map (`calculateSpeed` for players, 30 ft default for enemies).
+- `GameState.lastTokenMove?` — records the most recent token movement `{ tokenId, from, to }`. Injected into LLM context as a `PLAYER MOVEMENT:` line. Cleared when combat ends or the map is dismissed.
+- `combatService.ts`: `start_combat` automatically initializes `state.battleMap` (auto-placing party & enemies) every time combat starts. `end_combat` clears both `battleMap` and `lastTokenMove`.
+- `mcpService.ts` dispatches `move_token` and `init_battle_map` tool calls. `move_token` includes a **movement validation warning** when the move exceeds the creature's speed (warn-stamp pattern, does not block) and records `lastTokenMove`. `setLastTokenMove()` is the public method for UI-driven moves.
+- `agentLoop.ts` injects `buildGridContextString()` into `contextParts` whenever `battleMap` is present, passing a speeds map (`calculateSpeed` for players, 30 ft default for enemies). Also injects a `PLAYER MOVEMENT:` line when `state.lastTokenMove` is set.
 - `services/llm/prompts/mapPrompt.ts` is appended to the system message, strictly enforcing Chebyshev movement budgets and 5e attack ranges.
-- `components/BattleMapPanel.tsx` renders the canvas with **coordinate labels** (column/row numbers), **melee-range hover ring** (dashed green at 5 ft), current-turn pulse, dead-token greying, and drag-and-drop (host only).
-- `components/layouts/DesktopLayout.tsx` and `MobileLayout.tsx` embed `BattleMapPanel` as a collapsible panel below `CombatTracker`.
+- `components/BattleMapPanel.tsx` renders the canvas with **coordinate labels** (column/row numbers), **melee-range hover ring** (dashed green at 5 ft), current-turn pulse, dead-token greying, and drag-and-drop with **speed validation** and **token ownership**: players can only drag their own character token; the GM (host) can drag any token. Invalid drops (exceeding speed) are blocked — the token snaps back and the cell renders with a red fill + border.
+- `components/layouts/DesktopLayout.tsx` and `MobileLayout.tsx` embed `BattleMapPanel` as a collapsible panel below `CombatTracker`. Both compute a `battleMapSpeeds` memo (`calculateSpeed` for party, `beastFields.speed ?? 30` for enemies) and pass it to the panel. Both record `lastTokenMove` in their `handleTokenMove` callbacks before syncing state.
 
 ### `progressionService.ts`
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useGameContext } from '../../contexts/GameContext';
 import { useActionsContext } from '../../contexts/ActionsContext';
 import { useProgressionContext } from '../../contexts/ProgressionContext';
@@ -19,7 +19,7 @@ import TypingIndicator from '../shared/TypingIndicator';
 import { useActivityTracking } from '../../hooks/useActivityTracking';
 import { useOnboarding } from '../../hooks/useOnboarding';
 import { usePresence } from '../../hooks/usePresence';
-import { calculateAc } from '../../services/classEngine';
+import { calculateAc, calculateSpeed } from '../../services/classEngine';
 import { formatGameTime } from '../../utils/timeUtils';
 import { mcpServer } from '../../services/mcpService';
 import { pickSuggestionsForCharacter } from '../../services/llm/suggestions';
@@ -94,11 +94,18 @@ const MobileLayout: React.FC = () => {
   // --- VTT Battle Map handlers ---
 
   const handleTokenMove = useCallback((tokenId: string, x: number, y: number) => {
+    // Capture from-position before mutating
+    const token = gameState.battleMap?.tokens.find(t => t.id === tokenId);
+    const fromPos = token ? { ...token.pos } : undefined;
     mcpServer.updateBattleMapTokens(
       (gameState.battleMap?.tokens ?? []).map(t =>
         t.id === tokenId ? { ...t, pos: { x, y } } : t
       )
     );
+    // Record movement for LLM context
+    if (fromPos) {
+      mcpServer.setLastTokenMove({ tokenId, from: fromPos, to: { x, y } });
+    }
     syncState();
   }, [gameState.battleMap, syncState]);
 
@@ -128,6 +135,16 @@ const MobileLayout: React.FC = () => {
     if (!gameState.combat?.isActive) return undefined;
     return gameState.combat.initiative[gameState.combat.turnIndex]?.id;
   })();
+
+  // Build speed lookup for VTT movement validation
+  const battleMapSpeeds = useMemo(() => {
+    const speeds: Record<string, number> = {};
+    gameState.party.forEach(c => { speeds[c.id] = calculateSpeed(c); });
+    gameState.combat?.enemies.forEach(e => {
+      if (!e.isDead) speeds[e.id] = e.beastFields?.speed ?? 30;
+    });
+    return speeds;
+  }, [gameState.party, gameState.combat]);
 
   return (
     <div className="flex flex-col h-screen w-full relative overflow-hidden bg-stone-950">
@@ -168,6 +185,8 @@ const MobileLayout: React.FC = () => {
                 currentTurnId={currentTurnId}
                 isHost={isHost}
                 isProcessing={isLoading || !!gameState.isProcessing}
+                myCharacterId={myCharacterId}
+                speeds={battleMapSpeeds}
                 onTokenMove={handleTokenMove}
                 onClearMap={handleClearMap}
                 onInitMap={handleInitMap}
