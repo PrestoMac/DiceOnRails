@@ -52,8 +52,19 @@ const CATEGORY_STYLES: Record<string, string> = {
   death: 'bg-red-950/50 text-red-400 border border-red-900 hover:bg-red-900/50 hover:border-red-700 hover:text-red-300 animate-pulse',
 };
 
-const QUICK_BTN = 'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium whitespace-nowrap transition-all shrink-0';
-const DISABLED_STYLE = 'bg-stone-800/50 text-stone-600 cursor-not-allowed';
+const QUICK_BTN = "px-2.5 py-1 rounded text-xs font-semibold shrink-0 flex items-center gap-1.5 transition-all cursor-pointer select-none";
+const DISABLED_STYLE = "bg-stone-900/50 text-stone-600 border border-stone-800/40 cursor-not-allowed opacity-50";
+
+const QuickActionBtn: React.FC<{ action: QuickAction; locked: boolean; onClick: () => void; extraTitle?: string }> = ({ action, locked, onClick, extraTitle }) => (
+  <button type="button" disabled={locked} onClick={onClick} className={`${QUICK_BTN} ${locked ? DISABLED_STYLE : (action.customStyle || CATEGORY_STYLES[action.category])}`} title={extraTitle || action.fillText}>
+    <i className={`fas ${action.icon} text-[9px]`}></i> {action.label}
+    {action.badge && (
+      <span className="text-[8px] font-bold px-1 py-0.5 rounded uppercase tracking-tighter bg-indigo-950/90 text-indigo-300 border border-indigo-700/60 ml-0.5 inline-flex items-center gap-0.5">
+        <i className="fas fa-sparkles text-[7px]"></i> {action.badge}
+      </span>
+    )}
+  </button>
+);
 
 /** Chat input area with quick-action buttons (spells, weapons, features, rests), speech-to-text, and submit controls. */
 const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onResolveEnemyTurn, isLoading, combat, character, onInputChanged, onArcaneRecovery, onManageSpellbook, onSwapKnownSpell }) => {
@@ -356,17 +367,6 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onResolveEnemyTurn
     </div>
   );
 };
-
-const QuickActionBtn: React.FC<{ action: QuickAction; locked: boolean; onClick: () => void; extraTitle?: string }> = ({ action, locked, onClick, extraTitle }) => (
-  <button type="button" disabled={locked} onClick={onClick} className={`${QUICK_BTN} ${locked ? DISABLED_STYLE : (action.customStyle || CATEGORY_STYLES[action.category])}`} title={extraTitle || action.fillText}>
-    <i className={`fas ${action.icon} text-[9px]`}></i> {action.label}
-    {action.badge && (
-      <span className="text-[8px] font-bold px-1 py-0.5 rounded uppercase tracking-tighter bg-indigo-950/90 text-indigo-300 border border-indigo-700/60 ml-0.5 inline-flex items-center gap-0.5">
-        <i className="fas fa-sparkles text-[7px]"></i> {action.badge}
-      </span>
-    )}
-  </button>
-);
 
 export default InputArea;
 

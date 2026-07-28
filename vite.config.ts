@@ -82,7 +82,8 @@ export default defineConfig(({ mode }) => {
       'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
 
-      'import.meta.env.VITE_SETUP_MODE': JSON.stringify(isSetupMode ? 'true' : 'false')
+      'import.meta.env.VITE_SETUP_MODE': JSON.stringify(isSetupMode ? 'true' : 'false'),
+      'import.meta.env.VITE_BUILD_TIME': JSON.stringify(new Date().toISOString()),
     },
     resolve: {
       alias: {

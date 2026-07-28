@@ -42,33 +42,6 @@ const QueueNotification: React.FC<{ message: string }> = ({ message }) => (
 );
 void QueueNotification; // legacy component retained for reference; queue UI removed
 
-/** Root application component. Shows setup wizard when VITE_SETUP_MODE is true, otherwise orchestrates the splash screen, auth, dashboard, character creation, and the main game layout with all context providers. */
-const App: React.FC = () => {
-  if (import.meta.env.VITE_SETUP_MODE === 'true') return <SetupWizard />;
-
-  useEffect(() => { initAudio(); }, []);
-
-  const [showSplash, setShowSplash] = useState(true);
-
-  if (showSplash) return <SplashScreen onComplete={() => setShowSplash(false)} />;
-
-  return (
-    <AuthProvider>
-      <UIProvider>
-        <GameProvider>
-          <ProgressionProvider>
-            <CampaignProvider>
-              <ActionsProvider>
-                <AppContent />
-              </ActionsProvider>
-            </CampaignProvider>
-          </ProgressionProvider>
-        </GameProvider>
-      </UIProvider>
-    </AuthProvider>
-  );
-};
-
 const AppContent: React.FC = () => {
   const { userId, setUserId, handleLogout } = useAuthContext();
   const {
@@ -219,6 +192,36 @@ const AppContent: React.FC = () => {
       )}
       <CompendiumModal isOpen={isCompendiumOpen} onClose={() => setCompendiumOpen(false)} />
     </div>
+  );
+};
+
+/** Root application component. Shows setup wizard when VITE_SETUP_MODE is true, otherwise orchestrates the splash screen, auth, dashboard, character creation, and the main game layout with all context providers. */
+const App: React.FC = () => {
+  if (import.meta.env.VITE_SETUP_MODE === 'true') return <SetupWizard />;
+
+  useEffect(() => {
+    initAudio();
+    console.log('🔹 [DiceOnRails] App mounted. Build time:', import.meta.env.VITE_BUILD_TIME || 'dev');
+  }, []);
+
+  const [showSplash, setShowSplash] = useState(true);
+
+  if (showSplash) return <SplashScreen onComplete={() => setShowSplash(false)} />;
+
+  return (
+    <AuthProvider>
+      <UIProvider>
+        <GameProvider>
+          <ProgressionProvider>
+            <CampaignProvider>
+              <ActionsProvider>
+                <AppContent />
+              </ActionsProvider>
+            </CampaignProvider>
+          </ProgressionProvider>
+        </GameProvider>
+      </UIProvider>
+    </AuthProvider>
   );
 };
 

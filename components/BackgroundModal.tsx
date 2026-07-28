@@ -12,6 +12,21 @@ import {
   IdealEntry,
 } from '../utils/backgrounds';
 
+/** Read-only numbered reference table for the modal's Reference tab. */
+const RefTable: React.FC<{ title: string; entries: string[] }> = ({ title, entries }) => (
+  <div>
+    <p className="text-[10px] uppercase font-bold text-amber-700 tracking-widest mb-2">{title}</p>
+    <ol className="space-y-1">
+      {entries.map((e, i) => (
+        <li key={i} className="text-[10px] text-stone-400 flex gap-2">
+          <span className="text-stone-600 font-mono shrink-0">{i + 1}.</span>
+          <span>{e}</span>
+        </li>
+      ))}
+    </ol>
+  </div>
+);
+
 interface BackgroundModalProps {
   character: Character;
   isOpen: boolean;
@@ -226,20 +241,5 @@ const BackgroundModal: React.FC<BackgroundModalProps> = ({ character, isOpen, on
     document.body,
   );
 };
-
-/** Read-only numbered reference table for the modal's Reference tab. */
-const RefTable: React.FC<{ title: string; entries: string[] }> = ({ title, entries }) => (
-  <div>
-    <p className="text-[10px] uppercase font-bold text-amber-700 tracking-widest mb-2">{title}</p>
-    <ol className="space-y-1">
-      {entries.map((e, i) => (
-        <li key={i} className="text-[10px] text-stone-400 flex gap-2">
-          <span className="text-stone-600 font-mono shrink-0">{i + 1}.</span>
-          <span>{e}</span>
-        </li>
-      ))}
-    </ol>
-  </div>
-);
 
 export default BackgroundModal;

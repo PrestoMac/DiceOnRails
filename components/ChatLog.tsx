@@ -299,6 +299,13 @@ const ChatLog: React.FC<ChatLogProps> = ({ messages, settings, onRewind, onUndo,
     setTimeout(() => setExportToast(null), 2500);
   };
 
+  const formatMessageText = (text: string, role: MessageRole) => {
+    if (role === MessageRole.SYSTEM || role === MessageRole.TOOL) {
+      return text.replace(/^\[System:[a-zA-Z0-9_-]+\]\s*/i, '');
+    }
+    return text;
+  };
+
   const formatMessageForExport = (msg: Message): string => {
     const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const roleLabel = msg.senderName || (msg.role === MessageRole.USER ? 'You' : msg.role === MessageRole.MODEL ? 'Narrator' : msg.role === MessageRole.SYSTEM ? 'System' : 'Log');
@@ -340,13 +347,6 @@ const ChatLog: React.FC<ChatLogProps> = ({ messages, settings, onRewind, onUndo,
       if (!(await speakText(cleanText, settings)) && isDebugMode) console.error("Speech engine encountered a resistance check.");
     } catch (e) { if (isDebugMode) console.error("Narrator's voice was silenced by magic:", e); }
     finally { setPlayingMessageId(null); }
-  };
-
-  const formatMessageText = (text: string, role: MessageRole) => {
-    if (role === MessageRole.SYSTEM || role === MessageRole.TOOL) {
-      return text.replace(/^\[System:[a-zA-Z0-9_-]+\]\s*/i, '');
-    }
-    return text;
   };
 
   return (
