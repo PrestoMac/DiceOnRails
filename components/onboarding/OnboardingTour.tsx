@@ -4,7 +4,7 @@ export interface OnboardingTourProps {
   active: boolean;
   /** Whether combat is currently active — controls if the combat tracker step shows. */
   combatActive?: boolean;
-  /** Whether 2+ party members are present — controls if the Action Queue step shows. */
+  /** Whether 2+ party members are present — controls if the multiplayer "Take the Turn" step shows. */
   multiplayer?: boolean;
   /** Called when the user dismisses or completes the tour. */
   onDismiss: () => void;
@@ -47,9 +47,9 @@ const BASE_STEPS: TourStep[] = [
     side: 'right',
   },
   {
-    selector: '[data-tour="queue"]',
-    title: 'Action Queue',
-    body: 'In multiplayer, queue up actions while waiting your turn. Click "Queue Action" or "Queue Dialogue" to add them.',
+    selector: '[data-tour="process-batch"]',
+    title: 'Take the Turn',
+    body: 'In multiplayer, your messages are held in the chat as pending until any player presses "Take the Turn". This batches everyone\'s actions into one GM response. Remove your own pending messages any time before that.',
     side: 'top',
   },
 ];
@@ -74,7 +74,7 @@ function getRect(selector: string): Rect | null {
 
 /** Hand-rolled coachmark overlay with a viewport-sized mask and a hole for the highlighted element. */
 const OnboardingTour: React.FC<OnboardingTourProps> = ({ active, combatActive, multiplayer, onDismiss }) => {
-  const visibleSteps = multiplayer ? BASE_STEPS : BASE_STEPS.filter(s => s.selector !== '[data-tour="queue"]');
+  const visibleSteps = multiplayer ? BASE_STEPS : BASE_STEPS.filter(s => s.selector !== '[data-tour="process-batch"]');
   const steps = combatActive ? [...visibleSteps, COMBAT_STEP] : visibleSteps;
   const [idx, setIdx] = useState(0);
   const [rect, setRect] = useState<Rect | null>(null);

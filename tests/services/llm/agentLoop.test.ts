@@ -78,7 +78,6 @@ function buildCombatState(character: Character, enemyFirst: boolean): GameState 
     sessionLogs: [],
     quests: [],
     lore: [],
-    actionQueue: [],
     combat: {
       isActive: true,
       round: 1,

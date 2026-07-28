@@ -34,7 +34,6 @@ function makeState(party: Character[], overrides: Partial<GameState> = {}): Game
     sessionLogs: [],
     quests: [],
     lore: [],
-    actionQueue: [],
     ...overrides,
   };
 }

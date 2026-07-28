@@ -502,8 +502,7 @@ describe('combatTools', () => {
     function loadEnemyTurnCombat(playerHp = { current: 50, max: 50 }) {
       server.loadState({
         party: [makeCharacter({ hp: playerHp })],
-        worldDescription: 't', sessionLogs: [], quests: [], lore: [], actionQueue: [],
-        combat: {
+        worldDescription: 't', sessionLogs: [], quests: [], lore: [], combat: {
           isActive: true, round: 1, turnIndex: 0,
           initiative: [
             { id: 'hero-1', name: 'Valerius', initiative: 18, type: 'player', isDead: false, hasActedThisTurn: true },
@@ -554,8 +553,7 @@ describe('combatTools', () => {
       // Player-to-player advance: no attackResults
       server.loadState({
         party: [makeCharacter()],
-        worldDescription: 't', sessionLogs: [], quests: [], lore: [], actionQueue: [],
-        combat: {
+        worldDescription: 't', sessionLogs: [], quests: [], lore: [], combat: {
           isActive: true, round: 1, turnIndex: 0,
           initiative: [
             { id: 'hero-1', name: 'Valerius', initiative: 18, type: 'player', isDead: false, hasActedThisTurn: true },
@@ -645,8 +643,7 @@ describe('combatTools', () => {
       ];
       server.loadState({
         party: [char],
-        worldDescription: 't', sessionLogs: [], quests: [], lore: [], actionQueue: [],
-        combat: { isActive: true, round: 1, turnIndex: 0, initiative: [], enemies: [] },
+        worldDescription: 't', sessionLogs: [], quests: [], lore: [], combat: { isActive: true, round: 1, turnIndex: 0, initiative: [], enemies: [] },
       });
       await server.end_combat();
       const ids = (server.getFullState().party[0].conditions ?? []).map(c => c.id);
@@ -661,8 +658,7 @@ describe('combatTools', () => {
       wizard.runtime = { concentrationEffectiveDuration: 1, concentrationStartRound: 1 };
       server.loadState({
         party: [wizard],
-        worldDescription: 't', sessionLogs: [], quests: [], lore: [], actionQueue: [],
-        combat: {
+        worldDescription: 't', sessionLogs: [], quests: [], lore: [], combat: {
           isActive: true, round: 11, turnIndex: 0,
           initiative: [
             { id: wizard.id, name: wizard.name, initiative: 10, type: 'player', isDead: false, hasActedThisTurn: true },
@@ -681,8 +677,7 @@ describe('combatTools', () => {
       wizard.runtime = { concentrationEffectiveDuration: 10, concentrationStartRound: 1 };
       server.loadState({
         party: [wizard],
-        worldDescription: 't', sessionLogs: [], quests: [], lore: [], actionQueue: [],
-        combat: {
+        worldDescription: 't', sessionLogs: [], quests: [], lore: [], combat: {
           isActive: true, round: 3, turnIndex: 0,
           initiative: [
             { id: wizard.id, name: wizard.name, initiative: 10, type: 'player', isDead: false, hasActedThisTurn: true },

@@ -1,7 +1,6 @@
 export * from './useGameActions';
 export * from './useGameState';
 export * from './useProgression';
-export * from './useQueue';
 export * from './gameActionHelpers';
 export * from './useCampaigns';
 export * from './useAuth';

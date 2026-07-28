@@ -1,7 +1,6 @@
 import { createContext, useContext, ReactNode } from 'react';
-import { GameState, Message, AppStage, Currency, InventoryItem, QueuedAction, Character } from '../types';
+import { GameState, Message, AppStage, Currency, InventoryItem, Character } from '../types';
 import { useGameState } from '../hooks/useGameState';
-import { useQueue } from '../hooks/useQueue';
 import { useAuthContext } from './AuthContext';
 import { AppSettings } from '../types';
 
@@ -34,31 +33,18 @@ interface GameContextValue {
   setCampaignName: (name: string | undefined) => void;
   setIsNewCampaign: (n: boolean) => void;
   setMyCharacterId: (id: string | null) => void;
-  queueNotification: string | null;
-  handleEnqueueAction: (text: string, type: 'action' | 'dialogue') => Promise<void>;
-  handleRemoveQueueItem: (itemId: string) => Promise<void>;
-  handleUpdateQueueItem: (itemId: string, newText: string) => Promise<void>;
-  handleReorderQueue: (newQueue: QueuedAction[]) => Promise<void>;
   getSenderName: () => string;
 }
 
 const GameContext = createContext<GameContextValue | null>(null);
 
-/** Provides the core game state context (state, messages, queue, loading, sync) to the component tree. */
+/** Provides the core game state context (state, messages, loading, sync) to the component tree. */
 export function GameProvider({ children }: { children: ReactNode }) {
   const { userId } = useAuthContext();
   const gameState = useGameState(userId);
-  const queue = useQueue(
-    gameState.gameState,
-    gameState.setGameState,
-    gameState.currentCampaignId,
-    userId,
-    gameState.myCharacterId
-  );
 
   const value: GameContextValue = {
     ...gameState,
-    ...queue,
   };
 
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;

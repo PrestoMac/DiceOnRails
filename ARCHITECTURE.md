@@ -157,10 +157,10 @@ There is **no external state library**. Six contexts, each backed by a hook, exp
 |---|---|---|---|
 | `AuthContext` | `useAuth` | `hooks/useAuth.ts` | `userId` (from Supabase session), `setUserId`, `handleLogout` |
 | `UIContext` | `useSettings` + local state | `contexts/UIContext.tsx` | `AppSettings`, settings modal open state, `isMobile`, dice-roll modal data |
-| `GameContext` | `useGameState` + `useQueue` | `contexts/GameContext.tsx` | `GameState`, `messages`, `stage`, campaign id/name, character ids, queue actions, atmosphere updates |
+| `GameContext` | `useGameState` | `contexts/GameContext.tsx` | `GameState`, `messages`, `stage`, campaign id/name, character ids, `getSenderName`, atmosphere updates |
 | `ProgressionContext` | `useProgression` | `contexts/ProgressionContext.tsx` | Level-up modal state, stat allocations, feat/subclass choices |
 | `CampaignContext` | `useCampaigns` | `contexts/CampaignContext.tsx` | Campaign list CRUD, create/join/delete/rename |
-| `ActionsContext` | `useGameActions` + local | `contexts/ActionsContext.tsx` | `handleSendMessage`, `handleRewind`, `handleExecuteBatch`, `handleCharacterCreated`, `handleResolveEnemyTurn` |
+| `ActionsContext` | `useGameActions` + local | `contexts/ActionsContext.tsx` | `handleSendMessage`, `handleRewind`, `handleProcessBatch`, `handleRemovePendingMessage`, `handleCharacterCreated`, `handleResolveEnemyTurn` |
 
 Every context throws if `useXContext` is called outside its provider (`Error: useXContext must be used within XProvider`). The contexts compose the underlying hooks — the hooks themselves are also independently testable and are the actual loci of logic.
 
@@ -193,7 +193,6 @@ GameState = {
   currentAtmosphereUrl?: string,
   isProcessing?: boolean,                     // multiplayer lock
   processingUser?: string,
-  actionQueue: QueuedAction[],                // multiplayer queued turns
   combat?: CombatState,
   lastDiceRoll?: { sides, count, modifier, results, total },
   ctx?: ContextMetadata,                      // context pipeline state
@@ -406,18 +405,22 @@ The single most important flow to understand. Entry point: `useGameActions.handl
 
 4. **Return:** `{ toolMessages, iterationCount, promptTokens, completionTokens, cachedTokens, inlineNarration, suggestions }`. `inlineNarration` is sanitized via `sanitizeNarration` at the return point to catch any remaining artifacts.
 
-### Batched party turns (`handleExecuteBatch`)
+### Batched party turns (`handleProcessBatch`)
 
-`useGameActions.ts:337`. When multiplayer action queue is flushed:
+`useGameActions.ts`. The chat-native multiplayer batch processor — replaces the legacy queue-based `handleExecuteBatch`. Triggered when any player presses the "Take the Turn" button (rendered in `ChatLog` between the message list and the suggestion tray). Active only when `party.length > 1`.
 
-- Builds a `[Collaborative Turn]` user message containing every queued entry tagged with the character name (`playerName`); the `userId` (auth id) is kept on the queue item for audit but is NOT sent to the LLM. Message is created and broadcast *before* the lock sync so remote players see what's being processed.
+- Collects all pending USER messages (`Message.pending === true`). No-op if there are none or if solo. Optimistic-lock pre-check (`isCampaignProcessing`) narrows the two-player-click-race window.
+- **Race-window preservation**: re-fetches the `messages` JSONB column via `storageService.fetchMessages` and merges any unknown pending ids before promotion — pending messages added by other players in the ~50ms click window are not lost.
+- Builds an aggregated `[Collaborative Turn]\n[Name]: text` synthetic USER message (in LLM history only — NOT inserted into the chat; the individual pending bubbles remain visible per-player).
+- Promotes pending messages (`pending: false`) so they stay in the visible chat history. Tags the trailing MODEL narration with `batchTurn: true` so `handleRewind` can route retries.
 - Builds context via `buildBatchContextString()` (`gameActionHelpers.ts`) which emits `ACTIVE CLASS FEATURES / RESOURCES / SPELLS / FEATS` for **every** party member (not just the active one), so the LLM can attribute spells/resources to the right character. Private `notes`/`gmNotes` are stripped via `withoutPrivateNotes()`.
 - Same agent-loop flow as solo, including `dispatchToolRolls` (dice roll animations), `enableSuggestions`, and atmosphere updates on `move_to` — full parity with `handleSendMessage`.
 - Narration retry chain (tiers 2+3) is wrapped in `withNarrationRetryTimeout` (45s `Promise.race`) — same freeze protection as solo.
-- **Post-batch attribution diagnostic** (`warnIfBatchAttributionIncomplete`): `console.warn`s if any queued character never appeared as a tool-call actor. Pure observability, never blocks.
-- Error handler mirrors solo: reads from `mcpServer.getFullState()` (not stale closure), clears both `isProcessing` and `processingUser`, calls `mcpServer.loadState()` + `syncState()`.
-- Queue preservation: before clearing the queue on success, fetches the latest campaign state from Supabase (`storageService.fetchGameState`) and filters out only the executed item IDs — items added by other players during processing are preserved. Falls back to `[]` on fetch failure.
-- `handleRewind` detects `[Collaborative Turn]` messages and re-executes via `handleExecuteBatchRef` (the queue items are restored by the undo snapshot).
+- Error handler mirrors solo: reads from `mcpServer.getFullState()` (not stale closure), clears both `isProcessing` and `processingUser`, calls `mcpServer.loadState()` + `syncState()`. Writes per-character recovery chips for every alive party member on crash.
+
+### Pending-message send path (`handleSendMessage` multiplayer branch)
+
+When `party.length > 1 && !isRetry`, pressing Enter (or clicking a suggestion) appends the USER message with `pending: true` instead of triggering the LLM. The message renders with a dashed amber border + "Pending" pill + owner-gated × delete button (`handleRemovePendingMessage`). The local player's suggestion chips clear immediately via per-player `lastSuggestionsByCharacter` deletion — only the acting player loses their chips; everyone else keeps theirs. Pending messages persist in the `messages` JSONB column and propagate via existing realtime.
 
 ### Multiplayer attribution hardening
 The engine trusts the LLM to pass the correct actor id per tool call, silently defaulting to `party[0]` when omitted. Hardening (all gated on `party.length > 1`, so solo is byte-identical unless noted):
@@ -426,15 +429,21 @@ The engine trusts the LLM to pass the correct actor id per tool call, silently d
 - **Actor-id warn-stamp** (`mcpService.executeToolCall`) — appends `WARNING: ...` to `result.message` when an actor tool is called with no id in multiplayer. `long_rest` excluded (party-wide). XP is engine-driven (no LLM tool).
 - **`getTarget` ambiguity warning** (`partyService.ts`) — warns on 2+ name matches; resolution order unchanged.
 
+### Multiplayer presence (typing indicators)
+Built on Supabase Presence (ephemeral, broadcast-only — no DB writes, no migrations). Active only for syncable multiplayer campaigns.
+- **`hooks/usePresence.ts`**: subscribes to `presence-${campaignId}-typing`. Each client tracks `{ userId, characterId, name, portraitUrl, isTyping, lastActive }`. Typing is announced on input (debounced), auto-clears after 2500ms idle, hard-clears at 5000ms. Excludes the local user; dedups by `userId`.
+- **`components/shared/TypingIndicator.tsx`**: row of "NAME is writing…" chips with portrait + bouncing dots. Hidden when empty. Rendered above `InputArea` in both layouts.
+- **Wiring**: layouts pass `setTyping` to `<InputArea onInputChanged={(v) => setTyping(v.length > 0)} />`.
+
 ### Rewind flow (`handleRewind`)
 
-`useGameActions.ts:606`:
+`useGameActions.ts`:
 
 1. If currently processing → bail.
-2. Load the rewind point (state + messages from before the user's last message).
-3. If no rewind point → fall back to emergency snapshot, slice messages back to the last user msg, **bump `ctx.generation`** (invalidates in-flight compression), and re-call `handleSendMessage(text, isRetry=true)`.
-4. Otherwise restore the snapshot, restore messages, **bump generation**, sync to Supabase, and re-call retry. Before restoring, `restoreToBeforeLastTurn` captures the current `actionQueue` and re-merges any items not in the snapshot after restore — this preserves queue items added by other players during the original batch processing window.
-5. Retry routing: if the restored text starts with `[Collaborative Turn]` AND the engine has queue items (restored from snapshot), re-execute via `handleExecuteBatchRef` (batch retry). Otherwise re-send via `handleSendMessageRef(text, isRetry=true)` (solo retry).
+2. Load the rewind point (state + messages from before the user's last turn).
+3. If no rewind point → fall back to emergency snapshot, slice messages back to the last user msg (or to before the contiguous USER block preceding a `batchTurn` MODEL message), **bump `ctx.generation`** (invalidates in-flight compression), and re-call the appropriate retry.
+4. Otherwise restore the snapshot, restore messages (solo: `slice(0, -1)` to drop the trailing user msg; batch: verbatim — pending messages stay pending and re-editable), **bump generation**, sync to Supabase, and re-call retry.
+5. Retry routing: `restoreToBeforeLastTurn` returns `{ kind: 'solo', text }` for solo or `{ kind: 'batch' }` for batch (detected via `pending: true` on the snapshot's trailing message, or via the MODEL message's `batchTurn` flag on the emergency path). Solo re-sends via `handleSendMessageRef(text, isRetry=true)`; batch re-runs via `handleProcessBatchRef`.
 
 ---
 
@@ -618,7 +627,7 @@ The runtime uses static TS catalogs (`data/srdItems.ts`, `data/monsters.ts`) —
 
 ### Multiplayer lock
 
-Before any turn, `handleSendMessage` (and `handleExecuteBatch`) perform a **remote processing pre-check**: for syncable campaigns, they call `storageService.isCampaignProcessing(campaignId)` (a SELECT on Supabase) to verify no other player has started processing since the last realtime sync. If the remote is processing, the turn is aborted. This is fail-open (returns `false` on error). Anonymous campaigns skip the check entirely.
+Before any turn, `handleSendMessage` (and `handleProcessBatch`) perform a **remote processing pre-check**: for syncable campaigns, they call `storageService.isCampaignProcessing(campaignId)` (a SELECT on Supabase) to verify no other player has started processing since the last realtime sync. If the remote is processing, the turn is aborted. This is fail-open (returns `false` on error). Anonymous campaigns skip the check entirely.
 
 After passing the pre-check, the handler sets `isProcessing: true` and `processingUser: <name>` and writes that to Supabase. Other clients in `useGameState`'s subscription handler (lines 124-159) check `isProcessingRef`: if the local client thinks it's processing and the remote cleared the flag, that's the "unlock" signal; otherwise incoming remote state is applied.
 
@@ -697,8 +706,8 @@ components/wizard/
 
 Differences:
 
-- **Desktop** — three-column resizable sidebar (Character/Journal tabs), top header with location/time/share/Activity Bell, combat tracker as a floating bar, queue panel below the sidebar.
-- **Mobile** — bottom nav (`Adventure` / `Hero` / `Journal` / `Settings`), atmosphere strip above chat, slide-up queue sheet, persistent HP/AC status bar.
+- **Desktop** — three-column resizable sidebar (Character/Journal tabs), top header with location/time/share/Activity Bell, combat tracker as a floating bar, "Take the Turn" button in the chat (multiplayer only), typing indicator strip above InputArea.
+- **Mobile** — bottom nav (`Adventure` / `Hero` / `Journal` / `Settings`), atmosphere strip above chat, typing indicator strip above InputArea, persistent HP/AC status bar.
 
 ### Top-level screens & modals
 
@@ -740,7 +749,8 @@ The story view. Notable features:
 The input box. Notable features:
 - **Quick Actions** — auto-generated from the character's prepared/known spells, equipped weapons, and class resources. Plus hardcoded Short Rest / Long Rest shortcuts, Arcane Recovery modal button (wizard only, once per long rest), and Manage Spells modal button (any caster, locked in combat).
 - **Voice input** via `webkitSpeechRecognition` (browser support gated).
-- **Queue Action / Queue Dialogue** buttons for multiplayer turn queueing. Only rendered when `gameState.party.length > 1` (2+ party members); in solo play the buttons, the Action Queue panel/drawer, the mobile queue toggle, and the per-character tab bar are all hidden. The onboarding tour's "Action Queue" step is likewise skipped in solo via the `multiplayer` prop.
+- **Pending-message send** (multiplayer only, `party.length > 1`): pressing Enter appends the USER message with `pending: true` instead of triggering the LLM. Pending messages render with a dashed amber border + "Pending" pill + owner-gated × delete. Any player presses "Take the Turn" (rendered in `ChatLog`) to flush all pending messages through one LLM turn via `handleProcessBatch`. The per-character tab bar and onboarding "Take the Turn" step are likewise gated on multiplayer; solo is byte-identical to before.
+- **Typing indicators** (`components/shared/TypingIndicator.tsx`) rendered above InputArea for syncable multiplayer campaigns — built on Supabase Presence (ephemeral, no DB writes).
 - **Resolve Turn** button appears during enemy turns; calls `handleResolveEnemyTurn`.
 - Input is disabled (`effectivelyLocked`) while the LLM is processing or it's an enemy's turn.
 

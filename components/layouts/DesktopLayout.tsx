@@ -7,7 +7,6 @@ import { useAuthContext } from '../../contexts/AuthContext';
 import { AppStage } from '../../types';
 import { isSyncableCampaign } from '../../utils/campaign';
 import ChatLog from '../ChatLog';
-import ActionQueuePanel from '../ActionQueuePanel';
 import InputArea from '../InputArea';
 import CharacterSheet from '../CharacterSheet';
 import Journal from '../Journal';
@@ -16,8 +15,10 @@ import CombatTracker from '../CombatTracker';
 import BattleMapPanel from '../BattleMapPanel';
 import ActivityBell from '../shared/ActivityBell';
 import AtmosphereOverlay from '../shared/AtmosphereOverlay';
+import TypingIndicator from '../shared/TypingIndicator';
 import { useActivityTracking } from '../../hooks/useActivityTracking';
 import { useOnboarding } from '../../hooks/useOnboarding';
+import { usePresence } from '../../hooks/usePresence';
 import { formatGameTime } from '../../utils/timeUtils';
 import { mcpServer } from '../../services/mcpService';
 import { pickSuggestionsForCharacter } from '../../services/llm/suggestions';
@@ -29,10 +30,9 @@ const DesktopLayout: React.FC = () => {
     stage, currentCampaignId, campaignName, hostId, gameState, messages,
     isLoading, myCharacterId, viewingCharacterId, setViewingCharacterId,
     setStage, resetGame, handleUpdateInventory, handleUpdateCharacterFields,
-    handleEnqueueAction, handleRemoveQueueItem, handleUpdateQueueItem,
-    handleReorderQueue, syncState,
+    syncState,
   } = useGameContext();
-  const { handleSendMessage, handleUndo, handleRewind, handleExecuteBatch, handleResolveEnemyTurn, handleArcaneRecovery, handleManageSpellbook, handleSwapKnownSpell } = useActionsContext();
+  const { handleSendMessage, handleUndo, handleRewind, handleProcessBatch, handleRemovePendingMessage, handleResolveEnemyTurn, handleArcaneRecovery, handleManageSpellbook, handleSwapKnownSpell } = useActionsContext();
   const {
     showLevelUpModal, levelUpCharacter, selectedAllocations, remainingPoints,
     previewHp, allocationError, handleOpenLevelUp, handleCloseLevelUp,
@@ -54,7 +54,6 @@ const DesktopLayout: React.FC = () => {
     setIsAtmosphereExpanded(false);
   }, [gameState.currentAtmosphereUrl]);
 
-  const [isQueueOpen, setIsQueueOpen] = useState(false);
   const [hasScrollOverflow, setHasScrollOverflow] = useState(false);
   const [, setIsChatScrolledUp] = useState(false);
   const sidebarScrollRef = useRef<HTMLDivElement>(null);
@@ -65,6 +64,15 @@ const DesktopLayout: React.FC = () => {
   const fontScale = 0.625 + (sidebarWidth / 520) * 0.5;
 
   const { recentActivity } = useActivityTracking(gameState, messages, userId);
+
+  const charToShow = gameState.party.find(c => c.id === viewingCharacterId) || gameState.party[0];
+  const isMultiplayer = gameState.party.length > 1;
+  const isHost = !!userId && userId === hostId;
+  const handleBackOrReset = () => userId ? confirm('Return to dashboard?') && setStage(AppStage.DASHBOARD) : confirm('Are you sure you want to reset the game? All progress will be lost.') && resetGame();
+
+  // Multiplayer presence (typing indicators). Skipped for solo / anonymous hot-seat.
+  const myCharacterForPresence = isMultiplayer ? (charToShow ?? gameState.party[0]) : undefined;
+  const { typingUsers, setTyping } = usePresence(currentCampaignId, userId, isMultiplayer, myCharacterForPresence);
 
   const checkSidebarOverflow = useCallback(() => {
     const el = sidebarScrollRef.current;
@@ -98,11 +106,6 @@ const DesktopLayout: React.FC = () => {
     ro.observe(el);
     return () => ro.disconnect();
   }, [checkSidebarOverflow, tab]);
-
-  const charToShow = gameState.party.find(c => c.id === viewingCharacterId) || gameState.party[0];
-  const isMultiplayer = gameState.party.length > 1;
-  const isHost = !!userId && userId === hostId;
-  const handleBackOrReset = () => userId ? confirm('Return to dashboard?') && setStage(AppStage.DASHBOARD) : confirm('Are you sure you want to reset the game? All progress will be lost.') && resetGame();
 
   // --- VTT Battle Map handlers ---
 
@@ -156,9 +159,6 @@ const DesktopLayout: React.FC = () => {
         </div> : <Journal quests={gameState.quests} lore={gameState.lore} />}
         {hasScrollOverflow && <div className="sticky bottom-0 left-0 right-0 h-12 -mt-12 pointer-events-none bg-gradient-to-t from-stone-950/95 via-stone-950/60 to-transparent z-10" />}
       </div>
-      {isMultiplayer && <div className={`border-t border-stone-800 bg-stone-900/40 transition-all duration-300 ${isQueueOpen ? 'h-1/3' : 'h-auto'} flex flex-col`} style={{ fontSize: `${fontScale}rem` }} data-tour="queue">
-        <ActionQueuePanel queue={gameState.actionQueue || []} userId={userId} onRemove={handleRemoveQueueItem} onUpdate={handleUpdateQueueItem} onReorder={handleReorderQueue} onExecute={handleExecuteBatch} isProcessing={gameState.isProcessing} isCollapsed={!isQueueOpen} onToggleCollapse={() => setIsQueueOpen(!isQueueOpen)} />
-      </div>}
       {sidebarOpen && <div onMouseDown={handleDragStart} className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-amber-600/40 transition-colors z-30" />}
     </aside>
     <main className="flex-1 flex flex-col relative">
@@ -245,10 +245,20 @@ const DesktopLayout: React.FC = () => {
               syncState();
           }}
           portraitMap={gameState.party.reduce((m, c) => { if (c.portraitUrl) m[c.id] = c.portraitUrl; return m; }, {} as Record<string, string>)}
+          isMultiplayer={isMultiplayer}
+          myCharacterId={myCharacterId}
+          pendingCount={messages.filter(m => m.pending).length}
+          onProcessBatch={handleProcessBatch}
+          onRemovePendingMessage={handleRemovePendingMessage}
         />
       </div>
+      {isMultiplayer && typingUsers.length > 0 && (
+        <div className="relative z-10 shrink-0">
+          <TypingIndicator users={typingUsers} />
+        </div>
+      )}
       <div className="relative z-10 shrink-0">
-        <InputArea onSendMessage={handleSendMessage} onQueueAction={handleEnqueueAction} onResolveEnemyTurn={handleResolveEnemyTurn} isLoading={isLoading || gameState.isProcessing} combat={gameState.combat} character={charToShow} isMultiplayer={isMultiplayer} onArcaneRecovery={(id, sel) => handleArcaneRecovery(id, sel)} onManageSpellbook={handleManageSpellbook} onSwapKnownSpell={handleSwapKnownSpell} />
+        <InputArea onSendMessage={handleSendMessage} onResolveEnemyTurn={handleResolveEnemyTurn} isLoading={isLoading || gameState.isProcessing} combat={gameState.combat} character={charToShow} onInputChanged={(v) => setTyping(v.length > 0)} onArcaneRecovery={(id, sel) => handleArcaneRecovery(id, sel)} onManageSpellbook={handleManageSpellbook} onSwapKnownSpell={handleSwapKnownSpell} />
       </div>
     </main>
     {isAtmosphereExpanded && gameState.currentAtmosphereUrl && <div className="fixed inset-0 z-[110] bg-black/95 backdrop-blur-2xl flex flex-col items-center justify-center p-4 md:p-12 animate-in fade-in zoom-in-95 duration-300" onClick={() => setIsAtmosphereExpanded(false)}>

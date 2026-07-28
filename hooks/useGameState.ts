@@ -53,9 +53,35 @@ export const useGameState = (userId: string | undefined) => {
             if (data) {
                 setCampaignName(data.campaignName);
                 setHostId(data.hostId);
-                setMessages(data.messages);
 
-                const safeState = data.gameState ?? mcpServer.getFullState();
+                // One-time migration: convert any legacy `actionQueue` items
+                // (removed queue system) to pending USER messages so player work
+                // is never silently dropped on first load. The actionQueue field
+                // is then stripped from the loaded state and never re-persisted.
+                const migratedMessages: Message[] = [...data.messages];
+                const rawState = (data.gameState ?? mcpServer.getFullState()) as Record<string, unknown>;
+                const legacyQueue = Array.isArray(rawState.actionQueue) ? rawState.actionQueue : [];
+                if (legacyQueue.length > 0) {
+                    for (const item of legacyQueue) {
+                        const q = item as { id?: string; playerId?: string; playerName?: string; text?: string; type?: string; timestamp?: number };
+                        migratedMessages.push({
+                            id: `migrated-${q.id ?? crypto.randomUUID()}`,
+                            role: MessageRole.USER,
+                            text: q.text ?? '',
+                            senderName: q.playerName,
+                            // playerId held the character id in the legacy queue
+                            // (set from userId in useQueue). We can't reliably map
+                            // it to a character id post-hoc, so leave characterId
+                            // undefined; the avatar falls back to the initial.
+                            timestamp: q.timestamp ?? Date.now(),
+                            pending: true,
+                        });
+                    }
+                    delete rawState.actionQueue;
+                }
+                setMessages(migratedMessages);
+
+                const safeState = rawState as GameState;
                 // A fresh page load / campaign switch has no turn in flight. Strip any
                 // persisted `isProcessing: true` so the UI never boots into a frozen state.
                 const cleanState = { ...safeState, isProcessing: false, processingUser: undefined };
@@ -65,11 +91,11 @@ export const useGameState = (userId: string | undefined) => {
                 isProcessingLockedAt.current = null;
 
                 const enrichedState = mcpServer.getFullState();
-                const lastUserIdx = data.messages.map(m => m.id).lastIndexOf(
-                    data.messages.filter(m => m.role === MessageRole.USER).pop()?.id ?? ''
+                const lastUserIdx = migratedMessages.map(m => m.id).lastIndexOf(
+                    migratedMessages.filter(m => m.role === MessageRole.USER).pop()?.id ?? ''
                 );
                 if (lastUserIdx >= 0) {
-                    mcpServer.saveRewindPoint(enrichedState, data.messages.slice(0, lastUserIdx + 1));
+                    mcpServer.saveRewindPoint(enrichedState, migratedMessages.slice(0, lastUserIdx + 1));
                 }
 
                 if (uid) {
@@ -211,6 +237,13 @@ export const useGameState = (userId: string | undefined) => {
         syncCampaignState().catch(e => console.warn('[Sync] failed:', e));
     };
 
+    /** Resolves the local player's character name for chat message attribution. */
+    const getSenderName = useCallback((): string => {
+        if (!myCharacterId || !gameState.party) return "You";
+        const char = mcpServer.getTarget(myCharacterId);
+        return char?.name ?? "You";
+    }, [myCharacterId, gameState.party]);
+
     const performAtmosphereUpdate = async (locationName: string, locationDescription: string | undefined, currentSettings: AppSettings): Promise<boolean> => {
         if (!currentSettings.enableAtmosphere) return false;
 
@@ -255,6 +288,7 @@ export const useGameState = (userId: string | undefined) => {
         handleUpdateInventory,
         handleUpdateCurrency,
         handleUpdateCharacterFields,
+        getSenderName,
         performAtmosphereUpdate
     };
 };

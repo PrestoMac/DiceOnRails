@@ -21,15 +21,14 @@ interface QuickAction {
 
 interface InputAreaProps {
   onSendMessage: (text: string) => void;
-  onQueueAction?: (text: string, type: 'action' | 'dialogue') => void;
   onResolveEnemyTurn?: () => void;
   isLoading: boolean;
   combat?: CombatState;
   character?: Character | null;
   onScrollToBottom?: () => void;
   showScrollButton?: boolean;
-  /** When true (2+ party members), render the Queue Action/Dialogue buttons. */
-  isMultiplayer?: boolean;
+  /** Optional typing-indicator onChange hook (used in multiplayer so other players see "is writing…"). */
+  onInputChanged?: (value: string) => void;
   onArcaneRecovery?: (characterId: string, selections: Array<{ level: number; count: number }>) => void;
   /** Spellbook management for casters (prepare/unprepare + known-caster swaps). */
   onManageSpellbook?: (characterId: string, action: 'prepare' | 'unprepare' | 'learn' | 'forget' | 'finish_prep', spellId: string) => Promise<boolean>;
@@ -56,8 +55,8 @@ const CATEGORY_STYLES: Record<string, string> = {
 const QUICK_BTN = 'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium whitespace-nowrap transition-all shrink-0';
 const DISABLED_STYLE = 'bg-stone-800/50 text-stone-600 cursor-not-allowed';
 
-/** Chat input area with quick-action buttons (spells, weapons, features, rests), speech-to-text, and queue/submit controls. */
-const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onQueueAction, onResolveEnemyTurn, isLoading, combat, character, isMultiplayer, onArcaneRecovery, onManageSpellbook, onSwapKnownSpell }) => {
+/** Chat input area with quick-action buttons (spells, weapons, features, rests), speech-to-text, and submit controls. */
+const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onResolveEnemyTurn, isLoading, combat, character, onInputChanged, onArcaneRecovery, onManageSpellbook, onSwapKnownSpell }) => {
   const [input, setInput] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [recognition, setRecognition] = useState<{ continuous: boolean; interimResults: boolean; lang: string; onresult: (e: unknown) => void; onerror: (e: unknown) => void; onend: () => void; start: () => void; abort: () => void } | null>(null);
@@ -235,10 +234,6 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onQueueAction, onR
     if (input.trim() && !effectivelyLocked) { onSendMessage(input.trim()); setInput(''); if (isListening) recognition.stop(); }
   };
 
-  const handleQueueClick = (type: 'action' | 'dialogue') => {
-    if (input.trim() && !effectivelyLocked && onQueueAction) { onQueueAction(input.trim(), type); setInput(''); if (isListening) recognition.stop(); }
-  };
-
   const btnCls = (disabled: boolean, accent = false, danger = false) =>
     disabled ? 'bg-stone-800 text-stone-600 cursor-not-allowed' :
     danger ? 'bg-red-800 hover:bg-red-700 text-white shadow-lg shadow-red-900/20 border border-red-700/50 animate-pulse' :
@@ -286,7 +281,7 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onQueueAction, onR
             )}
           </div>
           <div className="relative flex-1">
-          <input type="text" value={input} onChange={e => setInput(e.target.value)}
+          <input type="text" value={input} onChange={e => { setInput(e.target.value); onInputChanged?.(e.target.value); }}
             placeholder={isEnemyTurn ? "The enemy is acting..." : isLoading ? "The GM is narrating..." : "What do you do, adventurer?"}
             disabled={effectivelyLocked}
             className={`w-full bg-stone-900 border rounded-lg px-4 py-3 pr-12 text-stone-100 focus:outline-none transition-all fantasy-font text-lg ${
@@ -297,10 +292,6 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onQueueAction, onR
           </div>
         </div>
         <div className="flex gap-2 justify-end">
-          {onQueueAction && isMultiplayer && <>
-            <button type="button" onClick={() => handleQueueClick('action')} disabled={effectivelyLocked || !input.trim()} className={`px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-2 ${btnCls(effectivelyLocked || !input.trim())}`} title="Add to queue as Action"><i className="fas fa-plus"></i> Queue Action</button>
-            <button type="button" onClick={() => handleQueueClick('dialogue')} disabled={effectivelyLocked || !input.trim()} className={`px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-2 ${btnCls(effectivelyLocked || !input.trim())}`} title="Add to queue as Dialogue"><i className="fas fa-quote-left"></i> Queue Dialogue</button>
-          </>}
           {isEnemyTurn && onResolveEnemyTurn && (
             <button type="button" onClick={onResolveEnemyTurn} disabled={isLoading} className="px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-2 bg-amber-600 hover:bg-amber-500 text-white shadow-lg shadow-amber-900/30 border border-amber-500/50 animate-pulse" title="Let the engine resolve the enemy's turn automatically">
               <i className="fas fa-bolt"></i> Resolve Turn

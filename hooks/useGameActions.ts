@@ -29,67 +29,6 @@ function isTrivialInput(text: string): boolean {
 }
 
 /**
- * Actor-bearing tool calls and the argument key that identifies the acting
- * character for each. Used by the batch attribution diagnostic to determine
- * which party member each tool call was attributed to.
- */
-const ACTOR_TOOL_KEYS: Record<string, string[]> = {
-  player_attack: ['attackerId'],
-  cast_spell: ['characterId', 'casterId'],
-  check_skill: ['targetId'],
-  make_save: ['targetId'],
-  roll_death_save: ['targetId'],
-  use_resource: ['characterId', 'targetId'],
-  update_inventory: ['targetId'],
-  adjust_currency: ['targetId'],
-  short_rest: ['targetId'],
-  long_rest: ['targetId'],
-  manage_spellbook: ['characterId', 'targetId'],
-  level_up: ['targetId'],
-};
-
-/**
- * Post-batch diagnostic: warns (console only) if any party member who queued an
- * action never appears as the actor of a tool call during the collaborative
- * turn. Indicates the LLM may have silently dropped or mis-attributed an action.
- * In solo play the queue is empty so this is a no-op. Never throws or blocks.
- */
-function warnIfBatchAttributionIncomplete(queue: GameState['actionQueue'], toolMessages: Message[], party: Character[]): void {
-  if (!queue || queue.length === 0 || party.length <= 1) return;
-  const queuedNames = new Set(queue.map(q => q.playerName).filter(Boolean));
-  if (queuedNames.size === 0) return;
-
-  const nameLower = new Map<string, string>();
-  for (const c of party) nameLower.set(c.name.toLowerCase(), c.name);
-
-  const seenActors = new Set<string>();
-  for (const m of toolMessages) {
-    if (!m.toolCalls) continue;
-    for (const tc of m.toolCalls) {
-      const keys = ACTOR_TOOL_KEYS[tc.name];
-      if (!keys) continue;
-      let args: Record<string, unknown> = {};
-      try { args = JSON.parse(tc.arguments || '{}'); } catch { continue; }
-      for (const k of keys) {
-        const v = args[k];
-        if (typeof v === 'string' && v.trim()) {
-          const resolved = nameLower.get(v.toLowerCase()) ?? v;
-          seenActors.add(resolved);
-        }
-      }
-    }
-  }
-
-  const missing: string[] = [];
-  for (const name of queuedNames) {
-    if (!seenActors.has(name)) missing.push(name);
-  }
-  if (missing.length > 0) {
-    console.warn(`[Batch Attribution] ${missing.length} queued player(s) had no attributed tool call this turn: ${missing.join(', ')}. The LLM may have dropped or mis-attributed their action(s).`);
-  }
-}
-
-/**
  * Hard cap for narration-retry LLM calls. A hung retry (e.g. a gateway that accepts
  * the connection then stalls on the response body) must never pin `isLoading`
  * forever and freeze the chat on "The Fates are deciding...". Resolves to
@@ -278,7 +217,36 @@ export const useGameActions = (
     const handleSendMessage = async (text: string, isRetry = false) => {
         if (isDebugMode) console.log('[DEBUG handleSendMessage] entered', { text, isRetry });
         const senderName = getSenderName();
-        const userMsg: Message = { id: 'user-' + Date.now(), role: MessageRole.USER, text, senderName, characterId: myCharacterId, timestamp: Date.now() };
+        const userMsg: Message = { id: 'user-' + Date.now(), role: MessageRole.USER, text, senderName, characterId: myCharacterId ?? undefined, timestamp: Date.now() };
+
+        // MULTIPLAYER PENDING PATH: when two or more party members are present
+        // AND this is a fresh send (not a rewind retry), the message is held in
+        // the chat as `pending: true` instead of triggering the LLM. Any player
+        // can later flush the pending batch via `handleProcessBatch`. The
+        // `isRetry` guard ensures rewind re-sends go straight to the LLM.
+        if (!isRetry && (gameState.party?.length ?? 0) > 1) {
+            const pendingMsg: Message = { ...userMsg, pending: true };
+            const withPending = [...messagesRef.current, pendingMsg];
+            setMessages(withPending);
+            messagesRef.current = withPending;
+            // Clear the local player's suggestion chips immediately — only the
+            // player who just typed/clicked loses their chips; everyone else
+            // keeps theirs until they act or the batch runs. Snapshots taken on
+            // the next batch preserve prior chips for undo.
+            const currentState = mcpServer.getFullState();
+            if (myCharacterId && currentState.lastSuggestionsByCharacter && currentState.lastSuggestionsByCharacter[myCharacterId]) {
+                const updated = { ...currentState.lastSuggestionsByCharacter };
+                delete updated[myCharacterId];
+                mcpServer.setLastSuggestionsByCharacter(updated);
+            }
+            syncState();
+            if (isSyncableCampaign(currentCampaignId)) {
+                storageService.syncCampaignState(currentCampaignId, mcpServer.getFullState(), withPending).catch(e => console.warn('[Sync] pending msg failed:', e));
+            } else if (currentCampaignId === ANONYMOUS_CAMPAIGN_ID) {
+                storageService.syncCampaignState(currentCampaignId, mcpServer.getFullState(), withPending).catch(e => console.warn('[Sync] pending msg failed:', e));
+            }
+            return;
+        }
 
         if (!isRetry && (gameState.isProcessing || processingRef.current)) return;
         if (isRetry && processingRef.current) return;
@@ -322,7 +290,7 @@ export const useGameActions = (
             }
             mcpServer.setLastSuggestions([]);
             syncState();
-            const allMessagesWithUser = [...messagesRef.current, userMsg];
+            const allMessagesWithUser = [...messagesRef.current.filter(m => !m.pending), userMsg];
             const ctxPrep = prepContext(ctxRef.current, allMessagesWithUser, buildContextString(myCharacterId));
             const historyForAPI = ctxPrep.activeMessages;
             let toolMessages: Message[] = [];
@@ -425,7 +393,7 @@ export const useGameActions = (
             );
             processingRef.current = false;
 
-            const messagesToSync = [...currentMessages, userMsg, ...insertToolCallMessages(currentMessages, toolMessages, 'model-synth'), modelMsg];
+            const messagesToSync = [...currentMessages.filter(m => !m.pending), userMsg, ...insertToolCallMessages(currentMessages, toolMessages, 'model-synth'), modelMsg];
             syncFinished(messagesToSync, { lastSuggestionsByCharacter: suggestionsMap });
             autoSpeak(modelMsg.text);
             messagesRef.current = messagesToSync;
@@ -468,14 +436,18 @@ export const useGameActions = (
         }
     };
 
-    const handleExecuteBatch = async () => {
-        if (!gameState.actionQueue || gameState.actionQueue.length === 0) return;
+    const handleProcessBatch = async () => {
+        // No-op in solo (every send triggers the LLM immediately) and when no
+        // pending messages exist. Also guards against re-entry / remote lock.
+        if ((gameState.party?.length ?? 0) <= 1) return;
+        const localPending = messagesRef.current.filter(m => m.pending);
+        if (localPending.length === 0) return;
         if (gameState.isProcessing || processingRef.current) return;
 
         if (isSyncableCampaign(currentCampaignId)) {
             const remoteProcessing = await storageService.isCampaignProcessing(currentCampaignId);
             if (remoteProcessing) {
-                if (isDebugMode) console.log('[handleExecuteBatch] aborted — remote campaign is processing');
+                if (isDebugMode) console.log('[handleProcessBatch] aborted — remote campaign is processing');
                 return;
             }
         }
@@ -484,25 +456,54 @@ export const useGameActions = (
         setIsLoading(true);
         const currentMessages = messagesRef.current;
 
-        const batchText = "[Collaborative Turn]\n" + gameState.actionQueue.map(item => `[${item.playerName}]: ${item.type === 'dialogue' ? `"${item.text}"` : item.text}`).join("\n");
-        const userMsg: Message = { id: 'batch-' + Date.now(), role: MessageRole.USER, text: batchText, senderName: "Party", timestamp: Date.now() };
+        // Race-window preservation: another player may have added a pending
+        // message in the ~50ms between our local snapshot and the lock. Re-fetch
+        // the messages column (Supabase only) and merge any unknown pending ids.
+        let pendingMsgs = localPending;
+        if (isSyncableCampaign(currentCampaignId)) {
+            try {
+                const remoteMsgs = await storageService.fetchMessages(currentCampaignId);
+                if (remoteMsgs) {
+                    const localIds = new Set(localPending.map(m => m.id));
+                    const extraPending = remoteMsgs.filter(m => m.pending && !localIds.has(m.id));
+                    if (extraPending.length > 0) {
+                        pendingMsgs = [...localPending, ...extraPending];
+                        if (isDebugMode) console.log('[handleProcessBatch] merged extra pending from remote', { count: extraPending.length });
+                    }
+                }
+            } catch {
+                // Fetch failed — proceed with local pending only.
+            }
+        }
+
+        // Build the aggregated batch text the LLM sees. Each pending message
+        // already carries its senderName + text (no action/dialogue distinction
+        // anymore — the LLM infers intent from the prose). Sent to the LLM as a
+        // synthetic USER message in history; NOT inserted as a chat bubble.
+        const batchText = "[Collaborative Turn]\n" + pendingMsgs.map(m => `[${m.senderName || 'Player'}]: ${m.text}`).join("\n");
+        const syntheticBatchUserMsg: Message = { id: 'batch-' + Date.now(), role: MessageRole.USER, text: batchText, senderName: "Party", timestamp: Date.now() };
 
         const lockedState = { ...gameState, isProcessing: true, processingUser: "Party" };
         mcpServer.beginTransaction();
         setGameState(lockedState); mcpServer.loadState(lockedState);
-        setMessages(prev => [...prev, userMsg]);
-        if (isSyncableCampaign(currentCampaignId)) storageService.syncCampaignState(currentCampaignId, lockedState, [...currentMessages, userMsg]).catch(e => console.warn('[Sync] failed:', e));
+        // Promote pending → regular USER messages in the visible chat. They
+        // stay attributed to their original sender; only the pending flag flips.
+        const promotedIds = new Set(pendingMsgs.map(m => m.id));
+        const promotedMessages = currentMessages.map(m => promotedIds.has(m.id) ? { ...m, pending: false } : m);
+        setMessages(promotedMessages);
+        messagesRef.current = promotedMessages;
+        if (isSyncableCampaign(currentCampaignId)) storageService.syncCampaignState(currentCampaignId, lockedState, promotedMessages).catch(e => console.warn('[Sync] failed:', e));
+        else if (currentCampaignId === ANONYMOUS_CAMPAIGN_ID) storageService.syncCampaignState(currentCampaignId, lockedState, promotedMessages).catch(e => console.warn('[Sync] failed:', e));
 
         const turnStart = Date.now();
         let firstDeltaAt: number | null = null;
 
         try {
-            mcpServer.saveRewindPoint(mcpServer.getFullState(), [...currentMessages, userMsg]);
-            mcpServer.saveEmergencySnapshot(mcpServer.getFullState());
+            // Rewind point captures the PRE-promotion state so a subsequent
+            // undo restores the pending messages (still removable).
+            mcpServer.saveRewindPoint(gameState, promotedMessages);
+            mcpServer.saveEmergencySnapshot(gameState);
             // Clear the local player's chips immediately (mirrors the solo path).
-            // Delete from lastSuggestionsByCharacter so the UI tray vanishes; the
-            // deprecated setLastSuggestions([]) alone was a no-op. Snapshots above
-            // still hold prior chips so undo restores them per-player.
             if (myCharacterId) {
                 const map = mcpServer.getFullState().lastSuggestionsByCharacter;
                 if (map && map[myCharacterId]) {
@@ -514,28 +515,18 @@ export const useGameActions = (
             mcpServer.setLastSuggestions([]);
             syncState();
 
-            // Enriched batch context: per-character class features / resources / spells /
-            // feats for EVERY party member (not just the locally-active one), plus the
-            // standard world/time/quest/lore/combat blocks. This matches the solo path's
-            // richness so the LLM can correctly attribute spells & resources in multiplayer.
             const batchContext = buildBatchContextString();
-
-            const batchAllMessages = [...currentMessages, userMsg];
+            const batchAllMessages = [...promotedMessages.filter(m => !m.pending), syntheticBatchUserMsg];
             const batchCtxPrep = prepContext(ctxRef.current, batchAllMessages, batchContext);
             const historyForAPI = batchCtxPrep.activeMessages;
             const batchCurrentState = mcpServer.getFullState();
-            if (isDebugMode) console.log('[handleExecuteBatch] calling runAgentLoop', { historyLen: historyForAPI.length, queueSize: gameState.actionQueue?.length });
+            if (isDebugMode) console.log('[handleProcessBatch] calling runAgentLoop', { historyLen: historyForAPI.length, pendingCount: pendingMsgs.length });
             const result = await runAgentLoop(historyForAPI, batchContext, batchCtxPrep.frozen,
                 async (toolName, args, toolResult) => {
                     await dispatchToolRolls(toolName, args, toolResult, onTriggerDiceRoll, batchCurrentState, myCharacterId);
                     if (toolName === 'move_to' && settings.enableAtmosphere) performAtmosphereUpdate(args.location_name as string, args.description as string | undefined, settings);
                 }, undefined, { requestEndNarration: true, enableSuggestions: !!settings.enableSuggestions, sessionId });
             mcpServer.commitTransaction();
-
-            // Attribution diagnostic (multiplayer observability, no behavior change).
-            // Checks whether every party member who queued an action actually appears as
-            // the actor of at least one tool call. Pure console.warn — never blocks.
-            warnIfBatchAttributionIncomplete(gameState.actionQueue, result.toolMessages, batchCurrentState.party);
 
             const streamingId = `model-${Date.now()}`;
             const placeholderMsg: Message = { id: streamingId, role: MessageRole.MODEL, text: '', timestamp: Date.now() };
@@ -561,7 +552,6 @@ export const useGameActions = (
                     console.error('[Narration] Batch retry failed:', err instanceof Error ? err.message : String(err));
                 }
             }
-            // Tier-3: minimal-prompt LLM retry.
             if (!result.inlineNarration && sanitizeNarration(finalNarration).length < 25) {
                 try {
                     const simple = await withNarrationRetryTimeout(generateNarrationSimple(historyForAPI, batchContext, batchCtxPrep.frozen, undefined, sessionId));
@@ -575,7 +565,6 @@ export const useGameActions = (
                     console.error('[Narration] Batch simple retry failed:', err instanceof Error ? err.message : String(err));
                 }
             }
-            // Tier-4: deterministic fallback from tool results.
             if (!result.inlineNarration && sanitizeNarration(finalNarration).length < 25) {
                 const det = buildDeterministicNarration(result.toolMessages);
                 if (det) {
@@ -584,39 +573,22 @@ export const useGameActions = (
                 }
             }
 
-            // Ultimate chokepoint: no LLM-sourced narration reaches the bubble unsanitized.
             const safeNarration = sanitizeNarration(finalNarration);
-            const modelMsg: Message = { id: streamingId, role: MessageRole.MODEL, text: safeNarration || 'The adventure continues...', timestamp: Date.now() };
+            // Tag MODEL narration as batchTurn so handleRewind can route a retry
+            // back to handleProcessBatch instead of the solo handleSendMessage path.
+            const modelMsg: Message = { id: streamingId, role: MessageRole.MODEL, text: safeNarration || 'The adventure continues...', timestamp: Date.now(), batchTurn: true };
             setMessages(prev => prev.map(m => m.id === streamingId ? modelMsg : m));
 
-            // Per-character suggestions: in batch (multiplayer) mode the agent
-            // loop may have produced a `suggestionsByChar` map via the
-            // narrate_turn.suggestionsByCharacter arg; this seeds Tier 0. The
-            // resolver falls through to deterministic per-character generators
-            // for any character the LLM missed.
             const batchStateForSuggestions = mcpServer.getFullState();
             const suggestionsMap = await resolveSuggestionsPerCharacter(
                 batchStateForSuggestions, historyForAPI, batchContext, batchCtxPrep.frozen,
                 result.suggestionsByChar, !!settings.enableSuggestions, sessionId,
             );
 
-            const messagesToSync = [...currentMessages, userMsg, ...insertToolCallMessages(currentMessages, result.toolMessages, 'model-synth'), modelMsg];
-
-            let preservedQueue: GameState['actionQueue'] = [];
-            if (isSyncableCampaign(currentCampaignId)) {
-                try {
-                    const remoteState = await storageService.fetchGameState(currentCampaignId);
-                    if (remoteState?.actionQueue) {
-                        const executedIds = new Set((gameState.actionQueue || []).map(q => q.id));
-                        preservedQueue = remoteState.actionQueue.filter(q => !executedIds.has(q.id));
-                    }
-                } catch {
-                    // Fetch failed — proceed with empty queue (original behavior)
-                }
-            }
+            const messagesToSync = [...promotedMessages.filter(m => !m.pending), ...insertToolCallMessages(promotedMessages, result.toolMessages, 'model-synth'), modelMsg];
 
             processingRef.current = false;
-            syncFinished(messagesToSync, { actionQueue: preservedQueue, lastSuggestionsByCharacter: suggestionsMap });
+            syncFinished(messagesToSync, { lastSuggestionsByCharacter: suggestionsMap });
             autoSpeak(modelMsg.text);
             messagesRef.current = messagesToSync;
             runPipeline_();
@@ -629,8 +601,6 @@ export const useGameActions = (
         } catch (err) {
             if (isDebugMode) console.error("Batch failure:", err);
             mcpServer.rollbackTransaction();
-            // Multiplayer batch crash: write per-character recovery chips so
-            // every player sees a non-empty tray.
             if (settings.enableSuggestions) {
                 const crashState = mcpServer.getFullState();
                 const aliveParty = (crashState.party || []).filter(c => c.hp && c.hp.current > 0);
@@ -653,6 +623,22 @@ export const useGameActions = (
             }
         } finally {
             setIsLoading(false); syncState();
+        }
+    };
+
+    /** Multiplayer: removes a pending message owned by the local player. No-op
+     *  for non-owners, non-pending messages, or once processing has started. */
+    const handleRemovePendingMessage = async (messageId: string) => {
+        if (processingRef.current || gameState.isProcessing) return;
+        const target = messagesRef.current.find(m => m.id === messageId);
+        if (!target || !target.pending || target.characterId !== (myCharacterId ?? undefined)) return;
+        const updated = messagesRef.current.filter(m => m.id !== messageId);
+        setMessages(updated);
+        messagesRef.current = updated;
+        if (isSyncableCampaign(currentCampaignId)) {
+            storageService.syncCampaignState(currentCampaignId, mcpServer.getFullState(), updated).catch(e => console.warn('[Sync] failed:', e));
+        } else if (currentCampaignId === ANONYMOUS_CAMPAIGN_ID) {
+            storageService.syncCampaignState(currentCampaignId, mcpServer.getFullState(), updated).catch(e => console.warn('[Sync] failed:', e));
         }
     };
 
@@ -718,14 +704,18 @@ export const useGameActions = (
     const handleSendMessageRef = useRef(handleSendMessage);
     handleSendMessageRef.current = handleSendMessage;
 
-    const handleExecuteBatchRef = useRef(handleExecuteBatch);
-    handleExecuteBatchRef.current = handleExecuteBatch;
+    const handleProcessBatchRef = useRef(handleProcessBatch);
+    handleProcessBatchRef.current = handleProcessBatch;
 
     // Restores game state, messages, and LLM context to before the most recent
     // user turn. Shared by handleUndo (pure undo) and handleRewind (undo + retry).
-    // Returns the original user text so the caller can optionally re-send it, or
-    // null when nothing was restored (busy / no last user message).
-    const restoreToBeforeLastTurn = useCallback(async (): Promise<string | null> => {
+    // Returns a discriminator describing what was restored:
+    //   - `{ kind: 'solo', text }` — solo turn; caller re-sends `text` to retry.
+    //   - `{ kind: 'batch' }`     — multiplayer batch turn; caller re-runs
+    //                              handleProcessBatch to retry (the pending
+    //                              messages are restored as `pending: true`).
+    //   - `null`                  — nothing to restore (busy / no last turn).
+    const restoreToBeforeLastTurn = useCallback(async (): Promise<{ kind: 'solo'; text: string } | { kind: 'batch' } | null> => {
         stopSpeaking();
         onCloseLevelUp?.();
         if (processingRef.current) {
@@ -737,31 +727,68 @@ export const useGameActions = (
         // useGameState's subscription handler, preventing them from overwriting
         // the restored state during the retry window.
         bumpRewindGeneration();
-        const liveQueue = mcpServer.getFullState().actionQueue ?? [];
         const snapshot = mcpServer.loadRewindPoint();
         if (isDebugMode) console.log('[rewind] snapshot:', !!snapshot, 'processingRef:', processingRef.current);
 
         if (!snapshot) {
             const emergencySnap = mcpServer.loadEmergencySnapshot();
             const currentMsgs = messagesRef.current;
+            // Detect a batch turn by walking back to the last MODEL message: if
+            // it carries `batchTurn`, the user messages preceding it were the
+            // promoted batch inputs and should be restored as pending. Otherwise
+            // solo — strip forward from the last USER message.
+            const lastModelIdx = [...currentMsgs].reverse().findIndex(m => m.role === MessageRole.MODEL);
+            const lastModel = lastModelIdx >= 0 ? currentMsgs[currentMsgs.length - 1 - lastModelIdx] : undefined;
+            const isBatch = lastModel?.batchTurn === true;
+
+            if (isBatch) {
+                // Walk back past the batch MODEL + tool messages to the promoted
+                // user messages that preceded them; restore those as pending.
+                let cutIdx = currentMsgs.length;
+                while (cutIdx > 0 && currentMsgs[cutIdx - 1].role !== MessageRole.USER) cutIdx--;
+                // Include the contiguous USER block (the promoted batch inputs).
+                while (cutIdx > 0 && currentMsgs[cutIdx - 1].role === MessageRole.USER) cutIdx--;
+                const restoredMessages = currentMsgs.slice(0, cutIdx).map(m => m.role === MessageRole.USER ? { ...m, pending: true } : m);
+                setMessages(restoredMessages);
+                messagesRef.current = restoredMessages;
+                processingRef.current = false; setIsLoading(false);
+
+                if (emergencySnap) mcpServer.restoreSnapshot(emergencySnap);
+                const gs = mcpServer.getFullState() as unknown as { ctx?: { episodeCheckpoints?: unknown[]; frozenRawHistory?: string; frozenRawTokens?: number; frozenMessageCount?: number; turnCounter?: number } };
+                ctxRef.current = {
+                    episodeCheckpoints: gs.ctx?.episodeCheckpoints ?? [],
+                    frozenRawHistory: gs.ctx?.frozenRawHistory ?? '',
+                    frozenRawTokens: gs.ctx?.frozenRawTokens ?? 0,
+                    frozenMessageCount: gs.ctx?.frozenMessageCount ?? 0,
+                    turnCounter: gs.ctx?.turnCounter ?? 0,
+                    isCompressing: false,
+                    compressPromise: null,
+                    generation: (gs.ctx?.generation ?? 0) + 1,
+                };
+
+                if (isSyncableCampaign(currentCampaignId)) {
+                    const cleanState = { ...mcpServer.getFullState(), isProcessing: false, processingUser: undefined };
+                    mcpServer.loadState(cleanState); setGameState(cleanState);
+                    await storageService.syncCampaignState(currentCampaignId, cleanState, restoredMessages);
+                } else if (currentCampaignId === ANONYMOUS_CAMPAIGN_ID) {
+                    await storageService.syncCampaignState(currentCampaignId, mcpServer.getFullState(), restoredMessages);
+                }
+                setViewingCharacterId(myCharacterId);
+                mcpServer.clearRewindPoint();
+                mcpServer.clearEmergencySnapshot();
+                if (isDebugMode) console.log('[rewind] emergency batch restore');
+                return { kind: 'batch' };
+            }
+
             const lastUserMsg = [...currentMsgs].reverse().find(m => m.role === MessageRole.USER);
             if (!lastUserMsg) return null;
             const lastUserIdx = currentMsgs.map(m => m.id).lastIndexOf(lastUserMsg.id);
             const restoredMessages = currentMsgs.slice(0, lastUserIdx);
             setMessages(restoredMessages);
-            // Sync the ref mirror immediately so a prompt retry captures the rewound
-            // list instead of a stale, pre-rewind snapshot.
             messagesRef.current = restoredMessages;
             processingRef.current = false; setIsLoading(false);
 
-            if (emergencySnap) {
-                mcpServer.restoreSnapshot(emergencySnap);
-                const emergencyQueueIds = new Set((emergencySnap.actionQueue ?? []).map(q => q.id));
-                const preservedFromEmergency = liveQueue.filter(q => !emergencyQueueIds.has(q.id));
-                if (preservedFromEmergency.length > 0) {
-                    mcpServer.loadState({ ...mcpServer.getFullState(), actionQueue: [...(mcpServer.getFullState().actionQueue ?? []), ...preservedFromEmergency] });
-                }
-            }
+            if (emergencySnap) mcpServer.restoreSnapshot(emergencySnap);
             const gs = mcpServer.getFullState() as unknown as { ctx?: { episodeCheckpoints?: unknown[]; frozenRawHistory?: string; frozenRawTokens?: number; frozenMessageCount?: number; turnCounter?: number } };
             ctxRef.current = {
                 episodeCheckpoints: gs.ctx?.episodeCheckpoints ?? [],
@@ -779,17 +806,22 @@ export const useGameActions = (
                 mcpServer.loadState(cleanState); setGameState(cleanState);
                 await storageService.syncCampaignState(currentCampaignId, cleanState, restoredMessages);
             } else if (currentCampaignId === ANONYMOUS_CAMPAIGN_ID) {
-                // Persist the rewound state locally so a refresh doesn't undo the rewind
                 await storageService.syncCampaignState(currentCampaignId, mcpServer.getFullState(), restoredMessages);
             }
             setViewingCharacterId(myCharacterId);
             mcpServer.clearRewindPoint();
             mcpServer.clearEmergencySnapshot();
             if (isDebugMode) console.log('[rewind] no snapshot, restored to before last message', { text: lastUserMsg.text.slice(0, 80) });
-            return lastUserMsg.text;
+            return { kind: 'solo', text: lastUserMsg.text };
         }
 
-        const userMessage = snapshot.messages[snapshot.messages.length - 1];
+        // Detect batch vs solo via the snapshot's trailing message: batch
+        // snapshots were saved with the pending messages still pending, so the
+        // last message has `pending: true`. Solo snapshots end with the user msg
+        // (never pending).
+        const lastSnapshotMsg = snapshot.messages[snapshot.messages.length - 1];
+        const isBatch = lastSnapshotMsg?.pending === true;
+        const userMessage = isBatch ? lastSnapshotMsg : lastSnapshotMsg;
         const originalText = userMessage?.text || '';
         processingRef.current = false; setIsLoading(false);
 
@@ -797,17 +829,12 @@ export const useGameActions = (
         const restoredState = mcpServer.getFullState();
         mcpServer.loadState(restoredState);
 
-        const snapshotQueueIds = new Set((snapshot.gameState.actionQueue ?? []).map(q => q.id));
-        const preservedQueueItems = liveQueue.filter(q => !snapshotQueueIds.has(q.id));
-        if (preservedQueueItems.length > 0) {
-            const merged = { ...mcpServer.getFullState(), actionQueue: [...(mcpServer.getFullState().actionQueue ?? []), ...preservedQueueItems] };
-            mcpServer.loadState(merged);
-        }
-
-        setMessages(snapshot.messages.slice(0, -1)); setGameState(mcpServer.getFullState());
-        // Sync the ref mirror immediately so a prompt retry captures the rewound
-        // list instead of a stale, pre-rewind snapshot.
-        messagesRef.current = snapshot.messages.slice(0, -1);
+        // Batch: keep all messages (the pending ones are restored as pending,
+        // ready for re-edit / re-process). Solo: strip the trailing user msg so
+        // the retry can re-add it.
+        const restoredMessages = isBatch ? snapshot.messages : snapshot.messages.slice(0, -1);
+        setMessages(restoredMessages); setGameState(mcpServer.getFullState());
+        messagesRef.current = restoredMessages;
 
         const gs = restoredState as unknown as { ctx?: { episodeCheckpoints?: unknown[]; frozenRawHistory?: string; frozenRawTokens?: number; frozenMessageCount?: number; turnCounter?: number } };
         ctxRef.current = {
@@ -824,14 +851,14 @@ export const useGameActions = (
         if (isSyncableCampaign(currentCampaignId)) {
             const cleanState = { ...mcpServer.getFullState(), isProcessing: false, processingUser: undefined };
             mcpServer.loadState(cleanState); setGameState(cleanState);
-            await storageService.syncCampaignState(currentCampaignId, cleanState, snapshot.messages.slice(0, -1));
+            await storageService.syncCampaignState(currentCampaignId, cleanState, restoredMessages);
         } else if (currentCampaignId === ANONYMOUS_CAMPAIGN_ID) {
-            await storageService.syncCampaignState(currentCampaignId, mcpServer.getFullState(), snapshot.messages.slice(0, -1));
+            await storageService.syncCampaignState(currentCampaignId, mcpServer.getFullState(), restoredMessages);
         }
         setViewingCharacterId(myCharacterId);
         mcpServer.clearRewindPoint();
-        if (isDebugMode) console.log('[rewind] restored with snapshot', { text: originalText.slice(0, 80) });
-        return originalText || null;
+        if (isDebugMode) console.log('[rewind] restored with snapshot', { isBatch, text: originalText.slice(0, 80) });
+        return isBatch ? { kind: 'batch' } : { kind: 'solo', text: originalText };
     }, [currentCampaignId, setMessages, setGameState, setIsLoading]);
 
     // Pure undo: reverts the last turn and stops. No re-send, so quests/lore/loot
@@ -841,15 +868,16 @@ export const useGameActions = (
     }, [restoreToBeforeLastTurn]);
 
     // Retry: reverts the last turn, then immediately re-processes the same input.
+    // Solo: re-sends the user text through handleSendMessage. Batch: re-runs
+    // handleProcessBatch which re-promotes the restored pending messages.
     const handleRewind = useCallback(async () => {
-        const text = await restoreToBeforeLastTurn();
-        if (text) {
-            if (isDebugMode) console.log('[handleRewind] retrying', { text: text.slice(0, 80) });
-            if (text.startsWith('[Collaborative Turn]') && (mcpServer.getFullState().actionQueue?.length ?? 0) > 0) {
-                setTimeout(() => handleExecuteBatchRef.current(), 100);
-            } else {
-                setTimeout(() => handleSendMessageRef.current(text, true), 100);
-            }
+        const result = await restoreToBeforeLastTurn();
+        if (result?.kind === 'batch') {
+            if (isDebugMode) console.log('[handleRewind] retrying batch');
+            setTimeout(() => handleProcessBatchRef.current(), 100);
+        } else if (result?.kind === 'solo') {
+            if (isDebugMode) console.log('[handleRewind] retrying solo', { text: result.text.slice(0, 80) });
+            setTimeout(() => handleSendMessageRef.current(result.text, true), 100);
         }
     }, [restoreToBeforeLastTurn]);
 
@@ -919,5 +947,5 @@ export const useGameActions = (
       }
     };
 
-    return { handleSendMessage, handleExecuteBatch, handleCharacterCreated, handleUndo, handleRewind, resetContextState, handleArcaneRecovery, handleManageSpellbook, handleSwapKnownSpell };
+    return { handleSendMessage, handleProcessBatch, handleRemovePendingMessage, handleCharacterCreated, handleUndo, handleRewind, resetContextState, handleArcaneRecovery, handleManageSpellbook, handleSwapKnownSpell };
 };

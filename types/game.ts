@@ -1,6 +1,5 @@
 import type { Character } from './character';
 import type { CombatState } from './combat';
-import type { QueuedAction } from './common';
 import type { BattleMap } from './grid';
 
 /** Difficulty tiers for quest XP calibration (mirrors combat CR buckets). */
@@ -66,7 +65,6 @@ export interface GameState {
   isProcessing?: boolean;
   processingUser?: string;
   currentAtmosphereUrl?: string;
-  actionQueue: QueuedAction[];
   combat?: CombatState;
   lastDiceRoll?: {
     sides: number;

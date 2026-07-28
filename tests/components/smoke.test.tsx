@@ -64,7 +64,7 @@ import InputArea from '../../components/InputArea';
 import ChatLog from '../../components/ChatLog';
 import DiceRollModal from '../../components/DiceRollModal';
 import Journal from '../../components/Journal';
-import ActionQueuePanel from '../../components/ActionQueuePanel';
+import TypingIndicator from '../../components/shared/TypingIndicator';
 import SettingsModal from '../../components/SettingsModal';
 import LevelUpModal from '../../components/LevelUpModal';
 import CharacterSheet from '../../components/CharacterSheet';
@@ -353,34 +353,15 @@ describe('Component Smoke Tests', () => {
     });
   });
 
-  describe('ActionQueuePanel', () => {
-    it('renders empty queue', () => {
-      render(
-        <ActionQueuePanel
-          queue={[]}
-          onRemove={() => {}}
-          onExecute={() => {}}
-        />
-      );
-      expect(screen.getByText(/Queue is empty/i)).toBeInTheDocument();
+  describe('TypingIndicator', () => {
+    it('renders nothing when no users are typing', () => {
+      const { queryByText } = render(<TypingIndicator users={[]} />);
+      expect(queryByText(/writing/i)).toBeNull();
     });
 
-    it('renders queued actions', () => {
-      render(
-        <ActionQueuePanel
-          queue={[{
-            id: 'a1',
-            playerId: 'p1',
-            playerName: 'Hero',
-            text: 'Attack the dragon',
-            type: 'action',
-            timestamp: 0,
-          }]}
-          onRemove={() => {}}
-          onExecute={() => {}}
-        />
-      );
-      expect(screen.getByText('Attack the dragon')).toBeInTheDocument();
+    it('renders a typing chip with the user name', () => {
+      render(<TypingIndicator users={[{ userId: 'u1', characterId: 'c1', name: 'Hero' }]} />);
+      expect(screen.getByText(/Hero is writing/i)).toBeInTheDocument();
     });
   });
 

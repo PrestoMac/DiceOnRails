@@ -51,6 +51,23 @@ export const storageService = {
         }
     },
 
+    /** Fetches the current messages array for a campaign from Supabase. Used by
+     *  the multiplayer batch processor to capture pending messages other players
+     *  added during the click race window. Returns null on error or if not found. */
+    async fetchMessages(campaignId: string): Promise<Message[] | null> {
+        try {
+            const { data, error } = await supabase
+                .from(CAMPAIGNS_TABLE)
+                .select('messages')
+                .eq('id', campaignId)
+                .single();
+            if (error || !data) return null;
+            return (data.messages as Message[] | null | undefined) ?? null;
+        } catch {
+            return null;
+        }
+    },
+
     /** Checks whether a campaign is currently being processed by another player. Fail-open: returns false on error so a Supabase outage doesn't block gameplay. */
     async isCampaignProcessing(campaignId: string): Promise<boolean> {
         try {

@@ -16,7 +16,7 @@ DiceOnRails pairs a **large language model** (for narration, roleplay, and inten
 - **Voice narration** — In-browser text-to-speech reads the GM's prose aloud.
 - **Solo or multiplayer** — Play alone (anonymous/local) or invite friends to a shared cloud campaign with realtime sync.
 - **Interactive Virtual Tabletop (VTT)** — Live 5e tactical grid map featuring drag-and-drop tokens, Chebyshev distance calculations, and LLM spatial awareness.
-- **Cross-platform UI** — Responsive layouts for desktop and mobile, voice input, action queueing, dice popups, and a searchable / exportable chat log.
+- **Cross-platform UI** — Responsive layouts for desktop and mobile, voice input, multiplayer pending-batch chat with typing indicators, dice popups, and a searchable / exportable chat log.
 - **Cloud saves & campaigns** — Powered by Supabase (Postgres + Realtime + Auth).
 - **Works with any OpenAI-compatible provider** — Default is OpenRouter; bring your own API key.
 
@@ -174,7 +174,8 @@ When signed in via Supabase:
 - **Share the Campaign ID** (copy button in the header) with friends.
 - **They join** by entering the ID at the dashboard.
 - Every action **syncs to Supabase in realtime** — all players see the same narration, dice, and state.
-- The active player's turn **locks the campaign** to prevent race conditions; others can queue actions.
+- The active player's turn **locks the campaign** to prevent race conditions; in multiplayer, each player types into the chat to add a pending message, then any player presses **"Take the Turn"** to flush the batch through one GM response.
+- Live **typing indicators** ("NAME is writing…") show when other players are composing their next move.
 - Each player has **private character notes** (visible only to your own character's owner); notes are never sent to the GM/LLM.
 - Delete / rename campaigns from the dashboard.
 

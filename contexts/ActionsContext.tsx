@@ -11,7 +11,10 @@ interface ActionsContextValue {
   handleSendMessage: (text: string, isRetry?: boolean) => Promise<void>;
   handleUndo: () => Promise<void>;
   handleRewind: () => Promise<void>;
-  handleExecuteBatch: () => Promise<void>;
+  /** Multiplayer: promotes all pending chat messages into a single batch turn and runs the LLM. Solo no-op. */
+  handleProcessBatch: () => Promise<void>;
+  /** Multiplayer: removes a pending message owned by the local player (no-op after processing starts). */
+  handleRemovePendingMessage: (messageId: string) => Promise<void>;
   handleCharacterCreated: (character: Character) => void;
   handleResolveEnemyTurn: () => Promise<void>;
   resetContextState: () => void;

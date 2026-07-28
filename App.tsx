@@ -40,6 +40,7 @@ const QueueNotification: React.FC<{ message: string }> = ({ message }) => (
     </div>
   </div>
 );
+void QueueNotification; // legacy component retained for reference; queue UI removed
 
 /** Root application component. Shows setup wizard when VITE_SETUP_MODE is true, otherwise orchestrates the splash screen, auth, dashboard, character creation, and the main game layout with all context providers. */
 const App: React.FC = () => {
@@ -74,7 +75,6 @@ const AppContent: React.FC = () => {
     stage, gameState, messages, isLoading,
     isNewCampaign, setStage,
     currentCampaignId, setCurrentCampaignId, loadGameData, syncState,
-    queueNotification
   } = useGameContext();
   const { settings, settingsOpen, setSettingsOpen, saveSettings, isMobile, diceRollData, clearDiceRoll, isCompendiumOpen, setCompendiumOpen } = useUIContext();
   const { campaigns, showCreateModal, setShowCreateModal, loadCampaigns, handleCreateNewCampaign, handleConfirmCreateCampaign, handleJoinCampaign, handleDeleteCampaign, handleRenameCampaign } = useCampaignContext();
@@ -185,7 +185,6 @@ const AppContent: React.FC = () => {
     <div className="flex h-screen w-full bg-stone-950 overflow-hidden relative">
       <div className="absolute inset-0 opacity-5 pointer-events-none" style={{backgroundImage:'radial-gradient(#444 1px, transparent 1px)', backgroundSize:'40px 40px'}}></div>
       {getContent()}
-      {queueNotification && <QueueNotification message={queueNotification} />}
       {settingsOpen && <SettingsModal settings={settings} userId={userId} messages={messages} gameState={gameState} onSave={saveSettings} onClose={() => setSettingsOpen(false)} onReplayOnboarding={() => { setSettingsOpen(false); onboarding.resetOnboarding(); }} />}
       {showCreateModal && <CampaignModal mode="create" isOpen={true} onConfirm={handleConfirmCreateCampaignWrapped} onCancel={() => setShowCreateModal(false)} />}
       {diceRollData?.isOpen && (

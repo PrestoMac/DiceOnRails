@@ -193,6 +193,19 @@ interface ChatLogProps {
   /** Map of characterId → portraitUrl, used to render avatars beside player
    *  message bubbles. Built by the layouts from gameState.party. */
   portraitMap?: Record<string, string>;
+  /** Multiplayer: 2+ party members present. Gates the "Take the Turn" button
+   *  and pending-message affordances. Defaults to false (solo). */
+  isMultiplayer?: boolean;
+  /** Multiplayer: the local player's character id — gates pending message
+   *  delete buttons (owner-only). */
+  myCharacterId?: string | null;
+  /** Multiplayer: count of currently pending messages in the chat. The "Take
+   *  the Turn" button only renders when this is > 0. */
+  pendingCount?: number;
+  /** Multiplayer: flushes all pending messages through one LLM turn. */
+  onProcessBatch?: () => void;
+  /** Multiplayer: removes one pending message (owner-gated, pre-processing). */
+  onRemovePendingMessage?: (messageId: string) => void;
 }
 
 type FilterType = 'all' | 'narration' | 'player' | 'system';
@@ -214,8 +227,8 @@ const MSG_STYLES: Record<MessageRole, string> = {
 const EXPORT_BTN_CLASS = 'w-full flex items-center gap-3 px-4 py-2.5 text-sm text-stone-300 hover:bg-stone-800/80 hover:text-amber-400 transition-colors text-left';
 const EXPORT_ICON_CLASS = 'text-xs w-5 text-center text-stone-500';
 
-/** Renders the scrollable message history with search, filter, export, speech playback, rewind, and roll-highlighting cards. */
-const ChatLog: React.FC<ChatLogProps> = ({ messages, settings, onRewind, onUndo, isProcessing, onExpandAtmosphere, atmosphereUrl, scrollRef: externalScrollRef, onScrollChange, disableInternalScroll, onPrefillInput, showWelcomeChips, suggestions, onPickSuggestion, onDismissSuggestion, portraitMap }) => {
+/** Renders the scrollable message history with search, filter, export, speech playback, rewind, roll-highlighting cards, multiplayer pending-batch controls, and the "Take the Turn" button. */
+const ChatLog: React.FC<ChatLogProps> = ({ messages, settings, onRewind, onUndo, isProcessing, onExpandAtmosphere, atmosphereUrl, scrollRef: externalScrollRef, onScrollChange, disableInternalScroll, onPrefillInput, showWelcomeChips, suggestions, onPickSuggestion, onDismissSuggestion, portraitMap, isMultiplayer = false, myCharacterId = null, pendingCount = 0, onProcessBatch, onRemovePendingMessage }) => {
   const internalScrollRef = useRef<HTMLDivElement>(null);
   const scrollRef = externalScrollRef || internalScrollRef;
   const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
@@ -471,9 +484,22 @@ const ChatLog: React.FC<ChatLogProps> = ({ messages, settings, onRewind, onUndo,
                 )}
               </div>
             );
+            // Pending multiplayer message: dashed amber border + Pending pill, and
+            // the owner gets a remove button. Undo/Rewind are hidden on pending
+            // messages because they are not yet a committed turn.
+            const isPending = msg.pending === true;
+            const isPendingOwner = isMultiplayer && isPending && !!myCharacterId && msg.characterId === myCharacterId && !isProcessing && !!onRemovePendingMessage;
+            const bubbleClass = isPending
+              ? 'bg-amber-950/20 border-r-4 border-dashed border-amber-500/70 text-stone-200 shadow-lg shadow-amber-950/30'
+              : MSG_STYLES[msg.role];
             const content = (
               <>
-            <div className={`group relative max-w-[85%] rounded-lg p-4 transition-all duration-300 ${MSG_STYLES[msg.role]}`}>
+            <div className={`group relative max-w-[85%] rounded-lg p-4 transition-all duration-300 ${bubbleClass}`}>
+              {isPending && (
+                <span className="absolute -top-2 left-3 px-2 py-0.5 rounded-full bg-amber-700 text-amber-50 text-[9px] uppercase font-bold tracking-widest shadow-md shadow-amber-900/40 flex items-center gap-1">
+                  <i className="fas fa-hourglass-half text-[8px] animate-pulse"></i> Pending
+                </span>
+              )}
               {msg.role === MessageRole.MODEL && <button onClick={() => handleSpeech(msg)} className={`absolute -right-12 top-2 p-2.5 rounded-full transition-all duration-300 ${playingMessageId === msg.id ? 'text-amber-500 animate-pulse bg-amber-900/30 ring-2 ring-amber-500/50 shadow-[0_0_20px_rgba(245,158,11,0.4)]' : 'text-stone-600 hover:text-amber-600 opacity-0 group-hover:opacity-100 bg-stone-900/40 hover:scale-110'}`} title={playingMessageId === msg.id ? "Silence Narrator" : "Hear Narration"}><i className={`fas ${playingMessageId === msg.id ? 'fa-volume-xmark' : 'fa-volume-high'} text-sm`}></i></button>}
               {msg.role === MessageRole.SYSTEM && <div className="flex items-center gap-2 mb-1 text-stone-500 uppercase text-[10px] font-bold tracking-widest border-b border-red-800/50 pb-1"><i className="fas fa-triangle-exclamation text-red-700"></i> System</div>}
               {msg.role === MessageRole.TOOL && <div className="flex items-center gap-2 mb-1 text-stone-500 uppercase text-[10px] font-bold tracking-widest border-b border-stone-800/50 pb-1"><i className="fas fa-terminal text-emerald-900"></i> System Log</div>}
@@ -491,7 +517,12 @@ const ChatLog: React.FC<ChatLogProps> = ({ messages, settings, onRewind, onUndo,
             <div className="flex items-center gap-2 mt-2 px-1">
               {msg.senderName && <span className="text-[10px] font-bold uppercase tracking-widest text-amber-600/80">{msg.senderName}</span>}
               <span className="text-[10px] uppercase tracking-tighter text-stone-700">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-              {msg.role === MessageRole.USER && msg.id === lastUserMessageId && (onUndo || onRewind) && <>
+              {isPendingOwner && (
+                <button onClick={e => { e.stopPropagation(); onRemovePendingMessage(msg.id); }} className="ml-1 p-1.5 rounded-full transition-all duration-300 text-stone-500 hover:text-red-400 hover:bg-red-950/40" title="Remove pending input">
+                  <i className="fas fa-xmark text-[10px]"></i>
+                </button>
+              )}
+              {!isPending && msg.role === MessageRole.USER && msg.id === lastUserMessageId && (onUndo || onRewind) && <>
                 {onUndo && <button onClick={e => { e.stopPropagation(); onUndo(); }} disabled={isProcessing} className={`ml-1 p-1.5 rounded-full transition-all duration-300 ${isProcessing ? 'text-stone-700 cursor-not-allowed' : 'text-stone-500 hover:text-amber-400 hover:bg-stone-800/60'}`} title="Undo — revert last turn"><i className="fas fa-undo text-[10px]"></i></button>}
                 {onRewind && <button onClick={e => { e.stopPropagation(); onRewind(); }} disabled={isProcessing} className={`ml-1 p-1.5 rounded-full transition-all duration-300 ${isProcessing ? 'text-stone-700 cursor-not-allowed' : 'text-stone-500 hover:text-amber-400 hover:bg-stone-800/60'}`} title="Retry — reverts game state and reprocesses"><i className="fas fa-redo text-[10px]"></i></button>}
               </>}
@@ -509,6 +540,21 @@ const ChatLog: React.FC<ChatLogProps> = ({ messages, settings, onRewind, onUndo,
           })()
           );
         })}
+
+        {isMultiplayer && !isProcessing && pendingCount > 0 && onProcessBatch && (
+          <div className="flex flex-col items-center pt-2 pb-3 w-full" data-tour="process-batch">
+            <button
+              onClick={(e) => { e.stopPropagation(); onProcessBatch(); }}
+              className="w-full max-w-[85%] py-3 rounded-xl bg-gradient-to-r from-amber-700 to-amber-600 hover:from-amber-600 hover:to-amber-500 text-amber-50 font-bold uppercase tracking-widest text-sm shadow-lg shadow-amber-900/30 border border-amber-500/40 transition-all flex items-center justify-center gap-2.5 animate-glow-pulse"
+              title="Send all pending actions to the GM as a single collaborative turn"
+            >
+              <i className="fas fa-dice-d20"></i>
+              Take the Turn
+              <span className="bg-amber-900/60 text-amber-100 px-2 py-0.5 rounded-full text-[10px] font-mono">{pendingCount}</span>
+            </button>
+            <p className="text-[10px] text-stone-500 italic mt-1.5">Any player can press this — all {pendingCount === 1 ? 'pending message is' : 'pending messages are'} sent to the GM together.</p>
+          </div>
+        )}
 
         {suggestions && suggestions.length > 0 && onPickSuggestion && (
           <div className="flex flex-col items-start pt-1 pb-2 w-full">

@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { GameState, Message } from '../types';
 
-/** Tracks recent activity for display (processing user, new messages, queue changes) and returns the activity log. */
+/** Tracks recent activity for display (processing user, new messages) and returns the activity log. */
 export function useActivityTracking(gameState: GameState, messages: Message[], userId?: string) {
   const [recentActivity, setRecentActivity] = useState<string[]>([]);
   const prevProcessingUserRef = useRef<string | undefined>(undefined);
   const prevMessageCountRef = useRef(0);
-  const prevQueueLengthRef = useRef(0);
+  void userId; // reserved for future per-user activity filtering
 
   const addActivity = useCallback((msg: string) => {
     setRecentActivity(prev => [msg, ...prev].slice(0, 5));
@@ -27,15 +27,6 @@ export function useActivityTracking(gameState: GameState, messages: Message[], u
     }
     prevMessageCountRef.current = count;
   }, [messages, addActivity]);
-
-  useEffect(() => {
-    const len = gameState.actionQueue?.length || 0;
-    if (prevQueueLengthRef.current > 0 && len > prevQueueLengthRef.current) {
-      const other = (gameState.actionQueue || []).slice(prevQueueLengthRef.current).find(i => i.playerId !== userId);
-      if (other) addActivity(`${other.playerName} added to queue`);
-    }
-    prevQueueLengthRef.current = len;
-  }, [gameState.actionQueue, userId, addActivity]);
 
   return { recentActivity, addActivity };
 }

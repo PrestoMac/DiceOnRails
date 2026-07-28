@@ -30,7 +30,6 @@ function makeCampaignState(opts: {
     sessionLogs: [],
     quests: [],
     lore: [],
-    actionQueue: [],
     combat: opts.combat,
     lastSuggestions: opts.lastSuggestions,
     lastSuggestionsByCharacter: opts.lastSuggestionsByCharacter,

@@ -40,8 +40,7 @@ function makeState(party: Character[]): GameState {
     sessionLogs: [],
     quests: [],
     lore: [],
-    actionQueue: [],
-  } as GameState;
+    } as GameState;
 }
 
 describe('presetCharacters data file', () => {

@@ -53,7 +53,6 @@ function makeServerState(overrides: Partial<GameState> = {}): GameState {
     sessionLogs: [],
     quests: [],
     lore: [],
-    actionQueue: [],
     ...overrides,
   };
 }
@@ -86,7 +85,8 @@ describe('MockMCPServer', () => {
       expect(state.sessionLogs).toEqual([]);
       expect(state.quests).toEqual([]);
       expect(state.lore).toEqual([]);
-      expect(state.actionQueue).toEqual([]);
+      // actionQueue was removed; verify it is absent.
+      expect((state as Record<string, unknown>).actionQueue).toBeUndefined();
     });
 
     it('loadState replaces internal state', () => {
@@ -97,11 +97,12 @@ describe('MockMCPServer', () => {
       expect(state.party).toHaveLength(1);
     });
 
-    it('loadState ensures party and actionQueue exist', () => {
+    it('loadState ensures party exists', () => {
       server.loadState({} as GameState);
       const state = server.getFullState();
       expect(state.party).toEqual([]);
-      expect(state.actionQueue).toEqual([]);
+      // actionQueue was removed from GameState; ensure it is not re-introduced.
+      expect((state as Record<string, unknown>).actionQueue).toBeUndefined();
     });
 
     it('reset restores initial state', () => {
@@ -1784,8 +1785,7 @@ describe('MockMCPServer', () => {
         party: [makeCharacter({ id: 'wiz-1', name: 'Wizard', class: 'wizard', level: 3, knownSpells: ['charm-person'], preparedSpells: ['charm-person'],
           resources: [{ id: 'spell-slot-1', name: 'L1', current: 3, max: 3, resetOn: 'long', source: 'class', sourceId: 'wizard' }],
           stats: { str: 10, dex: 14, con: 12, int: 18, wis: 13, cha: 10 } })],
-        worldDescription: 'test', sessionLogs: [], quests: [], lore: [], actionQueue: [],
-        combat: {
+        worldDescription: 'test', sessionLogs: [], quests: [], lore: [], combat: {
           isActive: true, round: 1, turnIndex: 0,
           initiative: [{ id: 'wiz-1', name: 'Wizard', initiative: 15, type: 'player', isDead: false, hasActedThisTurn: false }],
           enemies: [enemy],
@@ -1809,8 +1809,7 @@ describe('MockMCPServer', () => {
         party: [makeCharacter({ id: 'wiz-1', name: 'Wizard', class: 'wizard', level: 3, knownSpells: ['sleep'], preparedSpells: ['sleep'],
           resources: [{ id: 'spell-slot-1', name: 'L1', current: 3, max: 3, resetOn: 'long', source: 'class', sourceId: 'wizard' }],
           stats: { str: 10, dex: 14, con: 12, int: 18, wis: 13, cha: 10 } })],
-        worldDescription: 'test', sessionLogs: [], quests: [], lore: [], actionQueue: [],
-        combat: {
+        worldDescription: 'test', sessionLogs: [], quests: [], lore: [], combat: {
           isActive: true, round: 1, turnIndex: 0,
           initiative: [{ id: 'wiz-1', name: 'Wizard', initiative: 15, type: 'player', isDead: false, hasActedThisTurn: false }],
           enemies: [enemy],
@@ -1829,8 +1828,7 @@ describe('MockMCPServer', () => {
       const enemy1: Enemy = { id: 'e1', name: 'Goblin', hp: { current: 10, max: 10 }, ac: 13, stats: { str: 8, dex: 14, con: 10, int: 10, wis: 8, cha: 8 }, attacks: [], isDead: false, conditions: [{ id: 'incapacitated', source: 'test', duration: 5 }] };
       server.loadState({
         party: [char1, char2],
-        worldDescription: 'test', sessionLogs: [], quests: [], lore: [], actionQueue: [],
-        combat: {
+        worldDescription: 'test', sessionLogs: [], quests: [], lore: [], combat: {
           isActive: true, round: 1, turnIndex: 0,
           initiative: [
             { id: 'char-1', name: 'Alice', initiative: 20, type: 'player', isDead: false, hasActedThisTurn: false },
@@ -1854,8 +1852,7 @@ describe('MockMCPServer', () => {
       char.conditions = [{ id: 'haste', source: 'spell', duration: 5, onRemove: { kind: 'acBonus', value: acBonus } }];
       server.loadState({
         party: [char],
-        worldDescription: 'test', sessionLogs: [], quests: [], lore: [], actionQueue: [],
-      });
+        worldDescription: 'test', sessionLogs: [], quests: [], lore: [], });
       const result = await server.long_rest();
       expect(result.success).toBe(true);
       expect(char.conditions).toEqual([]);
@@ -1867,8 +1864,7 @@ describe('MockMCPServer', () => {
       char.conditions = [{ id: 'blinded', source: 'test', duration: 5 }];
       server.loadState({
         party: [char],
-        worldDescription: 'test', sessionLogs: [], quests: [], lore: [], actionQueue: [],
-        combat: {
+        worldDescription: 'test', sessionLogs: [], quests: [], lore: [], combat: {
           isActive: true, round: 1, turnIndex: 0,
           initiative: [{ id: 'c1', name: 'Hero', initiative: 15, type: 'player', isDead: false, hasActedThisTurn: false }],
           enemies: [],

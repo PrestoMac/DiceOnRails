@@ -41,15 +41,15 @@ describe('<OnboardingTour>', () => {
   it('renders the combat step when combatActive is true (extra step)', () => {
     const onDismiss = vi.fn();
     const { getByText, rerender } = render(<OnboardingTour active={true} onDismiss={onDismiss} />);
-    // base step count (solo: queue step hidden)
+    // base step count (solo: "Take the Turn" step hidden)
     expect(getByText(/1 \//).textContent).toContain('1 / 4');
     rerender(<OnboardingTour active={true} combatActive onDismiss={onDismiss} />);
     expect(getByText(/1 \//).textContent).toContain('1 / 5');
   });
 
-  it('includes the Action Queue step only when multiplayer is true', () => {
+  it('includes the "Take the Turn" step only when multiplayer is true', () => {
     const onDismiss = vi.fn();
-    // multiplayer: queue step restored (5 base steps)
+    // multiplayer: batch step restored (5 base steps)
     const { getByText, rerender } = render(<OnboardingTour active={true} multiplayer onDismiss={onDismiss} />);
     expect(getByText(/1 \//).textContent).toContain('1 / 5');
     // multiplayer + combat: 6 steps

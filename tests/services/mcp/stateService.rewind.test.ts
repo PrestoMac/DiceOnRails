@@ -37,8 +37,7 @@ function makeState(): GameState {
     sessionLogs: [],
     quests: [],
     lore: [],
-    actionQueue: [],
-  } as unknown as GameState;
+    } as unknown as GameState;
 }
 
 function userMsg(text: string): Message {

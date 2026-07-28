@@ -10,7 +10,6 @@ function makeState(overrides: Partial<GameState> = {}): GameState {
     sessionLogs: [],
     quests: [],
     lore: [],
-    actionQueue: [],
     ...overrides,
   };
 }

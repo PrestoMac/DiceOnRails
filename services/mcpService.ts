@@ -63,7 +63,6 @@ export class MockMCPServer {
       quests: [],
       lore: [],
       currentAtmosphereUrl: undefined as string | undefined,
-      actionQueue: [],
       startingLocation: undefined,
       locationImages: {}
     };

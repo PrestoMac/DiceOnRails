@@ -27,8 +27,7 @@ const wizard: Character = {
 
 const baseState: GameState = {
   party: [fighter, wizard],
-  worldDescription: 'A tavern', sessionLogs: [], quests: [], lore: [], actionQueue: [],
-} as GameState;
+  worldDescription: 'A tavern', sessionLogs: [], quests: [], lore: [], } as GameState;
 
 const mcpServerMock = {
   getTarget: vi.fn(),

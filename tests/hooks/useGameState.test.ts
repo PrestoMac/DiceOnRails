@@ -58,7 +58,7 @@ describe('useGameState', () => {
     vi.clearAllMocks();
     mockGetFullState.mockReturnValue({
       party: [], worldDescription: 'Initial', sessionLogs: [],
-      quests: [], lore: [], actionQueue: [], isProcessing: false,
+      quests: [], lore: [], isProcessing: false,
     });
   });
 
@@ -74,7 +74,7 @@ describe('useGameState', () => {
       data: {
         campaignName: 'Test Camp',
         messages: [],
-        gameState: { party: [], worldDescription: 'Loaded', sessionLogs: [], quests: [], lore: [], actionQueue: [] },
+        gameState: { party: [], worldDescription: 'Loaded', sessionLogs: [], quests: [], lore: [], },
         stage: AppStage.PLAY,
       },
       error: null,
@@ -135,8 +135,7 @@ describe('useGameState', () => {
   it('resetGame resets mcpServer and goes to START_MODE (quick-start decision)', async () => {
     mockGetFullState.mockReturnValue({
       party: [], worldDescription: 'Reset', sessionLogs: [],
-      quests: [], lore: [], actionQueue: [],
-    });
+      quests: [], lore: [], });
 
     const { result } = renderHook(() => useGameState('user-1'));
 
@@ -152,8 +151,7 @@ describe('useGameState', () => {
   it('resetGame clears local save for anonymous users', async () => {
     mockGetFullState.mockReturnValue({
       party: [], worldDescription: 'Reset', sessionLogs: [],
-      quests: [], lore: [], actionQueue: [],
-    });
+      quests: [], lore: [], });
 
     const { result } = renderHook(() => useGameState(undefined));
 
@@ -169,8 +167,7 @@ describe('useGameState', () => {
   it('syncState calls setGameState with mcpServer state', () => {
     mockGetFullState.mockReturnValue({
       party: [], worldDescription: 'Synced', sessionLogs: [],
-      quests: [], lore: [], actionQueue: [],
-    });
+      quests: [], lore: [], });
 
     const { result } = renderHook(() => useGameState(undefined));
 
@@ -184,8 +181,7 @@ describe('useGameState', () => {
   it('handleUpdateInventory updates inventory and syncs', () => {
     mockGetFullState.mockReturnValue({
       party: [], worldDescription: 'test', sessionLogs: [],
-      quests: [], lore: [], actionQueue: [],
-    });
+      quests: [], lore: [], });
 
     const { result } = renderHook(() => useGameState(undefined));
     const newInv = [{ name: 'Sword', quantity: 1 }];
@@ -201,8 +197,7 @@ describe('useGameState', () => {
   it('handleUpdateInventory persists for anonymous campaigns via syncCampaignState', async () => {
     mockGetFullState.mockReturnValue({
       party: [], worldDescription: 'test', sessionLogs: [],
-      quests: [], lore: [], actionQueue: [],
-    });
+      quests: [], lore: [], });
 
     const { result } = renderHook(() => useGameState(undefined));
     act(() => { result.current.setCurrentCampaignId('anonymous'); });
@@ -217,8 +212,7 @@ describe('useGameState', () => {
   it('handleUpdateCurrency persists for anonymous campaigns via syncCampaignState', async () => {
     mockGetFullState.mockReturnValue({
       party: [], worldDescription: 'test', sessionLogs: [],
-      quests: [], lore: [], actionQueue: [],
-    });
+      quests: [], lore: [], });
 
     const { result } = renderHook(() => useGameState(undefined));
     act(() => { result.current.setCurrentCampaignId('anonymous'); });
@@ -233,8 +227,7 @@ describe('useGameState', () => {
   it('handleUpdateCurrency updates currency and syncs', () => {
     mockGetFullState.mockReturnValue({
       party: [], worldDescription: 'test', sessionLogs: [],
-      quests: [], lore: [], actionQueue: [],
-    });
+      quests: [], lore: [], });
 
     const { result } = renderHook(() => useGameState(undefined));
     const newCurrency = { gp: 50, sp: 0, cp: 0 };
@@ -264,8 +257,7 @@ describe('useGameState', () => {
     vi.mocked(generateAtmosphere).mockResolvedValue('https://example.com/atmo.png');
     mockGetFullState.mockReturnValue({
       party: [], worldDescription: 'test', sessionLogs: [],
-      quests: [], lore: [], actionQueue: [],
-    });
+      quests: [], lore: [], });
 
     const { result } = renderHook(() => useGameState(undefined));
 

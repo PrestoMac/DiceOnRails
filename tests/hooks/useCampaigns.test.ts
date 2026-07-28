@@ -15,8 +15,7 @@ vi.mock('../../services/mcpService', () => ({
     reset: vi.fn(),
     getFullState: vi.fn(() => ({
       party: [], worldDescription: '', sessionLogs: [],
-      quests: [], lore: [], actionQueue: [],
-    })),
+      quests: [], lore: [], })),
   },
 }));
 
@@ -33,8 +32,7 @@ import { resetRewindGeneration } from '../../services/rewindGeneration';
 
 const freshGameState = (): GameState => ({
   party: [], worldDescription: '', sessionLogs: [],
-  quests: [], lore: [], actionQueue: [],
-} as unknown as GameState);
+  quests: [], lore: [], } as unknown as GameState);
 
 describe('useCampaigns', () => {
   const setStage = vi.fn();
@@ -236,7 +234,6 @@ describe('useCampaigns', () => {
     // Restore default mock for subsequent tests.
     vi.mocked(mcpServer.getFullState).mockReturnValue({
       party: [], worldDescription: '', sessionLogs: [],
-      quests: [], lore: [], actionQueue: [],
-    });
+      quests: [], lore: [], });
   });
 });

@@ -68,7 +68,6 @@ export function createStateService(state: GameState): StateService {
       if (!state.lore) state.lore = [];
       if (!state.sessionLogs) state.sessionLogs = [];
       if (!state.worldDescription) state.worldDescription = "You gather at The Rusty Tankard...";
-      if (!state.actionQueue) state.actionQueue = [];
       if (!state.locationImages) state.locationImages = {};
       if (!('lastSuggestions' in savedState)) {
         state.lastSuggestions = undefined;
@@ -89,7 +88,6 @@ export function createStateService(state: GameState): StateService {
         quests: [],
         lore: [],
         currentAtmosphereUrl: undefined as string | undefined,
-        actionQueue: [],
         startingLocation: undefined,
         locationImages: {},
         gameTime: 0,

@@ -82,19 +82,16 @@ export interface Message {
   toolCallId?: string;
   rollData?: RollData | RollData[];
   toolCalls?: Array<{ id: string; name: string; arguments: string }>;
-}
-
-/** An action queued by a player, pending execution. */
-export interface QueuedAction {
-  id: string;
-  playerId: string;
-  playerName: string;
-  /** The Supabase user id of the human who queued this action (audit trail). */
-  userId?: string;
-  avatarUrl?: string;
-  text: string;
-  type: 'action' | 'dialogue';
-  timestamp: number;
+  /** Multiplayer only: when true, the message is held in the chat as a pending
+   *  batch entry and has NOT yet been sent to the LLM. `handleProcessBatch`
+   *  flips this to false (promoting the message into chat history) when the
+   *  batch runs. Filtered out of LLM context. Removable by its owner until
+   *  processing starts. */
+  pending?: boolean;
+  /** Marks the MODEL narration that concludes a collaborative batch turn, so
+   *  that handleRewind can route a retry back to handleProcessBatch instead of
+   *  the solo handleSendMessage retry path. */
+  batchTurn?: boolean;
 }
 
 /** A full snapshot of game state for save/load operations. */

@@ -7,7 +7,6 @@ export function makeGameState(overrides: Partial<GameState> = {}): GameState {
     sessionLogs: [],
     quests: [],
     lore: [],
-    actionQueue: [],
     ...overrides,
   };
 }

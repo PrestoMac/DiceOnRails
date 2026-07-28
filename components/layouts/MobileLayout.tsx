@@ -7,7 +7,6 @@ import { useAuthContext } from '../../contexts/AuthContext';
 import { AppStage, Character, InventoryItem } from '../../types';
 import { isSyncableCampaign } from '../../utils/campaign';
 import ChatLog from '../ChatLog';
-import ActionQueuePanel from '../ActionQueuePanel';
 import InputArea from '../InputArea';
 import CharacterSheet from '../CharacterSheet';
 import Journal from '../Journal';
@@ -16,8 +15,10 @@ import CombatTracker from '../CombatTracker';
 import BattleMapPanel from '../BattleMapPanel';
 import ActivityBell from '../shared/ActivityBell';
 import HpBar from '../shared/HpBar';
+import TypingIndicator from '../shared/TypingIndicator';
 import { useActivityTracking } from '../../hooks/useActivityTracking';
 import { useOnboarding } from '../../hooks/useOnboarding';
+import { usePresence } from '../../hooks/usePresence';
 import { calculateAc } from '../../services/classEngine';
 import { formatGameTime } from '../../utils/timeUtils';
 import { mcpServer } from '../../services/mcpService';
@@ -46,10 +47,9 @@ const MobileLayout: React.FC = () => {
     stage, currentCampaignId, hostId, gameState, messages,
     isLoading, myCharacterId, viewingCharacterId, setViewingCharacterId,
     setStage, resetGame, handleUpdateInventory, handleUpdateCharacterFields,
-    handleEnqueueAction, handleRemoveQueueItem, handleUpdateQueueItem,
-    handleReorderQueue, syncState,
+    syncState,
   } = useGameContext();
-  const { handleSendMessage, handleUndo, handleRewind, handleExecuteBatch, handleResolveEnemyTurn, handleArcaneRecovery, handleManageSpellbook, handleSwapKnownSpell } = useActionsContext();
+  const { handleSendMessage, handleUndo, handleRewind, handleProcessBatch, handleRemovePendingMessage, handleResolveEnemyTurn, handleArcaneRecovery, handleManageSpellbook, handleSwapKnownSpell } = useActionsContext();
   const {
     showLevelUpModal, levelUpCharacter, selectedAllocations, remainingPoints,
     previewHp, allocationError, handleOpenLevelUp, handleCloseLevelUp,
@@ -69,6 +69,7 @@ const MobileLayout: React.FC = () => {
   }, [gameState.currentAtmosphereUrl]);
 
   const [showQueue, setShowQueue] = useState(false);
+  void showQueue; void setShowQueue; // legacy state retained for ref stability; queue UI removed
   const [isScrolledUp, setIsScrolledUp] = useState(false);
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const handleChatScroll = useCallback(() => {
@@ -80,8 +81,11 @@ const MobileLayout: React.FC = () => {
   const isMultiplayer = gameState.party.length > 1;
   const isHost = !!userId && userId === hostId;
   const handleBackOrReset = () => userId ? confirm('Return to dashboard?') && setStage(AppStage.DASHBOARD) : confirm('Are you sure you want to reset the game? All progress will be lost.') && resetGame();
-  const queueLen = gameState.actionQueue?.length || 0;
   const { recentActivity } = useActivityTracking(gameState, messages, userId);
+
+  // Multiplayer presence (typing indicators). Skipped for solo / anonymous hot-seat.
+  const myCharacterForPresence = isMultiplayer ? (charToShow ?? gameState.party[0]) : undefined;
+  const { typingUsers, setTyping } = usePresence(currentCampaignId, userId, isMultiplayer, myCharacterForPresence);
 
   // --- VTT Battle Map handlers ---
 
@@ -174,7 +178,7 @@ const MobileLayout: React.FC = () => {
             {gameState.currentAtmosphereUrl?<img src={gameState.currentAtmosphereUrl} alt="Atmosphere" className="w-full h-full object-cover opacity-70" onClick={()=>setIsAtmosphereExpanded(true)}/>:<div className="w-full h-full flex items-center justify-center text-stone-700"><i className="fas fa-compass text-2xl"></i></div>}
             <div className="absolute bottom-2 left-3 flex items-center gap-2"><div className="bg-stone-950/70 backdrop-blur-sm px-2 py-0.5 rounded-full flex items-center gap-1.5 border border-stone-800/50"><i className="fas fa-eye text-amber-600/60 text-[10px]"></i><span className="fantasy-font text-stone-300 text-xs tracking-widest uppercase text-shadow-sm leading-tight line-clamp-2">{gameState.party[0]?.location||"Unknown"}</span></div></div>
           </div>}
-          <div ref={chatScrollRef} onScroll={handleChatScroll} className="flex-1 overflow-y-auto relative"><ChatLog messages={messages} settings={settings} onRewind={handleRewind} onUndo={handleUndo} isProcessing={isLoading} scrollRef={chatScrollRef} onScrollChange={setIsScrolledUp} disableInternalScroll showWelcomeChips={onboarding.shouldShowWelcomeChips} onPrefillInput={(text) => { onboarding.markWelcomeSeen(); handleSendMessage(text); }} suggestions={settings.enableSuggestions && !gameState.isProcessing ? pickSuggestionsForCharacter(gameState, myCharacterId) : undefined} onPickSuggestion={(text) => handleSendMessage(text)} onDismissSuggestion={() => { if (myCharacterId && gameState.lastSuggestionsByCharacter) { const updated = { ...gameState.lastSuggestionsByCharacter }; delete updated[myCharacterId]; mcpServer.setLastSuggestionsByCharacter(updated); } else { mcpServer.setLastSuggestions([]); } syncState(); }} portraitMap={gameState.party.reduce((m, c) => { if (c.portraitUrl) m[c.id] = c.portraitUrl; return m; }, {} as Record<string, string>)} /></div>
+          <div ref={chatScrollRef} onScroll={handleChatScroll} className="flex-1 overflow-y-auto relative"><ChatLog messages={messages} settings={settings} onRewind={handleRewind} onUndo={handleUndo} isProcessing={isLoading} scrollRef={chatScrollRef} onScrollChange={setIsScrolledUp} disableInternalScroll showWelcomeChips={onboarding.shouldShowWelcomeChips} onPrefillInput={(text) => { onboarding.markWelcomeSeen(); handleSendMessage(text); }} suggestions={settings.enableSuggestions && !gameState.isProcessing ? pickSuggestionsForCharacter(gameState, myCharacterId) : undefined} onPickSuggestion={(text) => handleSendMessage(text)} onDismissSuggestion={() => { if (myCharacterId && gameState.lastSuggestionsByCharacter) { const updated = { ...gameState.lastSuggestionsByCharacter }; delete updated[myCharacterId]; mcpServer.setLastSuggestionsByCharacter(updated); } else { mcpServer.setLastSuggestions([]); } syncState(); }} portraitMap={gameState.party.reduce((m, c) => { if (c.portraitUrl) m[c.id] = c.portraitUrl; return m; }, {} as Record<string, string>)} isMultiplayer={isMultiplayer} myCharacterId={myCharacterId} pendingCount={messages.filter(m => m.pending).length} onProcessBatch={handleProcessBatch} onRemovePendingMessage={handleRemovePendingMessage} /></div>
           <button
             onClick={()=>{if(chatScrollRef.current)chatScrollRef.current.scrollTop=chatScrollRef.current.scrollHeight;}}
             className={`absolute right-3 top-1/2 -translate-y-1/2 z-40 w-9 h-9 rounded-full bg-stone-800/80 hover:bg-amber-700/70 text-stone-400 hover:text-amber-300 shadow-lg border border-stone-700/40 hover:border-amber-600/50 transition-all duration-300 flex items-center justify-center ${isScrolledUp?'opacity-100 scale-100':'opacity-0 scale-75 pointer-events-none'}`}
@@ -182,12 +186,9 @@ const MobileLayout: React.FC = () => {
           >
             <i className="fas fa-arrow-down text-xs"></i>
           </button>
-          {isMultiplayer&&showQueue&&<div className="absolute inset-0 z-30 flex flex-col" style={{top:'0'}}><div className="flex-1 bg-black/40 backdrop-blur-sm" onClick={()=>setShowQueue(false)}></div><div className="h-[70vh] bg-stone-900 border-t border-stone-800 rounded-t-2xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300"><div className="flex items-center justify-between px-4 py-3 border-b border-stone-800 shrink-0"><span className="text-xs uppercase font-bold tracking-widest text-stone-400">Action Queue</span><button onClick={()=>setShowQueue(false)} className="p-1 hover:bg-stone-800 rounded text-stone-500 hover:text-stone-300 transition-colors"><i className="fas fa-chevron-down text-sm"></i></button></div><div className="flex-1 overflow-y-auto p-2"><ActionQueuePanel queue={gameState.actionQueue||[]} userId={userId} onRemove={handleRemoveQueueItem} onUpdate={handleUpdateQueueItem} onReorder={handleReorderQueue} onExecute={handleExecuteBatch} isProcessing={gameState.isProcessing}/></div></div></div>}
-          {isMultiplayer && <div className="p-2 border-t border-stone-800 bg-stone-900 flex gap-2 overflow-x-auto">
-            <button onClick={()=>setShowQueue(!showQueue)} className={`px-3 py-1 rounded text-[10px] font-bold uppercase tracking-wider whitespace-nowrap border transition-all ${showQueue?'bg-amber-900 border-amber-700 text-amber-100':'bg-stone-800 border-stone-700 text-stone-400'}${queueLen>0?' animate-glow-pulse':''}`}><i className="fas fa-layer-group mr-1"></i> Queue ({queueLen})</button>
-          </div>}
-          {charToShow&&!showQueue&&<HpStatusBar character={charToShow} />}
-          {!showQueue&&<InputArea onSendMessage={handleSendMessage} onQueueAction={(t: string, ty: 'action'|'dialogue') => handleEnqueueAction(t, ty)} onResolveEnemyTurn={handleResolveEnemyTurn} isLoading={isLoading||gameState.isProcessing===true} combat={gameState.combat} character={charToShow} isMultiplayer={isMultiplayer} onArcaneRecovery={(id, sel) => handleArcaneRecovery(id, sel)} onManageSpellbook={handleManageSpellbook} onSwapKnownSpell={handleSwapKnownSpell}/>}
+          {isMultiplayer && typingUsers.length > 0 && <TypingIndicator users={typingUsers} />}
+          {charToShow&&<HpStatusBar character={charToShow} />}
+          <InputArea onSendMessage={handleSendMessage} onResolveEnemyTurn={handleResolveEnemyTurn} isLoading={isLoading||gameState.isProcessing===true} combat={gameState.combat} character={charToShow} onInputChanged={(v)=>setTyping(v.length>0)} onArcaneRecovery={(id, sel) => handleArcaneRecovery(id, sel)} onManageSpellbook={handleManageSpellbook} onSwapKnownSpell={handleSwapKnownSpell}/>
         </>}
         {mobileTab==='character'&&<div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
           {isMultiplayer && <div className="flex gap-2 overflow-x-auto pb-2 mb-2">{gameState.party.map((char: Character) => <button key={char.id} onClick={() => setViewingCharacterId(char.id)} className={`p-2 rounded text-xs whitespace-nowrap ${viewingCharacterId===char.id?'bg-amber-700 text-white':'bg-stone-800 text-stone-400'}`}>{char.name}{char.id===myCharacterId?' (You)':''}</button>)}</div>}

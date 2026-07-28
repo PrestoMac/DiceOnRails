@@ -93,7 +93,7 @@ function makeBaseState(): GameState {
       resources: [], knownSpells: [], preparedSpells: [], racialTraits: [], unlockedSubclassFeatures: [],
     }],
     worldDescription: 'A dark tavern',
-    sessionLogs: [], quests: [], lore: [], actionQueue: [],
+    sessionLogs: [], quests: [], lore: [],
     isProcessing: false,
   };
 }
@@ -170,7 +170,8 @@ describe('useGameActions', () => {
   it('returns handler functions', () => {
     const { result } = render();
     expect(result.current.handleSendMessage).toBeDefined();
-    expect(result.current.handleExecuteBatch).toBeDefined();
+    expect(result.current.handleProcessBatch).toBeDefined();
+    expect(result.current.handleRemovePendingMessage).toBeDefined();
     expect(result.current.handleCharacterCreated).toBeDefined();
     expect(result.current.handleUndo).toBeDefined();
     expect(result.current.handleRewind).toBeDefined();
@@ -713,34 +714,73 @@ describe('useGameActions', () => {
     });
   });
 
-  it('handleExecuteBatch returns early when queue is empty', async () => {
-    const { result } = render();
-    await act(async () => { await result.current.handleExecuteBatch(); });
-    expect(setIsLoading).not.toHaveBeenCalled();
-  });
+  describe('handleProcessBatch (multiplayer pending-batch)', () => {
+    function makeMultiplayerState(): GameState {
+      return {
+        ...makeBaseState(),
+        party: [
+          ...makeBaseState().party,
+          {
+            id: 'hero-2', name: 'Cleric', class: 'Cleric', race: 'Human', level: 1,
+            hp: { current: 10, max: 10 },
+            stats: { str: 10, dex: 10, con: 12, int: 13, wis: 16, cha: 12 },
+            inventory: [], currency: { gp: 0, sp: 0, cp: 0 },
+            location: 'Tavern', experience: 0, experienceToNextLevel: 300,
+            unusedStatPoints: 0, maxHpBonus: 0, hitDice: { current: 1, max: 1 },
+            resources: [], knownSpells: [], preparedSpells: [], racialTraits: [], unlockedSubclassFeatures: [],
+          },
+        ],
+      };
+    }
 
-  it('handleExecuteBatch processes queue when items exist', async () => {
-    const stateWithQueue = {
-      ...makeBaseState(),
-      actionQueue: [
-        { id: 'a1', playerId: 'p1', playerName: 'Player', text: 'I attack', type: 'action' as const, timestamp: 0 },
-      ],
-    };
-
-    const { result } = renderHook(() => useGameActions(
-      stateWithQueue, setGameState, [], setMessages,
-      'camp-1', 'user-1', 'hero-1', defaultProps.settings,
-      setIsLoading, onCloseLevelUp, syncState, performAtmosphereUpdate,
-      setStage, setViewingCharacterId, setMyCharacterId,
-      false, undefined, setIsNewCampaign, getSenderName, undefined,
-    ));
-
-    await act(async () => {
-      await result.current.handleExecuteBatch();
+    it('handleProcessBatch returns early in solo (party.length <= 1)', async () => {
+      const { result } = render();
+      await act(async () => { await result.current.handleProcessBatch(); });
+      expect(setIsLoading).not.toHaveBeenCalled();
     });
 
-    expect(setIsLoading).toHaveBeenCalledWith(true);
-    expect(mockRunAgentLoop).toHaveBeenCalled();
+    it('handleProcessBatch returns early when no pending messages', async () => {
+      const mp = makeMultiplayerState();
+      const { result } = renderHook(() => useGameActions(
+        mp, setGameState, [], setMessages,
+        undefined, undefined, 'hero-1', defaultProps.settings,
+        setIsLoading, onCloseLevelUp, syncState, performAtmosphereUpdate,
+        setStage, setViewingCharacterId, setMyCharacterId,
+        false, undefined, setIsNewCampaign, getSenderName, undefined,
+      ));
+      await act(async () => { await result.current.handleProcessBatch(); });
+      expect(setIsLoading).not.toHaveBeenCalled();
+    });
+
+    it('handleProcessBatch promotes pending messages and runs the agent loop', async () => {
+      const mp = makeMultiplayerState();
+      const pendingMsgs: import('../../types').Message[] = [
+        { id: 'p1', role: MessageRole.USER, text: 'I attack', senderName: 'Hero', characterId: 'hero-1', timestamp: 0, pending: true },
+        { id: 'p2', role: MessageRole.USER, text: 'I heal', senderName: 'Cleric', characterId: 'hero-2', timestamp: 1, pending: true },
+      ];
+
+      const { result } = renderHook(() => useGameActions(
+        mp, setGameState, pendingMsgs, setMessages,
+        undefined, undefined, 'hero-1', defaultProps.settings,
+        setIsLoading, onCloseLevelUp, syncState, performAtmosphereUpdate,
+        setStage, setViewingCharacterId, setMyCharacterId,
+        false, undefined, setIsNewCampaign, getSenderName, undefined,
+      ));
+
+      await act(async () => {
+        await result.current.handleProcessBatch();
+      });
+
+      expect(setIsLoading).toHaveBeenCalledWith(true);
+      expect(mockRunAgentLoop).toHaveBeenCalled();
+      // The synthetic batch user message text should include both players' inputs.
+      const callArgs = mockRunAgentLoop.mock.calls[0];
+      const history = callArgs[0] as import('../../types').Message[];
+      const batchUserMsg = history.find(m => m.text.startsWith('[Collaborative Turn]'));
+      expect(batchUserMsg).toBeDefined();
+      expect(batchUserMsg?.text).toContain('[Hero]: I attack');
+      expect(batchUserMsg?.text).toContain('[Cleric]: I heal');
+    });
   });
 
   it('handleSendMessage rolls back on error', async () => {
@@ -755,63 +795,16 @@ describe('useGameActions', () => {
     expect(setIsLoading).toHaveBeenCalledWith(false);
   });
 
-  describe('rewind queue preservation (multiplayer)', () => {
+  describe('rewind (multiplayer batch restore)', () => {
     afterEach(() => {
       defaultProps.currentCampaignId = undefined;
       defaultProps.userId = undefined;
     });
 
-    it('handleRewind preserves concurrently-added queue items from other players', async () => {
-      const liveState: GameState = {
-        ...makeBaseState(),
-        actionQueue: [
-          { id: 'B1', playerId: 'p2', playerName: 'Player B', text: 'I heal', type: 'action', timestamp: 0 },
-        ],
-      };
-      const snapshotState: GameState = {
-        ...makeBaseState(),
-        actionQueue: [
-          { id: 'A1', playerId: 'p1', playerName: 'Player A', text: 'I attack', type: 'action', timestamp: 0 },
-          { id: 'A2', playerId: 'p1', playerName: 'Player A', text: 'I move', type: 'action', timestamp: 1 },
-        ],
-      };
+    it('handleUndo restores messages from a solo snapshot (strips trailing user msg)', async () => {
+      const snapshotState: GameState = { ...makeBaseState() };
 
-      let mockState = liveState;
-      mcpServerMock.getFullState.mockImplementation(() => mockState);
-      mcpServerMock.restoreSnapshot.mockImplementation((snap: GameState) => { mockState = deepClone(snap); });
-      mcpServerMock.loadState.mockImplementation((s: GameState) => { mockState = s; });
-      mcpServerMock.loadRewindPoint.mockReturnValue({
-        gameState: deepClone(snapshotState),
-        messages: [
-          { id: 'batch-msg', role: MessageRole.USER, text: '[Collaborative Turn]\n[A]: I attack\n[A]: I move', timestamp: 0 },
-        ],
-      });
-
-      defaultProps.currentCampaignId = 'camp-mp-1';
-      defaultProps.userId = 'user-1';
-
-      const { result } = render();
-
-      await act(async () => {
-        await result.current.handleUndo();
-      });
-
-      const loadStateCalls = vi.mocked(mcpServerMock.loadState).mock.calls;
-      const mergedCall = loadStateCalls.find(([s]) => {
-        const queue = (s as GameState).actionQueue ?? [];
-        return queue.some(q => q.id === 'B1');
-      });
-      expect(mergedCall).toBeDefined();
-      if (!mergedCall) return;
-      const mergedQueue = (mergedCall[0] as GameState).actionQueue ?? [];
-      expect(mergedQueue.map(q => q.id).sort()).toEqual(['A1', 'A2', 'B1']);
-    });
-
-    it('handleRewind with no concurrent queue items does not add phantom items (solo regression)', async () => {
-      const liveState: GameState = { ...makeBaseState(), actionQueue: [] };
-      const snapshotState: GameState = { ...makeBaseState(), actionQueue: [] };
-
-      let mockState = liveState;
+      let mockState = snapshotState;
       mcpServerMock.getFullState.mockImplementation(() => mockState);
       mcpServerMock.restoreSnapshot.mockImplementation((snap: GameState) => { mockState = deepClone(snap); });
       mcpServerMock.loadState.mockImplementation((s: GameState) => { mockState = s; });
@@ -828,7 +821,43 @@ describe('useGameActions', () => {
         await result.current.handleUndo();
       });
 
-      expect(mockState.actionQueue).toEqual([]);
+      // setMessages should have been called with an empty array (the user msg stripped).
+      const setMessagesCalls = vi.mocked(setMessages).mock.calls;
+      expect(setMessagesCalls.length).toBeGreaterThan(0);
+      expect(setMessagesCalls[0][0]).toEqual([]);
+    });
+
+    it('handleUndo restores a batch snapshot keeping pending messages', async () => {
+      // Batch snapshots store messages with pending: true on the trailing
+      // entries. Undo must restore ALL of them (no slice) so the player can
+      // re-edit / re-process.
+      const snapshotState: GameState = { ...makeBaseState() };
+
+      let mockState = snapshotState;
+      mcpServerMock.getFullState.mockImplementation(() => mockState);
+      mcpServerMock.restoreSnapshot.mockImplementation((snap: GameState) => { mockState = deepClone(snap); });
+      mcpServerMock.loadState.mockImplementation((s: GameState) => { mockState = s; });
+      mcpServerMock.loadRewindPoint.mockReturnValue({
+        gameState: deepClone(snapshotState),
+        messages: [
+          { id: 'm1', role: MessageRole.MODEL, text: 'Earlier narration', timestamp: 0 },
+          { id: 'p1', role: MessageRole.USER, text: 'I attack', senderName: 'Hero', timestamp: 1, pending: true },
+          { id: 'p2', role: MessageRole.USER, text: 'I heal', senderName: 'Cleric', timestamp: 2, pending: true },
+        ],
+      });
+
+      const { result } = render();
+
+      await act(async () => {
+        await result.current.handleUndo();
+      });
+
+      const setMessagesCalls = vi.mocked(setMessages).mock.calls;
+      const lastCall = setMessagesCalls[setMessagesCalls.length - 1][0] as import('../../types').Message[];
+      // All three messages restored verbatim — no slice.
+      expect(lastCall.map(m => m.id)).toEqual(['m1', 'p1', 'p2']);
+      expect(lastCall[1].pending).toBe(true);
+      expect(lastCall[2].pending).toBe(true);
     });
   });
 
@@ -882,20 +911,34 @@ describe('useGameActions', () => {
       expect(storageService.isCampaignProcessing).not.toHaveBeenCalled();
     });
 
-    it('handleExecuteBatch aborts when remote campaign is processing', async () => {
+    it('handleProcessBatch aborts when remote campaign is processing', async () => {
       vi.mocked(storageService.isCampaignProcessing).mockResolvedValue(true);
       defaultProps.currentCampaignId = 'camp-mp-1';
       defaultProps.userId = 'user-1';
 
-      const stateWithQueue = {
+      // Multiplayer state with a pending message — without pending the batch
+      // path returns early before the remote-processing check fires.
+      const mp: GameState = {
         ...makeBaseState(),
-        actionQueue: [
-          { id: 'a1', playerId: 'p1', playerName: 'Player', text: 'I attack', type: 'action' as const, timestamp: 0 },
+        party: [
+          ...makeBaseState().party,
+          {
+            id: 'hero-2', name: 'Cleric', class: 'Cleric', race: 'Human', level: 1,
+            hp: { current: 10, max: 10 },
+            stats: { str: 10, dex: 10, con: 12, int: 13, wis: 16, cha: 12 },
+            inventory: [], currency: { gp: 0, sp: 0, cp: 0 },
+            location: 'Tavern', experience: 0, experienceToNextLevel: 300,
+            unusedStatPoints: 0, maxHpBonus: 0, hitDice: { current: 1, max: 1 },
+            resources: [], knownSpells: [], preparedSpells: [], racialTraits: [], unlockedSubclassFeatures: [],
+          },
         ],
       };
+      const pendingMsgs: import('../../types').Message[] = [
+        { id: 'p1', role: MessageRole.USER, text: 'I attack', senderName: 'Hero', characterId: 'hero-1', timestamp: 0, pending: true },
+      ];
 
       const { result } = renderHook(() => useGameActions(
-        stateWithQueue, setGameState, [], setMessages,
+        mp, setGameState, pendingMsgs, setMessages,
         'camp-mp-1', 'user-1', 'hero-1', defaultProps.settings,
         setIsLoading, onCloseLevelUp, syncState, performAtmosphereUpdate,
         setStage, setViewingCharacterId, setMyCharacterId,
@@ -903,7 +946,7 @@ describe('useGameActions', () => {
       ));
 
       await act(async () => {
-        await result.current.handleExecuteBatch();
+        await result.current.handleProcessBatch();
       });
 
       expect(storageService.isCampaignProcessing).toHaveBeenCalledWith('camp-mp-1');

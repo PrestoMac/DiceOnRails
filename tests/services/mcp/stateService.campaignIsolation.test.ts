@@ -19,8 +19,7 @@ function makeBaseState(): GameState {
     sessionLogs: [],
     quests: [],
     lore: [],
-    actionQueue: [],
-  } as unknown as GameState;
+    } as unknown as GameState;
 }
 
 describe('stateService.loadState campaign isolation', () => {
