@@ -163,7 +163,7 @@ const MobileLayout: React.FC = () => {
           {typeof gameState.gameTime === 'number' && !isNaN(gameState.gameTime) && (() => {
             const info = formatGameTime(gameState.gameTime);
             return (
-              <span className="text-[10px] text-stone-500">{info.time}</span>
+              <span className="text-[10px] text-stone-500">{info.period}</span>
             );
           })()}
           <button onClick={handleBackOrReset} className="p-2 hover:bg-stone-900 rounded-lg text-stone-400 transition-colors"><i className={`fas ${userId?'fa-arrow-left':'fa-undo'} text-lg`}></i></button>

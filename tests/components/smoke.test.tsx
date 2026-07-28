@@ -247,7 +247,7 @@ describe('Component Smoke Tests', () => {
     it('renders input and submit button', () => {
       render(<InputArea onSendMessage={() => {}} isLoading={false} />);
       expect(screen.getByPlaceholderText(/What do you do/i)).toBeInTheDocument();
-      expect(screen.getByText(/Act Now/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Act Now/i })).toBeInTheDocument();
     });
 
     it('sends message on submit', () => {
@@ -255,7 +255,7 @@ describe('Component Smoke Tests', () => {
       render(<InputArea onSendMessage={onSend} isLoading={false} />);
       const input = screen.getByPlaceholderText(/What do you do/i);
       fireEvent.change(input, { target: { value: 'Attack the dragon' } });
-      fireEvent.click(screen.getByText(/Act Now/i));
+      fireEvent.click(screen.getByRole('button', { name: /Act Now/i }));
       expect(onSend).toHaveBeenCalledWith('Attack the dragon');
     });
 

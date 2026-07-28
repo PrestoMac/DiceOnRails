@@ -318,24 +318,21 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onResolveEnemyTurn
           <input type="text" value={input} onChange={e => { setInput(e.target.value); onInputChanged?.(e.target.value); }}
             placeholder={isEnemyTurn ? "The enemy is acting..." : isLoading ? "The GM is narrating..." : "What do you do, adventurer?"}
             disabled={effectivelyLocked}
-            className={`w-full bg-stone-900 border rounded-lg px-4 py-3 pr-12 text-stone-100 focus:outline-none transition-all fantasy-font text-lg ${
+            className={`w-full bg-stone-900 border rounded-lg px-4 py-3 pr-10 text-stone-100 focus:outline-none transition-all fantasy-font text-lg ${
               isEnemyTurn ? 'border-red-900/50 focus:border-red-700' : 'border-stone-800 focus:border-amber-700'
             }`}
           />
-          <button type="button" onClick={toggleListening} disabled={effectivelyLocked} className={`absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full transition-all ${isListening ? 'text-red-500 bg-red-900/20 animate-pulse shadow-[0_0_10px_rgba(220,38,38,0.3)]' : 'text-stone-500 hover:text-amber-500 hover:bg-stone-800'}`} title={isListening ? "Stop Listening" : "Speak Action"}><i className={`fas ${isListening ? 'fa-microphone' : 'fa-microphone-lines'}`}></i></button>
+          <button type="button" onClick={toggleListening} disabled={effectivelyLocked} className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full transition-all ${isListening ? 'text-red-500 bg-red-900/20 animate-pulse shadow-[0_0_10px_rgba(220,38,38,0.3)]' : 'text-stone-500 hover:text-amber-500 hover:bg-stone-800'}`} title={isListening ? "Stop Listening" : "Speak Action"}><i className={`fas ${isListening ? 'fa-microphone' : 'fa-microphone-lines'} text-sm`}></i></button>
           </div>
-        </div>
-        <div className="flex gap-2 justify-end">
           {isEnemyTurn && onResolveEnemyTurn && (
-            <button type="button" onClick={onResolveEnemyTurn} disabled={isLoading} className="px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-2 bg-amber-600 hover:bg-amber-500 text-white shadow-lg shadow-amber-900/30 border border-amber-500/50 animate-pulse" title="Let the engine resolve the enemy's turn automatically">
-              <i className="fas fa-bolt"></i> Resolve Turn
+            <button type="button" onClick={onResolveEnemyTurn} disabled={isLoading} className="shrink-0 p-2.5 rounded-lg font-bold transition-all flex items-center justify-center bg-amber-600 hover:bg-amber-500 text-white shadow-lg shadow-amber-900/30 border border-amber-500/50 animate-pulse" title="Let the engine resolve the enemy's turn automatically">
+              <i className="fas fa-bolt"></i>
             </button>
           )}
-          <button type="submit" disabled={effectivelyLocked || !input.trim()} className={`px-6 py-2 rounded-lg font-bold transition-all flex items-center gap-2 ${btnCls(effectivelyLocked || !input.trim(), !isEnemyTurn, isEnemyTurn)}`}>
+          <button type="submit" disabled={effectivelyLocked || !input.trim()} aria-label={isEnemyTurn ? "Enemy's Turn" : "Act Now"} className={`shrink-0 p-2.5 rounded-lg font-bold transition-all flex items-center justify-center ${btnCls(effectivelyLocked || !input.trim(), !isEnemyTurn, isEnemyTurn)}`}>
             {isLoading ? <i className="fas fa-spinner animate-spin"></i> :
              isEnemyTurn ? <i className="fas fa-shield-halved"></i> :
              <i className="fas fa-feather-pointed"></i>}
-            <span className="hidden md:inline">{isEnemyTurn ? 'Enemy\'s Turn' : 'Act Now'}</span>
           </button>
         </div>
       </form>
