@@ -149,28 +149,30 @@ const MobileLayout: React.FC = () => {
 
   return (
     <div className="flex flex-col h-screen w-full relative overflow-hidden bg-stone-950">
-      <header className="h-14 min-h-[56px] border-b border-stone-800 bg-stone-950/90 backdrop-blur-md flex items-center justify-between px-4 z-20">
-        <div className="flex items-center gap-2 min-w-0">
+      <header className="h-20 min-h-[80px] border-b border-stone-800 bg-stone-950/90 backdrop-blur-md flex items-center justify-between px-4 z-20">
+        <div className="flex flex-col min-w-0">
           <h1 className="fantasy-font text-xl font-bold text-amber-600 tracking-tight shrink-0">Dice<span className="text-stone-100">OnRails</span></h1>
           {settings.enableAtmosphere && myLocation && (
-            <button onClick={() => myAtmosphereUrl && setIsAtmosphereExpanded(true)} disabled={!myAtmosphereUrl} title="View full scene" className="flex items-center gap-1 min-w-0 max-w-[42vw] text-stone-400 hover:text-amber-500 transition-colors disabled:opacity-50">
+            <button onClick={() => myAtmosphereUrl && setIsAtmosphereExpanded(true)} disabled={!myAtmosphereUrl} title="View full scene" className="flex items-center gap-1 text-stone-400 hover:text-amber-500 transition-colors disabled:opacity-50">
               <i className="fas fa-location-dot text-amber-600/60 text-[10px] shrink-0"></i>
-              <span className="fantasy-font text-stone-300 text-[11px] tracking-widest uppercase truncate">{myLocation}</span>
+              <span className="fantasy-font text-stone-300 text-xs tracking-widest uppercase truncate">{myLocation}</span>
             </button>
           )}
         </div>
+        <div className="flex flex-col items-end gap-1">
           {typeof gameState.gameTime === 'number' && !isNaN(gameState.gameTime) && (() => {
             const info = formatGameTime(gameState.gameTime);
             return (
-              <span className="text-[10px] text-stone-500 ml-auto">{info.period}</span>
+              <span className="text-[10px] text-stone-500">{info.period}</span>
             );
           })()}
-        <div className="flex items-center gap-3">
-          <button onClick={handleBackOrReset} className="p-2 hover:bg-stone-900 rounded-lg text-stone-400 transition-colors"><i className={`fas ${userId?'fa-arrow-left':'fa-undo'} text-lg`}></i></button>
-          <button onClick={handleLogout} className="p-2 hover:bg-stone-900 rounded-lg text-stone-400 transition-colors"><i className="fas fa-sign-out-alt text-lg"></i></button>
-          {stage===AppStage.PLAY&&isSyncableCampaign(currentCampaignId)&&<button onClick={()=>{navigator.clipboard.writeText(currentCampaignId);alert("Campaign ID copied to clipboard!");}} className="p-2 hover:bg-stone-900 rounded-lg text-amber-600 transition-colors"><i className="fas fa-link text-lg"></i></button>}
-          <ActivityBell activities={recentActivity} />
-          <div className="h-2 w-2 rounded-full bg-green-500 shadow-sm shadow-green-900 animate-pulse"></div>
+          <div className="flex items-center gap-2">
+            <button onClick={handleBackOrReset} className="p-2 hover:bg-stone-900 rounded-lg text-stone-400 transition-colors"><i className={`fas ${userId?'fa-arrow-left':'fa-undo'} text-lg`}></i></button>
+            <button onClick={handleLogout} className="p-2 hover:bg-stone-900 rounded-lg text-stone-400 transition-colors"><i className="fas fa-sign-out-alt text-lg"></i></button>
+            {stage===AppStage.PLAY&&isSyncableCampaign(currentCampaignId)&&<button onClick={()=>{navigator.clipboard.writeText(currentCampaignId);alert("Campaign ID copied to clipboard!");}} className="p-2 hover:bg-stone-900 rounded-lg text-amber-600 transition-colors"><i className="fas fa-link text-lg"></i></button>}
+            <ActivityBell activities={recentActivity} />
+            <div className="h-2 w-2 rounded-full bg-green-500 shadow-sm shadow-green-900 animate-pulse"></div>
+          </div>
         </div>
       </header>
       {gameState.combat?.isActive && <CombatTracker combat={gameState.combat} party={gameState.party} isMobile isHost={isHost} hasBattleMap={!!gameState.battleMap} onToggleBattleMap={() => { if (!gameState.battleMap) handleInitMap(20, 15); else setMapPanelOpen(p => !p); }} />}
