@@ -61,8 +61,9 @@ const MobileLayout: React.FC = () => {
   const onboarding = useOnboarding();
 
   const [mobileTab, setMobileTab] = useState<'adventure'|'character'|'journal'>('adventure');
-  const [isAtmosphereExpanded, setIsAtmosphereExpanded] = useState(false);
-  const [mapPanelOpen, setMapPanelOpen] = useState(true);
+  const myCharacter = gameState.party.find(c => c.id === myCharacterId) ?? gameState.party[0];
+  const myLocation = myCharacter?.location;
+  const myAtmosphereUrl = (myLocation && gameState.locationImages?.[myLocation]) || gameState.currentAtmosphereUrl;
 
   useEffect(() => {
     setIsAtmosphereExpanded(false);
@@ -80,10 +81,6 @@ const MobileLayout: React.FC = () => {
   const charToShow = gameState.party.find((c: Character) => c.id === viewingCharacterId) || gameState.party[0];
   const isMultiplayer = gameState.party.length > 1;
   // Per-character display identity (see DesktopLayout for rationale). Solo
-  // collapses: myCharacterId === party[0].id → byte-identical to before.
-  const myCharacter = gameState.party.find(c => c.id === myCharacterId) ?? gameState.party[0];
-  const myLocation = myCharacter?.location;
-  const myAtmosphereUrl = (myLocation && gameState.locationImages?.[myLocation]) || gameState.currentAtmosphereUrl;
   const isHost = !!userId && userId === hostId;
   const handleBackOrReset = () => userId ? confirm('Return to dashboard?') && setStage(AppStage.DASHBOARD) : confirm('Are you sure you want to reset the game? All progress will be lost.') && resetGame();
   const { recentActivity } = useActivityTracking(gameState, messages, userId);

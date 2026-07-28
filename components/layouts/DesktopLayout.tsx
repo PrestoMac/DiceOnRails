@@ -47,8 +47,9 @@ const DesktopLayout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarWidth, setSidebarWidth] = useState(320);
   const [isDragging, setIsDragging] = useState(false);
-  const [isAtmosphereExpanded, setIsAtmosphereExpanded] = useState(false);
-  const [mapPanelOpen, setMapPanelOpen] = useState(true);
+  const myCharacter = gameState.party.find(c => c.id === myCharacterId) ?? gameState.party[0];
+  const myLocation = myCharacter?.location;
+  const myAtmosphereUrl = (myLocation && gameState.locationImages?.[myLocation]) || gameState.currentAtmosphereUrl;
 
   useEffect(() => {
     setIsAtmosphereExpanded(false);
@@ -74,14 +75,6 @@ const DesktopLayout: React.FC = () => {
   // atmosphere image should track the LOCAL player's character, not party[0]
   // (which may be a different character a traveling companion left behind).
   // Solo collapses: myCharacterId === party[0].id → byte-identical to before.
-  const myCharacter = gameState.party.find(c => c.id === myCharacterId) ?? gameState.party[0];
-  const myLocation = myCharacter?.location;
-  // Atmosphere: prefer the cached image for MY location (already populated by
-  // setStartingLocation + performAtmosphereUpdate's cacheLocationImage), so
-  // another player's travel no longer flips our background. Falls back to the
-  // global currentAtmosphereUrl when our location has no cached image yet.
-  const myAtmosphereUrl = (myLocation && gameState.locationImages?.[myLocation]) || gameState.currentAtmosphereUrl;
-
   // Multiplayer presence (typing indicators). Skipped for solo / anonymous hot-seat.
   const myCharacterForPresence = isMultiplayer ? (charToShow ?? gameState.party[0]) : undefined;
   const { typingUsers, setTyping } = usePresence(currentCampaignId, userId, isMultiplayer, myCharacterForPresence);
