@@ -230,7 +230,7 @@ const EXPORT_BTN_CLASS = 'w-full flex items-center gap-3 px-4 py-2.5 text-sm tex
 const EXPORT_ICON_CLASS = 'text-xs w-5 text-center text-stone-500';
 
 /** Renders the scrollable message history with search, filter, export, speech playback, rewind, roll-highlighting cards, multiplayer pending-batch controls, and the "Take the Turn" button. */
-const ChatLog: React.FC<ChatLogProps> = ({ messages, settings, onRewind, onUndo, isProcessing, onExpandAtmosphere, atmosphereUrl, scrollRef: externalScrollRef, onScrollChange, disableInternalScroll, onPrefillInput, showWelcomeChips, suggestions, onPickSuggestion, onDismissSuggestion, portraitMap, isMultiplayer = false, myCharacterId = null, pendingCount = 0, onProcessBatch, onRemovePendingMessage }) => {
+const ChatLog: React.FC<ChatLogProps> = ({ messages, settings, onRewind, onUndo, isProcessing, onExpandAtmosphere, atmosphereUrl, scrollRef: externalScrollRef, onScrollChange, disableInternalScroll, onPrefillInput, showWelcomeChips, suggestions, onPickSuggestion, onDismissSuggestion, portraitMap, isMultiplayer = false, myCharacterId = null, pendingCount = 0, onProcessBatch, onRemovePendingMessage, onTriggerDiceRoll }) => {
   const internalScrollRef = useRef<HTMLDivElement>(null);
   const scrollRef = externalScrollRef || internalScrollRef;
   const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
