@@ -13,6 +13,7 @@ import CharacterSheet from '../CharacterSheet';
 import Journal from '../Journal';
 import LevelUpModal from '../LevelUpModal';
 import CombatTracker from '../CombatTracker';
+import BattleMapPanel from '../BattleMapPanel';
 import ActivityBell from '../shared/ActivityBell';
 import HpBar from '../shared/HpBar';
 import { useActivityTracking } from '../../hooks/useActivityTracking';
@@ -21,6 +22,7 @@ import { calculateAc } from '../../services/classEngine';
 import { formatGameTime } from '../../utils/timeUtils';
 import { mcpServer } from '../../services/mcpService';
 import { pickSuggestionsForCharacter } from '../../services/llm/suggestions';
+import { initBattleMap, autoPlaceParty, autoPlaceEnemies } from '../../services/gridService';
 
 /** Compact HP/AC status bar displayed below the chat area on mobile. */
 const HpStatusBar: React.FC<{ character: Character }> = ({ character }) => (
@@ -60,6 +62,7 @@ const MobileLayout: React.FC = () => {
 
   const [mobileTab, setMobileTab] = useState<'adventure'|'character'|'journal'>('adventure');
   const [isAtmosphereExpanded, setIsAtmosphereExpanded] = useState(false);
+  const [mapPanelOpen, setMapPanelOpen] = useState(true);
 
   useEffect(() => {
     setIsAtmosphereExpanded(false);
@@ -75,9 +78,48 @@ const MobileLayout: React.FC = () => {
 
   const charToShow = gameState.party.find((c: Character) => c.id === viewingCharacterId) || gameState.party[0];
   const isMultiplayer = gameState.party.length > 1;
+  const isHost = !!userId && userId === hostId;
   const handleBackOrReset = () => userId ? confirm('Return to dashboard?') && setStage(AppStage.DASHBOARD) : confirm('Are you sure you want to reset the game? All progress will be lost.') && resetGame();
   const queueLen = gameState.actionQueue?.length || 0;
   const { recentActivity } = useActivityTracking(gameState, messages, userId);
+
+  // --- VTT Battle Map handlers ---
+
+  const handleTokenMove = useCallback((tokenId: string, x: number, y: number) => {
+    mcpServer.updateBattleMapTokens(
+      (gameState.battleMap?.tokens ?? []).map(t =>
+        t.id === tokenId ? { ...t, pos: { x, y } } : t
+      )
+    );
+    syncState();
+  }, [gameState.battleMap, syncState]);
+
+  const handleClearMap = useCallback(() => {
+    if (!confirm('Remove the battle map?')) return;
+    mcpServer.clearBattleMap();
+    syncState();
+  }, [syncState]);
+
+  const handleInitMap = useCallback((width: number, height: number) => {
+    let bmap = initBattleMap(width, height, gameState.party[0]?.location ?? 'Battle');
+    bmap = autoPlaceParty(bmap, gameState.party.map(c => ({ id: c.id, name: c.name })));
+    if (gameState.combat?.enemies) {
+      bmap = autoPlaceEnemies(bmap, gameState.combat.enemies.filter(e => !e.isDead).map(e => ({ id: e.id, name: e.name })));
+    }
+    mcpServer.updateBattleMapTokens(bmap.tokens);
+    const state = mcpServer.getFullState();
+    if (state.battleMap) {
+      state.battleMap.width  = bmap.width;
+      state.battleMap.height = bmap.height;
+      state.battleMap.tokens = bmap.tokens;
+    }
+    syncState();
+  }, [gameState, syncState]);
+
+  const currentTurnId = (() => {
+    if (!gameState.combat?.isActive) return undefined;
+    return gameState.combat.initiative[gameState.combat.turnIndex]?.id;
+  })();
 
   return (
     <div className="flex flex-col h-screen w-full relative overflow-hidden bg-stone-950">
@@ -97,7 +139,35 @@ const MobileLayout: React.FC = () => {
           <div className="h-2 w-2 rounded-full bg-green-500 shadow-sm shadow-green-900 animate-pulse"></div>
         </div>
       </header>
-      {gameState.combat?.isActive && <CombatTracker combat={gameState.combat} party={gameState.party} isMobile />}
+      {gameState.combat?.isActive && <CombatTracker combat={gameState.combat} party={gameState.party} isMobile isHost={isHost} hasBattleMap={!!gameState.battleMap} onToggleBattleMap={() => { if (!gameState.battleMap) handleInitMap(20, 15); else setMapPanelOpen(p => !p); }} />}
+      {/* VTT Battle Map panel on Mobile */}
+      {gameState.battleMap && mobileTab === 'adventure' && (
+        <div className="relative z-10 border-b border-stone-800 shrink-0" style={{ height: mapPanelOpen ? '260px' : 'auto' }}>
+          <button
+            onClick={() => setMapPanelOpen(p => !p)}
+            className="w-full flex items-center gap-2 px-3 py-1.5 bg-stone-900/80 hover:bg-stone-900 border-b border-stone-800 text-[10px] uppercase tracking-wider font-bold text-stone-500 hover:text-amber-500 transition-colors"
+          >
+            <span>🗺</span>
+            <span>Battle Map</span>
+            <i className={`fas fa-chevron-${mapPanelOpen ? 'up' : 'down'} ml-auto`} />
+          </button>
+          {mapPanelOpen && (
+            <div style={{ height: '220px' }}>
+              <BattleMapPanel
+                battleMap={gameState.battleMap}
+                party={gameState.party}
+                combat={gameState.combat}
+                currentTurnId={currentTurnId}
+                isHost={isHost}
+                isProcessing={isLoading || !!gameState.isProcessing}
+                onTokenMove={handleTokenMove}
+                onClearMap={handleClearMap}
+                onInitMap={handleInitMap}
+              />
+            </div>
+          )}
+        </div>
+      )}
       <div className="flex-1 overflow-hidden relative flex flex-col pb-16 min-h-0">
         {mobileTab==='adventure'&&<>
           {settings.enableAtmosphere&&<div className="w-full h-32 relative shrink-0 border-b border-stone-800 bg-stone-900">

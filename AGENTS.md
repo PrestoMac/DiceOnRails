@@ -94,8 +94,8 @@ Binary dice tools (`check_skill`, `make_save`) support **branch finalization** v
 | Tool | Sub-service | Notes |
 |------|-------------|-------|
 | `roll_dice` | travel | `sides\|\|20, count\|\|1, modifier\|\|0`. Vestigial attack params removed (model must use `player_attack`). |
-| `add_enemy` | combat | |
-| `start_combat` | combat | |
+| `add_enemy` | combat | Auto-deduplicates names via `generateUniqueEnemyName` (Roman suffixes). |
+| `start_combat` | combat | Accepts `enemies[]` array. Auto-deduplicates names via `generateUniqueEnemyName`. |
 | `next_turn` | combat | No args forwarded. Engine attaches deterministic `data.narration` (from resolved enemy `attackResults[]`) + `data.suggestions` (contextual combat). Agent loop captures both at the break point so the fallback never fires in combat. |
 | `end_combat` | combat | |
 | `player_attack` | combat | Single `targetId` param (aliases removed). Supports `sharpshooter`, `greatWeaponMaster`. Damage/XP awarded atomically. |
@@ -120,8 +120,10 @@ Binary dice tools (`check_skill`, `make_save`) support **branch finalization** v
 | `polymorph_creature` | inline | |
 | `cast_ritual` | spells | **Auto-advances 10 minutes** (no separate `narrate_turn` needed since S3). |
 | `narrate_turn` | travel | Optional `xp` (1-10) for roleplay XP + optional `roleplay: 'dialogue'\|'creative'` tag. Any non-empty narration auto-awards 1 XP baseline (no tag needed); `creative` tag = 5 XP default when `xp` omitted; explicit `xp` overrides; `xp=0` suppresses. Supports `suggestionsByCharacter` (multiplayer-only field keyed by character id) as an alternative to the flat `suggestions` for per-player chips. |
+| `move_token` | grid | `tokenId`, `x`, `y` (0-based grid coords). Moves a combatant token on the VTT battle map. Chebyshev distance (5 ft/cell). |
+| `init_battle_map` | grid | `label`, `width` (def 20), `height` (def 15), `generateImage` (boolean). Activates VTT grid map and auto-places party + enemies. |
 
-**ToolFilter** (`services/llm/toolFilter.ts`): always visible: `roll_dice`, `check_skill`, `update_inventory`, `adjust_currency`, `move_to`, `upsert_quest`, `log_lore`, `narrate_turn`, `make_save`, `use_resource`, `roll_death_save`, `cast_spell`, `manage_spellbook`, `spell_effect`, `add_enemy`, `start_combat`, `inflict_damage`. Hidden unless: `state.combat?.isActive` → `next_turn`, `end_combat`, `player_attack`; party has unused stat/skill points → `level_up`; party not at full → `short_rest`, `long_rest`; party has spells → `summon_creature`, `teleport_creature`, `polymorph_creature`, `cast_ritual`.
+**ToolFilter** (`services/llm/toolFilter.ts`): always visible: `roll_dice`, `check_skill`, `update_inventory`, `adjust_currency`, `move_to`, `upsert_quest`, `log_lore`, `narrate_turn`, `make_save`, `use_resource`, `roll_death_save`, `cast_spell`, `manage_spellbook`, `spell_effect`, `add_enemy`, `start_combat`, `inflict_damage`, `move_token`, `init_battle_map`. Hidden unless: `state.combat?.isActive` → `next_turn`, `end_combat`, `player_attack`; party has unused stat/skill points → `level_up`; party not at full → `short_rest`, `long_rest`; party has spells → `summon_creature`, `teleport_creature`, `polymorph_creature`, `cast_ritual`.
 
 ### Context pipeline (`services/llm/contextManager.ts`)
 - **Active window**: last 20 messages, sent verbatim.
@@ -144,7 +146,7 @@ Binary dice tools (`check_skill`, `make_save`) support **branch finalization** v
 - **Hook tests**: use `renderHook` + `act` from `@testing-library/react`. Import dynamically after mocks.
 - **Component tests**: need full mocks for `supabaseClient`, `audioService`, `authService`, `debug`.
 - Test factories: `makeCharacter(overrides?)`, `makeWizard()`, `makeCleric()`, `makeEnemy()`, `makeCombatState()`, `makeGameState()`, `createTestRunner()`, `createMockAgentLoop()`, `createMockMCPServer()`, `mockRandom()`, `createTestServer()`.
-- Test files: `tests/services/llm/suggestions.test.ts` (legacy flat suggestions), `tests/services/llm/suggestionsPerCharacter.test.ts` (per-character suggestions: `pickSuggestionsForCharacter`, class-aware deterministic generators, `resolveSuggestionsPerCharacter`, `generateSuggestionsPerCharacter` structured JSON parsing).
+- Test files: `tests/services/llm/suggestions.test.ts` (legacy flat suggestions), `tests/services/llm/suggestionsPerCharacter.test.ts` (per-character suggestions: `pickSuggestionsForCharacter`, class-aware deterministic generators, `resolveSuggestionsPerCharacter`, `generateSuggestionsPerCharacter` structured JSON parsing), `tests/services/enemyNaming.test.ts` (enemy name Roman-numeral deduplication: `generateUniqueEnemyName` pure-function tests).
 - `no-explicit-any` and `non-null-assertion` are **errors everywhere** (set globally in `.eslintrc.cjs`, not just in tests). Test files additionally enforce `vitest/expect-expect` and strict `testing-library/*` rules.
 
 ## ESLint
@@ -164,6 +166,7 @@ Binary dice tools (`check_skill`, `make_save`) support **branch finalization** v
 - **Combat XP is auto-awarded on enemy defeat**: `awardEnemyDefeatXp` (`services/mcp/progressionService.ts`) hooks into `inflict_damage` — every kill path (player_attack, cast_spell, DoTs, enemy attacks) awards CR-based XP via `xpEngine.computeXp('combat', ...)` flat to all party members (no split, no solo buff) idempotently via the `Enemy.xpAwarded` flag.
 - **Transactions**: deep-clone via `JSON.parse(JSON.stringify(...))`. 3-tier: transaction (in-flight rollback), rewind point (full state+messages per turn), emergency snapshot (crash recovery).
 - **Duplicate currency detection**: `adjust_currency` is suppressed within 500ms for same target+amount. Cleared on `restoreSnapshot` and `reset`.
+- **Enemy name auto-deduplication (Roman numerals)**: `generateUniqueEnemyName(input, existingEnemies)` (`services/mcp/combatService.ts`) is called inside `buildEnemyFromTemplate` (covers `add_enemy` + `start_combat` array) and inside `summon_creature` (`mcpService.ts`). When two+ enemies share the same base name, the engine auto-appends a Roman-numeral suffix: first enemy keeps the bare name ("Goblin"), subsequent duplicates become "Goblin II", "Goblin III", etc. Falls back to Arabic beyond X ("Goblin 11"). Does NOT fill gaps — picks next-after-highest. The LLM sees the unique names via tool results, combat context, battle map tokens, and initiative — zero prompt changes needed. Pure engine-side fix.
 
 ### Engine mechanics
 - **Exhaustion** (levels 1-10; death at 10): applied as flat `d20Modifier: -level` on ALL d20 rolls (attacks, saves, checks, death saves) and `speedPenaltyFt: -(level * 5)`. Does NOT affect damage dice. **Travel-fatigue is hard-capped** at `MAX_SAFE_EXHAUSTION` (2): the `narrate_turn` exhaustion loop only applies levels 1..N, so the party can never die from a single journey — they must `long_rest` to climb higher.

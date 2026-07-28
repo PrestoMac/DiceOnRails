@@ -1,4 +1,5 @@
 import { GameState, MCPResponse, Character, Message, EnemyAttack, InventoryItem, Currency, Enemy, InitiativeEntry, LocationSignificance, QuestDifficulty } from '../types';
+import { initBattleMap, placeToken, moveToken as gridMoveToken, markTokenDead, autoPlaceParty, autoPlaceEnemies } from './gridService';
 import { isDebugMode } from '../utils/debug';
 import { cryptoRoll } from '../utils/random';
 import { sanitizeNarration } from '../utils/textSanitize';
@@ -7,7 +8,7 @@ import { lookupSRDItem } from '../utils/srdItems';
 import { generateId, fail } from './mcp/_shared';
 import { createPartyService, PartyService } from './mcp/partyService';
 import { createInventoryService, InventoryService } from './mcp/inventoryService';
-import { createCombatService, CombatService } from './mcp/combatService';
+import { createCombatService, CombatService, generateUniqueEnemyName } from './mcp/combatService';
 import { createSpellcastingService, SpellcastingService } from './mcp/spellcastingService';
 import { createProgressionService, ProgressionService } from './mcp/progressionService';
 import { createStateService, StateService } from './mcp/stateService';
@@ -196,6 +197,36 @@ export class MockMCPServer {
   public async swap_known_spell(characterId: string, oldSpellId: string, newSpellId: string): Promise<MCPResponse> { return this.spells.swap_known_spell(characterId, oldSpellId, newSpellId); }
   public async use_resource(characterId: string, resourceId: string, targetId?: string, amount?: number): Promise<MCPResponse> { return this.spells.use_resource(characterId, resourceId, targetId, amount); }
 
+  // ---------------------------------------------------------------------------
+  // VTT Battle Map — public surface for UI-driven operations
+  // ---------------------------------------------------------------------------
+
+  /** Removes the active battle map entirely (e.g. after combat ends). */
+  public clearBattleMap(): void {
+    delete (this.state as { battleMap?: unknown }).battleMap;
+  }
+
+  /** Replaces the full token array on the active battle map (used by UI drag-and-drop). */
+  public updateBattleMapTokens(tokens: import('../types/grid').GridToken[]): void {
+    if (this.state.battleMap) {
+      this.state.battleMap.tokens = tokens;
+    }
+  }
+
+  /** Places or updates a single token on the battle map (UI convenience). */
+  public placeBattleMapToken(token: import('../types/grid').GridToken): void {
+    if (this.state.battleMap) {
+      this.state.battleMap = placeToken(this.state.battleMap, token);
+    }
+  }
+
+  /** Marks an enemy token as dead on the map when its HP reaches 0. */
+  public markBattleMapTokenDead(id: string): void {
+    if (this.state.battleMap) {
+      this.state.battleMap = markTokenDead(this.state.battleMap, id);
+    }
+  }
+
 
   public async summon_creature(casterId: string, template: string, count: number = 1): Promise<MCPResponse> {
     const char = this.party.getTarget(casterId);
@@ -206,7 +237,7 @@ export class MockMCPServer {
       const creature = createSummonedCreature(template, char.id, char.level);
       if (!creature) return fail(`Unknown creature template: ${template}`);
       const enemy: Enemy = {
-        id: creature.id, name: creature.name, ac: creature.ac,
+        id: creature.id, name: generateUniqueEnemyName(creature.name, this.state.combat?.enemies ?? []), ac: creature.ac,
         hp: { current: creature.hp.current, max: creature.hp.max },
         attacks: creature.attacks, cr: creature.cr,
         xp: Math.floor(creature.cr * 100), isDead: false,
@@ -435,6 +466,52 @@ export class MockMCPServer {
           res = await this.teleport_creature(String(args.characterId || args.targetId || ''), String(args.destination || ''), Number(args.range ?? 30)); break;
         case 'polymorph_creature':
           res = await this.polymorph_creature(String(args.characterId || args.targetId || ''), String(args.newForm || args.beastForm || 'wolf'), Number(args.duration ?? 60)); break;
+        case 'move_token': {
+          // VTT: move a combatant token to a new grid cell.
+          const tokenIdRaw = String(args.tokenId || '');
+          const targetX = Number(args.x ?? 0);
+          const targetY = Number(args.y ?? 0);
+          if (!this.state.battleMap) {
+            res = { success: false, data: {}, message: 'No active battle map. Call init_battle_map first.' };
+          } else {
+            // Accept character name or id
+            const resolvedToken = this.state.battleMap.tokens.find(
+              t => t.id === tokenIdRaw || t.name.toLowerCase() === tokenIdRaw.toLowerCase()
+            );
+            if (!resolvedToken) {
+              res = { success: false, data: {}, message: `Token "${tokenIdRaw}" not found on battle map.` };
+            } else {
+              this.state.battleMap = gridMoveToken(this.state.battleMap, resolvedToken.id, { x: targetX, y: targetY });
+              const moved = this.state.battleMap.tokens.find(t => t.id === resolvedToken.id);
+              res = {
+                success: true,
+                data: { tokenId: resolvedToken.id, name: resolvedToken.name, x: moved?.pos.x, y: moved?.pos.y },
+                message: `${resolvedToken.name} moved to (${moved?.pos.x}, ${moved?.pos.y}) on the battle map.`,
+              };
+            }
+          }
+          break;
+        }
+        case 'init_battle_map': {
+          // VTT: initialise a battle map and auto-place all combatants.
+          const mapWidth  = Math.min(40, Math.max(5, Number(args.width  ?? 20)));
+          const mapHeight = Math.min(30, Math.max(5, Number(args.height ?? 15)));
+          const mapLabel  = args.label ? String(args.label) : (this.state.party[0]?.location ?? 'Battle');
+          let bmap = initBattleMap(mapWidth, mapHeight, mapLabel);
+          // Auto-place party members
+          bmap = autoPlaceParty(bmap, this.state.party.map(c => ({ id: c.id, name: c.name })));
+          // Auto-place enemies if combat is active
+          if (this.state.combat?.enemies) {
+            bmap = autoPlaceEnemies(bmap, this.state.combat.enemies.filter(e => !e.isDead).map(e => ({ id: e.id, name: e.name })));
+          }
+          this.state.battleMap = bmap;
+          res = {
+            success: true,
+            data: { width: mapWidth, height: mapHeight, label: mapLabel, tokenCount: bmap.tokens.length },
+            message: `Battle map "${mapLabel}" initialised (${mapWidth}×${mapHeight}). ${bmap.tokens.length} tokens placed.`,
+          };
+          break;
+        }
         case 'cast_ritual': {
           const ritualRes = await this.spells.cast_ritual(String(args.characterId || args.casterId || ''), String(args.spellId || ''));
           if (!this.state.combat?.isActive && ritualRes.success) {

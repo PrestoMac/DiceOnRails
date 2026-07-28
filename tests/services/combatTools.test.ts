@@ -84,6 +84,31 @@ describe('combatTools', () => {
       const result = await server.add_enemy('');
       expect(result.success).toBe(false);
     });
+
+    it('auto-numbers duplicate enemies with Roman suffixes', async () => {
+      await server.add_enemy('Goblin');
+      await server.add_enemy('Goblin');
+      await server.add_enemy('Goblin');
+      const state = server.getFullState();
+      expect(state.combat?.enemies).toHaveLength(3);
+      expect(state.combat.enemies[0].name).toBe('Goblin');
+      expect(state.combat.enemies[1].name).toBe('Goblin II');
+      expect(state.combat.enemies[2].name).toBe('Goblin III');
+    });
+
+    it('returns unique name in add_enemy result message', async () => {
+      await server.add_enemy('Orc');
+      const result = await server.add_enemy('Orc');
+      expect(result.message).toContain('Orc II');
+    });
+
+    it('does not suffix enemies with distinct names', async () => {
+      await server.add_enemy('Goblin');
+      await server.add_enemy('Orc');
+      await server.add_enemy('Wolf');
+      const state = server.getFullState();
+      expect(state.combat.enemies.map(e => e.name)).toEqual(['Goblin', 'Orc', 'Wolf']);
+    });
   });
 
   describe('start_combat', () => {
@@ -119,6 +144,20 @@ describe('combatTools', () => {
       const finalState = server.getFullState();
       expect(finalState.combat).toBeDefined();
       expect(finalState.combat.enemies).toHaveLength(2);
+    });
+
+    it('auto-numbers duplicate names in enemies array', async () => {
+      server.joinParty(makeCharacter());
+      const result = await server.start_combat(undefined, [
+        { name: 'Goblin', ac: 15, hp: 7 },
+        { name: 'Goblin', ac: 15, hp: 7 },
+        { name: 'Goblin', ac: 15, hp: 7 },
+      ]);
+      expect(result.success).toBe(true);
+      const state = server.getFullState();
+      expect(state.combat?.enemies.map(e => e.name)).toEqual([
+        'Goblin', 'Goblin II', 'Goblin III',
+      ]);
     });
   });
 

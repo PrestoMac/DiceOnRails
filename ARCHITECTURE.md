@@ -488,6 +488,8 @@ Cryptographically-secure dice (`cryptoRoll` from `utils/random.ts`). Public API:
 
 The math layer behind `mcp/combatService.ts`. `addEnemyToCombat` auto-fills stats from the SRD monster manual (`lookupMonster`). `initializeCombat` rolls initiative (with Alert feat bonus). `advanceToNextTurn` ticks conditions, handles DoTs, expires transformations. `resolveEnemySingleTurn` / `resolveAllEnemyTurns` are the auto-AI for enemy turns. Uses `getConditionEffects`, `isUnconscious`, `isIncapacitated`, etc.
 
+**Enemy name deduplication**: `generateUniqueEnemyName(input, existing)` (exported from `combatService.ts`) is called inside `buildEnemyFromTemplate` (the single factory for all `add_enemy` + `start_combat` enemies) and inside `summon_creature` (`mcpService.ts`). When two+ enemies share the same base name, the engine auto-appends Roman-numeral suffixes: "Goblin", "Goblin II", "Goblin III", … X, then Arabic (11, 12, …). Does not fill gaps — picks next-after-highest. The LLM sees unique names everywhere (tool results, combat context, battle map tokens, initiative) with zero prompt changes.
+
 ### `classEngine.ts`
 
 ~350 lines. The class/race/Subsystem authority. Key exports: `getClassDef`, `getRaceDef`, `getSubclassDef`, `calculateMaxHp`, `calculateAc`, `calculateSpeed`, `getDarkvisionRange`, `getSavingThrowBonus`, `getProficiencyBonus`, `getSpellSaveDc`, `getSpellAttackBonus`, `getDamageResistances`, `canEquipArmor`, `recalculateResourcePools`. Handles Unarmored Defense (Barbarian/Monk), Draconic Resilience, fighting styles, armor proficiency gating, etc.
@@ -507,6 +509,29 @@ The conditions subsystem: 16 standard conditions (blinded, charmed, frightened, 
 ### `featsService.ts`
 
 ~350 lines. All ASI/feat logic: `hasFeat`, `getFeat`, `getAllFeats`, `validateFeatPrereqs`, `applyAsiChoice`, `applyFeatChoice`, plus per-feat helpers (`getAlertInitiativeBonus`, `getToughHpBonus`, `getMobileSpeedBonus`, `getHeavyArmorMasterReduction`, etc.). Backed by `FEATS_CATALOG` in `utils/feats.ts`.
+
+### `gridService.ts` _(VTT Battle Map — Phase 1)_
+
+Pure-function grid service for the Virtual Tabletop integration. Zero side-effects — all functions are deterministic, `O(n)` on tokens, and tested independently.
+
+**Key exports:**
+- `initBattleMap(width, height, label?)` — factory for a fresh `BattleMap` with sensible defaults.
+- `placeToken(map, token)` / `moveToken(map, id, pos)` / `markTokenDead(map, id)` / `removeToken(map, id)` — immutable token CRUD (each returns a new map object).
+- `distanceCells(a, b)` — **Chebyshev** metric (diagonal = 1 cell, correct for D&D 5e).
+- `distanceFeet(a, b)` — Chebyshev × 5 ft per cell.
+- `isInRange(map, sourceId, targetId, rangeFt)` / `tokensInRange(map, sourceId, rangeFt)` — range queries.
+- `findFreeCell(map, near)` — spiral search for an unoccupied cell; used by auto-placement.
+- `autoPlaceParty(map, ids)` / `autoPlaceEnemies(map, ids)` — one-call auto-layout (players centre-left, enemies centre-right).
+- `buildGridContextString(map, state?)` — serialises the map to a structured ASCII block for LLM injection (positions, distance table, melee/range advisories).
+
+**Integration points:**
+- `GameState.battleMap?: BattleMap` — optional additive field; absent in existing saves = VTT inactive.
+- `combatService.ts`: `start_combat` automatically initializes `state.battleMap` (auto-placing party & enemies) every time combat starts. `end_combat` clears it.
+- `mcpService.ts` dispatches `move_token` and `init_battle_map` tool calls.
+- `agentLoop.ts` injects `buildGridContextString()` into `contextParts` whenever `battleMap` is present.
+- `services/llm/prompts/mapPrompt.ts` is appended to the system message, strictly enforcing Chebyshev movement budgets and 5e attack ranges.
+- `components/BattleMapPanel.tsx` renders the canvas and handles drag-and-drop (host only).
+- `components/layouts/DesktopLayout.tsx` and `MobileLayout.tsx` embed `BattleMapPanel` as a collapsible panel below `CombatTracker`.
 
 ### `progressionService.ts`
 
