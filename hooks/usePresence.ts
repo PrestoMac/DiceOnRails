@@ -25,6 +25,7 @@ interface PresenceProfile {
 const PRESENCE_KEY = 'typing';
 const STALE_THRESHOLD_MS = 30_000;
 const HEARTBEAT_INTERVAL_MS = 10_000;
+const IDLE_CLEAR_MS = 10_000;
 const RECONNECT_BASE_MS = 1000;
 const RECONNECT_MAX_MS = 30_000;
 
@@ -34,9 +35,10 @@ const RECONNECT_MAX_MS = 30_000;
  * Presence is ephemeral and broadcast-only: it does NOT touch the campaigns
  * table, requires no migrations, and survives no restarts — perfect for "is
  * writing…" indicators. Each client tracks a profile `{ userId, characterId,
- * name, portraitUrl, isTyping, lastActive }`. Typing is announced on input
- * and stays active as long as text remains in the input field (no auto-clear
- * timers — the InputArea controls the state directly).
+ * name, portraitUrl, isTyping, lastActive }`. Typing is announced on the first
+ * keystroke and stays active for 10s after the last keystroke (no flickering
+ * on every keypress — subsequent strokes within the window just reset the
+ * idle timer).
  *
  * Hardened against:
  *  - WebSocket drops → auto-reconnect with exponential backoff (1s→30s cap)
@@ -63,6 +65,7 @@ export function usePresence(
   const profileRef = useRef<PresenceProfile | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectAttemptsRef = useRef(0);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Ref mirror of myCharacter so the mount-stable channel effect and
@@ -141,15 +144,46 @@ export function usePresence(
     }
   }, []);
 
-  // Public setter invoked by the InputArea. Directly sets `isTyping` —
-  // no auto-clear timers. The InputArea controls the state: it calls
-  // setTyping(true) when text is entered and setTyping(false) on send/clear.
+  // Public setter invoked by the InputArea. On the first keystroke (when not
+  // already typing), broadcasts `isTyping: true`. Subsequent keystrokes within
+  // the 10s idle window just reset the timer without re-broadcasting, avoiding
+  // flicker. After 10s of no keystrokes, auto-clears to `isTyping: false`.
+  // Explicit `setTyping(false)` (on send/clear) broadcasts immediately and
+  // clears the timer.
   const setTyping = useCallback((isTyping: boolean) => {
     if (!isMultiplayer || !isSyncableCampaign(campaignId)) return;
     const base = profileRef.current ?? buildProfile(false);
     if (!base) return;
-    const next: PresenceProfile = { ...base, isTyping, lastActive: Date.now() };
-    void track(next);
+
+    if (isTyping) {
+      // If already broadcasting typing, just reset the idle timer (no re-broadcast).
+      if (base.isTyping) {
+        if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+        idleTimerRef.current = setTimeout(() => {
+          const cur = profileRef.current;
+          if (cur && cur.isTyping) {
+            void track({ ...cur, isTyping: false, lastActive: Date.now() });
+          }
+        }, IDLE_CLEAR_MS);
+        return;
+      }
+      // First keystroke — broadcast `isTyping: true`.
+      const next: PresenceProfile = { ...base, isTyping, lastActive: Date.now() };
+      void track(next);
+      // Set idle timer to auto-clear after 10s of no keystrokes.
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = setTimeout(() => {
+        const cur = profileRef.current;
+        if (cur && cur.isTyping) {
+          void track({ ...cur, isTyping: false, lastActive: Date.now() });
+        }
+      }, IDLE_CLEAR_MS);
+    } else {
+      // Explicit clear (send/clear) — broadcast immediately.
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      const next: PresenceProfile = { ...base, isTyping: false, lastActive: Date.now() };
+      void track(next);
+    }
   }, [isMultiplayer, campaignId, buildProfile, track]);
 
   // Build a channel, subscribe, and wire up presence event handlers.
@@ -231,6 +265,7 @@ export function usePresence(
 
     return () => {
       if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
       if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
       unsub();
       channelRef.current = null;
