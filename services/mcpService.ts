@@ -8,7 +8,7 @@ import { lookupSRDItem } from '../utils/srdItems';
 import { generateId, fail } from './mcp/_shared';
 import { createPartyService, PartyService } from './mcp/partyService';
 import { createInventoryService, InventoryService } from './mcp/inventoryService';
-import { createCombatService, CombatService } from './mcp/combatService';
+import { createCombatService, CombatService, generateUniqueEnemyName } from './mcp/combatService';
 import { createSpellcastingService, SpellcastingService } from './mcp/spellcastingService';
 import { createProgressionService, ProgressionService } from './mcp/progressionService';
 import { createStateService, StateService } from './mcp/stateService';
@@ -237,7 +237,7 @@ export class MockMCPServer {
       const creature = createSummonedCreature(template, char.id, char.level);
       if (!creature) return fail(`Unknown creature template: ${template}`);
       const enemy: Enemy = {
-        id: creature.id, name: creature.name, ac: creature.ac,
+        id: creature.id, name: generateUniqueEnemyName(creature.name, this.state.combat?.enemies ?? []), ac: creature.ac,
         hp: { current: creature.hp.current, max: creature.hp.max },
         attacks: creature.attacks, cr: creature.cr,
         xp: Math.floor(creature.cr * 100), isDead: false,

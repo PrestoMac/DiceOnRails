@@ -208,6 +208,47 @@ function clearEndOfCombatConditions(target: Character | Enemy): string[] {
   return removed;
 }
 
+// ---------------------------------------------------------------------------
+// Enemy name de-duplication — Roman numeral suffixes (engine-side fix)
+// ---------------------------------------------------------------------------
+
+const ROMAN_VALUES: Record<string, number> = {
+  I: 1, II: 2, III: 3, IV: 4, V: 5, VI: 6, VII: 7, VIII: 8, IX: 9, X: 10,
+};
+const ROMAN_BY_VALUE: string[] = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
+const ROMAN_SUFFIX_RE = /\s+(I{1,3}|IV|V|VI{0,3}|IX|X)$/;
+
+function romanSuffix(n: number): string {
+  return n <= 10 ? ROMAN_BY_VALUE[n - 1] : String(n);
+}
+
+/**
+ * Returns a unique display name for a new enemy by appending a Roman-numeral
+ * suffix (II, III, IV, …) when one or more existing enemies share the same
+ * canonical base name. The first enemy keeps its bare name; subsequent
+ * duplicates become "Goblin II", "Goblin III", etc. Falls back to Arabic
+ * numerals beyond X. Pure engine-side fix — the LLM never needs to number
+ * enemies itself.
+ */
+export function generateUniqueEnemyName(input: string, existing: Enemy[]): string {
+  const trimmed = input.trim();
+  const base = trimmed.replace(ROMAN_SUFFIX_RE, '').trim();
+  const taken = new Set(existing.map(e => e.name));
+  if (!taken.has(trimmed)) return trimmed;
+
+  let maxN = 1;
+  for (const e of existing) {
+    if (e.name.replace(ROMAN_SUFFIX_RE, '').trim() !== base) continue;
+    const m = e.name.match(ROMAN_SUFFIX_RE);
+    const suffix = m?.[1];
+    const n = suffix ? (ROMAN_VALUES[suffix] ?? 1) : 1;
+    if (n > maxN) maxN = n;
+  }
+  let next = maxN + 1;
+  while (taken.has(`${base} ${romanSuffix(next)}`)) next++;
+  return `${base} ${romanSuffix(next)}`;
+}
+
 /** Creates a new CombatService instance operating on the given GameState. */
 export function createCombatService(state: GameState, deps: CombatDeps): CombatService {
   function buildEnemyFromTemplate(name: string, overrides: {
@@ -216,9 +257,10 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
     damageImmunities?: string[]; damageVulnerabilities?: string[];
   }): Enemy {
     const template = lookupMonster(name.trim());
+    const uniqueName = generateUniqueEnemyName(name.trim(), state.combat?.enemies ?? []);
     return {
       id: `enemy-${generateId()}`,
-      name: name.trim(),
+      name: uniqueName,
       ac: overrides.ac ?? template?.ac ?? 10,
       hp: { current: overrides.hp ?? template?.hp?.max ?? 1, max: overrides.hp ?? template?.hp?.max ?? 1 },
       attacks: overrides.attacks ?? template?.attacks ?? [{ name: 'Strike', toHit: 2, damageDice: '1d4', damageType: 'bludgeoning' }],
@@ -368,11 +410,11 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
         }
       }
 
-      state.sessionLogs.push(`${cleanName} joins the fray!${sourceInfo}`);
+      state.sessionLogs.push(`${enemy.name} joins the fray!${sourceInfo}`);
       return {
         success: true,
         data: { enemy },
-        message: `${cleanName} added to combat. AC: ${enemy.ac}, HP: ${enemy.hp.max}${sourceInfo}`
+        message: `${enemy.name} added to combat. AC: ${enemy.ac}, HP: ${enemy.hp.max}${sourceInfo}`
       };
     },
 

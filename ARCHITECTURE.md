@@ -488,6 +488,8 @@ Cryptographically-secure dice (`cryptoRoll` from `utils/random.ts`). Public API:
 
 The math layer behind `mcp/combatService.ts`. `addEnemyToCombat` auto-fills stats from the SRD monster manual (`lookupMonster`). `initializeCombat` rolls initiative (with Alert feat bonus). `advanceToNextTurn` ticks conditions, handles DoTs, expires transformations. `resolveEnemySingleTurn` / `resolveAllEnemyTurns` are the auto-AI for enemy turns. Uses `getConditionEffects`, `isUnconscious`, `isIncapacitated`, etc.
 
+**Enemy name deduplication**: `generateUniqueEnemyName(input, existing)` (exported from `combatService.ts`) is called inside `buildEnemyFromTemplate` (the single factory for all `add_enemy` + `start_combat` enemies) and inside `summon_creature` (`mcpService.ts`). When two+ enemies share the same base name, the engine auto-appends Roman-numeral suffixes: "Goblin", "Goblin II", "Goblin III", … X, then Arabic (11, 12, …). Does not fill gaps — picks next-after-highest. The LLM sees unique names everywhere (tool results, combat context, battle map tokens, initiative) with zero prompt changes.
+
 ### `classEngine.ts`
 
 ~350 lines. The class/race/Subsystem authority. Key exports: `getClassDef`, `getRaceDef`, `getSubclassDef`, `calculateMaxHp`, `calculateAc`, `calculateSpeed`, `getDarkvisionRange`, `getSavingThrowBonus`, `getProficiencyBonus`, `getSpellSaveDc`, `getSpellAttackBonus`, `getDamageResistances`, `canEquipArmor`, `recalculateResourcePools`. Handles Unarmored Defense (Barbarian/Monk), Draconic Resilience, fighting styles, armor proficiency gating, etc.
