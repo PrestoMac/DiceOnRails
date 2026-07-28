@@ -529,17 +529,17 @@ Pure-function grid service for the Virtual Tabletop integration. Zero side-effec
 - `distanceCells(a, b)` — **Chebyshev** metric (diagonal = 1 cell, correct for D&D 5e).
 - `distanceFeet(a, b)` — Chebyshev × 5 ft per cell.
 - `isInRange(map, sourceId, targetId, rangeFt)` / `tokensInRange(map, sourceId, rangeFt)` — range queries.
-- `findFreeCell(map, near)` — spiral search for an unoccupied cell; used by auto-placement.
+- `findFreeCell(map, near)` — spiral search for an unoccupied cell; used by auto-placement. **Size-aware**: treats all cells in a Large+ token's N×N footprint as occupied.
 - `autoPlaceParty(map, ids)` / `autoPlaceEnemies(map, ids)` — one-call auto-layout (players centre-left, enemies centre-right).
-- `buildGridContextString(map, state?)` — serialises the map to a structured ASCII block for LLM injection (positions, distance table, melee/range advisories).
+- `buildGridContextString(map, state?, speeds?)` — serialises the map to a structured ASCII block for LLM injection (positions, distance table, melee/range advisories, **speeds section**).
 
 **Integration points:**
 - `GameState.battleMap?: BattleMap` — optional additive field; absent in existing saves = VTT inactive.
 - `combatService.ts`: `start_combat` automatically initializes `state.battleMap` (auto-placing party & enemies) every time combat starts. `end_combat` clears it.
-- `mcpService.ts` dispatches `move_token` and `init_battle_map` tool calls.
-- `agentLoop.ts` injects `buildGridContextString()` into `contextParts` whenever `battleMap` is present.
+- `mcpService.ts` dispatches `move_token` and `init_battle_map` tool calls. `move_token` includes a **movement validation warning** when the move exceeds the creature's speed (warn-stamp pattern, does not block).
+- `agentLoop.ts` injects `buildGridContextString()` into `contextParts` whenever `battleMap` is present, passing a speeds map (`calculateSpeed` for players, 30 ft default for enemies).
 - `services/llm/prompts/mapPrompt.ts` is appended to the system message, strictly enforcing Chebyshev movement budgets and 5e attack ranges.
-- `components/BattleMapPanel.tsx` renders the canvas and handles drag-and-drop (host only).
+- `components/BattleMapPanel.tsx` renders the canvas with **coordinate labels** (column/row numbers), **melee-range hover ring** (dashed green at 5 ft), current-turn pulse, dead-token greying, and drag-and-drop (host only).
 - `components/layouts/DesktopLayout.tsx` and `MobileLayout.tsx` embed `BattleMapPanel` as a collapsible panel below `CombatTracker`.
 
 ### `progressionService.ts`

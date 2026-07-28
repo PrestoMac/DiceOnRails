@@ -1,5 +1,5 @@
 import { GameState, MCPResponse, Character, Message, EnemyAttack, InventoryItem, Currency, Enemy, InitiativeEntry, LocationSignificance, QuestDifficulty } from '../types';
-import { initBattleMap, placeToken, moveToken as gridMoveToken, markTokenDead, autoPlaceParty, autoPlaceEnemies } from './gridService';
+import { initBattleMap, placeToken, moveToken as gridMoveToken, markTokenDead, autoPlaceParty, autoPlaceEnemies, distanceCells } from './gridService';
 import { isDebugMode } from '../utils/debug';
 import { cryptoRoll } from '../utils/random';
 import { sanitizeNarration } from '../utils/textSanitize';
@@ -14,7 +14,7 @@ import { createProgressionService, ProgressionService } from './mcp/progressionS
 import { createStateService, StateService } from './mcp/stateService';
 import { createContentService, ContentService } from './mcp/contentService';
 import { createTravelService, TravelService, validateTravelTimeAdvance } from './mcp/travelService';
-import { getClassDef } from './classEngine';
+import { getClassDef, calculateSpeed } from './classEngine';
 
 export { generateId };
 
@@ -480,12 +480,24 @@ export class MockMCPServer {
             if (!resolvedToken) {
               res = { success: false, data: {}, message: `Token "${tokenIdRaw}" not found on battle map.` };
             } else {
+              // Movement validation: warn if the move exceeds the creature's speed.
+              const dist = distanceCells(resolvedToken.pos, { x: targetX, y: targetY });
+              let speed = 30; // default medium creature
+              if (resolvedToken.type === 'player') {
+                const char = this.state.party.find(c => c.id === resolvedToken.id);
+                if (char) speed = calculateSpeed(char);
+              }
+              const maxCells = Math.max(1, Math.round(speed / 5));
+              let moveMsg = `${resolvedToken.name} moved to (${targetX}, ${targetY}) on the battle map.`;
+              if (dist > maxCells) {
+                moveMsg += ` WARNING: Movement of ${dist} cells exceeds ${resolvedToken.name}'s speed (${speed} ft = ${maxCells} cells).`;
+              }
               this.state.battleMap = gridMoveToken(this.state.battleMap, resolvedToken.id, { x: targetX, y: targetY });
               const moved = this.state.battleMap.tokens.find(t => t.id === resolvedToken.id);
               res = {
                 success: true,
                 data: { tokenId: resolvedToken.id, name: resolvedToken.name, x: moved?.pos.x, y: moved?.pos.y },
-                message: `${resolvedToken.name} moved to (${moved?.pos.x}, ${moved?.pos.y}) on the battle map.`,
+                message: moveMsg,
               };
             }
           }

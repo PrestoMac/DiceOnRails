@@ -117,6 +117,9 @@ const BattleMapPanel: React.FC<BattleMapPanelProps> = ({
   const dragging = useRef<{ tokenId: string; startPos: GridPosition } | null>(null);
   const [dragOverCell, setDragOverCell] = useState<GridPosition | null>(null);
 
+  // Hover state (for melee-range ring)
+  const [hoveredTokenId, setHoveredTokenId] = useState<string | null>(null);
+
   // Tooltip
   const [tooltip, setTooltip] = useState<TooltipInfo | null>(null);
 
@@ -200,6 +203,23 @@ const BattleMapPanel: React.FC<BattleMapPanelProps> = ({
       ctx.stroke();
     }
 
+    // --- Coordinate labels ---
+    const labelFont = `${Math.max(7, Math.round(cellSize * 0.28))}px sans-serif`;
+    ctx.font = labelFont;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = 'rgba(160,130,80,0.55)';
+    // Column labels (top edge)
+    for (let x = 0; x < battleMap.width; x++) {
+      ctx.fillText(String(x), x * cellSize + cellSize / 2, 2);
+    }
+    // Row labels (left edge)
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    for (let y = 0; y < battleMap.height; y++) {
+      ctx.fillText(String(y), cellSize - 3, y * cellSize + cellSize / 2);
+    }
+
     // --- Drag hover highlight ---
     if (dragOverCell) {
       ctx.fillStyle = 'rgba(251,191,36,0.18)';
@@ -209,6 +229,22 @@ const BattleMapPanel: React.FC<BattleMapPanelProps> = ({
         cellSize - 2,
         cellSize - 2,
       );
+    }
+
+    // --- Melee-range ring for hovered token ---
+    if (hoveredTokenId) {
+      const hovered = battleMap.tokens.find(t => t.id === hoveredTokenId);
+      if (hovered && !hovered.isDead) {
+        const { cx, cy } = cellToCanvas(hovered.pos, cellSize);
+        const meleeRadius = cellSize * 1.5; // 1 cell = 5 ft, so ring at ~7.5ft visual
+        ctx.beginPath();
+        ctx.arc(cx, cy, meleeRadius, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(16,185,129,0.35)'; // green tint
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 4]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
     }
 
     // --- Tokens ---
@@ -264,7 +300,7 @@ const BattleMapPanel: React.FC<BattleMapPanelProps> = ({
         ctx.fill();
       }
     }
-  }, [battleMap, cellSize, currentTurnId, dragOverCell]);
+  }, [battleMap, cellSize, currentTurnId, dragOverCell, hoveredTokenId]);
 
   useEffect(() => { draw(); }, [draw]);
 
@@ -306,16 +342,19 @@ const BattleMapPanel: React.FC<BattleMapPanelProps> = ({
     // Tooltip on hover
     const token = tokenAtPos(px, py);
     if (token) {
+      setHoveredTokenId(token.id);
       const hp = partyHpMap.get(token.id) ?? enemyHpMap.get(token.id);
       const aliveFoes = battleMap.tokens.filter(t => t.id !== token.id && !t.isDead);
       const distances = aliveFoes.map(f => {
         const ft = distanceFeet(token.pos, f.pos);
-        return `→ ${f.name}: ${ft} ft`;
+        const inMelee = ft <= 5;
+        return `→ ${f.name}: ${ft} ft${inMelee ? ' � melee' : ''}`;
       }).slice(0, 4);
       if (!canvasRef.current) return;
       const rect = canvasRef.current.getBoundingClientRect();
       setTooltip({ name: token.name, hp: hp ? `HP ${hp}` : undefined, distances, px: e.clientX - rect.left, py: e.clientY - rect.top });
     } else {
+      setHoveredTokenId(null);
       setTooltip(null);
     }
   };
@@ -335,6 +374,7 @@ const BattleMapPanel: React.FC<BattleMapPanelProps> = ({
       dragging.current = null;
       setDragOverCell(null);
     }
+    setHoveredTokenId(null);
     setTooltip(null);
   };
 

@@ -165,9 +165,19 @@ export function tokensInRange(map: BattleMap, sourceId: string, rangeFt: number)
 /**
  * Finds a free cell near a given position by spiraling outward.
  * Used when auto-placing tokens to avoid stacking.
+ * Respects token size: a token of size N occupies an N×N block of cells,
+ * so those cells are all considered occupied.
  */
 export function findFreeCell(map: BattleMap, near: GridPosition): GridPosition {
-  const occupied = new Set(map.tokens.map(t => `${t.pos.x},${t.pos.y}`));
+  const occupied = new Set<string>();
+  for (const t of map.tokens) {
+    const size = t.size ?? 1;
+    for (let dx = 0; dx < size; dx++) {
+      for (let dy = 0; dy < size; dy++) {
+        occupied.add(`${t.pos.x + dx},${t.pos.y + dy}`);
+      }
+    }
+  }
   if (!occupied.has(`${near.x},${near.y}`)) return near;
   for (let r = 1; r <= Math.max(map.width, map.height); r++) {
     for (let dx = -r; dx <= r; dx++) {
@@ -235,7 +245,11 @@ export function autoPlaceEnemies(map: BattleMap, enemyIds: { id: string; name: s
  *   Theron → Goblin Archer: 40 ft  |  Theron → Goblin Warrior: 30 ft
  * ```
  */
-export function buildGridContextString(map: BattleMap, _state?: GameState): string {
+export function buildGridContextString(
+  map: BattleMap,
+  _state?: GameState,
+  speeds?: Record<string, number>,
+): string {
   const label = map.label ? ` "${map.label}"` : '';
   const lines: string[] = [
     `BATTLE MAP${label} (${map.width}×${map.height} grid, 1 cell = ${FEET_PER_CELL} ft):`,
@@ -258,6 +272,22 @@ export function buildGridContextString(map: BattleMap, _state?: GameState): stri
     labelMap.set(t.id, lbl);
     lines.push(`  [${lbl}] ${t.name} (enemy) @ (${t.pos.x},${t.pos.y})`);
   });
+
+  // Speeds section
+  if (speeds && Object.keys(speeds).length > 0) {
+    const speedLines: string[] = [];
+    for (const [id, speed] of Object.entries(speeds)) {
+      const token = alive.find(t => t.id === id);
+      if (token) {
+        const cells = Math.round(speed / FEET_PER_CELL);
+        speedLines.push(`${token.name}: ${speed} ft (${cells} cells)`);
+      }
+    }
+    if (speedLines.length) {
+      lines.push('SPEEDS:');
+      speedLines.forEach(s => lines.push('  ' + s));
+    }
+  }
 
   if (alive.length < 2) return lines.join('\n');
 

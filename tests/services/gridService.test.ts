@@ -321,4 +321,47 @@ describe('buildGridContextString', () => {
     const ctx = buildGridContextString(map);
     expect(ctx).not.toContain('DISTANCES');
   });
+
+  it('includes speeds section when speeds are provided', () => {
+    let map = makeMap();
+    map = placeToken(map, { ...playerA, pos: { x: 0, y: 0 } });
+    map = placeToken(map, { ...enemy1,  pos: { x: 5, y: 0 } });
+    const ctx = buildGridContextString(map, undefined, { p1: 30, e1: 25 });
+    expect(ctx).toContain('SPEEDS:');
+    expect(ctx).toContain('Aria: 30 ft');
+    expect(ctx).toContain('Goblin: 25 ft');
+  });
+
+  it('omits speeds section when no speeds provided', () => {
+    let map = makeMap();
+    map = placeToken(map, { ...playerA, pos: { x: 0, y: 0 } });
+    const ctx = buildGridContextString(map);
+    expect(ctx).not.toContain('SPEEDS:');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// findFreeCell with token size
+// ---------------------------------------------------------------------------
+
+describe('findFreeCell (size-aware)', () => {
+  it('returns the target cell if empty', () => {
+    const map = makeMap();
+    expect(findFreeCell(map, { x: 3, y: 3 })).toEqual({ x: 3, y: 3 });
+  });
+
+  it('finds adjacent cell when target is occupied', () => {
+    const map = placeToken(makeMap(), { ...playerA, pos: { x: 3, y: 3 } });
+    const pos = findFreeCell(map, { x: 3, y: 3 });
+    expect(pos).not.toEqual({ x: 3, y: 3 });
+  });
+
+  it('treats cells occupied by a Large token as occupied', () => {
+    // Place a Large (size=2) token at (3,3) — it occupies (3,3), (4,3), (3,4), (4,4)
+    let map = makeMap();
+    map = placeToken(map, { ...playerA, pos: { x: 3, y: 3 }, size: 2 });
+    // (4,3) should be considered occupied
+    const pos = findFreeCell(map, { x: 4, y: 3 });
+    expect(pos).not.toEqual({ x: 4, y: 3 });
+  });
 });

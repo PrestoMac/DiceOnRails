@@ -11,7 +11,7 @@ import { sanitizeNarration } from '../../utils/textSanitize';
 import { filterTools } from './toolFilter';
 import { resolveLLMConfig, mapHistoryToMessages } from './llmApiClient';
 import { CONDITION_INFO } from '../../data/conditionInfo';
-import { calculateAc } from '../classEngine';
+import { calculateAc, calculateSpeed } from '../classEngine';
 import { MULTIPLAYER_PROMPT } from './prompts/multiplayerPrompt';
 import { MAP_PROMPT } from './prompts/mapPrompt';
 import { buildGridContextString } from '../gridService';
@@ -205,7 +205,18 @@ export async function runAgentLoop(
   // VTT: inject grid context when a battle map is active.
   // This gives the LLM full spatial awareness (positions, distances, range advisories).
   if (state.battleMap && state.battleMap.tokens.length > 0) {
-    contextParts.push(buildGridContextString(state.battleMap, state));
+    // Build a speed lookup for all tokens (players via calculateSpeed, enemies default 30).
+    const speeds: Record<string, number> = {};
+    for (const token of state.battleMap.tokens) {
+      if (token.isDead) continue;
+      if (token.type === 'player') {
+        const char = state.party.find(c => c.id === token.id);
+        if (char) speeds[token.id] = calculateSpeed(char);
+      } else {
+        speeds[token.id] = 30; // default medium creature speed
+      }
+    }
+    contextParts.push(buildGridContextString(state.battleMap, state, speeds));
   }
 
   const contextMessage = {
