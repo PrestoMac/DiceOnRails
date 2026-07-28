@@ -75,6 +75,7 @@ const AppContent: React.FC = () => {
     stage, gameState, messages, isLoading,
     isNewCampaign, setStage,
     currentCampaignId, setCurrentCampaignId, loadGameData, syncState,
+    campaignName,
   } = useGameContext();
   const { settings, settingsOpen, setSettingsOpen, saveSettings, isMobile, diceRollData, clearDiceRoll, isCompendiumOpen, setCompendiumOpen } = useUIContext();
   const { campaigns, showCreateModal, setShowCreateModal, loadCampaigns, handleCreateNewCampaign, handleConfirmCreateCampaign, handleJoinCampaign, handleDeleteCampaign, handleRenameCampaign } = useCampaignContext();
