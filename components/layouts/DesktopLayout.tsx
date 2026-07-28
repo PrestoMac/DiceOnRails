@@ -46,6 +46,7 @@ const DesktopLayout: React.FC = () => {
   const [tab, setTab] = useState<'character' | 'journal'>('character');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarWidth, setSidebarWidth] = useState(320);
+  const [isDragging, setIsDragging] = useState(false);
   const [isAtmosphereExpanded, setIsAtmosphereExpanded] = useState(false);
   const [mapPanelOpen, setMapPanelOpen] = useState(true);
   const myCharacter = gameState.party.find(c => c.id === myCharacterId) ?? gameState.party[0];
