@@ -231,7 +231,7 @@ const DesktopLayout: React.FC = () => {
           settings={settings}
           onRewind={handleRewind}
           onUndo={handleUndo}
-          isProcessing={isLoading}
+          isProcessing={isLoading || !!gameState.isProcessing}
           onExpandAtmosphere={() => setIsAtmosphereExpanded(true)}
           atmosphereUrl={myAtmosphereUrl}
           scrollRef={chatScrollRef}
@@ -257,6 +257,7 @@ const DesktopLayout: React.FC = () => {
           pendingCount={messages.filter(m => m.pending).length}
           onProcessBatch={handleProcessBatch}
           onRemovePendingMessage={handleRemovePendingMessage}
+          onTriggerDiceRoll={handleTriggerDiceRoll}
         />
       </div>
       {isMultiplayer && typingUsers.length > 0 && (

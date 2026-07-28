@@ -18,6 +18,8 @@ interface DiceRollCardProps {
   dieCount?: number;
   results?: number[];
   rerolledIndices?: number[];
+  /** Optional click handler — when provided, the card becomes clickable to replay the roll in the modal popup. */
+  onClick?: () => void;
 }
 
 /** Animated dice roll result card with SVG die faces, roll animation, and success/failure display. */
@@ -37,6 +39,7 @@ const DiceRollCard: React.FC<DiceRollCardProps> = ({
   dieCount = 1,
   results,
   rerolledIndices = [],
+  onClick,
 }) => {
   const sides = getDieSides(dieFace);
   const isMultiDie = dieCount > 1 && results && results.length > 0;
@@ -164,7 +167,7 @@ const DiceRollCard: React.FC<DiceRollCardProps> = ({
     </div>
   );
 
-  return (
+  const cardContent = (
     <div
       className={`inline-flex items-center gap-3 px-3 py-2 mt-2 rounded-lg border backdrop-blur-sm text-sm font-mono transition-all duration-300 ${borderColor} ${bgColor} ${glowClass}`}
     >
@@ -254,6 +257,20 @@ const DiceRollCard: React.FC<DiceRollCardProps> = ({
       )}
     </div>
   );
+
+  if (onClick) {
+    return (
+      <button
+        onClick={onClick}
+        className="block w-auto text-left focus:outline-none focus:ring-2 focus:ring-amber-500/50 rounded-lg transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+        title="Click to replay dice roll in modal"
+      >
+        {cardContent}
+      </button>
+    );
+  }
+
+  return cardContent;
 };
 
 export default DiceRollCard;

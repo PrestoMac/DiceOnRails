@@ -206,6 +206,8 @@ interface ChatLogProps {
   onProcessBatch?: () => void;
   /** Multiplayer: removes one pending message (owner-gated, pre-processing). */
   onRemovePendingMessage?: (messageId: string) => void;
+  /** Called when the user clicks a dice roll card to replay the modal popup. */
+  onTriggerDiceRoll?: (data: Record<string, unknown>) => Promise<void>;
 }
 
 type FilterType = 'all' | 'narration' | 'player' | 'system';
@@ -305,6 +307,24 @@ const ChatLog: React.FC<ChatLogProps> = ({ messages, settings, onRewind, onUndo,
     }
     return text;
   };
+
+  /** Builds a replay data object from a RollData for the dice roll modal popup. */
+  const buildReplayData = (rd: import('../types').RollData): Record<string, unknown> => ({
+    characterName: rd.label || 'Unknown',
+    rollType: rd.type,
+    label: rd.label,
+    rollResult: rd.dieRoll,
+    modifier: rd.modifier,
+    skillRank: rd.skillRank,
+    difficulty: rd.dc,
+    success: rd.success,
+    xpGained: undefined,
+    sides: parseInt((rd.dieFace || 'd20').replace('d', '')),
+    isCritical: rd.isCritical,
+    isFumble: rd.isFumble,
+    count: rd.dieCount,
+    results: rd.results,
+  });
 
   const formatMessageForExport = (msg: Message): string => {
     const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -506,7 +526,7 @@ const ChatLog: React.FC<ChatLogProps> = ({ messages, settings, onRewind, onUndo,
               <div className="markdown-content text-stone-300 leading-relaxed"><ReactMarkdown>{formatMessageText(cleanedText || msg.text, msg.role)}</ReactMarkdown></div>
           {msg.rollData ? (
             <div className={`mt-2 ${(Array.isArray(msg.rollData) ? msg.rollData : [msg.rollData]).length > 1 ? 'flex flex-col gap-2' : ''}`}>
-              {(Array.isArray(msg.rollData) ? msg.rollData : [msg.rollData]).map((rd, i) => <DiceRollCard key={i} {...rd} />)}
+              {(Array.isArray(msg.rollData) ? msg.rollData : [msg.rollData]).map((rd, i) => <DiceRollCard key={i} {...rd} onClick={onTriggerDiceRoll ? () => onTriggerDiceRoll(buildReplayData(rd)) : undefined} />)}
             </div>
           ) : rolls.length > 0 ? (
             <div className="flex flex-wrap gap-2 mt-1">
