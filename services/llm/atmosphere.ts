@@ -101,7 +101,8 @@ export async function generateStartingLocations(
   apiKey: string,
   provider?: LLMProvider,
   apiBase?: string,
-  sessionId?: string
+  sessionId?: string,
+  signal?: AbortSignal
 ): Promise<StartingLocation[]> {
   const effProvider = resolveProvider(provider, apiBase);
   const url = buildChatCompletionUrl(effProvider, apiBase);
@@ -126,7 +127,7 @@ export async function generateStartingLocations(
       method: "POST",
       headers,
       body: JSON.stringify(requestBody)
-    });
+    }, 180000, signal);
 
     if (!response.ok) {
       console.warn("[generateStartingLocations] API error:", response.status, await response.text());

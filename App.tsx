@@ -99,10 +99,10 @@ const AppContent: React.FC = () => {
     handleConfirmCreateCampaign(name);
   };
 
-  const handleGenerateStartingLocations = useCallback(async (charInfo: { name: string; race: string; class: string }): Promise<StartingLocation[]> => {
+  const handleGenerateStartingLocations = useCallback(async (charInfo: { name: string; race: string; class: string }, signal?: AbortSignal): Promise<StartingLocation[]> => {
     const apiKey = getEnv("VITE_LLM_API_KEY");
     if (!apiKey) return [];
-    const locs = await generateStartingLocations(charInfo, apiKey);
+    const locs = await generateStartingLocations(charInfo, apiKey, undefined, undefined, undefined, signal);
     return Promise.all(
       locs.map(async (loc) => {
         const url = await generateAtmosphere(`${loc.name}: ${loc.description}`);

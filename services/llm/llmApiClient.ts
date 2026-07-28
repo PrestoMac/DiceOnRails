@@ -95,10 +95,17 @@ export function mapHistoryToMessages(history: Message[]) {
  * @param url - The URL to fetch.
  * @param init - The fetch init options.
  * @param timeoutMs - Timeout in milliseconds (default 30000).
+ * @param externalSignal - Optional external AbortSignal (e.g. for user-initiated cancellation).
  * @returns A promise resolving to the Response.
  */
-export function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = 30000): Promise<Response> {
+export function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = 30000, externalSignal?: AbortSignal): Promise<Response> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(new Error(`Request timed out after ${timeoutMs}ms`)), timeoutMs);
+    if (externalSignal) {
+      externalSignal.addEventListener('abort', () => {
+        clearTimeout(timer);
+        controller.abort(externalSignal.reason);
+      }, { once: true });
+    }
     return fetch(url, { ...init, signal: controller.signal }).finally(() => clearTimeout(timer));
 }

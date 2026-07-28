@@ -7,9 +7,10 @@ import { buildPresetCharacter } from '../services/characterCreationService';
 
 interface QuickStartFlowProps {
   onComplete: (character: Character) => void;
-  onGenerateStartingLocations: (charInfo: { name: string; race: string; class: string }) => Promise<StartingLocation[]>;
   onSetStartingLocation: (location: StartingLocation) => void;
   onSwitchToCustom: () => void;
+  /** Optional AbortSignal to cancel an in-flight generation (e.g. when user retries). */
+  onGenerateStartingLocations: (charInfo: { name: string; race: string; class: string }, signal?: AbortSignal) => Promise<StartingLocation[]>;
   /** true = host new campaign (preset → starting grounds). false = joining existing party (preset only; campaign starting location is fixed by host). */
   isNewCampaign?: boolean;
   /** When joining, the campaign's existing starting location (for preview + finalization). */
@@ -44,6 +45,15 @@ const QuickStartFlow: React.FC<QuickStartFlowProps> = ({ onComplete, onGenerateS
   const [isGenerating, setIsGenerating] = useState(false);
   const [genFailed, setGenFailed] = useState(false);
   const generationIdRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
+  const [showRetry, setShowRetry] = useState(false);
+
+  // After 60s of generating, surface a retry button. Resets when isGenerating toggles.
+  useEffect(() => {
+    if (!isGenerating) { setShowRetry(false); return; }
+    const timer = setTimeout(() => setShowRetry(true), 60000);
+    return () => clearTimeout(timer);
+  }, [isGenerating]);
 
   const fetchLocations = useCallback(async (spec: PresetCharacterSpec) => {
     const race = RACES_BY_ID[spec.raceId];
@@ -51,10 +61,13 @@ const QuickStartFlow: React.FC<QuickStartFlowProps> = ({ onComplete, onGenerateS
     if (!race || !cls) return;
     setIsGenerating(true);
     setGenFailed(false);
+    setShowRetry(false);
     const gid = ++generationIdRef.current;
+    const abortController = new AbortController();
+    abortRef.current = abortController;
     const charInfo = { name: spec.name, race: race.name, class: cls.name };
     try {
-      const locs = await onGenerateStartingLocations(charInfo);
+      const locs = await onGenerateStartingLocations(charInfo, abortController.signal);
       if (gid !== generationIdRef.current) return;
       setGeneratedLocations(locs);
       setSelectedLocation(locs.length > 0 ? locs[0] : null);
@@ -189,11 +202,22 @@ const QuickStartFlow: React.FC<QuickStartFlowProps> = ({ onComplete, onGenerateS
               <div className="space-y-4 py-12 text-center">
                 <i className="fas fa-dice-d20 text-6xl text-amber-500 animate-spin"></i>
                 <p className="text-stone-400 text-sm">Summoning possible starting grounds...</p>
+                {showRetry && (
+                  <div className="pt-4">
+                    <button
+                      type="button"
+                      onClick={() => { abortRef.current?.abort(); if (selectedSpec) fetchLocations(selectedSpec); }}
+                      className="px-6 py-3 bg-amber-700 hover:bg-amber-600 rounded-lg font-bold text-white transition-all uppercase tracking-widest text-xs"
+                    >
+                      <i className="fas fa-redo-alt mr-2"></i> Retry
+                    </button>
+                  </div>
+                )}
               </div>
             ) : genFailed || generatedLocations.length === 0 ? (
               <div className="space-y-4 py-8 text-center">
                 <p className="text-stone-500 text-sm">Failed to generate locations.</p>
-                <button type="button" onClick={() => selectedSpec && fetchLocations(selectedSpec)} className="px-6 py-3 bg-amber-700 hover:bg-amber-600 rounded-lg font-bold text-white transition-all uppercase tracking-widest text-xs">Retry</button>
+                <button type="button" onClick={() => { abortRef.current?.abort(); if (selectedSpec) fetchLocations(selectedSpec); }} className="px-6 py-3 bg-amber-700 hover:bg-amber-600 rounded-lg font-bold text-white transition-all uppercase tracking-widest text-xs">Retry</button>
               </div>
             ) : (
               <>
@@ -228,7 +252,7 @@ const QuickStartFlow: React.FC<QuickStartFlowProps> = ({ onComplete, onGenerateS
                     </div>
                   </div>
                 )}
-                <button type="button" onClick={() => selectedSpec && fetchLocations(selectedSpec)} className="w-full py-3 bg-stone-800 hover:bg-stone-700 rounded-lg font-bold text-stone-400 transition-all uppercase tracking-widest text-xs flex items-center justify-center gap-2 border border-stone-700">
+                <button type="button" onClick={() => { abortRef.current?.abort(); if (selectedSpec) fetchLocations(selectedSpec); }} className="w-full py-3 bg-stone-800 hover:bg-stone-700 rounded-lg font-bold text-stone-400 transition-all uppercase tracking-widest text-xs flex items-center justify-center gap-2 border border-stone-700">
                   <i className="fas fa-dice-d20"></i> Reroll Starting Grounds
                 </button>
                 <button type="button" onClick={handleBegin} disabled={!selectedLocation} className="w-full py-4 bg-green-800 hover:bg-green-700 disabled:opacity-30 rounded-lg font-bold text-white transition-all uppercase tracking-widest shadow-xl shadow-green-900/20 text-xs">
