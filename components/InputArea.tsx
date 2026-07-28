@@ -52,7 +52,7 @@ const CATEGORY_STYLES: Record<string, string> = {
   death: 'bg-red-950/50 text-red-400 border border-red-900 hover:bg-red-900/50 hover:border-red-700 hover:text-red-300 animate-pulse',
 };
 
-const QUICK_BTN = "px-2.5 py-1 rounded text-xs font-semibold shrink-0 flex items-center gap-1.5 transition-all cursor-pointer select-none";
+const QUICK_BTN = "px-2.5 py-1 rounded text-xs font-semibold shrink-0 whitespace-nowrap flex items-center gap-1.5 transition-all cursor-pointer select-none";
 const DISABLED_STYLE = "bg-stone-900/50 text-stone-600 border border-stone-800/40 cursor-not-allowed opacity-50";
 
 const QuickActionBtn: React.FC<{ action: QuickAction; locked: boolean; onClick: () => void; extraTitle?: string }> = ({ action, locked, onClick, extraTitle }) => (
