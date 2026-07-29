@@ -4,6 +4,7 @@ import { RACES_CATALOG } from '../../utils/races';
 import { StepH, NavBtn, DragonColorPicker } from './SharedComponents';
 import Tooltip from '../ui/Tooltip';
 import { STAT_INFO } from '../../data/referenceConstants';
+import { getRaceAssessment } from './classRaceAssessment';
 
 const RACES = RACES_CATALOG;
 
@@ -11,21 +12,40 @@ const RACES = RACES_CATALOG;
 const RaceStep: React.FC<StepProps> = ({ wizardState, updateWizard, onNext }) => {
   const { selectedRace, draconicAncestry } = wizardState;
   const stepCls = "space-y-6 animate-in fade-in duration-500";
+  const selectedAssessment = getRaceAssessment(selectedRace.id);
+  const continueDisabled = (selectedRace.id === 'dragonborn' && !draconicAncestry) || selectedAssessment.status === 'disabled';
 
   return (
     <div className={stepCls}>
       <StepH>Choose Lineage</StepH>
       <div className="grid grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto custom-scrollbar pr-1">
-        {RACES.map(race => (
-          <button
-            key={race.name}
-            onClick={() => {
-              updateWizard({ selectedRace: race });
-              if (race.id !== 'dragonborn') updateWizard({ draconicAncestry: null });
-            }}
-            className={`p-4 rounded-xl border-2 text-left transition-all ${selectedRace.name === race.name ? 'border-amber-600 bg-amber-900/10' : 'border-stone-800 bg-stone-900/40 hover:border-stone-600'}`}
-          >
-            <h3 className="font-bold text-lg text-stone-100">{race.name}</h3>
+        {RACES.map(race => {
+          const { status, reason } = getRaceAssessment(race.id);
+          const isDisabled = status === 'disabled';
+          const isSelected = selectedRace.name === race.name;
+          return (
+            <button
+              key={race.name}
+              disabled={isDisabled}
+              onClick={() => {
+                if (isDisabled) return;
+                updateWizard({ selectedRace: race });
+                if (race.id !== 'dragonborn') updateWizard({ draconicAncestry: null });
+              }}
+              className={`relative p-4 rounded-xl border-2 text-left transition-all ${isSelected && isDisabled ? 'border-red-900/50 bg-red-950/10' : isSelected ? 'border-amber-600 bg-amber-900/10' : 'border-stone-800 bg-stone-900/40 hover:border-stone-600'} ${isDisabled ? 'opacity-40 cursor-not-allowed' : ''}`}
+            >
+              <div className="absolute top-2 right-2">
+                <Tooltip content={reason} side="top" maxWidth={320}>
+                  {status === 'disabled' ? (
+                    <i className="fas fa-ban text-red-500/70 text-sm" />
+                  ) : status === 'warning' ? (
+                    <i className="fas fa-triangle-exclamation text-amber-500/80 text-sm" />
+                  ) : (
+                    <i className="fas fa-circle-check text-emerald-500/70 text-sm" />
+                  )}
+                </Tooltip>
+              </div>
+              <h3 className="font-bold text-lg text-stone-100">{race.name}</h3>
             <p className="text-xs text-stone-500 italic mt-1">{race.description}</p>
             <div className="mt-2 flex flex-wrap gap-1">
               {typeof race.asi === 'object'
@@ -58,7 +78,8 @@ const RaceStep: React.FC<StepProps> = ({ wizardState, updateWizard, onNext }) =>
               </details>
             )}
           </button>
-        ))}
+        );
+      })}
       </div>
       {selectedRace.id === 'dragonborn' && (
         <DragonColorPicker
@@ -67,8 +88,11 @@ const RaceStep: React.FC<StepProps> = ({ wizardState, updateWizard, onNext }) =>
           flavor="race"
         />
       )}
+      {selectedAssessment.status === 'disabled' && (
+        <p className="text-[10px] text-red-500/70 text-center">The currently selected lineage has been temporarily disabled. Please choose a different lineage.</p>
+      )}
       <NavBtn
-        disabled={selectedRace.id === 'dragonborn' && !draconicAncestry}
+        disabled={continueDisabled}
         onClick={onNext}
       >
         Continue
