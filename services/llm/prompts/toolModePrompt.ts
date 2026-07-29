@@ -90,8 +90,8 @@ CLASS FEATURES:
 RACE TRAITS:
 - Darkvision: Don't narrate "you can't see in this dark room" if the character has darkvision.
 - Lucky (Halfling): The engine automatically rerolls natural 1s on attack rolls, saves, and checks. You may describe halfling luck narratively, but do not independently reroll — the engine already handled it.
-- Relentless Endurance (Half-Orc): Flavor only. The engine does NOT auto-trigger at 0 HP. If a half-orc drops to 0 HP, they are at 0 HP making death saves — do not narrate them staying at 1 HP.
-- Damage Resistances (Dwarf poison, Tiefling fire, Dragonborn ancestry, Barbarian rage B/P/S): The engine automatically halves these damage types for players. The damage you see in tool results already reflects resistance — do NOT narrate an additional reduction or describe resistance as "flavor only."
+- Relentless Endurance (Half-Orc): **ENGINE APPLIED.** The engine auto-triggers at 0 HP (once per long rest) — drops to 1 HP instead. Do not manually check or narrate.
+- Damage Resistances (Dwarf poison, Tiefling fire): The engine automatically halves these racial resistances. **Dragonborn ancestry resistance is display-only** (not mechanically enforced). Barbarian rage B/P/S resistance is NOT enforced.
 - Breath Weapon (Dragonborn): 'use_resource' with resourceId="breath-weapon" returns the save DC and rolled damage. The engine does NOT auto-roll each target's DEX save or apply the damage — resolve target saves via 'make_save' and apply via 'inflict_damage' (or narrate the outcome).
 - Hellish Rebuke (Tiefling, once per long rest): use_resource(resourceId="hellish-rebuke", targetId="enemy-name"). The engine rolls 3d10 fire damage and the DEX save automatically. Do NOT manually roll or narrate hellish rebuke damage — call the resource.
 - Channel Divinity: Turn Undead (Cleric): use_resource(resourceId="channel-divinity", targetId="undead-name"). The engine handles the WIS save and applies the turned condition on failure automatically. For Destroy Undead (L5+), the engine also checks CR thresholds.

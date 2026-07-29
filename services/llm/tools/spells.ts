@@ -113,15 +113,17 @@ export const tools = [
         type: "function",
         function: {
             name: 'polymorph_creature',
-            description: 'Polymorphs a creature into a different form.',
+            description: 'Transform a creature into a beast form. For Druids: this IS Wild Shape — the engine auto-consumes wild-shape charges, enforces CR limits, and tracks remaining uses. For non-Druids: standard polymorph (CR capped at caster level). Available beast forms include: wolf, bear, hawk, giant-spider, tiger, owl, rat, cat, frog, spider, horse.',
             parameters: {
                 type: 'object',
                 properties: {
-                    targetId: { type: 'string' },
-                    newForm: { type: 'string' },
-                    duration: { type: 'integer' }
+                    characterId: { type: 'string', description: 'Character ID or name doing the transformation' },
+                    targetId: { type: 'string', description: 'Alternative: target character ID or name' },
+                    beastForm: { type: 'string', description: 'Beast form to transform into (e.g. "wolf", "bear", "hawk")' },
+                    newForm: { type: 'string', description: 'Alternative name for beastForm' },
+                    duration: { type: 'integer', description: 'Duration in minutes (default 60). Wild Shape = half druid level hours.' }
                 },
-                required: ['targetId', 'newForm']
+                required: ['newForm']
             }
         }
     }

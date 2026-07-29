@@ -872,6 +872,7 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
       if (handler) {
         return handler({ state, deps }, characterId, targetId, amount);
       }
+      }
       return { success: true, data: {}, message: `Used ${resourceId}.` };
     },
   };

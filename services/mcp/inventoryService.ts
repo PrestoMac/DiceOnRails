@@ -215,6 +215,7 @@ export function createInventoryService(state: GameState, deps: InventoryDeps): I
       }
       const current = target.hp.current;
       const newHp = Math.max(0, current - effectiveDmg);
+      const displayedDmg = options?.skipTargetDerivedReductions ? safeAmount : effectiveDmg;
       target.hp.current = newHp;
 
       if (newHp === 0 && current > 0) {
@@ -226,7 +227,6 @@ export function createInventoryService(state: GameState, deps: InventoryDeps): I
           deps.updateInitiativeDeathStatus(target.id, true);
         }
       }
-      const displayedDmg = options?.skipTargetDerivedReductions ? safeAmount : effectiveDmg;
       const hamReduction = options?.skipTargetDerivedReductions ? 0 : (safeAmount - effectiveDmg);
       const hamNote = hamReduction > 0 ? ` (Heavy Armor Master reduced by ${hamReduction})` : '';
 

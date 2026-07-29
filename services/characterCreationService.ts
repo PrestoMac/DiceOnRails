@@ -89,15 +89,44 @@ export function buildCharacterFromWizard(
     })(),
     location: loc?.name || '', experience: 0, experienceToNextLevel: calculateXPToNextLevel(level),
     unusedStatPoints: Math.max(0, (level - 1) * 2 - bonusAllocated), maxHpBonus: 0, hitDice: { current: level, max: level },
-    skills: updatedSkills, unusedSkillPoints: remainingSkillPoints || 0,
+    unusedSkillPoints: remainingSkillPoints || 0,
     feats: collectedFeats, featSelections, featChoices, pendingFeatChoice: false,
     resources, racialTraits,
-    conditionsImmunities: (selectedRace.id === 'elf' || selectedRace.id === 'half-elf') ? ['sleep'] : undefined,
-    knownSpells: !selectedClass.spellcasting ? [] : (
-      selectedClass.id === 'wizard' || selectedClass.spellcasting.prepMode === 'known'
+    conditionsImmunities: (() => {
+      if (selectedRace.id === 'elf' || selectedRace.id === 'half-elf') return ['sleep'];
+      return undefined;
+    })(),
+    skills: (() => {
+      const skills = { ...updatedSkills };
+      const raceDef = getRaceDef(selectedRace.id);
+      if (raceDef) {
+        for (const trait of raceDef.traits) {
+          if (trait.id === 'keen-senses' && (skills['perception'] ?? 0) < 1) {
+            skills['perception'] = 1;
+          }
+        }
+      }
+      return skills;
+    })(),
+    bonusSkillProficiencies: (() => {
+      const raceDef = getRaceDef(selectedRace.id);
+      if (raceDef && raceDef.traits.some(t => t.id === 'skill-versatility')) {
+        return 2;
+      }
+      return undefined;
+    })(),
+    knownSpells: (() => {
+      if (!selectedClass.spellcasting) {
+        return (selectedRace.id === 'tiefling' ? ['thaumaturgy'] : []);
+      }
+      const baseKnown = selectedClass.id === 'wizard' || selectedClass.spellcasting.prepMode === 'known'
         ? [...selectedCantrips, ...selectedSpells]
-        : [...selectedCantrips]
-    ),
+        : [...selectedCantrips];
+      if (selectedRace.id === 'tiefling' && !baseKnown.includes('thaumaturgy')) {
+        baseKnown.unshift('thaumaturgy');
+      }
+      return baseKnown;
+    })(),
     preparedSpells: !selectedClass.spellcasting ? [] : (
       selectedClass.id === 'wizard'
         ? [...selectedCantrips, ...selectedSpells.slice(0, Math.max(1, level + getMod(fs.int)))]
@@ -128,8 +157,9 @@ export function buildCharacterFromWizard(
     })(),
     unlockedSubclassFeatures: [],
     languages: (() => {
-      const r = RACES_BY_ID[selectedRace.id];
-      return r?.languages ? [...r.languages] : ['common'];
+      const raceDef = getRaceDef(selectedRace.id);
+      if (!raceDef) return [];
+      return raceDef.languages.filter(l => l !== 'one-of-choice');
     })(),
   };
 
