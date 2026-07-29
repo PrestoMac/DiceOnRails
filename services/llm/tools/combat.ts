@@ -55,7 +55,7 @@ export const tools = [
         type: "function",
         function: {
             name: 'player_attack',
-            description: 'PLAYER WEAPON ATTACK. Rolls to-hit and damage, applies damage, and handles feats (Two-Weapon Fighting, Great Weapon Fighting, Sneak Attack, Sharpshooter, Great Weapon Master) automatically.',
+            description: 'PLAYER WEAPON ATTACK. Rolls to-hit and damage, applies damage, and handles feats (Two-Weapon Fighting, Great Weapon Fighting, Sneak Attack, Sharpshooter, Great Weapon Master, Divine Smite) automatically.',
             parameters: {
                 type: 'object',
                 properties: {
@@ -66,7 +66,7 @@ export const tools = [
                     isSneakAttack: { type: 'boolean', description: 'Set true for Rogue Sneak Attack.' },
                     sharpshooter: { type: 'boolean', description: 'Use Sharpshooter feat: -5 to hit, +10 damage.' },
                     greatWeaponMaster: { type: 'boolean', description: 'Use Great Weapon Master feat: -5 to hit, +10 damage.' },
-                    divineSmite: { type: 'object', description: 'Optional. Use Divine Smite on a melee hit (Paladin L2+). Expend a spell slot to deal extra radiant d8s.', properties: { slotLevel: { type: 'integer', description: 'Spell slot level to expend (1-5)' } }, required: ['slotLevel'] }
+                    divineSmite: { type: 'object', description: 'Optional. Paladin Divine Smite: expend a spell slot to deal 2d8 + 1d8/level radiant damage (max 5d8, doubled on crit, +1d8 vs fiends/undead). Engine consumes slot automatically.', properties: { slotLevel: { type: 'integer', description: 'Spell slot level to expend (1-5)' } }, required: ['slotLevel'] }
                 },
                 required: ['attackerId', 'weaponName']
             }

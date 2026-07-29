@@ -116,15 +116,16 @@ export const tools = [
         type: "function",
         function: {
             name: 'use_resource',
-            description: 'Use a limited class resource (Rage, Ki, Second Wind, Action Surge, etc.).',
+            description: 'Use a limited class/race resource. ENGINE-BACKED: rage (barbarian: sets raging, +2/+3/+4 damage), ki (monk: returns DC and martial arts die for Flurry of Blows/Stunning Strike/Patient Defense), second-wind (fighter: heals 1d10+level), breath-weapon (dragonborn: returns DC and rolled damage), lay-on-hands-pool (paladin: heals amount HP with targetId), channel-divinity (cleric: Preserve Life or Turn Undead), sorcery-points (sorcerer: spend for metamagic), bardic-inspiration (bard: returns rolled BI die with targetId).',
             parameters: {
                 type: 'object',
                 properties: {
-                    targetId: { type: 'string' },
-                    resourceId: { type: 'string', description: 'Resource ID (e.g. "second-wind")' },
-                    action: { type: 'string', description: 'Specific action to take with the resource' }
+                    targetId: { type: 'string', description: 'Character using the resource' },
+                    characterId: { type: 'string', description: 'Alternative: character using the resource' },
+                    resourceId: { type: 'string', description: 'Resource ID: rage, ki, second-wind, breath-weapon, lay-on-hands-pool, channel-divinity, sorcery-points, bardic-inspiration, action-surge, relentless-endurance' },
+                    amount: { type: 'integer', description: 'Amount to spend (for lay-on-hands-pool: HP to heal. For sorcery-points: metamagic cost.)' }
                 },
-                required: ['targetId', 'resourceId']
+                required: ['resourceId']
             }
         }
     }

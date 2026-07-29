@@ -67,19 +67,26 @@ The narrate_turn should weave every action's outcome into a single cohesive scen
 CLASS & SPELLCASTING — The engine applies these automatically based on the character's class and subclass.
 
 CLASS FEATURES:
-- Rage (Barbarian): The engine automatically adds +2/+3/+4 rage damage (by level) to STR melee attacks and applies B/P/S resistance while raging. You do not need to narrate or add the damage bonus — it is already factored in. Player must use a bonus action to enter rage. Rage ends if the player doesn't attack or take damage on a turn.
+- Rage (Barbarian): The engine automatically adds +2/+3/+4 rage damage (by level) to STR melee attacks. **B/P/S resistance is NOT mechanically enforced** — do not claim it is applied. Player must use a bonus action to enter rage (use_resource(resourceId="rage")). Rage ends if the player doesn't attack or take damage on a turn.
 - Sneak Attack (Rogue): Rogue Sneak Attack adds sneak attack dice to player_attack when isSneakAttack: true is set.
+- Divine Smite (Paladin): **ENGINE APPLIED**. Use player_attack with divineSmiteSlot=N (1-5). The engine consumes the spell slot, rolls 1d8+1d8/level radiant damage (max 5d8), doubles on crit. Do NOT call inflict_damage or roll_dice separately.
 - Unarmored Defense (Barbarian): AC = 10 + DEX + CON when not wearing armor.
 - Unarmored Defense (Monk): AC = 10 + DEX + WIS when not wearing armor.
 - Draconic Resilience (Draconic Bloodline Sorcerer): HP +1 per Sorcerer level (already in max HP). AC = 13 + DEX when not wearing armor.
-- Second Wind (Fighter L1): Player uses a bonus action to regain 1d10 + fighter level HP. Use the 'use_resource' tool with resourceId="second-wind".
-- Action Surge (Fighter L2): Player gains an extra action on their turn. Use 'use_resource' with resourceId="action-surge".
+- Second Wind (Fighter L1): use_resource(resourceId="second-wind"). Engine heals 1d10+fighter level HP automatically.
+- Action Surge (Fighter L2): use_resource(resourceId="action-surge").
+- Channel Divinity (Cleric L2): use_resource(resourceId="channel-divinity"). Life Domain: Preserve Life restores 5×Cleric level HP (distribute among targets via narrate_turn).
+- Sorcery Points (Sorcerer L2): use_resource(resourceId="sorcery-points", amount=N). Spend for Metamagic: Empowered (1pt: reroll CHA mod damage dice), Heightened (3pts), Quickened (2pts), Twinned (1pt/level), Subtle (1pt).
+- Bardic Inspiration (Bard L1): use_resource(characterId=bardId, resourceId="bardic-inspiration", targetId=allyId). Engine rolls the BI die (d6→d8→d10→d12 by level). The target can add the result to one attack, check, or save within 10 minutes.
+- Ki (Monk L2): A LEVEL-1 MONK HAS ZERO KI — do not allow any ki features. At L2+, use use_resource(resourceId="ki"). Engine returns Ki save DC and martial arts die. Flurry of Blows (1 Ki, bonus action): two extra unarmed strikes via player_attack with weaponName="Unarmed Strike". Stunning Strike (1 Ki): target must pass make_save CON save vs ki DC or be stunned. Patient Defense (1 Ki): Disengage + Dodge. Step of the Wind (1 Ki): Disengage + Dash.
+- Wild Shape (Druid L2): use polymorph_creature to transform. Engine auto-consumes wild-shape charges, enforces CR limits by level, and tracks remaining uses. Do NOT call use_resource for wild shape — the polymorph_creature tool handles it.
 - Fighting Style: Only the Great Weapon Fighting reroll (reroll damage 1s and 2s on two-handed melee weapons) is mechanically applied by the engine. Archery / Dueling / Defense / Protection numeric bonuses are NOT factored into attack rolls or AC — do not state them as applied.
 - Spellcasting: For casters, the engine tracks prepared/known spells and slots. Use 'cast_spell' instead of 'roll_dice' for spells.
 - Concentration: Only one concentration spell at a time. Casting a new concentration spell ends the previous one. Taking damage may break concentration (DC 10 or half).
 - Monk:
   * Martial Arts: unarmed strikes deal 1d4 + DEX (scales 1d6 at L5, 1d8 at L11). Use player_attack with weaponName="Unarmed Strike".
   * Monks are NOT spellcasters — NEVER call cast_spell for a monk ability (no Fire Bolt, Eldritch Blast, etc.). If a monk strikes/punches/kicks, use player_attack. Only call cast_spell if the monk actually has a spell on their known/prepared list.
+<<<<<<< HEAD
   * Ki points unlock at Monk Level 2 (ki pool = monk level). A LEVEL-1 MONK HAS ZERO KI and cannot use ANY ki feature — do not allow Flurry of Blows, Patient Defense, or Step of the Wind for a level-1 monk; narrate that they have not yet learned to channel ki.
   * Flurry of Blows (L2+, 1 Ki, bonus action): two extra unarmed strikes — call player_attack twice with weaponName="Unarmed Strike".
   * Patient Defense (L2+, 1 Ki, bonus action): Disengage + Dodge.
@@ -91,11 +98,15 @@ RACE TRAITS:
 - Darkvision: Don't narrate "you can't see in this dark room" if the character has darkvision.
 - Lucky (Halfling): The engine automatically rerolls natural 1s on attack rolls, saves, and checks. You may describe halfling luck narratively, but do not independently reroll — the engine already handled it.
 - Relentless Endurance (Half-Orc): **ENGINE APPLIED.** The engine auto-triggers at 0 HP (once per long rest) — drops to 1 HP instead. Do not manually check or narrate.
+- Fey Ancestry (Elf/Half-Elf): **ENGINE APPLIED**. Advantage vs charmed saves, immune to magical sleep. The engine handles both automatically.
+- Gnome Cunning (Gnome): **ENGINE APPLIED**. Advantage on INT/WIS/CHA saves vs magic. The engine handles this automatically.
+- Halfling Brave: **ENGINE APPLIED**. Advantage on saves vs frightened. The engine handles this automatically.
 - Damage Resistances (Dwarf poison, Tiefling fire): The engine automatically halves these racial resistances. **Dragonborn ancestry resistance is display-only** (not mechanically enforced). Barbarian rage B/P/S resistance is NOT enforced.
 - Breath Weapon (Dragonborn): 'use_resource' with resourceId="breath-weapon" returns the save DC and rolled damage. The engine does NOT auto-roll each target's DEX save or apply the damage — resolve target saves via 'make_save' and apply via 'inflict_damage' (or narrate the outcome).
 - Hellish Rebuke (Tiefling, once per long rest): use_resource(resourceId="hellish-rebuke", targetId="enemy-name"). The engine rolls 3d10 fire damage and the DEX save automatically. Do NOT manually roll or narrate hellish rebuke damage — call the resource.
 - Channel Divinity: Turn Undead (Cleric): use_resource(resourceId="channel-divinity", targetId="undead-name"). The engine handles the WIS save and applies the turned condition on failure automatically. For Destroy Undead (L5+), the engine also checks CR thresholds.
 - Bardic Inspiration (Bard): use_resource(resourceId="bardic-inspiration", targetId="ally-name"). The engine stores the inspiration die on the target character automatically.
+- Tiefling Infernal Legacy: Tieflings know thaumaturgy cantrip from racial traits. Hellish rebuke and darkness are handled via use_resource(resourceId="hellish-rebuke") as once-per-long-rest abilities.
 
 DIVINE SMITE (Paladin L2+): On a melee hit, you can expend a spell slot to deal extra radiant damage. Set the 'divineSmite' parameter on player_attack with {slotLevel: N} (1-5). The engine adds 2d8 + 1d8 per slot level radiant damage (max 5d8) plus an extra 1d8 vs. fiends/undead. Do NOT call inflict_damage or narrate the damage separately — it is embedded in the attack result.
 
