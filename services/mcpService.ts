@@ -315,9 +315,18 @@ export class MockMCPServer {
    * `narration`/`timePassed`; binary dice tools pass `narrationOnSuccess`/
    * `narrationOnFailure` and the engine selects the branch from the result's own
    * roll outcome (zero-hallucination). Only honored OUT of combat. No-op otherwise.
+   *
+   * When `deferFinalize` is true the finalize is skipped entirely — the tool
+   * executes mechanically only (roll, damage, location change, etc.) with no
+   * per-tool narration, time advance, condition tick, or roleplay XP. This is
+   * used by the agent loop's multi-action synthesis path: when 2+ action tools
+   * in one LLM response each carry inline-finalize args, deferring prevents
+   * gameTime stacking and narration loss. A single synthesizing narrate_turn
+   * (either explicit in the same batch, or elicited on the next iteration)
+   * then advances time/ticks conditions/awards XP from the full result context.
    */
-  private async maybeFinalizeTurn(args: Record<string, unknown>, baseResult: MCPResponse): Promise<MCPResponse> {
-    if (this.state.combat?.isActive) return baseResult;
+  private async maybeFinalizeTurn(args: Record<string, unknown>, baseResult: MCPResponse, deferFinalize?: boolean): Promise<MCPResponse> {
+    if (deferFinalize || this.state.combat?.isActive) return baseResult;
 
     const hasInlineNarration = typeof args.narration === 'string' && (args.narration as string).trim() !== '';
     const hasTimePassed = args.timePassed !== undefined && args.timePassed !== null;
@@ -357,13 +366,18 @@ export class MockMCPServer {
   }
 
 
-  /** Routes an LLM tool call by name to the appropriate sub-service, dispatching across 29 cases (28 tools + unknown default). */
-  public async executeToolCall(name: string, args: Record<string, unknown>): Promise<MCPResponse> {
+  /**
+   * Routes an LLM tool call by name to the appropriate sub-service, dispatching across 29 cases (28 tools + unknown default).
+   * The optional `options.deferFinalize` flag skips inline-turn finalization on action tools — used by the
+   * agent loop's multi-action synthesis path so that 2+ parallel finalizing tools don't each stack gameTime
+   * or clobber each other's narration. A single synthesizing narrate_turn handles time/conditions/XP instead.
+   */
+  public async executeToolCall(name: string, args: Record<string, unknown>, options?: { deferFinalize?: boolean }): Promise<MCPResponse> {
     if (isDebugMode) {
       console.log(`[executeToolCall] Executing: ${name} with args:`, args);
     }
     try {
-      if (!this.state.combat?.isActive && typeof args.timePassed === 'number' && args.timePassed > 0) {
+      if (!options?.deferFinalize && !this.state.combat?.isActive && typeof args.timePassed === 'number' && args.timePassed > 0) {
         const validation = validateTravelTimeAdvance(name, args.timePassed);
         if (!validation.ok) {
           return { success: false, data: {}, message: validation.message };
@@ -391,15 +405,15 @@ export class MockMCPServer {
           res = await this.combat.player_attack(String(args.attackerId || ''), String(args.weaponName || ''), String(args.targetId || args.target_name || args.target || ''), args.isOffHand as boolean | undefined, args.isSneakAttack as boolean | undefined, args.sharpshooter as boolean | undefined, args.greatWeaponMaster as boolean | undefined); break;
         case 'move_to': {
           res = await this.travel.move_to(String(args.location_name || 'Unknown'), String(args.description || ''), args.targetId as string | undefined, args.skillCheck as unknown as { skill_name?: string; difficulty?: number; onSuccess?: unknown }, args.significance as LocationSignificance | undefined);
-          res = await this.maybeFinalizeTurn(args, res);
+          res = await this.maybeFinalizeTurn(args, res, options?.deferFinalize);
           break;
         }
         case 'check_skill':
-          res = await this.maybeFinalizeTurn(args, await this.travel.check_skill(String(args.skill_name || ''), Number(args.difficulty ?? 10), args.targetId as string, args.onSuccess as Record<string, unknown>)); break;
+          res = await this.maybeFinalizeTurn(args, await this.travel.check_skill(String(args.skill_name || ''), Number(args.difficulty ?? 10), args.targetId as string, args.onSuccess as Record<string, unknown>), options?.deferFinalize); break;
         case 'inflict_damage':
           res = await this.inventory.inflict_damage(Number(args.amount ?? 0), (args.targetId || args.target_name) as string, args.damageType as string); break;
         case 'adjust_currency':
-          res = await this.maybeFinalizeTurn(args, await this.inventory.adjust_currency(Number(args.gp ?? 0), Number(args.sp ?? 0), Number(args.cp ?? 0), args.targetId as string)); break;
+          res = await this.maybeFinalizeTurn(args, await this.inventory.adjust_currency(Number(args.gp ?? 0), Number(args.sp ?? 0), Number(args.cp ?? 0), args.targetId as string), options?.deferFinalize); break;
         case 'update_inventory': {
           const batchItems = Array.isArray(args.items) ? args.items as Array<Record<string, unknown>> : [];
           if (batchItems.length > 0) {
@@ -415,18 +429,18 @@ export class MockMCPServer {
               msgs.push(r.message);
               if (!r.success) anyFail = true;
             }
-            res = await this.maybeFinalizeTurn(args, { success: !anyFail, data: { batch: batchItems.length, character: args.targetId }, message: msgs.join('\n') });
+            res = await this.maybeFinalizeTurn(args, { success: !anyFail, data: { batch: batchItems.length, character: args.targetId }, message: msgs.join('\n') }, options?.deferFinalize);
           } else {
-            res = await this.maybeFinalizeTurn(args, await this.inventory.update_inventory(String(args.item_name || ''), String(args.action || 'add') as 'add' | 'remove' | 'edit', Number(args.quantity ?? 1), args.new_name as string | undefined, args.targetId as string, args.type as unknown as InventoryItem['type'], args.rarity as unknown as InventoryItem['rarity'], args.description as string, args.stats as unknown as InventoryItem['stats'], args.equipped as boolean, args.cost_gp as number | undefined, args.cost_sp as number | undefined, args.cost_cp as number | undefined, args.autoDeductMarketPrice as boolean | undefined, args.craft as boolean | undefined));
+            res = await this.maybeFinalizeTurn(args, await this.inventory.update_inventory(String(args.item_name || ''), String(args.action || 'add') as 'add' | 'remove' | 'edit', Number(args.quantity ?? 1), args.new_name as string | undefined, args.targetId as string, args.type as unknown as InventoryItem['type'], args.rarity as unknown as InventoryItem['rarity'], args.description as string, args.stats as unknown as InventoryItem['stats'], args.equipped as boolean, args.cost_gp as number | undefined, args.cost_sp as number | undefined, args.cost_cp as number | undefined, args.autoDeductMarketPrice as boolean | undefined, args.craft as boolean | undefined), options?.deferFinalize);
           }
           break;
         }
         case 'upsert_quest':
-          res = await this.maybeFinalizeTurn(args, await this.content.upsert_quest(String(args.title || ''), String(args.description || ''), String(args.status || 'active') as 'active' | 'completed' | 'failed', args.difficulty as QuestDifficulty | undefined, args.reputationChanges as unknown as Array<{ faction: string; delta: number }>)); break;
+          res = await this.maybeFinalizeTurn(args, await this.content.upsert_quest(String(args.title || ''), String(args.description || ''), String(args.status || 'active') as 'active' | 'completed' | 'failed', args.difficulty as QuestDifficulty | undefined, args.reputationChanges as unknown as Array<{ faction: string; delta: number }>), options?.deferFinalize); break;
         case 'log_lore':
-          res = await this.maybeFinalizeTurn(args, await this.content.log_lore(String(args.title || ''), String(args.content || ''), String(args.category || 'History'))); break;
+          res = await this.maybeFinalizeTurn(args, await this.content.log_lore(String(args.title || ''), String(args.content || ''), String(args.category || 'History')), options?.deferFinalize); break;
         case 'make_save':
-          res = await this.maybeFinalizeTurn(args, await this.combat.make_save(String(args.targetId || ''), String(args.stat || 'dex'), Number(args.dc ?? 10))); break;
+          res = await this.maybeFinalizeTurn(args, await this.combat.make_save(String(args.targetId || ''), String(args.stat || 'dex'), Number(args.dc ?? 10)), options?.deferFinalize); break;
         case 'roll_death_save':
           res = await this.combat.roll_death_save(String(args.targetId || '')); break;
         case 'level_up': {

@@ -58,6 +58,12 @@ You MAY end a non-combat turn by passing narration + timePassed directly on a to
 - Attacks and damage spells still require a SEPARATE narrate_turn after you observe the rolled result (numbers in the prose must be truthful).
 - NEVER use inline/branch narration while in combat — combat turns are driven by next_turn.
 
+MULTIPLE ACTIONS IN ONE TURN (out of combat):
+When a player performs 2+ distinct actions (e.g. two skill checks, or a search + a lore discovery), you have two options:
+- PREFERRED: call all action tools WITHOUT narration args, then include a single narrate_turn alongside them that synthesizes ALL results into one coherent narration. Include timePassed for the total scene, and suggestions/suggestionsByCharacter for next actions.
+- ALTERNATIVE: if you include narration/narrationOnSuccess on each individual tool, the engine will defer them and prompt you to synthesize afterward — costing an extra round-trip. Avoid this by using the preferred pattern.
+The synthesizing narrate_turn should weave every action's outcome into a single cohesive scene — do not write disconnected paragraphs per action.
+
 CLASS & SPELLCASTING — The engine applies these automatically based on the character's class and subclass.
 
 CLASS FEATURES:

@@ -562,4 +562,174 @@ describe('runAgentLoop', () => {
 
     expect(result.inlineNarration).toBeUndefined();
   });
+
+  // ─── Multi-action synthesis path tests ───
+
+  it('multi-finalize without narrate_turn: defers tools, synthesizes on next iteration', async () => {
+    const gameTimeBefore = mcpServer.getFullState().gameTime ?? 0;
+    const SYNTH_NARR = 'SYNTHTOKEN Both the lock and the trap are dealt with in one fluid sequence.';
+
+    // Iteration 1: two check_skill calls each with branch narration → multi-finalize detected.
+    mockFetch.mockResolvedValueOnce(makeLLMResponse('', [
+      { name: 'check_skill', args: {
+          skill_name: 'thieves_tools', difficulty: 12, targetId: 'hero-1',
+          narrationOnSuccess: 'LOCK_NARR The lock clicks open.', narrationOnFailure: 'LOCK_FAIL The lock jams.', timePassed: 5,
+      } },
+      { name: 'check_skill', args: {
+          skill_name: 'investigation', difficulty: 10, targetId: 'hero-1',
+          narrationOnSuccess: 'TRAP_NARR You find the trap.', narrationOnFailure: 'TRAP_FAIL You miss the trap.', timePassed: 5,
+      } },
+    ]));
+    // Iteration 2: synthesizing narrate_turn.
+    mockFetch.mockResolvedValueOnce(makeLLMResponse('', [
+      { name: 'narrate_turn', args: { narration: SYNTH_NARR, timePassed: 10, suggestions: ['Open the chest', 'Look around'] } },
+    ]));
+
+    const result = await runAgentLoop(
+      [{ id: 'u1', role: MessageRole.USER, text: 'I pick the lock and search for traps', timestamp: 0 }],
+      'Dungeon',
+      undefined, undefined, undefined,
+      { requestEndNarration: true, enableSuggestions: true },
+    );
+
+    // Two iterations: action batch + synthesis narrate_turn.
+    expect(result.iterationCount).toBe(2);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    // Both check_skill results in toolMessages.
+    const checkMsgs = result.toolMessages.filter(m => m.text.includes('check_skill'));
+    expect(checkMsgs).toHaveLength(2);
+    // Narration comes from the synthesis narrate_turn, not from either check_skill.
+    expect(result.inlineNarration).toBe(SYNTH_NARR);
+    // gameTime advanced once (by narrate_turn's timePassed=10), not stacked (would be 20).
+    const gameTimeAfter = mcpServer.getFullState().gameTime ?? 0;
+    expect(gameTimeAfter - gameTimeBefore).toBe(10);
+    // Suggestions from the synthesis narrate_turn.
+    expect(result.suggestions).toEqual(['Open the chest', 'Look around']);
+  });
+
+  it('multi-finalize with explicit narrate_turn: skills deferred, narrate_turn synthesizes in one iteration', async () => {
+    const gameTimeBefore = mcpServer.getFullState().gameTime ?? 0;
+    const SYNTH_NARR = 'SYNTHEXPLICIT The lock yields and the trap is disarmed in a single practiced motion.';
+
+    // Single response: two check_skill (deferred) + narrate_turn (synthesis).
+    mockFetch.mockResolvedValueOnce(makeLLMResponse('', [
+      { name: 'check_skill', args: {
+          skill_name: 'thieves_tools', difficulty: 12, targetId: 'hero-1',
+          narrationOnSuccess: 'LOCK_INDIVIDUAL', narrationOnFailure: 'LOCK_FAIL_INDIVIDUAL', timePassed: 5,
+      } },
+      { name: 'check_skill', args: {
+          skill_name: 'investigation', difficulty: 10, targetId: 'hero-1',
+          narrationOnSuccess: 'TRAP_INDIVIDUAL', narrationOnFailure: 'TRAP_FAIL_INDIVIDUAL', timePassed: 5,
+      } },
+      { name: 'narrate_turn', args: { narration: SYNTH_NARR, timePassed: 8 } },
+    ]));
+
+    const result = await runAgentLoop(
+      [{ id: 'u1', role: MessageRole.USER, text: 'I pick the lock and search for traps', timestamp: 0 }],
+      'Dungeon',
+      undefined, undefined, undefined,
+      { requestEndNarration: true },
+    );
+
+    // One iteration: the explicit narrate_turn pre-synthesized.
+    expect(result.iterationCount).toBe(1);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    // Narration from narrate_turn, not from individual check_skill branch texts.
+    expect(result.inlineNarration).toBe(SYNTH_NARR);
+    expect(result.inlineNarration).not.toContain('LOCK_INDIVIDUAL');
+    expect(result.inlineNarration).not.toContain('TRAP_INDIVIDUAL');
+    // gameTime advanced once by narrate_turn's timePassed=8 (not stacked from checks).
+    const gameTimeAfter = mcpServer.getFullState().gameTime ?? 0;
+    expect(gameTimeAfter - gameTimeBefore).toBe(8);
+  });
+
+  it('gameTime does NOT stack when multi-finalize tools each carry timePassed', async () => {
+    const gameTimeBefore = mcpServer.getFullState().gameTime ?? 0;
+
+    mockFetch.mockResolvedValueOnce(makeLLMResponse('', [
+      { name: 'check_skill', args: {
+          skill_name: 'perception', difficulty: 10, targetId: 'hero-1',
+          narrationOnSuccess: 'You see it.', narrationOnFailure: 'You miss it.', timePassed: 30,
+      } },
+      { name: 'check_skill', args: {
+          skill_name: 'investigation', difficulty: 15, targetId: 'hero-1',
+          narrationOnSuccess: 'You find it.', narrationOnFailure: 'You miss it.', timePassed: 30,
+      } },
+    ]));
+    mockFetch.mockResolvedValueOnce(makeLLMResponse('', [
+      { name: 'narrate_turn', args: { narration: 'Both searches complete in half an hour.', timePassed: 30 } },
+    ]));
+
+    await runAgentLoop(
+      [{ id: 'u1', role: MessageRole.USER, text: 'I search everywhere', timestamp: 0 }],
+      'Dungeon',
+      undefined, undefined, undefined,
+      { requestEndNarration: true },
+    );
+
+    const gameTimeAfter = mcpServer.getFullState().gameTime ?? 0;
+    // 30 (from narrate_turn), NOT 60 (stacked from 2 × 30).
+    expect(gameTimeAfter - gameTimeBefore).toBe(30);
+  });
+
+  it('synthesisExpected guard: re-nudges when LLM emits action tools instead of narrate_turn', async () => {
+    // Iteration 1: two check_skill with branch narration → multi-finalize detected, deferred.
+    mockFetch.mockResolvedValueOnce(makeLLMResponse('', [
+      { name: 'check_skill', args: {
+          skill_name: 'perception', difficulty: 10, targetId: 'hero-1',
+          narrationOnSuccess: 'You spot something.', narrationOnFailure: 'You miss it.', timePassed: 5,
+      } },
+      { name: 'check_skill', args: {
+          skill_name: 'investigation', difficulty: 12, targetId: 'hero-1',
+          narrationOnSuccess: 'You find a clue.', narrationOnFailure: 'You find nothing.', timePassed: 5,
+      } },
+    ]));
+    // Iteration 2: LLM misbehaves — emits another check_skill instead of narrate_turn.
+    mockFetch.mockResolvedValueOnce(makeLLMResponse('', [
+      { name: 'check_skill', args: { skill_name: 'arcana', difficulty: 15, targetId: 'hero-1' } },
+    ]));
+    // Iteration 3: LLM finally emits narrate_turn.
+    mockFetch.mockResolvedValueOnce(makeLLMResponse('', [
+      { name: 'narrate_turn', args: { narration: 'GUARDPASS The search reveals hidden secrets.', timePassed: 10 } },
+    ]));
+
+    const result = await runAgentLoop(
+      [{ id: 'u1', role: MessageRole.USER, text: 'I search the room', timestamp: 0 }],
+      'Dungeon',
+      undefined, undefined, undefined,
+      { requestEndNarration: true },
+    );
+
+    // Three iterations: actions → re-nudge → narrate_turn.
+    expect(result.iterationCount).toBe(3);
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+    expect(result.inlineNarration).toBe('GUARDPASS The search reveals hidden secrets.');
+    // The iter-2 re-nudge message must be present in the iter-3 request.
+    const iter3Body = JSON.parse((mockFetch.mock.calls[2][1] as { body: string }).body);
+    const nudge = iter3Body.messages.find((m: { role: string; content: string }) =>
+      m.role === 'user' && m.content.includes('narrate_turn') && m.content.includes('Do not call more action tools'));
+    expect(nudge).toBeDefined();
+  });
+
+  it('single check_skill with branch narration is NOT deferred (byte-identity)', async () => {
+    const NARR = 'SOLOTOKEN The guard is convinced by your eloquent words.';
+    mockFetch.mockResolvedValueOnce(makeLLMResponse('', [
+      { name: 'check_skill', args: {
+          skill_name: 'persuasion', difficulty: 15, targetId: 'hero-1',
+          narrationOnSuccess: NARR, narrationOnFailure: NARR, timePassed: 5,
+      } },
+    ]));
+
+    const result = await runAgentLoop(
+      [{ id: 'u1', role: MessageRole.USER, text: 'I persuade the guard', timestamp: 0 }],
+      'Tavern',
+      undefined, undefined, undefined,
+      { requestEndNarration: true },
+    );
+
+    // Single iteration — inline finalize, no synthesis round-trip.
+    expect(result.iterationCount).toBe(1);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(result.inlineNarration).toBe(NARR);
+  });
 });

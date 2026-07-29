@@ -24,6 +24,13 @@ const CRITICAL_TOOLS = new Set(['cast_spell', 'inflict_damage', 'roll_dice', 'pl
 // "[System:tool_call] Unknown tool: tool_call".
 const VALID_TOOL_NAMES = new Set(tools.map((t: { function: { name: string } }) => t.function.name));
 
+// Nudge appended after deferred multi-action tool execution, instructing the LLM
+// to synthesize all resolved results into a single coherent narrate_turn. This is
+// the core of the multi-action synthesis path: when 2+ action tools carry inline-
+// finalize args, they are deferred (mechanical-only execution), and this message
+// tells the LLM to look at every result and write ONE narration + time + suggestions.
+const SYNTHESIS_NUDGE = 'All actions have resolved. Now call narrate_turn ONCE to synthesize all results into one coherent narration covering every action that occurred. Include timePassed (total minutes for the entire scene), suggestions or suggestionsByCharacter for next actions, and xp for any roleplay-worthy moments. Do NOT re-attempt any action tools.';
+
 function createToolMessage(toolName: string, result: MCPResponse, toolCallId?: string): Message {
     return {
         id: `tool-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
@@ -40,12 +47,13 @@ async function executeToolBatch(
     toolCalls: { id: string; name: string; args: Record<string, unknown> }[],
     toolMessages: Message[],
     onToolResult?: (toolName: string, args: Record<string, unknown>, result: MCPResponse) => void,
+    options?: { deferFinalize?: boolean },
 ): Promise<{ results: Array<{ mapped: { id: string; name?: string; args: Record<string, unknown> }; raw: { id: string; function: { name?: string; arguments?: string } }; result: MCPResponse }>; criticalFailed: boolean }> {
     if (isDebugMode) console.log(`[AgentLoop] executeToolBatch executing ${toolCalls.length} tool(s)`, toolCalls.map(tc => ({ name: tc.name, args: tc.args })));
     const batchStart = Date.now();
     const results = await Promise.all(toolCalls.map(async tc => {
         const execStart = Date.now();
-        const result = await mcpServer.executeToolCall(tc.name, tc.args);
+        const result = await mcpServer.executeToolCall(tc.name, tc.args, options);
         if (isDebugMode) console.log(`[AgentLoop] Tool ${tc.name} completed in ${Date.now() - execStart}ms`, { success: result.success, messageLen: result.message.length });
         return { mapped: tc, raw: rawToolCalls.find((r: { id: string }) => r.id === tc.id) || tc, result };
     }));
@@ -249,6 +257,9 @@ export async function runAgentLoop(
   let suggestionsByChar: Record<string, string[]> | undefined;
   let narrateTurnExecuted = false;
   let correctiveRetries = 0;
+  // Set when the agent loop has deferred multi-action finalize and is waiting
+  // for the LLM to emit a synthesizing narrate_turn on the next iteration.
+  let synthesisExpected = false;
   // Tracks the most recent assistant prose (or reasoning_content fallback) across
   // iterations. Used as a last-resort source for inlineNarration when the model
   // emits prose alongside tool calls but no narrate_turn/inline-finalize narration
@@ -354,6 +365,13 @@ export async function runAgentLoop(
     }
 
     if (rawToolCalls.length === 0) {
+      // Synthesis guard: if we deferred multi-action finalize and the LLM failed
+      // to emit narrate_turn, re-nudge rather than falling through to break.
+      if (synthesisExpected) {
+        if (isDebugMode) console.warn(`[AgentLoop] Synthesis expected but no tool calls (iter ${iter + 1}); re-nudging for narrate_turn`);
+        messages.push({ role: 'user', content: 'You must call narrate_turn now to conclude the turn. The actions have already resolved — synthesize them into narration. Do not call any other tool.' });
+        continue;
+      }
       // Layer-2 guardrail: the model suffered a tool-calling format failure and emitted
       // its calls as raw <tool_call>/<function> text instead of using the structured
       // tool_calls field. Nudge it to re-issue proper structured calls (recovers dropped
@@ -399,8 +417,43 @@ export async function runAgentLoop(
       return { id: tc.id, name: tc.function.name, args: parsedArgs };
     });
 
+    const hasNarrateTurn = toolCalls.some((tc: { name: string }) => tc.name === 'narrate_turn');
+
+    // Synthesis guard: when waiting for the LLM's synthesizing narrate_turn after
+    // a deferred multi-action batch, reject any response that doesn't include
+    // narrate_turn and re-nudge. Prevents the LLM from re-attempting actions
+    // instead of synthesizing.
+    if (synthesisExpected && !hasNarrateTurn) {
+      if (isDebugMode) console.warn(`[AgentLoop] Synthesis expected but LLM emitted non-narrate_turn tools (iter ${iter + 1}); re-nudging`);
+      messages.push({ role: 'user', content: 'The turn is ready to conclude. Call narrate_turn to synthesize the resolved actions into narration. Do not call more action tools.' });
+      continue;
+    }
+    if (synthesisExpected && hasNarrateTurn) {
+      synthesisExpected = false;
+    }
+
     const combatActive = mcpServer.getFullState().combat?.isActive === true;
-    const isEndOfTurn = toolCalls.some((tc: { name: string; args?: { narration?: string; autoAdvanceTime?: boolean; timePassed?: number; narrationOnSuccess?: string; narrationOnFailure?: string } }) =>
+
+    // Multi-action synthesis detection: 2+ non-narrate_turn tools each carrying
+    // inline-finalize args (narration / timePassed / narrationOnSuccess /
+    // narrationOnFailure). When detected, each tool's finalize is deferred
+    // (mechanical execution only — no per-tool narration, no gameTime stacking).
+    // The LLM then synthesizes a single narrate_turn that accounts for ALL
+    // resolved results. Gated out of combat (combat turns are next_turn-driven).
+    // Single-action turns (the common case) are byte-identical — multiFinalize
+    // is false, no deferral, inline finalize works exactly as before.
+    const nonNarrateTools = toolCalls.filter((tc: { name: string }) => tc.name !== 'narrate_turn');
+    const multiFinalize = !combatActive && nonNarrateTools.filter((tc: { args?: { narration?: string; timePassed?: number; narrationOnSuccess?: string; narrationOnFailure?: string } }) =>
+      tc.args?.narration || tc.args?.timePassed !== undefined ||
+      tc.args?.narrationOnSuccess || tc.args?.narrationOnFailure
+    ).length >= 2;
+
+    // When multi-finalize without an explicit narrate_turn, suppress isEndOfTurn
+    // so the normal path executes the deferred tools and the loop continues for
+    // a synthesis iteration. When multi-finalize WITH an explicit narrate_turn,
+    // isEndOfTurn is true (the narrate_turn triggers it) and the isEndOfTurn
+    // block handles the synthesis directly.
+    const isEndOfTurn = !(multiFinalize && !hasNarrateTurn) && toolCalls.some((tc: { name: string; args?: { narration?: string; autoAdvanceTime?: boolean; timePassed?: number; narrationOnSuccess?: string; narrationOnFailure?: string } }) =>
       tc.name === 'narrate_turn' ||
       (tc.name === 'long_rest' && (tc.args?.narration || tc.args?.autoAdvanceTime)) ||
       (tc.name === 'short_rest' && (tc.args?.narration || tc.args?.autoAdvanceTime)) ||
@@ -415,7 +468,7 @@ export async function runAgentLoop(
 
       const preEndCalls = toolCalls.filter((tc: { name: string }) => tc.name !== 'narrate_turn');
       if (preEndCalls.length > 0) {
-        const { results: preEndResults, criticalFailed: preEndCritical } = await executeToolBatch(rawToolCalls, preEndCalls, toolMessages, onToolResult);
+        const { results: preEndResults, criticalFailed: preEndCritical } = await executeToolBatch(rawToolCalls, preEndCalls, toolMessages, onToolResult, multiFinalize ? { deferFinalize: true } : undefined);
 
         if (options?.requestEndNarration && !preEndCritical) {
           for (const r of preEndResults) {
@@ -540,12 +593,24 @@ export async function runAgentLoop(
       id: tc.id, type: 'function',
       function: { name: tc.function.name, arguments: tc.function.arguments }
     }));
-    const { results: batchResults } = await executeToolBatch(rawToolCalls, toolCalls, toolMessages, onToolResult);
+    const { results: batchResults } = await executeToolBatch(rawToolCalls, toolCalls, toolMessages, onToolResult, multiFinalize ? { deferFinalize: true } : undefined);
 
     messages.push({ role: 'assistant', content: "", tool_calls: toolCallDefs });
     for (const { mapped, raw, result } of batchResults) {
       const toolName = mapped.name || raw.function?.name;
       messages.push({ role: 'tool', tool_call_id: raw.id, content: formatToolResult(toolName, result) });
+    }
+
+    // Multi-action synthesis: when multi-finalize was detected (and no explicit
+    // narrate_turn was in the batch), nudge the LLM to synthesize a single
+    // narrate_turn on the next iteration. The deferred tools have already
+    // executed mechanically — their results are in the tool messages above.
+    // The LLM sees all outcomes and writes one coherent narration + timePassed
+    // + suggestions + xp, which the next iteration's narrate_turn delivers.
+    if (multiFinalize && !hasNarrateTurn) {
+      messages.push({ role: 'user', content: SYNTHESIS_NUDGE });
+      synthesisExpected = true;
+      if (isDebugMode) console.log(`[AgentLoop] Multi-action synthesis: deferred ${nonNarrateTools.length} tool(s), nudging for narrate_turn on next iteration`);
     }
 
 

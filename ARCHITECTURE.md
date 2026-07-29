@@ -227,7 +227,7 @@ Sub-services are factory functions (`createXService(state, deps?)`) that close o
 
 1. Coerces args to the correct types (LLMs send strings; engine needs numbers).
 2. Delegates to the relevant sub-service method.
-3. For certain tools (deterministic actions, binary dice checks), wraps the result through **`maybeFinalizeTurn(args, result)`** — an engine helper that collapses action+narrate_turn into one call. It reads `narration`/`timePassed` (deterministic) or `narrationOnSuccess`/`narrationOnFailure` (branch, selected by the actual roll outcome) from the tool args, calls `narrate_turn` internally, and merges the narration into `data.narration` (for the bubble) while keeping time-advancement logs in the `message` (for the system log). Only honored out of combat (OOC guard).
+3. For certain tools (deterministic actions, binary dice checks), wraps the result through **`maybeFinalizeTurn(args, result, deferFinalize?)`** — an engine helper that collapses action+narrate_turn into one call. It reads `narration`/`timePassed` (deterministic) or `narrationOnSuccess`/`narrationOnFailure` (branch, selected by the actual roll outcome) from the tool args, calls `narrate_turn` internally, and merges the narration into `data.narration` (for the bubble) while keeping time-advancement logs in the `message` (for the system log). Only honored out of combat (OOC guard). When `deferFinalize` is true (multi-action synthesis path), early-returns the base result without calling `narrate_turn` — a single synthesizing `narrate_turn` handles time/conditions/XP afterward.
 4. Returns an `MCPResponse = { success: boolean; data: any; message?: string }`.
 
 This same method is called by the agent loop **and** by the React layer (e.g. `mcpServer.resolveAllPendingEnemyTurns()` from `ActionsContext.handleResolveEnemyTurn`).
@@ -395,7 +395,7 @@ The single most important flow to understand. Entry point: `useGameActions.handl
      - Iteration 0 (no raw text) → push "you MUST call at least one tool" and continue.
      - Active combat, current actor is enemy, <5 iters → push "call next_turn".
      - Otherwise break.
-   - **End-of-turn detection:** if any tool call is `narrate_turn`, or a rest/move with narration/autoAdvanceTime, OR **any action tool carrying `narration`/`timePassed` or `narrationOnSuccess`/`narrationOnFailure` (gated out of combat)** → execute pre-end calls first, extract suggestions from their args, then (if time hasn't already advanced) execute `narrate_turn`, then break. The narration from inline-finalized or branched tools is captured as `inlineNarration` from the tool result's `data.narration` field.
+    - **End-of-turn detection:** if any tool call is `narrate_turn`, or a rest/move with narration/autoAdvanceTime, OR **any action tool carrying `narration`/`timePassed` or `narrationOnSuccess`/`narrationOnFailure` (gated out of combat)** → execute pre-end calls first, extract suggestions from their args, then (if time hasn't already advanced) execute `narrate_turn`, then break. The narration from inline-finalized or branched tools is captured as `inlineNarration` from the tool result's `data.narration` field. **Multi-action synthesis:** when 2+ action tools each carry finalize args, `multiFinalize` is detected — finalize is deferred on all of them (mechanical-only execution via `deferFinalize` flag), preventing gameTime stacking and narration loss. If the batch includes an explicit `narrate_turn`, it serves as the synthesis (no extra iteration). If not, `isEndOfTurn` is suppressed, the normal path executes the deferred tools, a `SYNTHESIS_NUDGE` message is appended, and the loop continues for one more iteration where the LLM synthesizes. A `synthesisExpected` flag re-nudges if the LLM doesn't emit `narrate_turn`.
   - Otherwise batch-execute all tool calls in parallel via `executeToolBatch`, append `{role: assistant, tool_calls}` + per-tool `{role: tool, tool_call_id}` messages, loop.
   - **Critical-tool tracking:** `cast_spell`, `inflict_damage`, `roll_dice`, `player_attack` — if any fails, set `criticalToolFailed` so we don't trust inline narration.
   - **Budget guard:** if estimated payload exceeds 95% of `CONTEXT_BUDGET`, break early.
@@ -967,7 +967,7 @@ These are unwritten rules that hold across the codebase. Violate them at your pe
 ### State
 
 - **`mcpServer` is the only source of truth for `GameState`.** React state mirrors it via `syncState()` (`useGameState.ts:26`) which just calls `setGameState(mcpServer.getFullState())`. Never mutate `gameState` directly — always go through `mcpServer`.
-- **All tool execution flows through `mcpServer.executeToolCall`** (or its typed wrappers on `MockMCPServer`). Don't call `combatEngine`/`spellcastingEngine` directly from React. `executeToolCall` now wraps certain results through `maybeFinalizeTurn` which collapses action+narrate_turn into one call for inline-finalized tools.
+- **All tool execution flows through `mcpServer.executeToolCall`** (or its typed wrappers on `MockMCPServer`). Don't call `combatEngine`/`spellcastingEngine` directly from React. `executeToolCall` now wraps certain results through `maybeFinalizeTurn` which collapses action+narrate_turn into one call for inline-finalized tools. The optional `options.deferFinalize` flag (used by the agent loop's multi-action synthesis path) skips finalize so 2+ parallel finalizing tools don't stack gameTime or clobber each other's narration.
 - **A campaign is "syncable" iff `campaignId != null && campaignId !== 'anonymous'`.** The literal string `'anonymous'` is the sentinel for local-only play.
 - **`isProcessing` is a multiplayer lock.** Always set it before a turn and clear it in a `finally`.
 - **Combat XP is auto-awarded on enemy defeat.** `inflict_damage` calls `awardEnemyDefeatXp` which awards CR-based XP flat to all party members via `xpEngine.computeXp('combat', ...)`. Idempotent via `Enemy.xpAwarded` flag. Covers every kill path.
@@ -978,7 +978,7 @@ These are unwritten rules that hold across the codebase. Violate them at your pe
 - **Never call `inflict_damage` after `player_attack` or `cast_spell`** — those tools handle damage atomically. This is repeated loudly in `TOOL_MODE_INSTRUCTION`.
 - **Spells never use `roll_dice`.** Spell attack rolls and damage are inside `cast_spell`.
 - **Critical tools** (`cast_spell`, `inflict_damage`, `roll_dice`, `player_attack`) failing sets `criticalToolFailed`, which suppresses inline narration and forces a separate narration pass.
-- **Inline finalization is OOC-only.** `maybeFinalizeTurn` checks `state.combat?.isActive` — in combat, turns are driven by `next_turn`, never by inline narration.
+- **Inline finalization is OOC-only.** `maybeFinalizeTurn` checks `state.combat?.isActive` (and the `deferFinalize` flag) — in combat, turns are driven by `next_turn`, never by inline narration. When `deferFinalize` is true (multi-action synthesis path), finalize is skipped so a single synthesizing `narrate_turn` handles time/conditions/XP from full context.
 
 ### LLM
 
