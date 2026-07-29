@@ -49,7 +49,7 @@ export function ActionsProvider({ children }: { children: ReactNode }) {
     handleCloseLevelUp,
     syncState, performAtmosphereUpdate, setStage, setViewingCharacterId,
     setMyCharacterId, isNewCampaign, campaignName, setIsNewCampaign,
-    getSenderName, handleTriggerDiceRoll
+    getSenderName
   );
 
   const handleResolveEnemyTurn = useCallback(async () => {

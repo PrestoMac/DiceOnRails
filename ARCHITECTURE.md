@@ -414,7 +414,7 @@ The single most important flow to understand. Entry point: `useGameActions.handl
 - Builds an aggregated `[Collaborative Turn]\n[Name]: text` synthetic USER message (in LLM history only — NOT inserted into the chat; the individual pending bubbles remain visible per-player).
 - Promotes pending messages (`pending: false`) so they stay in the visible chat history. Tags the trailing MODEL narration with `batchTurn: true` so `handleRewind` can route retries.
 - Builds context via `buildBatchContextString()` (`gameActionHelpers.ts`) which emits `ACTIVE CLASS FEATURES / RESOURCES / SPELLS / FEATS` for **every** party member (not just the active one), so the LLM can attribute spells/resources to the right character. Private `notes`/`gmNotes` are stripped via `withoutPrivateNotes()`.
-- Same agent-loop flow as solo, including `dispatchToolRolls` (dice roll animations), `enableSuggestions`, and atmosphere updates on `move_to` — full parity with `handleSendMessage`.
+- Same agent-loop flow as solo, including `enableSuggestions` and atmosphere updates on `move_to` — full parity with `handleSendMessage`.
 - Narration retry chain (tiers 2+3) is wrapped in `withNarrationRetryTimeout` (45s `Promise.race`) — same freeze protection as solo.
 - Error handler mirrors solo: reads from `mcpServer.getFullState()` (not stale closure), clears both `isProcessing` and `processingUser`, calls `mcpServer.loadState()` + `syncState()`. Writes per-character recovery chips for every alive party member on crash.
 
@@ -740,7 +740,7 @@ The story view. Notable features:
 - Parses `[System:*]` log prefixes and renders them as bordered "System Log" cards.
 - Two regex-based roll parsers (`ATTACK_ROLL_RE`, `SKILL_ROLL_RE`) extract roll data from older message text and render `RollCard` components inline. When `msg.rollData` exists (structured data), the regex stripping is skipped — the full message text is preserved alongside the `DiceRollCard`.
 - Modern messages carry `msg.rollData` directly (set by `extractRollData` in `narration.ts`) and render via `DiceRollCard`. For `check_skill`, the dice card label shows the skill name (e.g. "Perception", "Arcana") via `data.skillName`.
-- **Dice roll replay**: clicking any `DiceRollCard` opens the `DiceRollModal` popup with the roll data — this lets all clients view dice roll results even though only the submitting client auto-triggers the modal during `dispatchToolRolls`.
+- **Dice roll auto-trigger**: a `useEffect` in `ChatLog` detects newly-arrived messages (by ID) carrying `rollData` and calls `onTriggerDiceRoll(buildReplayData(roll))` for each with staggered 4 s delays. Runs on every client — local and remote via Supabase realtime — so all players see the animation, not just the submitting client. `DiceRollCard` remains clickable for manual replay.
 - **"The Fates are deciding..."** loading indicator is shown when `isProcessing={isLoading || !!gameState.isProcessing}` — the `gameState.isProcessing` part ensures remote clients see the indicator when Supabase realtime delivers the lock state.
 - Filters: All / Narration / Player / System; plus full-text search.
 - Export menu: copy to clipboard or download `.txt`.

@@ -98,7 +98,7 @@ import { bumpRewindGeneration } from '../services/rewindGeneration';
 import { isSyncableCampaign, ANONYMOUS_CAMPAIGN_ID } from '../utils/campaign';
 import {
   cleanSpeak,
-  dispatchToolRolls, DiceRollFn, buildContextString, buildBatchContextString
+  buildContextString, buildBatchContextString
 } from './gameActionHelpers';
 import { resolveSuggestionsPerCharacter, GENERIC_SUGGESTIONS, buildExplorationSuggestions } from '../services/llm/suggestions';
 import { syncFinishedState as syncStateHelper, prepareContext as prepContext,
@@ -119,7 +119,7 @@ export const useGameActions = (
     setStage: (s: AppStage) => void, setViewingCharacterId: (id: string | null) => void,
     setMyCharacterId: (id: string | null) => void, isNewCampaign: boolean,
     campaignName: string | undefined, setIsNewCampaign: (n: boolean) => void,
-    getSenderName: () => string, onTriggerDiceRoll?: DiceRollFn
+    getSenderName: () => string
 ) => {
     const processingRef = useRef(false);
     const messagesRef = useRef<Message[]>(messages);
@@ -308,8 +308,7 @@ export const useGameActions = (
                 if (isDebugMode) console.log('[handleSendMessage] calling runAgentLoop', { historyLen: historyForAPI.length, contextLen: buildContextString(myCharacterId).length });
                 mcpServer.beginTransaction();
                 const result = await runAgentLoop(historyForAPI, buildContextString(myCharacterId), ctxPrep.frozen,
-                    async (toolName, args, toolResult) => {
-                        await dispatchToolRolls(toolName, args, toolResult, onTriggerDiceRoll, currentState, myCharacterId);
+                    async (toolName, args, _toolResult) => {
                         if (toolName === 'move_to' && settings.enableAtmosphere) performAtmosphereUpdate(args.location_name as string, args.description as string | undefined, settings);
                     }, undefined, { requestEndNarration: true, enableSuggestions: !!settings.enableSuggestions, sessionId });
                 mcpServer.commitTransaction();
@@ -519,11 +518,9 @@ export const useGameActions = (
             const batchAllMessages = [...promotedMessages.filter(m => !m.pending), syntheticBatchUserMsg];
             const batchCtxPrep = prepContext(ctxRef.current, batchAllMessages, batchContext);
             const historyForAPI = batchCtxPrep.activeMessages;
-            const batchCurrentState = mcpServer.getFullState();
             if (isDebugMode) console.log('[handleProcessBatch] calling runAgentLoop', { historyLen: historyForAPI.length, pendingCount: pendingMsgs.length });
             const result = await runAgentLoop(historyForAPI, batchContext, batchCtxPrep.frozen,
-                async (toolName, args, toolResult) => {
-                    await dispatchToolRolls(toolName, args, toolResult, onTriggerDiceRoll, batchCurrentState, myCharacterId);
+                async (toolName, args, _toolResult) => {
                     if (toolName === 'move_to' && settings.enableAtmosphere) performAtmosphereUpdate(args.location_name as string, args.description as string | undefined, settings);
                 }, undefined, { requestEndNarration: true, enableSuggestions: !!settings.enableSuggestions, sessionId });
             mcpServer.commitTransaction();

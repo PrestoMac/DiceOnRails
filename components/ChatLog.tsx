@@ -243,6 +243,8 @@ const ChatLog: React.FC<ChatLogProps> = ({ messages, settings, onRewind, onUndo,
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const lastUserMessageId = [...messages].reverse().find(m => m.role === MessageRole.USER)?.id;
+  const prevMessageIds = useRef<Set<string>>(new Set());
+  const mounted = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -265,6 +267,36 @@ const ChatLog: React.FC<ChatLogProps> = ({ messages, settings, onRewind, onUndo,
     }
   }, [messages]);
   useEffect(() => () => stopSpeaking(), []);
+
+  /** Auto-triggers dice roll modal popups for newly-arrived messages that carry
+   *  structured rollData. Runs on every client (local + remote via realtime),
+   *  so all players see the animation — not just the one who submitted the turn.
+   *  Skips initial-load messages (mounted ref) to avoid triggering on campaign
+   *  hydration. Staggered delays (4 s apart) prevent modal overlap when multiple
+   *  rolls arrive in the same batch. */
+  useEffect(() => {
+    if (!onTriggerDiceRoll) return;
+    const currentIds = new Set(messages.map(m => m.id));
+    if (!mounted.current) {
+      // First render: seed the seen-set so we don't trigger on initial load.
+      prevMessageIds.current = currentIds;
+      mounted.current = true;
+      return;
+    }
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    let delay = 0;
+    for (const msg of messages) {
+      if (prevMessageIds.current.has(msg.id)) continue;
+      const rolls = msg.rollData ? (Array.isArray(msg.rollData) ? msg.rollData : [msg.rollData]) : [];
+      for (const roll of rolls) {
+        const t = setTimeout(() => onTriggerDiceRoll(buildReplayData(roll)), delay);
+        timers.push(t);
+        delay += 4000;
+      }
+    }
+    prevMessageIds.current = currentIds;
+    return () => { timers.forEach(clearTimeout); };
+  }, [messages, onTriggerDiceRoll]);
 
   useEffect(() => { if (showSearchBar && searchInputRef.current) searchInputRef.current.focus(); }, [showSearchBar]);
 
