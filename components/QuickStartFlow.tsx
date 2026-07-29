@@ -4,6 +4,8 @@ import { PRESET_CHARACTERS, PresetCharacterSpec } from '../data/presetCharacters
 import { RACES_BY_ID } from '../utils/races';
 import { CLASSES_BY_ID } from '../utils/classes';
 import { buildPresetCharacter } from '../services/characterCreationService';
+import { getRaceAssessment, getClassAssessment } from './creation/classRaceAssessment';
+import Tooltip from './ui/Tooltip';
 
 interface QuickStartFlowProps {
   onComplete: (character: Character) => void;
@@ -151,13 +153,41 @@ const QuickStartFlow: React.FC<QuickStartFlowProps> = ({ onComplete, onGenerateS
                 const race = RACES_BY_ID[spec.raceId];
                 const cls = CLASSES_BY_ID[spec.classId];
                 if (!race || !cls) return null;
+                const raceAssess = getRaceAssessment(spec.raceId);
+                const classAssess = getClassAssessment(spec.classId);
+                const statuses = [raceAssess.status, classAssess.status];
+                const worstStatus = statuses.includes('disabled') ? 'disabled' : statuses.includes('warning') ? 'warning' : 'ok';
+                const isDisabled = worstStatus === 'disabled';
+                const reason = raceAssess.status === 'disabled'
+                  ? `${race.name} is temporarily disabled — ${raceAssess.reason}`
+                  : classAssess.status === 'disabled'
+                    ? `${cls.name} is temporarily disabled — ${classAssess.reason}`
+                    : raceAssess.status === 'warning' && classAssess.status === 'warning'
+                      ? `${race.name}: ${raceAssess.reason}\n${cls.name}: ${classAssess.reason}`
+                      : raceAssess.status === 'warning'
+                        ? `${race.name}: ${raceAssess.reason}`
+                        : classAssess.status === 'warning'
+                          ? `${cls.name}: ${classAssess.reason}`
+                          : raceAssess.reason;
                 return (
                   <button
                     key={spec.id}
                     type="button"
-                    onClick={() => handleSelectPreset(spec)}
-                    className="group flex flex-col items-center text-center p-3 bg-stone-900/50 border-2 border-stone-800 rounded-xl hover:border-amber-600 hover:bg-amber-900/10 transition-all duration-200"
+                    disabled={isDisabled}
+                    onClick={() => { if (!isDisabled) handleSelectPreset(spec); }}
+                    className={`group relative flex flex-col items-center text-center p-3 border-2 rounded-xl transition-all duration-200 ${isDisabled ? 'opacity-40 cursor-not-allowed border-stone-800 bg-stone-900/30' : 'bg-stone-900/50 border-stone-800 hover:border-amber-600 hover:bg-amber-900/10'}`}
                   >
+                    <div className="absolute top-1 right-1">
+                      <Tooltip content={reason} side="top" maxWidth={300}>
+                        {isDisabled ? (
+                          <i className="fas fa-ban text-red-500/70 text-xs" />
+                        ) : worstStatus === 'warning' ? (
+                          <i className="fas fa-triangle-exclamation text-amber-500/80 text-xs" />
+                        ) : (
+                          <i className="fas fa-circle-check text-emerald-500/70 text-xs" />
+                        )}
+                      </Tooltip>
+                    </div>
                     <div className="w-12 h-12 rounded-full bg-stone-800/60 border border-stone-700 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
                       <i className={`fas ${cls.icon} text-lg text-amber-500`}></i>
                     </div>
@@ -169,6 +199,9 @@ const QuickStartFlow: React.FC<QuickStartFlowProps> = ({ onComplete, onGenerateS
                 );
               })}
             </div>
+            {PRESET_CHARACTERS.some(spec => getRaceAssessment(spec.raceId).status === 'disabled' || getClassAssessment(spec.classId).status === 'disabled') && (
+              <p className="text-[10px] text-red-500/60 text-center mt-2">Some presets are temporarily disabled due to incomplete engine support. Use custom creation for those options.</p>
+            )}
             <div className="flex justify-center pt-2">
               <button type="button" onClick={onSwitchToCustom} className="text-[11px] text-stone-500 hover:text-amber-500 uppercase tracking-widest font-bold transition-colors flex items-center gap-2">
                 <i className="fas fa-arrow-left text-[9px]"></i> Build a custom character instead
