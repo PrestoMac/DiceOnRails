@@ -704,12 +704,12 @@ components/wizard/
 - Pull state from all 6 contexts.
 - Render `<ChatLog>`, `<InputArea>`, `<CharacterSheet>`, `<Journal>`, `<LevelUpModal>`, `<CombatTracker>`, `<ActivityBell>`, `<AtmosphereOverlay>`.
 - Use `useActivityTracking` to summarize recent events for the bell.
-- **Per-character location & atmosphere**: compute `myCharacter = party.find(c => c.id === myCharacterId) ?? party[0]`, then `myLocation` + `myAtmosphereUrl = locationImages?.[myLocation] ?? currentAtmosphereUrl`. The location banner, fullscreen overlay, battle-map label, and `<AtmosphereOverlay>` all track the local player's character, not `party[0]`. When one party member travels away, the others' title and background stay put. Solo collapses to `party[0]` (byte-identical).
+- **Per-character location & atmosphere**: compute `myCharacter = party.find(c => c.id === myCharacterId) ?? party[0]`, then `myLocation` + `myAtmosphereUrl = locationImages?.[myLocation] ?? currentAtmosphereUrl`. The header location label (desktop) / location pill (mobile), the fullscreen overlay, the battle-map label, and `<AtmosphereOverlay>` all track the local player's character, not `party[0]`. When one party member travels away, the others' title and background stay put. Solo collapses to `party[0]` (byte-identical).
 
 Differences:
 
 - **Desktop** — three-column resizable sidebar (Character/Journal tabs), top header with location/time/share/Activity Bell, combat tracker as a floating bar, "Take the Turn" button in the chat (multiplayer only), typing indicator strip above InputArea.
-- **Mobile** — bottom nav (`Adventure` / `Hero` / `Journal` / `Settings`), atmosphere strip above chat, typing indicator strip above InputArea, persistent HP/AC status bar.
+- **Mobile** — bottom nav (`Adventure` / `Hero` / `Journal` / `Settings`), `<AtmosphereOverlay>` blended behind the chat (same dimmed full-bleed `z-0` pattern as desktop, content lifted to `z-10`) with a clickable location pill in the header to expand the scene fullscreen, typing indicator strip above InputArea, persistent HP/AC status bar.
 
 ### Top-level screens & modals
 

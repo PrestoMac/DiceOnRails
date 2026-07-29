@@ -14,6 +14,7 @@ import LevelUpModal from '../LevelUpModal';
 import CombatTracker from '../CombatTracker';
 import BattleMapPanel from '../BattleMapPanel';
 import ActivityBell from '../shared/ActivityBell';
+import AtmosphereOverlay from '../shared/AtmosphereOverlay';
 import HpBar from '../shared/HpBar';
 import TypingIndicator from '../shared/TypingIndicator';
 import { useActivityTracking } from '../../hooks/useActivityTracking';
@@ -147,16 +148,24 @@ const MobileLayout: React.FC = () => {
   }, [gameState.party, gameState.combat]);
 
   return (
-    <div className="flex flex-col h-screen w-full relative overflow-hidden bg-stone-950">
-      <header className="h-14 min-h-[56px] border-b border-stone-800 bg-stone-950/90 backdrop-blur-md flex items-center justify-between px-4 z-20">
-        <h1 className="fantasy-font text-xl font-bold text-amber-600 tracking-tight">Dice<span className="text-stone-100">OnRails</span></h1>
+    <div className="flex flex-col h-[100dvh] w-full relative overflow-hidden bg-stone-950">
+      <header className="h-[72px] min-h-[72px] border-b border-stone-800 bg-stone-950/90 backdrop-blur-md flex items-center justify-between px-4 z-20">
+        <div className="flex flex-col items-start min-w-0">
+          <h1 className="fantasy-font text-lg font-bold text-amber-600 tracking-tight shrink-0">Dice<span className="text-stone-100">OnRails</span></h1>
+          {settings.enableAtmosphere && myLocation && (
+            <button onClick={() => myAtmosphereUrl && setIsAtmosphereExpanded(true)} disabled={!myAtmosphereUrl} title="View full scene" className="flex items-center gap-1 text-stone-400 hover:text-amber-500 transition-colors disabled:opacity-50">
+              <i className="fas fa-location-dot text-amber-600/60 text-[10px] shrink-0"></i>
+              <span className="fantasy-font text-stone-300 text-[11px] tracking-widest uppercase truncate max-w-[50vw]">{myLocation}</span>
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
           {typeof gameState.gameTime === 'number' && !isNaN(gameState.gameTime) && (() => {
             const info = formatGameTime(gameState.gameTime);
             return (
-              <span className="text-[10px] text-stone-500 ml-auto">{info.period}</span>
+              <span className="text-[10px] text-stone-500">{info.period}</span>
             );
           })()}
-        <div className="flex items-center gap-3">
           <button onClick={handleBackOrReset} className="p-2 hover:bg-stone-900 rounded-lg text-stone-400 transition-colors"><i className={`fas ${userId?'fa-arrow-left':'fa-undo'} text-lg`}></i></button>
           <button onClick={handleLogout} className="p-2 hover:bg-stone-900 rounded-lg text-stone-400 transition-colors"><i className="fas fa-sign-out-alt text-lg"></i></button>
           {stage===AppStage.PLAY&&isSyncableCampaign(currentCampaignId)&&<button onClick={()=>{navigator.clipboard.writeText(currentCampaignId);alert("Campaign ID copied to clipboard!");}} className="p-2 hover:bg-stone-900 rounded-lg text-amber-600 transition-colors"><i className="fas fa-link text-lg"></i></button>}
@@ -197,11 +206,8 @@ const MobileLayout: React.FC = () => {
       )}
       <div className="flex-1 overflow-hidden relative flex flex-col pb-16 min-h-0">
         {mobileTab==='adventure'&&<>
-          {settings.enableAtmosphere&&<div className="w-full h-32 relative shrink-0 border-b border-stone-800 bg-stone-900">
-            {myAtmosphereUrl?<img src={myAtmosphereUrl} alt="Atmosphere" className="w-full h-full object-cover opacity-70" onClick={()=>setIsAtmosphereExpanded(true)}/>:<div className="w-full h-full flex items-center justify-center text-stone-700"><i className="fas fa-compass text-2xl"></i></div>}
-            <div className="absolute bottom-2 left-3 flex items-center gap-2"><div className="bg-stone-950/70 backdrop-blur-sm px-2 py-0.5 rounded-full flex items-center gap-1.5 border border-stone-800/50"><i className="fas fa-eye text-amber-600/60 text-[10px]"></i><span className="fantasy-font text-stone-300 text-xs tracking-widest uppercase text-shadow-sm leading-tight line-clamp-2">{myLocation||"Unknown"}</span></div></div>
-          </div>}
-          <div ref={chatScrollRef} onScroll={handleChatScroll} className="flex-1 overflow-y-auto relative"><ChatLog messages={messages} settings={settings} onRewind={handleRewind} onUndo={handleUndo} isProcessing={isLoading || !!gameState.isProcessing} scrollRef={chatScrollRef} onScrollChange={setIsScrolledUp} disableInternalScroll showWelcomeChips={onboarding.shouldShowWelcomeChips} onPrefillInput={(text) => { onboarding.markWelcomeSeen(); handleSendMessage(text); }} suggestions={settings.enableSuggestions && !gameState.isProcessing ? pickSuggestionsForCharacter(gameState, myCharacterId) : undefined} onPickSuggestion={(text) => handleSendMessage(text)} onDismissSuggestion={() => { if (myCharacterId && gameState.lastSuggestionsByCharacter) { const updated = { ...gameState.lastSuggestionsByCharacter }; delete updated[myCharacterId]; mcpServer.setLastSuggestionsByCharacter(updated); } else { mcpServer.setLastSuggestions([]); } syncState(); }} portraitMap={gameState.party.reduce((m, c) => { if (c.portraitUrl) m[c.id] = c.portraitUrl; return m; }, {} as Record<string, string>)} isMultiplayer={isMultiplayer} myCharacterId={myCharacterId} pendingCount={messages.filter(m => m.pending).length} onProcessBatch={handleProcessBatch} onRemovePendingMessage={handleRemovePendingMessage} onTriggerDiceRoll={handleTriggerDiceRoll} /></div>
+          <AtmosphereOverlay url={myAtmosphereUrl} enabled={settings.enableAtmosphere} />
+          <div ref={chatScrollRef} onScroll={handleChatScroll} className="flex-1 overflow-y-auto relative z-10"><ChatLog messages={messages} settings={settings} onRewind={handleRewind} onUndo={handleUndo} isProcessing={isLoading || !!gameState.isProcessing} scrollRef={chatScrollRef} onScrollChange={setIsScrolledUp} disableInternalScroll showWelcomeChips={onboarding.shouldShowWelcomeChips} onPrefillInput={(text) => { onboarding.markWelcomeSeen(); handleSendMessage(text); }} suggestions={settings.enableSuggestions && !gameState.isProcessing ? pickSuggestionsForCharacter(gameState, myCharacterId) : undefined} onPickSuggestion={(text) => handleSendMessage(text)} onDismissSuggestion={() => { if (myCharacterId && gameState.lastSuggestionsByCharacter) { const updated = { ...gameState.lastSuggestionsByCharacter }; delete updated[myCharacterId]; mcpServer.setLastSuggestionsByCharacter(updated); } else { mcpServer.setLastSuggestions([]); } syncState(); }} portraitMap={gameState.party.reduce((m, c) => { if (c.portraitUrl) m[c.id] = c.portraitUrl; return m; }, {} as Record<string, string>)} isMultiplayer={isMultiplayer} myCharacterId={myCharacterId} pendingCount={messages.filter(m => m.pending).length} onProcessBatch={handleProcessBatch} onRemovePendingMessage={handleRemovePendingMessage} onTriggerDiceRoll={handleTriggerDiceRoll} /></div>
           <button
             onClick={()=>{if(chatScrollRef.current)chatScrollRef.current.scrollTop=chatScrollRef.current.scrollHeight;}}
             className={`absolute right-3 top-1/2 -translate-y-1/2 z-40 w-9 h-9 rounded-full bg-stone-800/80 hover:bg-amber-700/70 text-stone-400 hover:text-amber-300 shadow-lg border border-stone-700/40 hover:border-amber-600/50 transition-all duration-300 flex items-center justify-center ${isScrolledUp?'opacity-100 scale-100':'opacity-0 scale-75 pointer-events-none'}`}
@@ -209,9 +215,9 @@ const MobileLayout: React.FC = () => {
           >
             <i className="fas fa-arrow-down text-xs"></i>
           </button>
-          {isMultiplayer && typingUsers.length > 0 && <TypingIndicator users={typingUsers} />}
-          {charToShow&&<HpStatusBar character={charToShow} />}
-          <InputArea onSendMessage={handleSendMessage} onResolveEnemyTurn={handleResolveEnemyTurn} isLoading={isLoading||gameState.isProcessing===true} combat={gameState.combat} character={charToShow} onInputChanged={(v)=>setTyping(v.length>0)} onArcaneRecovery={(id, sel) => handleArcaneRecovery(id, sel)} onManageSpellbook={handleManageSpellbook} onSwapKnownSpell={handleSwapKnownSpell}/>
+          {isMultiplayer && typingUsers.length > 0 && <div className="relative z-10 shrink-0"><TypingIndicator users={typingUsers} /></div>}
+          {charToShow&&<div className="relative z-10 shrink-0"><HpStatusBar character={charToShow} /></div>}
+          <div className="relative z-10 shrink-0"><InputArea onSendMessage={handleSendMessage} onResolveEnemyTurn={handleResolveEnemyTurn} isLoading={isLoading||gameState.isProcessing===true} combat={gameState.combat} character={charToShow} onInputChanged={(v)=>setTyping(v.length>0)} onArcaneRecovery={(id, sel) => handleArcaneRecovery(id, sel)} onManageSpellbook={handleManageSpellbook} onSwapKnownSpell={handleSwapKnownSpell}/></div>
         </>}
         {mobileTab==='character'&&<div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
           {isMultiplayer && <div className="flex gap-2 overflow-x-auto pb-2 mb-2">{gameState.party.map((char: Character) => <button key={char.id} onClick={() => setViewingCharacterId(char.id)} className={`p-2 rounded text-xs whitespace-nowrap ${viewingCharacterId===char.id?'bg-amber-700 text-white':'bg-stone-800 text-stone-400'}`}>{char.name}{char.id===myCharacterId?' (You)':''}</button>)}</div>}
