@@ -235,6 +235,18 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
         return enemy?.id || targetId;
       });
 
+      // Per-target damage ledger populated as damage is applied (after saves). The
+      // engine's result.damage.total for save spells is a pre-save Σ-perTarget and
+      // cannot be reported as "dealt"; this captures the actually-dealt amount per
+      // target so dmgSummary is accurate.
+      const damageBreakdown: Array<{ name: string; rolled: number; dealt: number; savePassed?: boolean }> = [];
+      const nameOfTarget = (id: string): string => {
+        const c = deps.getTarget(id);
+        if (c) return c.name;
+        const e = state.combat?.enemies?.find(en => en.id === id || en.name.toLowerCase() === id.toLowerCase().trim());
+        return e?.name || id;
+      };
+
       if (result.damage?.perTarget?.length && spellDef?.save) {
         const saveDC = result.saveRoll?.dc ?? getSpellSaveDc(char);
         const saveStat = spellDef.save.stat;
@@ -256,6 +268,7 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
             const cleanId = t.targetId.toLowerCase().trim();
             return rt === t.targetId || rt.toLowerCase() === cleanId;
           }) || t.targetId;
+          damageBreakdown.push({ name: nameOfTarget(resolvedTargetId), rolled: t.damage, dealt: dmg, savePassed });
           const dmgResult = await deps.inflict_damage(dmg, resolvedTargetId, result.damage.type);
           if (!dmgResult.success) {
             state.sessionLogs.push(`Damage to ${t.targetId} failed: ${dmgResult.message}`);
@@ -268,6 +281,7 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
             const cleanId = t.targetId.toLowerCase().trim();
             return rt === t.targetId || rt.toLowerCase() === cleanId;
           }) || t.targetId;
+          damageBreakdown.push({ name: nameOfTarget(resolvedTargetId), rolled: t.damage, dealt: dmg });
           const dmgResult = await deps.inflict_damage(dmg, resolvedTargetId, result.damage.type);
           if (!dmgResult.success) {
             state.sessionLogs.push(`Damage to ${t.targetId} failed: ${dmgResult.message}`);
@@ -480,6 +494,14 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
         dmgSummary = ' ' + result.perBeam.map((b: { attackRoll: { total: number }; isHit: boolean; damage: unknown }, i: number) =>
           `Ray ${i+1}: ${b.attackRoll.total} to hit, ${b.isHit ? `${b.damage} ${result.damage?.type || ''} damage` : 'miss'}`
         ).join('. ') + '.';
+      } else if (damageBreakdown.length > 0) {
+        // Per-target breakdown using actually-dealt (post-save) damage. Replaces the
+        // old single-number report that showed a misleading pre-save Σ-perTarget.
+        const dmgType = result.damage?.type || 'damage';
+        const totalDealt = damageBreakdown.reduce((s, d) => s + d.dealt, 0);
+        const parts = damageBreakdown.map(d => `${d.name} ${d.dealt} ${dmgType}${d.savePassed === true ? ' (saved)' : ''}`);
+        const dcPrefix = result.saveRoll ? `DC ${result.saveRoll.dc} ${result.saveRoll.stat.toUpperCase()} save. ` : '';
+        dmgSummary = ` ${dcPrefix}${parts.join(', ')}. (${totalDealt} ${dmgType} total)`;
       } else if (result.narrationHint) {
         dmgSummary = ` ${result.narrationHint}`;
       } else if (result.damage && result.damage.total > 0) {

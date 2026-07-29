@@ -228,12 +228,12 @@ export function rollDeathSaveRoll(): RollData {
 
 export function rollDeathSave(ch: Character, cs?: CombatState): {
   message: string; roll: number; total: number; successes: number;
-  failures: number; isStable: boolean; revived: boolean; died: boolean;
+  failures: number; isStable: boolean; revived: boolean; died: boolean; rollSuccess: boolean;
 } {
   ensureDeathSaves(ch);
   const s = ch.deathSaves as NonNullable<typeof ch.deathSaves>;
   if (s.isStable) {
-    return { message: `${ch.name} is stable.`, roll: 0, total: 0, successes: s.successes, failures: s.failures, isStable: true, revived: false, died: false };
+    return { message: `${ch.name} is stable.`, roll: 0, total: 0, successes: s.successes, failures: s.failures, isStable: true, revived: false, died: false, rollSuccess: false };
   }
   const rawRoll = cryptoRoll(20);
   const total = rawRoll - getExhaustionPenalty(ch);
@@ -241,17 +241,17 @@ export function rollDeathSave(ch: Character, cs?: CombatState): {
     ch.hp.current = 1;
     ch.deathSaves = { successes: 0, failures: 0, isStable: false };
     if (cs) updateCombatantDeathStatus(cs, ch.id, false);
-    return { message: `${ch.name} rolls DEATH SAVE: **Natural 20!** Revived with 1 HP!`, roll: rawRoll, total, successes: 0, failures: 0, isStable: false, revived: true, died: false };
+    return { message: `${ch.name} rolls DEATH SAVE: **Natural 20!** Revived with 1 HP!`, roll: rawRoll, total, successes: 0, failures: 0, isStable: false, revived: true, died: false, rollSuccess: true };
   }
   if (total >= 10) {
     s.successes++;
     if (s.successes >= 3) s.isStable = true;
-    return { message: `${ch.name} rolls DEATH SAVE: **${rawRoll}** — ${s.successes >= 3 ? '3 successes! Stabilized.' : `Success (${s.successes}/3)`}`, roll: rawRoll, total, successes: s.successes, failures: s.failures, isStable: s.isStable, revived: false, died: false };
+    return { message: `${ch.name} rolls DEATH SAVE: **${rawRoll}** — ${s.successes >= 3 ? '3 successes! Stabilized.' : `Success (${s.successes}/3)`}`, roll: rawRoll, total, successes: s.successes, failures: s.failures, isStable: s.isStable, revived: false, died: false, rollSuccess: true };
   }
   s.failures++;
   const dead = s.failures >= 3;
   if (dead && cs) updateCombatantDeathStatus(cs, ch.id, true);
-  return { message: `${ch.name} rolls DEATH SAVE: **${rawRoll}** — ${dead ? `3 failures! **${ch.name} has died.**` : `Failure (${s.failures}/3)`}`, roll: rawRoll, total, successes: s.successes, failures: s.failures, isStable: false, revived: false, died: dead };
+  return { message: `${ch.name} rolls DEATH SAVE: **${rawRoll}** — ${dead ? `3 failures! **${ch.name} has died.**` : `Failure (${s.failures}/3)`}`, roll: rawRoll, total, successes: s.successes, failures: s.failures, isStable: false, revived: false, died: dead, rollSuccess: false };
 }
 
 const VALID_STATS: StatKey[] = ['str', 'dex', 'con', 'int', 'wis', 'cha'];

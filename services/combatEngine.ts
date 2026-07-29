@@ -221,7 +221,7 @@ export function getCurrentCombatActor(cs: CombatState): { name: string; type: 'p
 
 /** Performs a death save for a character: natural 20 revives with 1 HP, >=10 success, <10 failure; 3 failures marks them as dead. Delegates to the canonical diceEngine version. */
 export function rollDeathSave(ch: Character, cs: CombatState): {
-  message: string; roll: number; total: number; successes: number; failures: number; isStable: boolean; revived: boolean; died: boolean;
+  message: string; roll: number; total: number; successes: number; failures: number; isStable: boolean; revived: boolean; died: boolean; rollSuccess: boolean;
 } {
   return diceRollDeathSave(ch, cs);
 }

@@ -523,8 +523,13 @@ export function castSpell(
         ? `Critical miss! Rolled ${result.attackRoll.total} to hit${rollDetails}.`
         : `Rolled ${result.attackRoll.total} to hit${rollDetails}. ${result.damage?.total || 0} ${result.damage?.type || ''} damage${dmgDetails}.`;
     } else if (result.saveRoll) {
-      const dmgDetails = result.damageRollDetails ? ` (${result.damageRollDetails})` : '';
-      result.narrationHint = `DC ${result.saveRoll.dc} ${result.saveRoll.stat.toUpperCase()} save. ${result.damage?.total || 0} ${result.damage?.type || ''} damage${dmgDetails}.`;
+      // Save-spell damage is resolved per-target in the service (each target rolls
+      // a save; 'half'/'none' outcomes apply), so the engine cannot know the
+      // actually-dealt total here. Record only the save DC — the service attaches a
+      // per-target breakdown. (Previously this emitted a pre-save Σ-perTarget as the
+      // damage "dealt", which was both wrong and looked impossible next to a single
+      // target's base dice.)
+      result.narrationHint = `DC ${result.saveRoll.dc} ${result.saveRoll.stat.toUpperCase()} save.`;
     } else if (result.healing) {
       result.narrationHint = `Healed for ${result.healing} HP.`;
     } else if (result.autoHitDamage) {

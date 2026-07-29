@@ -47,6 +47,28 @@ function makeLLMErrorResponse(status: number, message: string) {
   } as unknown as Response;
 }
 
+function makeLLMResponseWithIds(toolCalls: Array<{ id: string; name: string; args: Record<string, unknown> }>, content = '') {
+  const choices = [{
+    message: {
+      content,
+      tool_calls: toolCalls.map(tc => ({
+        id: tc.id,
+        type: 'function',
+        function: { name: tc.name, arguments: JSON.stringify(tc.args) },
+      })),
+      role: 'assistant',
+    },
+  }];
+  return {
+    ok: true,
+    status: 200,
+    json: () => Promise.resolve({
+      choices,
+      usage: { prompt_tokens: 50, completion_tokens: 20, prompt_tokens_details: { cached_tokens: 5 } },
+    }),
+  } as unknown as Response;
+}
+
 function buildCombatState(character: Character, enemyFirst: boolean): GameState {
   const enemy: Enemy = {
     id: 'enemy-1',
@@ -156,6 +178,45 @@ describe('runAgentLoop', () => {
 
     expect(result.toolMessages).toHaveLength(2);
     expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('serializes next_turn to run after action tools in the same batch (sleep-race fix)', async () => {
+    const order: string[] = [];
+    // mcpServer is a Proxy delegating to the real instance; assign through it so
+    // the wrapper lands on the instance (vi.spyOn can't see through the proxy).
+    const originalExecute = mcpServer.executeToolCall;
+    mcpServer.executeToolCall = async (name: string, args: Record<string, unknown>, options?: { deferFinalize?: boolean }) => {
+      order.push(`start:${name}`);
+      const result = await originalExecute(name, args, options);
+      order.push(`end:${name}`);
+      return result;
+    };
+
+    // Adversarial id ordering: next_turn's id sorts BEFORE the action tool's id.
+    // Old code dispatched them concurrently (the race that let a slept enemy act);
+    // the fix serializes next_turn after all action tools complete.
+    mockFetch
+      .mockResolvedValueOnce(makeLLMResponseWithIds([
+        { id: 'call_0aaa', name: 'next_turn', args: {} },
+        { id: 'call_9zzz', name: 'adjust_currency', args: { gp: 1 } },
+      ]))
+      .mockResolvedValueOnce(makeLLMResponse('', [
+        { name: 'narrate_turn', args: { narration: 'The deed is done.', timePassed: 0 } },
+      ]));
+
+    try {
+      await runAgentLoop([], 'Act, then end the turn.');
+    } finally {
+      mcpServer.executeToolCall = originalExecute;
+    }
+
+    const actionEnd = order.indexOf('end:adjust_currency');
+    const turnStart = order.indexOf('start:next_turn');
+    expect(actionEnd).toBeGreaterThanOrEqual(0);
+    expect(turnStart).toBeGreaterThanOrEqual(0);
+    // next_turn must START only after the action tool has FINISHED — proving the
+    // turn-advancer is no longer raced against concurrent condition/HP mutations.
+    expect(actionEnd).toBeLessThan(turnStart);
   });
 
   it('max iterations stops the loop', async () => {

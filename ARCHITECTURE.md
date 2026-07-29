@@ -984,7 +984,7 @@ These are unwritten rules that hold across the codebase. Violate them at your pe
 
 - **English-only output.** Hardcoded in `SYSTEM_INSTRUCTION`. The narration layer re-asserts it.
 - **Never write `[System:tool_name]` or raw `<tool_call>`/`<function>` markup in narration** — these are internal protocol between engine and LLM. `sanitizeNarration()` strips them at three layers (engine-side, generateNarration return, and `modelMsg.text` chokepoint). ChatLog strips `[System:…]` prefixes from SYSTEM messages.
-- **Tool calls per iteration are batched and parallel** (`Promise.all` in `executeToolBatch`), but the agent loop respects tool ordering by `tool_call_id` for assistant/tool message pairing.
+- **Tool calls per iteration are batched and parallel** (`Promise.all` in `executeToolBatch`), but the agent loop respects tool ordering by `tool_call_id` for assistant/tool message pairing. **Turn-advancers are serialized**: `next_turn` is partitioned out and runs strictly *after* all sibling action tools complete, so it observes their condition/HP mutations (closes the Sleep/`next_turn` race where an asleep enemy acted). A defense-in-depth guard in `resolveEnemyTurn` re-checks incapacitated/unconscious before each enemy acts regardless of ordering.
 - **Tool results sent to the LLM are slim.** `formatToolResult()` produces a compact per-tool JSON (no full `data` blob), reducing per-iteration token growth. The rich `data` is extracted for the UI separately by `extractRollData()`.
 
 ### Context

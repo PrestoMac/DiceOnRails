@@ -55,7 +55,11 @@ export function extractRollData(toolName: string, result: MCPResponse): RollData
   } else if (toolName === 'make_save') {
     return skillRollData(d, d.dc, d.stat ? `${d.stat} Save` : undefined, { isCritical: d.nat20, isFumble: d.nat1 });
   } else if (toolName === 'roll_death_save') {
-    return { type: 'death_save', dieFace: 'd20', dieRoll: d.roll ?? 0, modifier: 0, total: d.roll ?? 0, label: 'Death Save', success: d.deathSaves?.isStable || d.deathSaves?.successes >= 3, dieCount: 1, results: [d.roll ?? 0] };
+    // rollSuccess reflects whether THIS individual roll succeeded (>= 10, or nat 20
+    // revive), not whether the character is now stable. The old check
+    // (isStable || successes >= 3) made every successful save read as a failure
+    // until the 3rd success, mis-styling the DiceRollCard.
+    return { type: 'death_save', dieFace: 'd20', dieRoll: d.roll ?? 0, modifier: 0, total: d.roll ?? 0, label: 'Death Save', success: d.rollSuccess ?? (d.deathSaves?.isStable || false), dieCount: 1, results: [d.roll ?? 0] };
   } else if (toolName === 'inflict_damage') {
     if (d.concentrationSave) { const cs = d.concentrationSave; return skillRollData({ roll: cs.d20Roll, modifier: cs.modifier, total: cs.roll, success: cs.success }, cs.dc, 'CON Save (Concentration)'); }
     return undefined;

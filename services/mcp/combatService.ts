@@ -928,7 +928,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       const combatState = state.combat?.isActive ? state.combat : undefined;
       const result = rollDeathSave(target, combatState);
 
-      return { success: true, data: { deathSaves: target.deathSaves, roll: result.roll }, message: result.message };
+      return { success: true, data: { deathSaves: target.deathSaves, roll: result.roll, rollSuccess: result.rollSuccess, revived: result.revived }, message: result.message };
     },
 
     async resolveEnemyTurn() {
@@ -960,6 +960,22 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
           success: true,
           data: { skipped: true, ...advanceResult.data },
           message: `${currentEntry.name} is defeated. ${advanceResult.message}`
+        };
+      }
+
+      // Defense-in-depth: an incapacitated/unconscious enemy (e.g. asleep via the
+      // Sleep spell) cannot act. This mirrors next_turn's initiative skip-logic and
+      // guards the parallel-batch race where a condition-applying tool (cast_spell)
+      // and next_turn are dispatched concurrently, so next_turn's skip check may run
+      // before the condition lands on the combatant.
+      if (isIncapacitated(enemy) || isUnconscious(enemy)) {
+        currentEntry.hasActedThisTurn = true;
+        const advanceResult = await this.next_turn(false);
+        const reason = isUnconscious(enemy) ? 'unconscious' : 'incapacitated';
+        return {
+          success: true,
+          data: { skipped: true, ...advanceResult.data },
+          message: `${enemy.name} is ${reason} and skips its turn. ${advanceResult.message}`
         };
       }
 

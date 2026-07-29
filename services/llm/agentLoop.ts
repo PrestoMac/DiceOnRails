@@ -51,12 +51,29 @@ async function executeToolBatch(
 ): Promise<{ results: Array<{ mapped: { id: string; name?: string; args: Record<string, unknown> }; raw: { id: string; function: { name?: string; arguments?: string } }; result: MCPResponse }>; criticalFailed: boolean }> {
     if (isDebugMode) console.log(`[AgentLoop] executeToolBatch executing ${toolCalls.length} tool(s)`, toolCalls.map(tc => ({ name: tc.name, args: tc.args })));
     const batchStart = Date.now();
-    const results = await Promise.all(toolCalls.map(async tc => {
+    const runTool = async (tc: { id: string; name: string; args: Record<string, unknown> }) => {
         const execStart = Date.now();
         const result = await mcpServer.executeToolCall(tc.name, tc.args, options);
         if (isDebugMode) console.log(`[AgentLoop] Tool ${tc.name} completed in ${Date.now() - execStart}ms`, { success: result.success, messageLen: result.message.length });
         return { mapped: tc, raw: rawToolCalls.find((r: { id: string }) => r.id === tc.id) || tc, result };
-    }));
+    };
+
+    // Turn-advancing tools (next_turn) must observe ALL prior combatant-state
+    // mutations (conditions, HP) from sibling action tools. Running them
+    // concurrently via Promise.all creates a race — e.g. Sleep's 'unconscious'
+    // condition can land AFTER next_turn already evaluated its skip check, so an
+    // asleep enemy still acts. Action tools run in parallel first; next_turn is
+    // serialised afterwards so it always sees the fully-mutated state.
+    const TURN_ADVANCERS = new Set(['next_turn']);
+    const rest = toolCalls.filter(tc => !TURN_ADVANCERS.has(tc.name));
+    const advancers = toolCalls.filter(tc => TURN_ADVANCERS.has(tc.name));
+
+    const restResults = rest.length > 0 ? await Promise.all(rest.map(runTool)) : [];
+    const advancerResults: typeof restResults = [];
+    for (const tc of advancers) {
+        advancerResults.push(await runTool(tc));
+    }
+    const results = [...restResults, ...advancerResults];
     results.sort((a, b) => String(a.raw.id).localeCompare(String(b.raw.id)));
     let criticalFailed = false;
     for (const { mapped, raw, result } of results) {

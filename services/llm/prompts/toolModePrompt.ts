@@ -77,6 +77,14 @@ CLASS FEATURES:
 - Fighting Style: Only the Great Weapon Fighting reroll (reroll damage 1s and 2s on two-handed melee weapons) is mechanically applied by the engine. Archery / Dueling / Defense / Protection numeric bonuses are NOT factored into attack rolls or AC — do not state them as applied.
 - Spellcasting: For casters, the engine tracks prepared/known spells and slots. Use 'cast_spell' instead of 'roll_dice' for spells.
 - Concentration: Only one concentration spell at a time. Casting a new concentration spell ends the previous one. Taking damage may break concentration (DC 10 or half).
+- Monk:
+  * Martial Arts: unarmed strikes deal 1d4 + DEX (scales 1d6 at L5, 1d8 at L11). Use player_attack with weaponName="Unarmed Strike".
+  * Monks are NOT spellcasters — NEVER call cast_spell for a monk ability (no Fire Bolt, Eldritch Blast, etc.). If a monk strikes/punches/kicks, use player_attack. Only call cast_spell if the monk actually has a spell on their known/prepared list.
+  * Ki points unlock at Monk Level 2 (ki pool = monk level). A LEVEL-1 MONK HAS ZERO KI and cannot use ANY ki feature — do not allow Flurry of Blows, Patient Defense, or Step of the Wind for a level-1 monk; narrate that they have not yet learned to channel ki.
+  * Flurry of Blows (L2+, 1 Ki, bonus action): two extra unarmed strikes — call player_attack twice with weaponName="Unarmed Strike".
+  * Patient Defense (L2+, 1 Ki, bonus action): Disengage + Dodge.
+  * Step of the Wind (L2+, 1 Ki, bonus action): Disengage + Dash.
+  Always check the character's level before offering a ki action.
 
 RACE TRAITS:
 - Darkvision: Don't narrate "you can't see in this dark room" if the character has darkvision.
