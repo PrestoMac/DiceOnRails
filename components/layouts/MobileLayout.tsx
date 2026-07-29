@@ -148,7 +148,7 @@ const MobileLayout: React.FC = () => {
   }, [gameState.party, gameState.combat]);
 
   return (
-    <div className="flex flex-col h-screen w-full relative overflow-hidden bg-stone-950">
+    <div className="flex flex-col h-[100dvh] w-full relative overflow-hidden bg-stone-950">
       <header className="h-[72px] min-h-[72px] border-b border-stone-800 bg-stone-950/90 backdrop-blur-md flex items-center justify-between px-4 z-20">
         <div className="flex flex-col items-start min-w-0">
           <h1 className="fantasy-font text-lg font-bold text-amber-600 tracking-tight shrink-0">Dice<span className="text-stone-100">OnRails</span></h1>
@@ -204,7 +204,7 @@ const MobileLayout: React.FC = () => {
           )}
         </div>
       )}
-      <div className="flex-1 overflow-hidden relative flex flex-col pb-[9.5rem] min-h-0">
+      <div className="flex-1 overflow-hidden relative flex flex-col pb-16 min-h-0">
         {mobileTab==='adventure'&&<>
           <AtmosphereOverlay url={myAtmosphereUrl} enabled={settings.enableAtmosphere} />
           <div ref={chatScrollRef} onScroll={handleChatScroll} className="flex-1 overflow-y-auto relative z-10"><ChatLog messages={messages} settings={settings} onRewind={handleRewind} onUndo={handleUndo} isProcessing={isLoading || !!gameState.isProcessing} scrollRef={chatScrollRef} onScrollChange={setIsScrolledUp} disableInternalScroll showWelcomeChips={onboarding.shouldShowWelcomeChips} onPrefillInput={(text) => { onboarding.markWelcomeSeen(); handleSendMessage(text); }} suggestions={settings.enableSuggestions && !gameState.isProcessing ? pickSuggestionsForCharacter(gameState, myCharacterId) : undefined} onPickSuggestion={(text) => handleSendMessage(text)} onDismissSuggestion={() => { if (myCharacterId && gameState.lastSuggestionsByCharacter) { const updated = { ...gameState.lastSuggestionsByCharacter }; delete updated[myCharacterId]; mcpServer.setLastSuggestionsByCharacter(updated); } else { mcpServer.setLastSuggestions([]); } syncState(); }} portraitMap={gameState.party.reduce((m, c) => { if (c.portraitUrl) m[c.id] = c.portraitUrl; return m; }, {} as Record<string, string>)} isMultiplayer={isMultiplayer} myCharacterId={myCharacterId} pendingCount={messages.filter(m => m.pending).length} onProcessBatch={handleProcessBatch} onRemovePendingMessage={handleRemovePendingMessage} onTriggerDiceRoll={handleTriggerDiceRoll} /></div>
