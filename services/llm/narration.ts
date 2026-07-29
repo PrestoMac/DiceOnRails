@@ -23,7 +23,7 @@ export function extractRollData(toolName: string, result: MCPResponse): RollData
     const type: RollData['type'] = d.target_ac ? 'attack' : d.isDamageRoll ? 'damage' : 'skill';
     return { type, dieFace: `d${d.sides}`, dieRoll: d.results?.[0] ?? 0, modifier: d.modifier ?? 0, total: d.total ?? 0, dc: d.target_ac, success: d.success, label: d.roll_label, isCritical: d.isCritical, isFumble: d.isFumble, dieCount: d.count ?? 1, results: d.results ?? [d.results?.[0] ?? 0], rerolledIndices: d.rerolledIndices };
   } else if (toolName === 'check_skill') {
-    return skillRollData(d, d.difficulty, d.character, { skillRank: d.skillRank ?? 0 });
+    return skillRollData(d, d.difficulty, d.skillName || d.character, { skillRank: d.skillRank ?? 0 });
   } else if (toolName === 'player_attack') {
     const attackCard: RollData = { type: 'attack', dieFace: 'd20', dieRoll: d.roll ?? 0, modifier: (d.attackRoll ?? 0) - (d.roll ?? 0), total: d.attackRoll ?? 0, dc: d.targetAc, success: d.isHit, isCritical: d.isCritical, isFumble: d.isFumble, dieCount: 1, results: [d.roll ?? 0] };
     if (d.isHit === true && d.damage != null) {

@@ -326,7 +326,7 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
 
       return {
         success: true,
-        data: { roll, modifier, skillRank, total, difficulty, success, character: target.name, xpGained },
+        data: { roll, modifier, skillRank, total, difficulty, success, character: target.name, skillName: labelName, xpGained },
         message: `${target.name} ${labelName}: ${success ? 'SUCCESS' : 'FAILURE'} (Total ${total} vs DC ${difficulty}) [Roll: ${roll}, Stat Mod: ${modifier >= 0 ? '+' : ''}${modifier}, Skill Rank: +${skillRank}].${xpMsg}`
       };
     },
