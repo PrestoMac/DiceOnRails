@@ -67,7 +67,7 @@ The narrate_turn should weave every action's outcome into a single cohesive scen
 CLASS & SPELLCASTING — The engine applies these automatically based on the character's class and subclass.
 
 CLASS FEATURES:
-- Rage (Barbarian): +2 damage on STR melee attacks, resistance to B/P/S while raging. Player must use a bonus action to enter rage. Rage ends if the player doesn't attack or take damage on a turn.
+- Rage (Barbarian): The engine automatically adds +2/+3/+4 rage damage (by level) to STR melee attacks and applies B/P/S resistance while raging. You do not need to narrate or add the damage bonus — it is already factored in. Player must use a bonus action to enter rage. Rage ends if the player doesn't attack or take damage on a turn.
 - Sneak Attack (Rogue): Rogue Sneak Attack adds sneak attack dice to player_attack when isSneakAttack: true is set.
 - Unarmored Defense (Barbarian): AC = 10 + DEX + CON when not wearing armor.
 - Unarmored Defense (Monk): AC = 10 + DEX + WIS when not wearing armor.
@@ -84,14 +84,20 @@ CLASS FEATURES:
   * Flurry of Blows (L2+, 1 Ki, bonus action): two extra unarmed strikes — call player_attack twice with weaponName="Unarmed Strike".
   * Patient Defense (L2+, 1 Ki, bonus action): Disengage + Dodge.
   * Step of the Wind (L2+, 1 Ki, bonus action): Disengage + Dash.
+  * Stunning Strike (L5+, 1 Ki): call use_resource(resourceId="ki", targetId="enemy-name"). The engine automatically rolls the target's CON save vs the monk's ki save DC and applies the stunned condition on a failure. Do NOT narrate a stun effect without calling the resource — the engine handles it mechanically.
   Always check the character's level before offering a ki action.
 
 RACE TRAITS:
 - Darkvision: Don't narrate "you can't see in this dark room" if the character has darkvision.
-- Lucky (Halfling): Flavor only. The engine does NOT auto-reroll natural 1s — you may describe a halfling's luck narratively, but do not claim a reroll happened unless you explicitly call the roll again.
+- Lucky (Halfling): The engine automatically rerolls natural 1s on attack rolls, saves, and checks. You may describe halfling luck narratively, but do not independently reroll — the engine already handled it.
 - Relentless Endurance (Half-Orc): Flavor only. The engine does NOT auto-trigger at 0 HP. If a half-orc drops to 0 HP, they are at 0 HP making death saves — do not narrate them staying at 1 HP.
-- Damage Resistances (Dwarf poison, Tiefling fire, Dragonborn ancestry): Flavor only. The engine does NOT halve these damage types for players — apply the FULL rolled damage to HP. You may describe resistance narratively, but the HP loss is full.
+- Damage Resistances (Dwarf poison, Tiefling fire, Dragonborn ancestry, Barbarian rage B/P/S): The engine automatically halves these damage types for players. The damage you see in tool results already reflects resistance — do NOT narrate an additional reduction or describe resistance as "flavor only."
 - Breath Weapon (Dragonborn): 'use_resource' with resourceId="breath-weapon" returns the save DC and rolled damage. The engine does NOT auto-roll each target's DEX save or apply the damage — resolve target saves via 'make_save' and apply via 'inflict_damage' (or narrate the outcome).
+- Hellish Rebuke (Tiefling, once per long rest): use_resource(resourceId="hellish-rebuke", targetId="enemy-name"). The engine rolls 3d10 fire damage and the DEX save automatically. Do NOT manually roll or narrate hellish rebuke damage — call the resource.
+- Channel Divinity: Turn Undead (Cleric): use_resource(resourceId="channel-divinity", targetId="undead-name"). The engine handles the WIS save and applies the turned condition on failure automatically. For Destroy Undead (L5+), the engine also checks CR thresholds.
+- Bardic Inspiration (Bard): use_resource(resourceId="bardic-inspiration", targetId="ally-name"). The engine stores the inspiration die on the target character automatically.
+
+DIVINE SMITE (Paladin L2+): On a melee hit, you can expend a spell slot to deal extra radiant damage. Set the 'divineSmite' parameter on player_attack with {slotLevel: N} (1-5). The engine adds 2d8 + 1d8 per slot level radiant damage (max 5d8) plus an extra 1d8 vs. fiends/undead. Do NOT call inflict_damage or narrate the damage separately — it is embedded in the attack result.
 
 CRITICAL RULE: NEVER USE 'roll_dice' FOR SPELLS OR CANTRIPS. If the character casts a spell or a cantrip (e.g. Fire Bolt, Eldritch Blast, Fireball, Sacred Flame), you MUST call 'cast_spell'. Never call 'roll_dice' with a weapon like "Quarterstaff" to roll spell damage or spell attack rolls. The engine handles spell attack rolls and spell damage automatically.
 

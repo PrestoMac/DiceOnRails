@@ -1,12 +1,12 @@
-# Dice on Rails — Reboot Blueprint
+# Dice on Rails — Reboot Blueprint v4
 
-> **Version:** 1.0  
+> **Version:** 4.0 (Production-Hardened Architecture)  
 > **Status:** Approved for execution  
 > **Last updated:** 2025
 
 ## Executive Summary
 
-Dice on Rails is a **universal AI-driven dice-engine platform**. It is not just a D&D 5e game — it is a modular engine capable of running any dice-based tabletop RPG (5e, Pathfinder, Call of Cthulhu, Shadowrun, FATE, etc.) with an AI Game Master as a first-class citizen.
+Dice on Rails is a **universal AI-driven dice-engine platform**. It is not just a D&D 5e game — it is a modular engine capable of running any dice-based tabletop RPG (5e, Pathfinder, Call of Cthulhu, Shadowrun) with an AI Game Master as a first-class citizen.
 
 This document is the complete architectural blueprint for rebooting the existing Dice on Rails codebase into this universal platform. The 5e system is the **first module** — not the only product.
 
@@ -20,19 +20,37 @@ value = base_number folded through modifiers at an event point
 
 The **Effect Dispatcher** (the "spine") is the universal mechanism that performs this fold. Everything else — dice, classes, conditions, AI — hangs off it.
 
+### Viability Assessment
+
+| Subsystem | Viability | Risk | Mitigation |
+|---|---|---|---|
+| **Kernel Store & Schema** | High | Dynamic runtime mutations bypassing schema | Build-time JSON Schema + runtime type guards |
+| **Data Preparation** | High | Cross-tier feedback loops | Strict unidirectional dependency graph |
+| **Effect Dispatcher** | High | Priority deadlocks in overrides | Multi-tier deterministic sorting tuple |
+| **Async Interrupts** | High | Stack explosion, context staleness | Bounded snapshot frames + checksum verification |
+| **Dice Families** | High | External entropy breaking determinism | Pure functional execution with injected RNG |
+| **AI Cognition Layer** | High | Cache eviction, illegal fallbacks | Multi-vendor cache boundaries + action-aware fallbacks |
+| **System Module SDK** | High | Contract breaking | Build-time validation + runtime guards |
+
 ---
 
 ## Design Principles
 
 1. **The dispatcher is the spine.** Every numeric outcome in any dice game is "a value folded through modifiers at an event point." Make that fold first-class and universal; everything else hangs off it.
 
-2. **A game system is a data package, not code in the engine.** 5e, Pathfinder, CoC, Shadowrun, FATE are each a directory of schema + catalogs + rules + prompt fragments. The kernel knows zero game specifics.
+2. **A game system is a data package, not code in the engine.** 5e, Pathfinder, CoC, Shadowrun are each a directory of schema + catalogs + rules + prompt fragments. The kernel knows zero game specifics.
 
-3. **AI is an actor, not a special case.** Human input and LLM input pass through the *same* action API. The AI's tools, context, and prompt are **auto-generated from the registered system** — adding a system gives you a working AI GM for free.
+3. **AI is an actor, not a special case.** Human input and LLM input pass through the *same* action API. The AI's tools are **static universal verbs** with system-specific payload schemas — preserving prompt caching and controlling token usage.
 
 4. **Type safety by schema + codegen, not hard-coding.** Runtime is a property-bag; dev-time is fully typed via generated accessors from each system's schema.
 
 5. **Determinism via injection.** RNG, time, persistence, and the LLM client are all injected ports. Core is pure functions → fully testable, fully replayable.
+
+6. **Strictly synchronous dispatcher.** The dispatcher is a pure, synchronous function. Async operations (reactions, user input) are handled via bounded state suspension snapshots — never inline blocking.
+
+7. **Stratified data preparation.** Entity data resolves in strict unidirectional tiers (Base → Modifiers → Derived → Override) to prevent cyclical dependencies.
+
+8. **Prompt cache hygiene.** System prompts are strictly static. Dynamic state lives in user messages. Timestamps are quantized to turn indices.
 
 ---
 
@@ -41,8 +59,13 @@ The **Effect Dispatcher** (the "spine") is the universal mechanism that performs
 | Decision | Choice |
 |---|---|
 | Entity model | Schema + codegen (runtime property-bag, dev-time typed interfaces) |
-| AI authority | Cooperative (engine validates mechanics + rejects with structured hints; AI owns narration/scene/NPC behavior; numbers always engine-truthful) |
+| AI authority | Cooperative with rejection budgeting (max 2 retries, then action-aware fallback) |
+| AI tool model | Static universal verbs with parametric payloads (preserves prompt caching) |
 | Dice families v1 | d20, dice-pool, percentile, Fudge (4 `RollPolicy` implementations) |
+| Dispatcher model | Strictly synchronous; reactions via bounded State Suspension + Continuation |
+| Data preparation | Stratified unidirectional: Base → Modifiers → Derived → Override |
+| Stacking model | Typed multi-pass (Item/Status/Circumstance/Untyped) |
+| Override sorting | Multi-tier deterministic: (subPhase, priority, timestamp, entityId) |
 | Build path | Fresh engine in a monorepo; current app's 5e data + UI port over as first system module + host |
 | Repo | Single pnpm workspace, one CI gate |
 | Engine brand | **Dice on Rails** (the universal platform itself) |
@@ -54,21 +77,20 @@ The **Effect Dispatcher** (the "spine") is the universal mechanism that performs
 ```
 dice-on-rails/                          # Project root
   packages/
-    engine/         @dor/engine         Kernel: EntityStore • Dispatcher • Dice • RNG • Resources
+    engine/         @dor/engine         Kernel: EntityStore • Synchronous Dispatcher • Dice • RNG • Resources
                                         (pure, zero I/O, zero game knowledge)
     rules/          @dor/rules          Hooks • Sources (permanent/transient/equipment) •
-                                        Reducers • Stacking • Conditions • Abilities • TurnModel
+                                        Reducers • Typed Stacking • Conditions • Abilities • TurnModel
     dice/           @dor/dice           Four v1 RollPolicy implementations:
                                         d20, pool, percentile, fudge
-    cognition/      @dor/cognition      AI layer: ToolGenerator • ContextAssembler •
-                                        PromptAssembler • VerbDispatcher
-                                        (one universal agent loop)
+    cognition/      @dor/cognition      AI layer: Static Verb Dispatcher • ContextAssembler •
+                                        PromptAssembler • Cooperative Authority with action-aware fallbacks
     system-sdk/     @dor/system-sdk     Schema format • Codegen • SystemLoader • CLI
                                         (validate / codegen / replay)
   systems/
     dnd5e/                              FIRST system module:
                                         schema + data + rules + prompt  ← ported from current data/*
-    fate-lite/                          (Phase E) Second-system proof of universality
+    coc-lite/                           (Phase E) Second-system proof (d100 percentile)
   apps/
     host/                               The playable game:
                                         React UI + persistence/realtime ports + adapters  ← ported from current app
@@ -83,10 +105,10 @@ dice-on-rails/                          # Project root
 ```
 ┌─ 7. HOST ─────────────────────────── web / desktop / server shell              │
 ├─ 6. TRANSPORT ────────────────────── persistence port + realtime sync          │
-├─ 5. AI COGNITION ─────────────────── tool-gen • context-gen • narration        │
+├─ 5. AI COGNITION ─────────────────── static verbs • context-gen • narration    │
 ├─ 4. ACTOR LAYER ──────────────────── HumanAdapter ⇄ ActionAPI ⇄ AgentAdapter   │
 ├─ 3. GAME SYSTEM PACKAGE ──────────── schema • data • rules • prompt  ← "mod"   │
-├─ 2. RULES ENGINE ─────────────────── hooks • sources • reducers • stacking     │
+├─ 2. RULES ENGINE ─────────────────── stratified hooks • typed stacking         │
 └─ 1. KERNEL ───────────────────────── entity-store • event-bus • DISPATCHER     │
 ```
 
@@ -120,63 +142,303 @@ Each system declares a **schema** (JSON Schema + custom annotations); a codegen 
 
 **Derived values are never stored.** AC, max HP, initiative, spell DC — always computed via `resolve()`.
 
-### The Dispatcher (The Spine)
+### Stratified Data Preparation (Unidirectional)
 
-The single universal operation:
+To prevent cyclical dependencies, entity data resolves in strict unidirectional tiers. Data flows only downward — higher tiers can read lower tiers, but never write back.
+
+```
+Tier 1: Base Properties        ──► Raw entity props (stats, level, class, race)
+        │                              No computation, just data access
+        │                              READ-ONLY for all other tiers
+        ▼
+Tier 2: Base Ability Scores  ──► Ability modifiers, proficiency bonus
+        │                              Depends only on Tier 1
+        │                              READ-ONLY for Tiers 3-4
+        ▼
+Tier 3: Modifier Aggregation ──► Active effects from all sources
+        │                              Depends on Tiers 1-2
+        │                              Applies typed stacking rules
+        ▼
+Tier 4: Derived + Override   ──► AC, Save DC, Initiative, Max HP, control-flow
+                                       Depends on Tiers 1-3
+                                       NEVER feeds back into lower tiers
+```
+
+**Invariant:** A value computed in Tier N cannot modify any value in Tier M where M < N within the same evaluation pass. This guarantees termination in predictable linear time.
+
+### Synchronous Dispatcher with Bounded State Suspension (The Spine, v4)
+
+The dispatcher is a **pure, synchronous function**. It never blocks on async operations.
 
 ```typescript
 type HookName = string;  // base set + system-registered
 
 interface HookContext {
   readonly _hook: HookName;
+  readonly _phase: 'base' | 'modifiers' | 'derived' | 'override';
+  readonly _tier: 1 | 2 | 3 | 4;
   [key: string]: unknown;
 }
 
 interface Modifier {
   kind: string;
   payload: Record<string, unknown>;
-  stackGroup?: string;       // for stacking rules
-  source: SourceRef;         // which source provider emitted this
+  stackGroup?: string;
+  stackCategory?: 'item' | 'status' | 'circumstance' | 'untyped';
+  source: SourceRef;
 }
 
 interface SourceProvider {
   id: string;
-  weight: number;            // ordering (permanent before transient)
+  weight: number;
   collect(entity: Entity, hook: HookName): Modifier[];
 }
 
 interface Reducer<C extends HookContext = HookContext> {
   kind: string;
   hook: HookName;
-  priority: number;          // lower runs first (multipliers before additives)
+  phase: 'base' | 'modifiers' | 'derived' | 'override';
+  tier: 1 | 2 | 3 | 4;
+  priority: number;
   reduce(ctx: C, modifier: Modifier, entity: Entity): C;
 }
 
-// THE universal fold
+// THE universal fold — strictly synchronous
 function resolve(
   store: EntityStore,
   entity: Entity,
   hook: HookName,
   ctx: HookContext
-): typeof ctx;
+): HookContext | StateSnapshot;
 ```
 
-How `resolve()` works:
+#### Execution Lifecycle
 
 ```
-resolve(store, entity, hook, ctx) =
-  sources(entity, hook)                         // all active modifier sources, ordered
-    .flatMap(mod => reducers(hook, mod.kind)
-      .sortBy(priority)
-      .map(r => r.reduce(ctx, mod, entity)))
-    .applyStackingRules(ctx)                    // per stack-group policy
+Phase 1: Base Initialization (Tiers 1-2)
+        ──► Raw properties → ability scores → proficiency
+        │
+        ▼
+Phase 2: Modifier Resolution (Tier 3)
+        ──► Collect modifiers → typed stacking (Item/Status/Circumstance/Untyped)
+        │
+        ▼
+Phase 3: Derived Computation (Tier 4)
+        ──► AC, Save DC, Initiative, Max HP
+        │
+        ▼
+Phase 4: Post-Evaluation Override
+        ──► Control-flow mutations, clamps, boolean flags
+        │   (Reliable Talent, immunity, absolute caps)
+        │
+        ▼
+  Check for reaction triggers
+        │
+        ├──► No triggers: Return result synchronously
+        │
+        └──► Triggers present: Create bounded snapshot frame
+                                      │
+                                      ▼
+                            Return snapshot to host (synchronous)
+                                      │
+                                      ▼
+                            Host handles async notification out-of-band
+                                      │
+                                      ▼
+                            Reaction decision arrives or timeout
+                                      │
+                                      ▼
+                            Host calls continueWithReaction(snapshot, decision)
+                                      │
+                                      ▼
+                            Engine verifies checksum, restores, completes
 ```
 
-Three registries (pluggable): **sources**, **reducers**, **hooks**. A "game system" populates them. Nothing here knows what a "save" or a "wizard" is.
+### Bounded State Suspension and Continuation
+
+Instead of inline async blocking, the engine uses bounded frame stacks with checksum verification:
+
+```typescript
+interface StateSnapshot {
+  id: string;                    // Unique suspension ID
+  frameDepth: number;            // Nested reaction depth (max: 5)
+  parentSnapshotId?: string;     // Parent frame for nested reactions
+  entityId: string;
+  hook: HookName;
+  context: HookContext;          // Frozen at suspension point
+  stateChecksum: string;         // SHA-256 of entity store at suspension
+  timestamp: number;             // For timeout tracking
+  reactionTriggers: ReactionTrigger[];
+}
+
+interface ReactionTrigger {
+  triggerType: string;           // 'attack_roll' | 'spell_cast' | 'damage_taken'
+  source: EntityRef;
+  validReactions: string[];      // Ability IDs that can respond
+}
+
+interface ReactionDecision {
+  snapshotId: string;
+  reactions: Array<{
+    ability: string;
+    actor: string;
+    payload: Record<string, unknown>;
+  }>;
+}
+
+// Constants
+const MAX_SNAPSHOT_DEPTH = 5;   // Prevents infinite reaction chains
+const SNAPSHOT_TTL_MS = 30000;  // 30 second timeout
+```
+
+**Why bounded frames:**
+- Prevents stack explosion from nested reactions (Shield → Counterspell → Counterspell...)
+- Frame depth ceiling ensures termination
+- Parent-child linking enables proper resumption order
+- Checksum verification detects stale state
+
+### Checksum Verification
+
+To prevent world state desynchronization during suspension windows:
+
+```typescript
+function computeStateChecksum(store: EntityStore): string {
+  // SHA-256 of all entity props + collections
+  // Changes if ANY entity mutates during suspension
+  const stateString = JSON.stringify({
+    entities: store.query(() => true).map(e => ({
+      id: e.id,
+      props: e.props,
+      collections: e.collections,
+    })),
+  });
+  return sha256(stateString);
+}
+
+function continueWithReaction(snapshot: StateSnapshot, decision: ReactionDecision): HookContext {
+  // Verify state hasn't changed during suspension
+  const currentChecksum = computeStateChecksum(store);
+  if (currentChecksum !== snapshot.stateChecksum) {
+    throw new StateDesynchronizationError(
+      `Snapshot ${snapshot.id} is stale. ` +
+      `Expected checksum ${snapshot.stateChecksum}, got ${currentChecksum}`
+    );
+  }
+  
+  // Verify timeout
+  if (Date.now() - snapshot.timestamp > SNAPSHOT_TTL_MS) {
+    throw new SnapshotTimeoutError(`Snapshot ${snapshot.id} expired`);
+  }
+  
+  // Restore frozen context and apply reactions
+  let ctx = { ...snapshot.context };
+  for (const reaction of decision.reactions) {
+    const ability = getAbility(reaction.ability);
+    ctx = ability.run(ctx, reaction.actor, reaction.payload);
+  }
+  
+  return finalizeResolution(ctx);
+}
+```
+
+### Multi-Tier Override Sorting
+
+To eliminate priority parity deadlocks, override rules use a deterministic sorting tuple:
+
+```typescript
+interface OverrideRule {
+  condition: (ctx: HookContext) => boolean;
+  apply: (ctx: HookContext) => HookContext;
+  
+  // Multi-tier sorting key for deterministic execution order
+  sortKey: {
+    subPhase: 'transform' | 'clamp' | 'floor' | 'boolean';  // Execution band
+    priority: number;                                        // Within-band priority
+    timestamp: number;                                       // Tiebreaker 1
+    entityId: string;                                        // Tiebreaker 2
+  };
+}
+
+// Sub-phase execution order (deterministic):
+// 1. transform — Absolute property transformations (set roll = 20)
+// 2. clamp     — Numerical value clamps (speed ≤ maxSpeed)
+// 3. floor     — Minimum thresholds (roll ≥ 10)
+// 4. boolean   — State flag overrides (isCrit = false)
+
+// Example: Reliable Talent
+const RELIABLE_TALENT: OverrideRule = {
+  condition: (ctx) => ctx._hook === 'onSkillCheck' && ctx.roll <= 9,
+  apply: (ctx) => ({ ...ctx, roll: 10 }),
+  sortKey: {
+    subPhase: 'floor',
+    priority: 100,
+    timestamp: Date.now(),
+    entityId: ctx.character.id,
+  },
+};
+
+// Example: Critical Immunity
+const CRITICAL_IMMUNITY: OverrideRule = {
+  condition: (ctx) => ctx._hook === 'onAttackDamage' && ctx.isCrit,
+  apply: (ctx) => ({ ...ctx, isCrit: false }),
+  sortKey: {
+    subPhase: 'boolean',
+    priority: 200,
+    timestamp: Date.now(),
+    entityId: ctx.target.id,
+  },
+};
+```
+
+**Sorting algorithm:**
+```typescript
+function compareOverrides(a: OverrideRule, b: OverrideRule): number {
+  // 1. Sub-phase order (transform < clamp < floor < boolean)
+  const subPhaseOrder = { transform: 0, clamp: 1, floor: 2, boolean: 3 };
+  const subDiff = subPhaseOrder[a.sortKey.subPhase] - subPhaseOrder[b.sortKey.subPhase];
+  if (subDiff !== 0) return subDiff;
+  
+  // 2. Priority (higher first)
+  if (a.sortKey.priority !== b.sortKey.priority) {
+    return b.sortKey.priority - a.sortKey.priority;
+  }
+  
+  // 3. Timestamp (earlier first)
+  if (a.sortKey.timestamp !== b.sortKey.timestamp) {
+    return a.sortKey.timestamp - b.sortKey.timestamp;
+  }
+  
+  // 4. Entity ID (deterministic string sort)
+  return a.sortKey.entityId.localeCompare(b.sortKey.entityId);
+}
+```
+
+### Dependency-Tracked Reactive Caching
+
+```typescript
+interface DependencyGraph {
+  // Maps computed property → set of source IDs it depends on
+  dependencies: Map<string, Set<string>>;
+  // Maps source ID → set of computed properties that become dirty
+  reverseDeps: Map<string, Set<string>>;
+  // Spatial dependency tracking (for auras, adjacency)
+  spatialDeps: Map<string, Set<string>>;  // entityId → set of affected entityIds
+  
+  markDirty(sourceId: string): void;
+  markSpatialDirty(entityId: string): void;  // Special handling for position changes
+  isDirty(propertyId: string): boolean;
+  clearDirty(propertyId: string): void;
+}
+```
+
+**Spatial dependency optimization:**
+- Position changes mark only nearby entities dirty (within aura range)
+- Distant entities retain cached values
+- Prevents cascade invalidation during tactical combat
 
 ### Dice Engine: Expression + Policy
 
-A roll is `RollSpec { expression, policy, modifiers }`. The *expression* says what dice; the *policy* says how to interpret them. One abstraction covers every system:
+A roll is `RollSpec { expression, policy, modifiers }`. The *expression* says what dice; the *policy* says how to interpret them.
 
 | System | Expression | Policy |
 |---|---|---|
@@ -209,6 +471,34 @@ interface RollPolicy {
 }
 ```
 
+### Meta-Currency Hooks (Pre/Post-Resolution)
+
+To handle luck expenditure, inspiration dice, and other post-roll adjustments without breaking determinism:
+
+```typescript
+interface MetaCurrencyHook {
+  timing: 'pre-roll' | 'post-roll';
+  condition: (ctx: HookContext) => boolean;
+  apply: (ctx: HookContext, rng: RNG) => HookContext;
+  resourceCost: { pool: string; amount: number };
+}
+
+// Examples:
+const LUCK: MetaCurrencyHook = {
+  timing: 'post-roll',
+  condition: (ctx) => ctx.roll < 10,
+  apply: (ctx, rng) => ({ ...ctx, roll: rng.roll(20) }),
+  resourceCost: { pool: 'luck', amount: 1 },
+};
+
+const BARDC_INSPIRATION: MetaCurrencyHook = {
+  timing: 'post-roll',
+  condition: (ctx) => hasCondition(ctx.target, 'bardic-inspiration'),
+  apply: (ctx, rng) => ({ ...ctx, roll: ctx.roll + rng.roll(8) }),
+  resourceCost: { pool: 'bardic-inspiration', amount: 1 },
+};
+```
+
 ### Resources
 
 A `ResourcePool` — HP, hit dice, spell slots, ki, sanity, luck, edge — all the same primitive:
@@ -233,26 +523,25 @@ Systems define which pools exist; the engine handles reset bookkeeping generical
 | Hook | Context | Purpose |
 |---|---|---|
 | `computeAc` | `{ baseAc, character, equippedArmor }` | Armor Class calculation |
-| `computeSpeed` | `{ speed, character }` | Movement speed |
+| `computeSpeed` | `{ speed, character, maxSpeed }` | Movement speed |
 | `computeMaxHp` | `{ hp, character }` | Maximum hit points |
-| `computeAttackCount` | `{ count, character, weapon }` | Extra Attack (NEW) |
+| `computeAttackCount` | `{ count, character, weapon }` | Extra Attack |
 | `onAttackRoll` | `{ roll, character, weapon, target, isRanged }` | Attack roll resolution |
 | `onAttackDamage` | `{ damage, character, weapon, isCrit, isRanged }` | Damage calculation |
-| `onDamageTaken` | `{ amount, damageType, target, source }` | Damage application (resistance/immunity) |
+| `onDamageTaken` | `{ amount, damageType, target, source }` | Damage application |
 | `onSaveRoll` | `{ roll, stat, character, source }` | Saving throw |
 | `onSkillCheck` | `{ roll, skill, character }` | Skill check |
-| `onHeal` | `{ amount, target, source, spellLevel }` | Healing (NEW) |
-| `onCastSpell` | `{ character, spellDef, slotLevel, damageDealt }` | Spell casting (NEW) |
-| `onInitiative` | `{ roll, character }` | Initiative (NEW) |
-| `onDeathSave` | `{ roll, character, isSuccess }` | Death saving throw (NEW) |
-| `onTurnStart` | `{ character }` | Turn start (auras, rage-end) (NEW) |
+| `onHeal` | `{ amount, target, source, spellLevel }` | Healing |
+| `onCastSpell` | `{ character, spellDef, slotLevel }` | Spell casting |
+| `onInitiative` | `{ roll, character }` | Initiative |
+| `onDeathSave` | `{ roll, character }` | Death saving throw |
+| `onTurnStart` | `{ character }` | Turn start |
 | `onTurnEnd` | `{ character }` | Turn end |
 | `onRoundEnd` | `{}` | Round end |
+| `onReactionCheck` | `{ trigger, character, source }` | Reaction trigger evaluation |
 | `onLongRest` | `{ character }` | Long rest |
 | `onShortRest` | `{ character }` | Short rest |
 | `onLevelUp` | `{ character, newLevel }` | Level up |
-
-Systems may register additional hooks.
 
 ### Source Providers
 
@@ -260,49 +549,47 @@ Systems may register additional hooks.
 |---|---|---|
 | `permanent` | Race, class, subclass, feat, background effects | Elf darkvision, Fighter Extra Attack |
 | `equipment` | Equipped item effects | Magic sword +1, armor |
-| `transient` | Condition/buff effects (the keystone) | Rage, bless, haste, Bardic Inspiration die |
+| `transient` | Condition/buff effects | Rage, bless, haste, Bardic Inspiration |
 | `environment` | Area effects | Darkness, difficult terrain |
 
-**Condition-as-effect-carrier** is the keystone pattern. `ActiveCondition` carries an optional `effects[]` field. When a condition is applied, its effects flow through the dispatcher automatically while active. This single mechanism fixes:
+**Condition-as-effect-carrier** is the keystone pattern. `ActiveCondition` carries an optional `effects[]` field. When a condition is applied, its effects flow through the dispatcher automatically while active.
 
-- **Rage** → condition carrying `damage-resistance{B/P/S}` + `damage-bonus{melee-str}` + `advantage-on-save{str}`
-- **Bardic Inspiration** → condition on target with `granted-die` effect, consumed on next roll
-- **Auras** → conditions re-applied to in-range allies each turn
-- **Bless/Bane, Haste, etc.** → future spell effects
+### Typed Multi-Pass Stacking Engine
 
-### Stacking Rules
+```
+Typed Stacking Pipeline:
 
-Each modifier declares a `stackGroup`. A system-wide policy resolves same-group conflicts:
-
-| Policy | Behavior | Example |
-|---|---|---|
-| `replace` | Highest wins | 5e same-source bonus |
-| `sum` | Additive | Most damage types |
-| `highest` | Keep highest | AC from different sources |
-| `lowest` | Keep lowest | (rare) |
-| `supertype-limits` | No two same-type | "no two competence bonuses" |
-
-Configured per system, not engine code.
-
-### Abilities Registry
-
-An `Ability` is a declarative descriptor for active/spendable actions:
+Collected Modifiers
+         │
+         ├──► Item Bonuses         ──► Select Highest (per stack group)
+         ├──► Status Bonuses       ──► Select Highest (per stack group)
+         ├──► Circumstance Bonuses ──► Select Highest (per stack group)
+         └──► Untyped Bonuses      ──► Sum All Values
+                                             │
+                                             ▼
+                                  Sum Active Category Values
+```
 
 ```typescript
-interface AbilityDescriptor {
-  id: string;                    // 'breath-weapon', 'divine-smite', ...
-  resourceId?: string;           // what it spends (validated upstream)
-  cost?: number;
-  targeting: 'self' | 'ally' | 'enemy' | 'aoe' | 'none';
-  aoe?: {
-    shape: 'cone' | 'line' | 'radius';
-    range: number;
-  };
-  run(ctx, characterId, targetId?, amount?, opts?): Promise<MCPResponse>;
+interface StackingPolicy {
+  categories: ('item' | 'status' | 'circumstance' | 'untyped')[];
+  categoryPolicy: Record<string, 'replace' | 'sum' | 'highest'>;
+  overrides?: Record<string, string[]>;
 }
 ```
 
-The engine executes AoE, multi-target, and multi-step flows generically — no per-ability engine code.
+### Abilities Registry
+
+```typescript
+interface AbilityDescriptor {
+  id: string;
+  resourceId?: string;
+  cost?: number;
+  targeting: 'self' | 'ally' | 'enemy' | 'aoe' | 'none';
+  aoe?: { shape: 'cone' | 'line' | 'radius'; range: number };
+  run(ctx, characterId, targetId?, amount?, opts?): Promise<MCPResponse>;
+}
+```
 
 ### Initiative / Turn Scheduler
 
@@ -313,9 +600,6 @@ Pluggable `TurnModel`:
 | `CyclicModel` | D&D 5e, Pathfinder | d20+mod, one pass per round |
 | `PassModel` | Shadowrun | Initiative score decrements, multiple passes |
 | `PopcornModel` | FATE, Cortex | Current actor picks who goes next |
-| `TickModel` | Exalted, RT | Action-cost on a time track |
-
-The engine emits `onTurnStart`/`onTurnEnd`/`onRoundEnd` events; the dispatcher and conditions tick against them.
 
 ---
 
@@ -328,10 +612,9 @@ interface D20PolicyOptions {
   critThreshold?: number;        // default 20 (Champion: 19)
   fumbleThreshold?: number;      // default 1
   advantagePolicy?: 'keep-higher' | 'keep-lower' | 'roll-once';
+  degreesOfSuccess?: boolean;    // Pathfinder 2e ±10 thresholds
 }
 ```
-
-Handles: advantage/disadvantage, critical hits (configurable threshold), fumbles.
 
 ### 2. Dice Pool Policy
 
@@ -344,72 +627,116 @@ interface PoolPolicyOptions {
 }
 ```
 
-Handles: count-hits, exploding dice, glitch detection.
-
 ### 3. Percentile Policy
 
 ```typescript
 interface PercentilePolicyOptions {
-  difficulty?: 'regular' | 'hard' | 'extreme';  // target = skill, ½skill, ⅕skill
-  fumbleThreshold?: number;      // default 96 (regular), 100 (hard/extreme)
+  difficulty?: 'regular' | 'hard' | 'extreme';
+  fumbleThreshold?: number;      // default 96
   critThreshold?: number;        // default 5
 }
 ```
-
-Handles: target-threshold, degrees of success, fumbles, criticals.
 
 ### 4. Fudge Policy
 
 ```typescript
 interface FudgePolicyOptions {
   diceCount: number;             // default 4
-  ladder?: Record<number, string>;  // +4 "Legendary", +3 "Superb", ...
+  ladder?: Record<number, string>;
 }
 ```
-
-Handles: 4dF sum, ladder mapping.
 
 ---
 
 ## The AI Cognition Layer (`@dor/cognition`)
 
-The AI layer is **introspective**: it reads the registered system and generates three things automatically.
+### Static Universal Verbs
 
-### Tool Generation
-
-Instead of hand-writing tool schemas, tools are emitted from registered data:
-
-- **Universal verbs** always present: `act`, `narrate`, `advance_turn`, `query_state`
-- **Entity verbs** generated from schemas: every ability/resource a character has becomes a typed tool param
-- **Catalog verbs**: `cast_spell`'s param schema is built from the spell catalog's fields; adding a spell field auto-extends the tool
+Four static top-level tools — preserves provider prompt caching:
 
 ```typescript
-interface ToolSchema {
-  name: string;
-  description: string;
-  params: JSONSchema;
+interface UniversalVerbs {
+  act(verb: string, payload: Record<string, unknown>): Promise<ActionResult>;
+  query(aspect: string, filters?: Record<string, unknown>): Promise<QueryResult>;
+  narrate(text: string, tone?: string): Promise<void>;
+  advance_turn(mode: string): Promise<TurnResult>;
+}
+```
+
+System packages provide JSON Schema definitions for the `payload` object.
+
+### Multi-Vendor Cache Boundary Managers
+
+To optimize token usage across different LLM providers, the cognition layer uses provider-specific payload formatters:
+
+```typescript
+interface CacheBoundaryConfig {
+  provider: 'anthropic' | 'openai' | 'google';
+  formatPayload(request: LLMRequest): LLMRequest;
 }
 
-function generateTools(system: SystemPackage, entity: Entity): ToolSchema[];
+// Anthropic: Explicit cache_control markers
+const ANTHROPIC_CACHE: CacheBoundaryConfig = {
+  provider: 'anthropic',
+  formatPayload: (request) => ({
+    ...request,
+    system: [
+      {
+        type: 'text',
+        text: STATIC_SYSTEM_PROMPT,
+        cache_control: { type: 'ephemeral' },  // 5-minute TTL
+      },
+    ],
+    tools: request.tools.map(tool => ({
+      ...tool,
+      cache_control: { type: 'ephemeral' },
+    })),
+  }),
+};
+
+// OpenAI: Automatic prefix hash matching (requires 1024+ token static prefix)
+const OPENAI_CACHE: CacheBoundaryConfig = {
+  provider: 'openai',
+  formatPayload: (request) => ({
+    ...request,
+    // Ensure static prefix exceeds 1024 tokens for automatic caching
+    messages: [
+      { role: 'system', content: STATIC_SYSTEM_PROMPT },  // Static, cached
+      { role: 'system', content: STATIC_TOOL_DEFINITIONS },  // Static, cached
+      ...request.messages,  // Dynamic, processed fresh
+    ],
+  }),
+};
 ```
 
-### Context Assembly
+### Prompt Cache Hygiene
 
-A `ContextAssembler` walks the entity store + active sources and emits a token-budgeted string. Per-system `prompt/*.md` fragments are injected. Derived values come from `resolve()` so the AI always sees truthful AC/DC/bonuses (no hallucination).
+**CRITICAL:** To preserve prompt caching benefits, the cognition module enforces strict structural prompt hygiene:
 
-### Prompt Assembly
+```typescript
+// ✅ CORRECT: Static system prompt (cacheable)
+const SYSTEM_PROMPT = `You are a Game Master for a tabletop role-playing game.
+Follow the rules of the system module.
+Use the provided tools to resolve actions.
+Never narrate numbers you did not roll through the engine.`;
 
+// ❌ WRONG: Dynamic content in system prompt (breaks cache)
+const BAD_SYSTEM_PROMPT = `You are a GM. Turn: ${gameState.turnCounter}. HP: ${hp}. Time: ${new Date().toISOString()}.`;
+
+// ✅ CORRECT: Dynamic state in user message
+const userMessage = {
+  role: 'user',
+  content: `Turn ${gameState.turnCounter}. Party status: ${partyStatus}.`,
+};
 ```
-system-prompt = kernel-rules + system.prompt.system + system.prompt[mode] + actor-persona
-```
 
-The kernel supplies the universal contract ("use tools, don't narrate numbers you didn't roll, advance time only via tools"); the system package supplies game-specific GMing guidance.
+**Rules:**
+1. System prompts contain ONLY core engine instructions and permanent rules
+2. Dynamic state (HP, position, conditions) goes in user messages
+3. Timestamps are quantized to turn indices (`turn: 5`), not ISO dates
+4. Cache control markers share normalized TTL settings
 
-### Verb Dispatcher (Universal Agent Loop)
-
-The agent loop speaks **verbs**, not system jargon. `act(abilityId, targets, opts)` is the same whether it's a 5e Greatsword attack or a CoC Shotgun blast. The system's reducers + dice policy decide what actually happens. **One agent loop implementation serves every system.**
-
-### Cooperative Authority Model
+### Cooperative Authority with Action-Aware Fallbacks
 
 | Engine Validates | AI Owns |
 |---|---|
@@ -419,13 +746,56 @@ The agent loop speaks **verbs**, not system jargon. `act(abilityId, targets, opt
 | Prerequisites met | NPC behavior |
 | **Numbers** (always engine-truthful) | **Prose** (always AI-generated) |
 
-On violation, the engine returns a structured `Rejection { reason, hint }` (not an exception); the agent loop feeds it back as a tool-result so the LLM self-corrects. This formalizes the existing "warn-stamp" pattern.
+```typescript
+interface RejectionBudget {
+  maxRetries: number;            // Default: 2
+  currentRetries: number;
+  
+  canRetry(): boolean;
+  exhaust(): FallbackAction;     // Action-aware fallback
+}
+
+// Action-aware fallback matrix
+function selectFallback(ctx: {
+  isReactionWindow: boolean;
+  currentTurn: string;
+  actorTurn: string;
+  availableActions: string[];
+}): FallbackAction {
+  // Out-of-turn reaction window: decline the reaction
+  if (ctx.isReactionWindow && ctx.currentTurn !== ctx.actorTurn) {
+    return { type: 'decline_reaction', reason: 'fallback' };
+  }
+  
+  // In-turn: passive defensive action
+  if (ctx.availableActions.includes('dodge')) {
+    return { type: 'dodge' };
+  }
+  if (ctx.availableActions.includes('defend')) {
+    return { type: 'defend' };
+  }
+  
+  // Last resort: wait
+  return { type: 'wait' };
+}
+```
+
+**Why action-aware:** Forcing a `dodge` action during another player's turn (as a reaction fallback) violates action economy. The fallback must respect turn context.
+
+**Repeated fallback detection:**
+```typescript
+interface FallbackAlert {
+  actorId: string;
+  fallbackCount: number;
+  threshold: number;             // Default: 3 per encounter
+  
+  shouldDowngrade(): boolean;    // Switch to deterministic script or alert human
+}
+```
 
 ---
 
 ## The System Package Format
-
-A game system is a directory/package with a strict contract:
 
 ```
 systems/<system-id>/
@@ -434,66 +804,68 @@ systems/<system-id>/
     character.schema.json    → codegen → typed Character
     enemy.schema.json
     item.schema.json
-  data/                      catalogs: classes, races, backgrounds, spells, monsters, items, feats
+  data/                      catalogs: classes, races, spells, monsters, items
   rules/
     dice.ts                  RollPolicy config
     initiative.ts            TurnModel impl
-    stacking.ts              stack-group policies
+    stacking.ts              Typed stacking policy
     reducers/                one file per effect family
     sources/                 condition catalog, aura definitions
-    abilities/               active abilities (breath-weapon, divine-smite, ...)
+    abilities/               active abilities
+    overrides/               Post-evaluation override rules with sortKeys
+    verbs.json               Payload schemas for static universal verbs
   prompt/
-    system.md                "you are a 5e GM…" (system rules for the AI)
-    combat.md                guidance for combat narration
-    exploration.md           guidance for exploration
-    tone.md                  narrative style guidance
-    glossary.md              term definitions injected on demand
+    system.md                Static system prompt (no dynamic content)
+    combat.md
+    exploration.md
+    tone.md
+    glossary.md
 ```
 
-**The contract:** a loader reads `manifest.json`, registers schemas + reducers + sources + abilities + dice policy + initiative model + prompt fragments. The engine is ready. Swap the folder → different game. Multiple systems can coexist (a campaign picks one).
+**The contract:** a loader reads `manifest.json`, registers schemas + reducers + sources + abilities + dice policy + initiative model + prompt fragments + verb schemas. The engine is ready. Swap the folder → different game. Multiple systems can coexist (a campaign picks one).
 
 ---
 
 ## The 5e System Module (`systems/dnd5e/`)
 
-This is the first system module, ported from the current Dice on Rails `data/*` directory.
+### Reducers (`systems/dnd5e/rules/reducers/`)
 
-### What lives here (vs. engine code)
+| Reducer | Phase | Fixes |
+|---|---|---|
+| `extra-attack` | modifiers | Fighter/Barbarian/Monk/Paladin/Ranger Extra Attack |
+| `reckless-attack` | modifiers | Barbarian Reckless Attack |
+| `fighting-style-archery` | modifiers | +2 ranged attack |
+| `fighting-style-dueling` | modifiers | +2 one-handed damage |
+| `fighting-style-defense` | modifiers | +1 AC when armored |
+| `healing-bonus` | modifiers | Disciple of Life, Blessed Healer |
+| `evasion` | modifiers | Rogue/Monk Evasion |
+| `uncanny-dodge` | modifiers | Rogue Uncanny Dodge |
+| `crit-bonus-dice` | modifiers | Brutal Critical, Savage Attacks (FIXED) |
 
-All "Effects 2.0" fixes become **5e-system data**, not engine code:
+### Overrides (`systems/dnd5e/rules/overrides/`)
 
-#### Reducers (`systems/dnd5e/rules/reducers/`)
+| Override | Sub-Phase | SortKey | Fixes |
+|---|---|---|---|
+| `reliable-talent` | floor | `{subPhase: 'floor', priority: 100}` | Rogue Reliable Talent (roll floor = 10) |
+| `critical-immunity` | boolean | `{subPhase: 'boolean', priority: 200}` | Monster immunity to crits |
+| `speed-cap` | clamp | `{subPhase: 'clamp', priority: 50}` | Encumbrance, armor speed limits |
+| `death-on-exhaustion` | transform | `{subPhase: 'transform', priority: 300}` | Exhaustion level 10 = death |
 
-| Reducer | Fixes |
-|---|---|
-| `extra-attack` | Fighter/Barbarian/Monk/Paladin/Ranger Extra Attack (engine-loop) |
-| `reckless-attack` | Barbarian Reckless Attack |
-| `fighting-style-archery` | +2 ranged attack |
-| `fighting-style-dueling` | +2 one-handed damage |
-| `fighting-style-defense` | +1 AC when armored |
-| `fighting-style-protection` | Reaction disadvantage for adjacent ally |
-| `healing-bonus` | Disciple of Life, Blessed Healer, Song of Rest |
-| `evasion` | Rogue/Monk Evasion |
-| `uncanny-dodge` | Rogue Uncanny Dodge |
-| `crit-bonus-dice` (FIXED) | Barbarian Brutal Critical, Half-Orc Savage Attacks |
-
-#### Conditions (`systems/dnd5e/rules/sources/`)
+### Conditions (`systems/dnd5e/rules/sources/`)
 
 | Condition | Carries Effects |
 |---|---|
 | `rage` | `damage-resistance{B/P/S}`, `damage-bonus{melee-str}`, `advantage-on-save{str}` |
-| `bardic-inspiration` | `granted-die` (consumed on next attack/save/skill) |
-| `aura-of-protection` | `save-bonus` = CHA mod (applied to allies in range each turn) |
-| `aura-of-courage` | `condition-immunity{frightened}` |
-| `aura-of-devotion` | `condition-immunity{charmed}` |
+| `bardic-inspiration` | `granted-die` (consumed on next roll) |
+| `aura-of-protection` | `save-bonus` = CHA mod |
 
-#### Abilities (`systems/dnd5e/rules/abilities/`)
+### Abilities (`systems/dnd5e/rules/abilities/`)
 
 | Ability | What it does |
 |---|---|
 | `breath-weapon` | AoE: loops targets, rolls saves, applies damage |
-| `divine-smite` | Slot-consuming extra radiant damage on hit |
-| `wild-shape` | Links to polymorph flow, tracks form condition |
+| `divine-smite` | Slot-consuming extra radiant damage |
+| `wild-shape` | Links to polymorph flow |
 | `destroy-undead` | Radius auto-kill at CR limit |
 
 ### Result: Every class and race reaches full SRD fidelity
@@ -501,55 +873,26 @@ All "Effects 2.0" fixes become **5e-system data**, not engine code:
 | Class/Race | Status After Reboot |
 |---|---|
 | **Wizard** | ✅ Full spellcasting, spellbook, ritual, Arcane Recovery |
-| **Sorcerer** | ✅ Full casting + Sorcery Points + Metamagic (twinned/quickened/empowered) |
-| **Fighter** | ✅ Extra Attack (engine-loop), Fighting Styles, Second Wind, Action Surge |
-| **Cleric** | ✅ Full casting + Turn Undead + Disciple of Life + Channel Divinity |
+| **Sorcerer** | ✅ Full casting + Sorcery Points + Metamagic |
+| **Fighter** | ✅ Extra Attack (engine-loop), Fighting Styles, Second Wind |
+| **Cleric** | ✅ Full casting + Turn Undead + Disciple of Life |
 | **Druid** | ✅ Full casting + Wild Shape (condition-linked) |
 | **Paladin** | ✅ Lay on Hands + Divine Smite (slot consumed) + Auras |
 | **Ranger** | ✅ Half casting + Hunter features + Extra Attack |
-| **Rogue** | ✅ Sneak Attack (engine-validated trigger) + Expertise + Evasion |
-| **Monk** | ✅ Martial Arts + Ki (all features wired) + Stunning Strike |
+| **Rogue** | ✅ Sneak Attack + Expertise + Evasion + Reliable Talent |
+| **Monk** | ✅ Martial Arts + Ki (all features wired) |
 | **Warlock** | ✅ Pact Magic + Invocations + Mystic Arcanum |
 | **Barbarian** | ✅ Rage (resistance applied) + Reckless Attack + Brutal Critical |
-| **Bard** | ✅ Bardic Inspiration (die consumed) + Expertise + Jack of All Trades |
+| **Bard** | ✅ Bardic Inspiration (die consumed) + Expertise |
 | **Elf** | ✅ Darkvision + Keen Senses + Fey Ancestry |
 | **Dwarf** | ✅ Darkvision + Resilience + Stonecunning |
 | **Halfling** | ✅ Lucky + Brave |
 | **Gnome** | ✅ Darkvision + Gnome Cunning |
-| **Half-Elf** | ✅ Flexible ASI + Fey Ancestry + Skill Versatility |
+| **Half-Elf** | ✅ Flexible ASI + Fey Ancestry |
 | **Half-Orc** | ✅ Relentless Endurance + Savage Attacks (FIXED) |
-| **Tiefling** | ✅ Darkvision + Hellish Resistance + Infernal Legacy |
-| **Dragonborn** | ✅ Draconic Ancestry + Resistance + Breath Weapon (FIXED) |
+| **Tiefling** | ✅ Darkvision + Hellish Resistance |
+| **Dragonborn** | ✅ Draconic Ancestry + Breath Weapon (FIXED) |
 | **Human** | ✅ +1 all stats |
-
----
-
-## The Host App (`apps/host/`)
-
-The playable game. Ports the current React UI, Supabase persistence, audio/portrait/atmosphere layers.
-
-### What stays (ported)
-
-- React UI components (CharacterSheet, ChatLog, BattleMap, etc.)
-- Supabase persistence + realtime sync
-- Audio service
-- Portrait generation
-- Atmosphere overlay
-- VTT battle map
-- Multiplayer presence (typing indicators)
-
-### What changes
-
-| Current | Replaced By |
-|---|---|
-| `mcpService` + `effectDispatcher` + `conditionEngine` | `@dor/engine` + `@dor/rules` + `systems/dnd5e` |
-| `agentLoop` + 27 hand-written tool schemas | `@dor/cognition` VerbDispatcher (auto-tools) |
-| `data/classes.ts` etc. | `systems/dnd5e/data/` |
-| `resourceHandlers` | `@dor/rules` ability registry |
-| `recalculateResourcePools` | Kernel resource engine |
-| `storageService`, Supabase channels | `@dor/host` ports (same transports) |
-
-A thin `engineAdapter.ts` maps the existing `GameState` shape to the kernel `EntityStore`, so the UI migrates incrementally without a big-bang rewrite.
 
 ---
 
@@ -561,17 +904,27 @@ A thin `engineAdapter.ts` maps the existing `GameState` shape to the kernel `Ent
 
 **Deliverables:**
 - EntityStore with schema-driven property bags
-- Dispatcher with three registries (sources, reducers, hooks)
+- **Stratified unidirectional data preparation** (4 tiers, no backward reads)
+- **Synchronous dispatcher** with 4 phases (base, modifiers, derived, override)
+- **Bounded State Suspension + Continuation** for reactions (max depth 5, checksum verification)
+- **Multi-tier override sorting** (subPhase → priority → timestamp → entityId)
+- Dependency-tracked reactive caching with spatial optimization
 - Dice engine with 4 RollPolicy implementations
 - Resource pool engine
 - TurnModel interface + CyclicModel
+- Typed stacking engine (Item/Status/Circumstance/Untyped)
+- Meta-currency hooks (pre-roll, post-roll)
 
-**Gate:** Headless engine resolves a 5e combat from fixtures; deterministic replays pass.
+**Gate:** Headless engine resolves a 5e combat from fixtures; deterministic replays pass; 1,000 parallel `resolve()` calls complete within performance budget; nested reaction chains (depth ≤ 5) resolve without memory leaks.
 
 **Tests:**
 - Property tests with injected RNG
 - Replay fixtures (golden state)
 - Each dice policy: pure unit tests
+- Stratified lifecycle verification (no cycles)
+- Bounded snapshot frame tests (depth limit, checksum verification)
+- Multi-tier override sorting tests (deterministic order)
+- Performance benchmarking (1,000 parallel resolves)
 
 ---
 
@@ -585,7 +938,8 @@ A thin `engineAdapter.ts` maps the existing `GameState` shape to the kernel `Ent
 - SystemLoader (reads manifest, registers everything)
 - CLI: `dor validate-system`, `dor codegen`, `dor replay`
 - Port `data/*` → `systems/dnd5e/data/`
-- Register all reducers, abilities, conditions for 5e
+- Register all reducers, abilities, conditions, overrides for 5e
+- Define verb payload schemas (`systems/dnd5e/rules/verbs.json`)
 - All "Effects 2.0" fixes live as 5e data
 
 **Gate:** `dor validate-system dnd5e` green; codegen emits typed `Character`; all class/race fixes verified.
@@ -594,6 +948,7 @@ A thin `engineAdapter.ts` maps the existing `GameState` shape to the kernel `Ent
 - Schema validation tests
 - Codegen output tests
 - System package golden-state replays
+- Complete SRD ruleset verification
 
 ---
 
@@ -602,18 +957,25 @@ A thin `engineAdapter.ts` maps the existing `GameState` shape to the kernel `Ent
 **Scope:** `@dor/cognition`
 
 **Deliverables:**
-- ToolGenerator (auto-generates tool schemas from system)
+- Static Verb Dispatcher (4 universal verbs: act, query, narrate, advance_turn)
+- Payload schema registry (system-provided verb schemas)
 - ContextAssembler (token-budgeted state serialization)
+- **Multi-vendor cache boundary managers** (Anthropic, OpenAI, Google)
+- **Prompt cache hygiene enforcement** (static system prompts, dynamic state in user messages)
 - PromptAssembler (kernel + system + mode + persona)
-- VerbDispatcher (universal agent loop)
-- Cooperative authority model (structured rejections)
+- Cooperative authority with **action-aware fallbacks** (respects turn context)
+- Fallback alert system (repeated failures → downgrade actor)
+- Mock LLM test harness
 
-**Gate:** Headless AI GM runs a full 5e turn via verbs under cooperative authority.
+**Gate:** Headless AI GM runs a full 5e turn via static verbs under cooperative authority with rejection budgeting enforced and prompt cache hit-rate verified (>85%).
 
 **Tests:**
-- Mock-LLM tests on generated tool schemas
+- Mock-LLM tests on verb dispatch
 - Context string assertions
 - Agent loop scenario tests
+- Rejection budget enforcement tests
+- **Prompt cache hit-rate verification** (must exceed 85%)
+- Action-aware fallback tests (out-of-turn → decline_reaction)
 
 ---
 
@@ -625,6 +987,7 @@ A thin `engineAdapter.ts` maps the existing `GameState` shape to the kernel `Ent
 - engineAdapter (GameState ↔ EntityStore mapping)
 - HumanAdapter (UI events → action intents)
 - AgentAdapter (LLM tool calls → action intents)
+- **State Continuation Handler** (restores snapshots, verifies checksums)
 - Persistence port (Supabase + local)
 - Realtime port (presence/sync)
 - Migrated React UI
@@ -635,20 +998,35 @@ A thin `engineAdapter.ts` maps the existing `GameState` shape to the kernel `Ent
 - Ported vitest suite (behavioral parity)
 - UI integration tests
 - Multiplayer sync tests
+- Reaction continuation tests (checksum verification)
 
 ---
 
 ### Phase E — Second System Proof
 
-**Scope:** `systems/fate-lite` (or CoC-lite)
+**Scope:** `systems/coc-lite` (Call of Cthulhu d100 percentile)
 
 **Deliverables:**
 - Minimal second system package
 - Demonstrates universality (same engine, different rules)
 
-**Gate:** Two systems coexist on one engine → universality demonstrated.
+**Gate:** Two systems coexist on one engine → universality demonstrated within scalar domain.
 
-**Why this matters:** One system is a refactor; two is a platform. Phase E is the credibility gate.
+**Why CoC:** Percentile system validates the engine beyond d20; Sanity tracking tests resource pool flexibility; Major Wounds test override rules.
+
+---
+
+## System-by-System Universality Audit
+
+| Game System | Primary Mechanics | Modifier Model | Compatibility | Notes |
+|---|---|---|---|---|
+| **D&D 5e** | d20 + Additive Modifiers | Additive bonuses, Adv/Dis | Native (95%) | Primary baseline |
+| **Pathfinder 2e** | d20 + Modifiers; 4 DoS | Typed stacking (Status/Item/Circumstance) | High (90%) | Fully supported via typed stacking |
+| **Call of Cthulhu 7e** | d100 vs Skill; Hard/Extreme | Binary tiers, Sanity tracking | High (85%) | Sanity resource track needed |
+| **Shadowrun 6e** | d6 pool vs Threshold | Glitch, exploding dice | Moderate (75%) | Physical/Stun tracks needed |
+| **Fate Core** | 4dF vs Ladder | Aspects, Compels, Stress | Low (40%) | Scalar dispatcher insufficient for narrative aspects |
+
+**Boundary acknowledgment:** Dice on Rails is a universal platform for **rules-heavy, numeric, dice-based systems**. Narrative-first mechanics (Fate, PbtA) require a different abstraction layer.
 
 ---
 
@@ -659,10 +1037,14 @@ A thin `engineAdapter.ts` maps the existing `GameState` shape to the kernel `Ent
 | **Kernel** | Property tests, injected RNG, replay fixtures | Same inputs → same outputs across runs |
 | **Dice policies** | Pure unit tests, one per kind | d20 advantage, pool hit-count, percentile fumble |
 | **Reducers** | Pure unit tests, one per effect kind | extra-attack count, damage-bonus, resistance |
+| **Overrides** | Control-flow tests | Reliable Talent floor, immunity, speed cap |
+| **Snapshots** | Bounded frame tests | Depth limit, checksum verification, TTL |
 | **System packages** | Golden-state turn replays → exact state-diff | Full 5e combat scenario |
-| **Cognition** | Mock-LLM tests | Tool schema generation, context assembly |
+| **Cognition** | Mock-LLM tests | Verb dispatch, context assembly, fallbacks |
 | **Host** | Ported vitest suite | UI behavior, multiplayer sync |
 | **Integration** | Headless scenarios per system | End-to-end turn resolution |
+| **Performance** | Benchmark suite | 1,000 parallel `resolve()` calls |
+| **Cache** | Prompt cache hit-rate tests | Must exceed 85% hit rate |
 
 ---
 
@@ -671,11 +1053,19 @@ A thin `engineAdapter.ts` maps the existing `GameState` shape to the kernel `Ent
 | Risk | Impact | Mitigation |
 |---|---|---|
 | Codegen friction | High | `dor codegen --watch`; schema is single source of truth |
-| Dispatcher perf (fold on every roll) | Medium | Cache derived values, invalidate on source-change |
+| Dispatcher perf | Medium | Dependency-tracked reactive caching; spatial optimization |
 | Over-abstraction | High | No kernel feature ships without Phase E's second system needing it |
 | Cooperative-authority drift | Medium | One authoritative table per verb (engine validates / AI owns) |
 | Big-bang risk | High | Strangler via adapter; current game stays playable through Phase D |
 | Scope creep | Medium | Phase E enforces "does a second system need this?" |
+| LLM rejection loops | Medium | Rejection budgeting (max 2 retries → action-aware fallback) |
+| Prompt cache misses | High | Static universal verbs + multi-vendor cache boundaries |
+| State lock from async | High | Bounded State Suspension (no inline async blocking) |
+| Cyclical dependencies | Medium | Stratified unidirectional 4-tier data preparation |
+| Snapshot stack explosion | Medium | Bounded frame depth (max 5) + parent-child linking |
+| Stale snapshot continuation | Medium | SHA-256 checksum verification before resumption |
+| Override priority deadlocks | Medium | Multi-tier deterministic sorting (subPhase, priority, timestamp, entityId) |
+| Spatial cache cascades | Medium | Spatial dependency tracking (only nearby entities invalidated) |
 
 ---
 
@@ -683,14 +1073,14 @@ A thin `engineAdapter.ts` maps the existing `GameState` shape to the kernel `Ent
 
 | Current File/Module | Becomes | Action |
 |---|---|---|
-| `services/effectDispatcher.ts` | `@dor/engine` dispatcher | Extract + generalize + add stacking |
+| `services/effectDispatcher.ts` | `@dor/engine` dispatcher | Extract + generalize + add multi-phase + typed stacking + override phase |
 | `services/conditionEngine.ts` | `@dor/rules` conditions | Finish as transient-source provider |
 | `services/resourceHandlers.ts` | `@dor/rules` ability registry | Promote to declarative descriptors |
 | `services/classEngine.ts` | `@dor/engine` resource engine | Generalize |
 | `services/spellcastingEngine.ts` | `systems/dnd5e/rules/casting.ts` | Port as 5e plugin |
 | `services/combatService.ts` | `@dor/rules` + `systems/dnd5e` | Split: generic combat → rules; 5e specifics → system |
-| `services/llm/agentLoop.ts` | `@dor/cognition` VerbDispatcher | Rewrite as universal loop |
-| `services/llm/tools/*.ts` | Auto-generated by ToolGenerator | Delete (auto-generated) |
+| `services/llm/agentLoop.ts` | `@dor/cognition` Static Verb Dispatcher | Rewrite as universal loop with rejection budgeting |
+| `services/llm/tools/*.ts` | Auto-generated verb schemas | Delete (replaced by static verbs + payload schemas) |
 | `data/classes.ts` | `systems/dnd5e/data/classes.ts` | Port |
 | `data/races.ts` | `systems/dnd5e/data/races.ts` | Port |
 | `data/spells.ts` | `systems/dnd5e/data/spells.ts` | Port |
@@ -705,8 +1095,9 @@ A thin `engineAdapter.ts` maps the existing `GameState` shape to the kernel `Ent
 - `char.raging` boolean special-case
 - `inspirationDice` array special-case
 - Dead `crit-bonus-dice` reducer (replaced by fixed version)
-- Hand-written tool schemas (auto-generated)
+- Hand-written tool schemas (replaced by static verbs + payload schemas)
 - 5e-hardcoded agent loop
+- Inline async blocking for reactions
 
 ---
 
@@ -718,44 +1109,120 @@ A thin `engineAdapter.ts` maps the existing `GameState` shape to the kernel `Ent
 | **Hook** | An event point in the engine lifecycle (onAttackRoll, computeAc, etc.) |
 | **Source** | Anything that contributes modifiers (race, class, condition, equipment) |
 | **Reducer** | A pure function that folds a modifier into a hook context |
-| **Stacking** | Rules for how multiple modifiers of the same kind combine |
+| **Stacking** | Rules for how multiple modifiers combine (typed: Item/Status/Circumstance/Untyped) |
 | **Condition** | A transient source with duration/tick/removal (the buff system) |
 | **Ability** | An active/spendable action with targeting and effects |
 | **RollPolicy** | How to interpret a dice expression (d20, pool, percentile, Fudge) |
-| **TurnModel** | How initiative/order works (cyclic, pass, popcorn, tick) |
+| **TurnModel** | How initiative/order works (cyclic, pass, popcorn) |
 | **System Package** | A directory of schema + data + rules + prompt that defines one game |
 | **Cooperative Authority** | Engine validates mechanics; AI owns narration; numbers engine-truthful |
-| **Verb** | A universal action (act, narrate, advance_turn, query_state) |
+| **Rejection Budgeting** | Max retries before fallback (prevents LLM infinite loops) |
+| **Static Verbs** | Fixed top-level AI tools (act, query, narrate, advance_turn) with system payload schemas |
+| **State Suspension** | Bounded snapshot-based async handling (no inline async blocking) |
+| **Continuation** | Resuming suspended state after reaction decision with checksum verification |
+| **Stratified Data** | Unidirectional 4-tier preparation (Base → Modifiers → Derived → Override) |
+| **Post-Evaluation Override** | Phase 4 for control-flow mutations (Reliable Talent, immunity, caps) |
+| **Meta-Currency Hooks** | Pre-roll/post-roll expenditure (luck, inspiration) |
+| **Prompt Cache Hygiene** | Static system prompts, dynamic state in user messages, quantized timestamps |
+| **Multi-Vendor Cache** | Provider-specific cache boundary formatting (Anthropic, OpenAI, Google) |
 | **Schema + Codegen** | Runtime property-bag, dev-time typed interfaces generated from schema |
+| **Dependency Graph** | Dirty-flag caching for derived values with spatial optimization |
 
 ---
 
 ## Appendices
 
-### A. Dispatcher Pseudocode (Complete)
+### A. Synchronous Dispatcher with Bounded State Suspension
 
 ```typescript
-function resolve(store, entity, hook, ctx) {
-  // 1. Collect all active sources for this entity+hook
-  const sources = getSourceProviders()
-    .sort((a, b) => a.weight - b.weight)
-    .flatMap(provider => provider.collect(entity, hook));
-
-  // 2. For each source, find matching reducers
-  const results = [];
-  for (const modifier of sources) {
-    const reducers = getReducers(hook, modifier.kind)
-      .sort((a, b) => a.priority - b.priority);
-
-    let currentCtx = ctx;
-    for (const reducer of reducers) {
-      currentCtx = reducer.reduce(currentCtx, modifier, entity);
+function resolve(store, entity, hook, initialCtx): HookContext | StateSnapshot {
+  // Phase 1: Base Initialization (Tiers 1-2)
+  let ctx = { ...initialCtx, _phase: 'base', _tier: 1 };
+  ctx = prepareBaseData(store, entity, ctx);
+  ctx._tier = 2;
+  ctx = prepareAbilityScores(store, entity, ctx);
+  
+  // Phase 2: Modifier Resolution (Tier 3)
+  ctx._phase = 'modifiers';
+  ctx._tier = 3;
+  const modifiers = collectModifiers(store, entity, hook);
+  
+  // Typed multi-pass stacking
+  for (const category of ['item', 'status', 'circumstance', 'untyped']) {
+    const categoryMods = modifiers.filter(m => m.stackCategory === category);
+    const stacked = applyStackingRules(categoryMods);
+    for (const mod of stacked) {
+      ctx = getReducers(hook, mod.kind, 'modifiers')
+        .sort((a, b) => a.priority - b.priority)
+        .reduce(ctx, (reducer) => reducer.reduce(ctx, mod, entity));
     }
-    results.push(currentCtx);
   }
+  
+  // Phase 3: Derived Computation (Tier 4)
+  ctx._phase = 'derived';
+  ctx._tier = 4;
+  ctx = computeDerivedValues(store, entity, ctx);
+  
+  // Phase 4: Post-Evaluation Override
+  ctx._phase = 'override';
+  const overrides = getOverrides(hook)
+    .filter(o => o.condition(ctx))
+    .sort(compareOverrides);  // Multi-tier deterministic sort
+  
+  for (const override of overrides) {
+    ctx = override.apply(ctx);
+  }
+  
+  // Check for reaction triggers
+  const triggers = evaluateReactionTriggers(ctx);
+  if (triggers.length > 0) {
+    // Create bounded snapshot frame
+    return {
+      id: generateSnapshotId(),
+      frameDepth: getCurrentFrameDepth() + 1,
+      parentSnapshotId: getCurrentSnapshotId(),
+      entityId: entity.id,
+      hook,
+      context: ctx,
+      stateChecksum: computeStateChecksum(store),
+      timestamp: Date.now(),
+      reactionTriggers: triggers,
+    };
+  }
+  
+  return ctx;
+}
 
-  // 3. Apply stacking rules per stack-group
-  return applyStacking(results, ctx);
+function continueWithReaction(snapshot: StateSnapshot, decision: ReactionDecision): HookContext {
+  // Verify frame depth
+  if (snapshot.frameDepth > MAX_SNAPSHOT_DEPTH) {
+    throw new MaxReactionDepthExceededError(
+      `Reaction chain exceeded maximum depth of ${MAX_SNAPSHOT_DEPTH}`
+    );
+  }
+  
+  // Verify state checksum
+  const currentChecksum = computeStateChecksum(store);
+  if (currentChecksum !== snapshot.stateChecksum) {
+    throw new StateDesynchronizationError(
+      `Snapshot ${snapshot.id} is stale. ` +
+      `Expected ${snapshot.stateChecksum}, got ${currentChecksum}`
+    );
+  }
+  
+  // Verify timeout
+  if (Date.now() - snapshot.timestamp > SNAPSHOT_TTL_MS) {
+    throw new SnapshotTimeoutError(`Snapshot ${snapshot.id} expired`);
+  }
+  
+  // Restore frozen context and apply reactions
+  let ctx = { ...snapshot.context };
+  for (const reaction of decision.reactions) {
+    const ability = getAbility(reaction.ability);
+    ctx = ability.run(ctx, reaction.actor, reaction.payload);
+  }
+  
+  return finalizeResolution(ctx);
 }
 ```
 
@@ -766,82 +1233,173 @@ function resolve(store, entity, hook, ctx) {
 applyCondition(barbarian, {
   id: 'rage',
   source: barbarian.id,
-  duration: null,  // lasts until conditions end it
+  duration: null,
   effects: [
-    { kind: 'damage-resistance', payload: { type: 'bludgeoning' } },
-    { kind: 'damage-resistance', payload: { type: 'piercing' } },
-    { kind: 'damage-resistance', payload: { type: 'slashing' } },
+    { kind: 'damage-resistance', payload: { type: 'bludgeoning' }, stackCategory: 'status' },
+    { kind: 'damage-resistance', payload: { type: 'piercing' }, stackCategory: 'status' },
+    { kind: 'damage-resistance', payload: { type: 'slashing' }, stackCategory: 'status' },
     { kind: 'damage-bonus', payload: { amount: '2', condition: 'melee-str' } },
     { kind: 'advantage-on-save', payload: { stat: 'str' } },
     { kind: 'advantage-on-save', payload: { stat: 'con' } },
   ]
 });
 
-// When rage ends (no attack/damage on turn):
+// When rage ends:
 removeCondition(barbarian, 'rage');
 ```
 
-### C. Bardic Inspiration as Consumed Condition
+### C. Bardic Inspiration as Meta-Currency Hook
 
 ```typescript
 // When bard grants inspiration:
 applyCondition(target, {
   id: 'bardic-inspiration',
   source: bard.id,
-  duration: 10,  // 10 minutes
+  duration: 10,
   durationUnit: 'minute',
   effects: [
-    { kind: 'granted-die', payload: { dieSize: 8 } }
+    { kind: 'meta-currency', payload: { hook: 'post-roll', dieSize: 8 } }
   ]
 });
 
-// The 'granted-die' reducer on onAttackRoll/onSaveRoll/onSkillCheck:
-function reduce(ctx, modifier, character) {
-  const inspiration = character.collections.conditions?.find(
-    c => c.id === 'bardic-inspiration' && c.source === modifier.source
-  );
-  if (inspiration) {
-    const dieSize = modifier.payload.dieSize;
-    const bonus = cryptoRoll(dieSize);
-    ctx.roll += bonus;
-    ctx.inspirationBonus = bonus;
-    removeCondition(character, 'bardic-inspiration');
-  }
-  return ctx;
+// The meta-currency hook executes after roll resolution:
+const BARDC_INSPIRATION_HOOK: MetaCurrencyHook = {
+  timing: 'post-roll',
+  condition: (ctx) => {
+    const inspiration = ctx.character.collections.conditions?.find(
+      c => c.id === 'bardic-inspiration' && c.source === ctx.bardId
+    );
+    return !!inspiration;
+  },
+  apply: (ctx, rng) => ({
+    ...ctx,
+    roll: ctx.roll + rng.roll(ctx.inspirationDieSize || 8),
+  }),
+  resourceCost: { pool: 'bardic-inspiration', amount: 1 },
+};
+```
+
+### D. Reliable Talent Override
+
+```typescript
+const RELIABLE_TALENT: OverrideRule = {
+  condition: (ctx) => {
+    return ctx._hook === 'onSkillCheck' && 
+           ctx.character.class === 'rogue' && 
+           ctx.character.level >= 11 &&
+           ctx.roll <= 9 &&
+           ctx.isProficient === true;
+  },
+  apply: (ctx) => ({ ...ctx, roll: 10 }),
+  sortKey: {
+    subPhase: 'floor',
+    priority: 100,
+    timestamp: Date.now(),
+    entityId: ctx.character.id,
+  },
+};
+```
+
+### E. Static Verb Schema Example
+
+```json
+{
+  "verbs": [
+    {
+      "verb": "act",
+      "description": "Perform a game action",
+      "payloadSchemas": {
+        "attack": {
+          "type": "object",
+          "properties": {
+            "attackerId": { "type": "string" },
+            "weaponName": { "type": "string" },
+            "targetId": { "type": "string" },
+            "isOffHand": { "type": "boolean" },
+            "divineSmite": {
+              "type": "object",
+              "properties": { "slotLevel": { "type": "integer", "minimum": 1, "maximum": 5 } }
+            }
+          },
+          "required": ["attackerId", "weaponName", "targetId"]
+        },
+        "cast_spell": {
+          "type": "object",
+          "properties": {
+            "casterId": { "type": "string" },
+            "spellId": { "type": "string" },
+            "slotLevel": { "type": "integer" },
+            "targets": { "type": "array", "items": { "type": "string" } },
+            "metamagic": {
+              "type": "object",
+              "properties": {
+                "option": { "type": "string", "enum": ["twinned", "quickened", "empowered"] },
+                "sorceryPointCost": { "type": "integer" }
+              }
+            }
+          },
+          "required": ["casterId", "spellId"]
+        }
+      }
+    }
+  ]
 }
 ```
 
-### D. Extra Attack Engine-Loop
+### F. Prompt Cache Hygiene Example
 
 ```typescript
-async function player_attack(characterId, weaponName, targetId, opts) {
-  const attacker = store.get(characterId);
-  const target = store.get(targetId);
+// ✅ CORRECT: Static system prompt (cacheable)
+const SYSTEM_PROMPT = `You are a Game Master for a tabletop role-playing game.
+Follow the rules of the system module.
+Use the provided tools to resolve actions.
+Never narrate numbers you did not roll through the engine.`;
 
-  // 1. Compute attack count via dispatcher
-  const attackCtx = resolve(store, attacker, 'computeAttackCount', {
-    _hook: 'computeAttackCount',
-    count: 1,
-    character: attacker,
-    weaponName,
-    isRanged: false,
-  });
-  const attackCount = attackCtx.count;
+// Dynamic state goes in user message (not system prompt)
+const userMessage = {
+  role: 'user',
+  content: `Turn ${gameState.turnCounter}. 
+Party status: ${partyStatus}. 
+Active conditions: ${activeConditions}.
+What happens next?`
+};
 
-  // 2. Loop N times
-  const results = [];
-  for (let i = 0; i < attackCount; i++) {
-    const result = await resolveSingleAttack(attacker, weaponName, target, opts);
-    results.push(result);
-  }
+// ❌ WRONG: Dynamic content in system prompt (breaks cache)
+const BAD_PROMPT = `You are a GM. Turn: ${gameState.turnCounter}. HP: ${hp}. Time: ${new Date().toISOString()}.`;
+```
 
-  // 3. Return all attacks
-  return {
-    success: true,
-    data: { attacks: results },
-    message: `${attacker.name} attacks ${target.name} ${attackCount} time(s)...`
-  };
-}
+### G. Multi-Vendor Cache Formatting
+
+```typescript
+// Anthropic: Explicit cache_control markers
+const anthropicRequest = {
+  model: 'claude-sonnet-4-20250514',
+  max_tokens: 4096,
+  system: [
+    {
+      type: 'text',
+      text: STATIC_SYSTEM_PROMPT,
+      cache_control: { type: 'ephemeral' },
+    },
+  ],
+  tools: STATIC_TOOLS.map(tool => ({
+    ...tool,
+    cache_control: { type: 'ephemeral' },
+  })),
+  messages: [
+    { role: 'user', content: dynamicStatePayload },
+  ],
+};
+
+// OpenAI: Automatic prefix hashing (requires 1024+ token static prefix)
+const openaiRequest = {
+  model: 'gpt-4o',
+  messages: [
+    { role: 'system', content: STATIC_SYSTEM_PROMPT + STATIC_TOOL_DEFINITIONS },  // >1024 tokens
+    { role: 'user', content: dynamicStatePayload },
+  ],
+  tools: STATIC_TOOLS,
+};
 ```
 
 ---
@@ -851,7 +1409,7 @@ async function player_attack(characterId, weaponName, targetId, opts) {
 1. **Review this blueprint** with the team
 2. **Confirm Phase A scope** (kernel + rules + dice)
 3. **Scaffold the monorepo** (pnpm workspace, package structure)
-4. **Implement Phase A** (dispatcher spine + dice policies)
+4. **Implement Phase A** (stratified dispatcher + bounded snapshots + multi-tier overrides + typed stacking)
 5. **Proceed through phases B–E**
 
 The plan is complete and ready for execution.

@@ -164,7 +164,7 @@ export class MockMCPServer {
   public getCurrentTurnInfo(): { name: string; type: 'player' | 'enemy'; id: string } | null { return this.combat.getCurrentTurnInfo(); }
   public updateInitiativeDeathStatus(id: string, isDead: boolean): void { this.combat.updateInitiativeDeathStatus(id, isDead); }
   public checkCombatEndConditions(): { ended: boolean; reason?: string; victory?: boolean } { return this.combat.checkCombatEndConditions(); }
-  public async player_attack(attackerId: string, weaponName: string, targetId: string, isOffHand?: boolean, isSneakAttack?: boolean, sharpshooter?: boolean, greatWeaponMaster?: boolean): Promise<MCPResponse> { return this.combat.player_attack(attackerId, weaponName, targetId, isOffHand, isSneakAttack, sharpshooter, greatWeaponMaster); }
+  public async player_attack(attackerId: string, weaponName: string, targetId: string, isOffHand?: boolean, isSneakAttack?: boolean, sharpshooter?: boolean, greatWeaponMaster?: boolean, divineSmite?: { slotLevel: number }): Promise<MCPResponse> { return this.combat.player_attack(attackerId, weaponName, targetId, isOffHand, isSneakAttack, sharpshooter, greatWeaponMaster, divineSmite); }
   public async resolveEnemyTurn(): Promise<MCPResponse> { return this.combat.resolveEnemyTurn(); }
   public async resolveAllPendingEnemyTurns(): Promise<{ messages: string[]; combatEnded: boolean; victory?: boolean; attackResults: Record<string, unknown>[] }> { return this.combat.resolveAllPendingEnemyTurns(); }
   public syncInitiativeConditions(): void { this.combat.syncInitiativeConditions(); }
@@ -289,11 +289,44 @@ export class MockMCPServer {
   public async polymorph_creature(characterId: string, beastFormName: string, duration: number = 60): Promise<MCPResponse> {
     const char = this.party.getTarget(characterId);
     if (!char) return fail('Character not found.');
-    const { BEAST_FORMS, applyPolymorph } = await import('./transformationEngine');
+    const { BEAST_FORMS, applyPolymorph, applyWildShape } = await import('./transformationEngine');
     const beast = BEAST_FORMS[beastFormName.toLowerCase()];
     if (!beast) return fail(`Unknown beast form: ${beastFormName}.`);
     const classDef = getClassDef(char.class);
-    if (classDef?.spellcasting && beast.cr > char.level) {
+
+    const isDruid = char.class === 'druid';
+    if (isDruid) {
+      const druidLevel = char.level;
+      const maxCR = Math.max(0.25, Math.floor(druidLevel / 3));
+      const crValue = beast.cr ?? 0;
+      if (crValue > maxCR) {
+        return fail(`Cannot wild shape into ${beast.name} (CR ${crValue}) - max CR for Druid level ${druidLevel} is ${maxCR}.`);
+      }
+      if (beast.beastFields?.fly && druidLevel < 8) {
+        return fail(`Cannot wild shape into a flying beast at Druid level ${druidLevel} — requires level 8.`);
+      }
+      if (beast.beastFields?.swim && druidLevel < 4) {
+        return fail(`Cannot wild shape into a swimming beast at Druid level ${druidLevel} — requires level 4.`);
+      }
+      const wsResource = (char.resources || []).find(r => r.id === 'wild-shape');
+      if (!wsResource || wsResource.current < 1) {
+        return fail(`No wild shape charges remaining (${wsResource?.current ?? 0}/${wsResource?.max ?? 2}).`);
+      }
+      wsResource.current -= 1;
+      const transformation = applyWildShape(char, beast, Math.max(30, (druidLevel / 2) * 60));
+      if (!char.runtime) char.runtime = {};
+      char.runtime.transformationState = transformation;
+      char.hp.max = beast.hp.max;
+      char.hp.current = beast.hp.max;
+      this.state.sessionLogs.push(`${char.name} uses Wild Shape to become a ${beast.name}!`);
+      return {
+        success: true,
+        data: { character: char.name, transformedInto: beast.name, newHp: beast.hp, newAc: beast.ac, attacks: beast.attacks, chargesRemaining: wsResource },
+        message: `${char.name} wild shapes into a ${beast.name}! HP: ${beast.hp}, AC: ${beast.ac}. Wild shape charges remaining: ${wsResource.current}/${wsResource.max}.`
+      };
+    }
+
+    if (classDef?.spellcasting && beast.cr && beast.cr > char.level) {
       return fail(`Cannot polymorph into ${beast.name} (CR ${beast.cr}) - exceeds character level ${char.level}.`);
     }
     const transformation = applyPolymorph(char, beast, duration);
@@ -402,7 +435,7 @@ export class MockMCPServer {
         case 'end_combat':
           res = await this.combat.end_combat(); break;
         case 'player_attack':
-          res = await this.combat.player_attack(String(args.attackerId || ''), String(args.weaponName || ''), String(args.targetId || args.target_name || args.target || ''), args.isOffHand as boolean | undefined, args.isSneakAttack as boolean | undefined, args.sharpshooter as boolean | undefined, args.greatWeaponMaster as boolean | undefined); break;
+          res = await this.combat.player_attack(String(args.attackerId || ''), String(args.weaponName || ''), String(args.targetId || args.target_name || args.target || ''), args.isOffHand as boolean | undefined, args.isSneakAttack as boolean | undefined, args.sharpshooter as boolean | undefined, args.greatWeaponMaster as boolean | undefined, args.divineSmite as { slotLevel: number } | undefined); break;
         case 'move_to': {
           res = await this.travel.move_to(String(args.location_name || 'Unknown'), String(args.description || ''), args.targetId as string | undefined, args.skillCheck as unknown as { skill_name?: string; difficulty?: number; onSuccess?: unknown }, args.significance as LocationSignificance | undefined);
           res = await this.maybeFinalizeTurn(args, res, options?.deferFinalize);
@@ -470,7 +503,7 @@ export class MockMCPServer {
           if (targetsList.length === 0 && (args.targetId || args.target_name)) {
             targetsList = [String(args.targetId || args.target_name)];
           }
-          res = await this.spells.cast_spell(String(args.characterId || args.casterId || ''), String(args.spellId || ''), Number(args.slotLevel ?? 0), targetsList, args.targetSaveResults as Record<string, boolean> | undefined, args.reaction as boolean | undefined); break;
+          res = await this.spells.cast_spell(String(args.characterId || args.casterId || ''), String(args.spellId || ''), Number(args.slotLevel ?? 0), targetsList, args.targetSaveResults as Record<string, boolean> | undefined, args.reaction as boolean | undefined, args.metamagic as { option?: string } | undefined); break;
         }
         case 'spell_effect':
           res = await this.spells.spell_effect(String(args.mode || 'counter') as 'counter' | 'dispel', String(args.casterId || ''), Number(args.targetSpellLevel ?? 3), args.targetId as string); break;

@@ -6,13 +6,13 @@ import { getMod, getProficiencyBonus, calculateAc, getClassDef } from '../classE
 import { getConditionEffects, isIncapacitated, isUnconscious, removeCondition, tickConditions, tickConditionsByTime, rollSaveAgainstCondition, getExhaustionPenalty } from '../conditionEngine';
 import {
   getAlertInitiativeBonus,
-  hasFeat,
   getResilientSaveBonus,
   getShieldMasterSaveBonus,
 } from '../featsService';
 import { rollDice, rollDeathSave } from '../diceEngine';
 import { parseDiceFormula } from '../../utils/dice';
 import { resolveAdvantage } from '../../utils/combatUtils';
+import { getEffects, applyEffects, SaveRollContext, AttackRollContext, AttackDamageContext } from '../effectDispatcher';
 import { breakConcentration as engineBreakConcentration, checkConcentrationExpiry } from '../spellcastingEngine';
 import { initBattleMap, autoPlaceParty, autoPlaceEnemies, placeToken, findFreeCell } from '../gridService';
 
@@ -38,7 +38,7 @@ export interface CombatService {
   checkCombatEndConditions(): { ended: boolean; reason?: string; victory?: boolean };
   resolveAllPendingEnemyTurns(): Promise<{ messages: string[]; combatEnded: boolean; victory?: boolean; attackResults: Record<string, unknown>[] }>;
   syncInitiativeConditions(): void;
-  player_attack(attackerId: string, weaponName: string, targetId: string, isOffHand?: boolean, isSneakAttack?: boolean, sharpshooter?: boolean, greatWeaponMaster?: boolean): Promise<MCPResponse>;
+  player_attack(attackerId: string, weaponName: string, targetId: string, isOffHand?: boolean, isSneakAttack?: boolean, sharpshooter?: boolean, greatWeaponMaster?: boolean, divineSmite?: { slotLevel: number }): Promise<MCPResponse>;
   resolveAdvantage(attacker?: Character | Enemy, target?: Character | Enemy, roll?: number): { roll: number; hasAdvantage: boolean; hasDisadvantage: boolean };
   initializeDeathSaves(character: Character): void;
 }
@@ -871,15 +871,25 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
         const mod = getMod(statVal);
         const resilientBonus = getResilientSaveBonus(partyTarget, mappedStat as 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha');
         const shieldMasterBonus = getShieldMasterSaveBonus(partyTarget, mappedStat as 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha');
-        const totalMod = mod + resilientBonus + shieldMasterBonus;
-        // Fey Ancestry (elf/half-elf): advantage on saves against being charmed.
-        const hasFeyAncestry = (partyTarget.racialTraits || []).includes('fey-ancestry');
-        const advantage = charmSave && hasFeyAncestry;
+        let totalMod = mod + resilientBonus + shieldMasterBonus;
+
+        const saveCtx: SaveRollContext = {
+          _hook: 'onSaveRoll',
+          roll: 0,
+          stat: mappedStat,
+          character: partyTarget,
+          hasAdvantage: false,
+          extraModifier: 0,
+          spellContext: charmSave ? { isMagical: true } : undefined,
+        };
+        const afterEffects = applyEffects(partyTarget, 'onSaveRoll', saveCtx);
+        totalMod += afterEffects.extraModifier;
+
         let roll = cryptoRoll(20);
         let advantageNote = '';
-        if (advantage) {
+        if (afterEffects.hasAdvantage) {
           const second = cryptoRoll(20);
-          advantageNote = ` [Fey Ancestry advantage: ${roll} vs ${second}]`;
+          advantageNote = ` [Advantage: ${roll} vs ${second}]`;
           roll = Math.max(roll, second);
         }
         const total = roll + totalMod - getExhaustionPenalty(partyTarget);
@@ -1058,7 +1068,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       return { messages, combatEnded, victory, attackResults };
     },
 
-    async player_attack(attackerId, weaponName, targetId, isOffHand, isSneakAttack, sharpshooter, greatWeaponMaster) {
+    async player_attack(attackerId, weaponName, targetId, isOffHand, isSneakAttack, sharpshooter, greatWeaponMaster, divineSmite) {
       const attacker = deps.getTarget(attackerId);
       if (!attacker) return fail(`Attacker "${attackerId}" not found.`, ErrorCodes.NOT_FOUND);
 
@@ -1087,8 +1097,20 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       const advResult = this.resolveAdvantage(attacker, enemy, roll);
       roll = advResult.roll;
 
+      const atkRollCtx: AttackRollContext = {
+        _hook: 'onAttackRoll',
+        roll,
+        character: attacker,
+        weaponName,
+        targetId: enemy.id,
+        isRanged,
+      };
+      const afterRoll = applyEffects(attacker, 'onAttackRoll', atkRollCtx);
+      roll = afterRoll.roll;
+      const hasExpandedCrit = !!(afterRoll as unknown as Record<string, unknown>)._critRangeExpanded;
+
       const attackRoll = roll + atkBonus - getExhaustionPenalty(attacker);
-      const isCrit = roll === 20;
+      const isCrit = roll === 20 || (hasExpandedCrit && roll >= 19);
       const isFumble = roll === 1;
       const enemyAc = typeof enemy.ac === 'number' ? enemy.ac : 10;
       const isHit = isCrit || (!isFumble && attackRoll >= enemyAc);
@@ -1134,7 +1156,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       const dieSides = parsed.sides;
       const flatMod = parsed.bonus;
 
-      const hasGWF = hasFeat(attacker, 'great-weapon-fighting') && !isOffHand;
+      const hasGWF = getEffects(attacker, 'gwf-reroll').length > 0 && !isOffHand;
       const damageResults: number[] = [];
       for (let i = 0; i < diceCount; i++) {
         let v = cryptoRoll(dieSides);
@@ -1147,7 +1169,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       if (isUnarmed && !isMonk) {
         damageTotal += abilityMod;
       } else if (isOffHand) {
-        if (hasFeat(attacker, 'two-weapon-fighting')) damageTotal += abilityMod;
+        if (getEffects(attacker, 'offhand-modifier').length > 0) damageTotal += abilityMod;
       } else {
         damageTotal += abilityMod;
       }
@@ -1156,9 +1178,48 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       if (greatWeaponMaster && !isRanged) damageTotal += 10;
 
       if (isSneakAttack) {
-        const sneakDice = attacker.sneakAttackDice ?? Math.ceil(attacker.level / 2);
+        const sneakSources = getEffects(attacker, 'sneak-attack');
+        const sneakDiceFromData = sneakSources[0]?.payload.extraDiceAtLevel as Record<string, number> | undefined;
+        let sneakDice: number;
+        if (sneakDiceFromData) {
+          sneakDice = 1;
+          const sorted = Object.keys(sneakDiceFromData).map(Number).sort((a, b) => a - b);
+          for (const lvl of sorted) {
+            if (attacker.level >= lvl) sneakDice = sneakDiceFromData[String(lvl)];
+          }
+        } else {
+          sneakDice = attacker.sneakAttackDice ?? Math.ceil(attacker.level / 2);
+        }
         for (let i = 0; i < (isCrit ? 2 * sneakDice : sneakDice); i++) {
           damageTotal += cryptoRoll(6);
+        }
+      }
+
+      const dmgCtx: AttackDamageContext = {
+        _hook: 'onAttackDamage',
+        damage: damageTotal,
+        character: attacker,
+        weaponName,
+        isCrit,
+        isRanged,
+      };
+      const afterDmg = applyEffects(attacker, 'onAttackDamage', dmgCtx);
+      damageTotal = afterDmg.damage;
+
+      if (divineSmite && divineSmite.slotLevel && !isOffHand) {
+        const smiteLevel = Math.min(divineSmite.slotLevel, 5);
+        const smiteDice = 2 + smiteLevel;
+        const isFiendOrUndead = enemy.type === 'fiend' || enemy.type === 'undead';
+        const extraSmiteDie = isFiendOrUndead ? 1 : 0;
+        for (let i = 0; i < smiteDice + extraSmiteDie; i++) {
+          damageTotal += cryptoRoll(8);
+        }
+        damageTotal = Math.round(damageTotal);
+        // Consume the spell slot
+        const slotId = `spell-slot-${divineSmite.slotLevel}`;
+        const slot = (attacker.resources || []).find(r => r.id === slotId);
+        if (slot && slot.current > 0) {
+          slot.current -= 1;
         }
       }
 

@@ -7,6 +7,7 @@ import { SPELLS_BY_ID, parseDuration } from '../../utils/spells';
 import { rollDice } from '../diceEngine';
 import { parseDiceFormula } from '../../utils/dice';
 import { applyCondition, removeCondition, getConditionEffects, getExhaustionPenalty } from '../conditionEngine';
+import { RESOURCE_HANDLERS } from '../resourceHandlers';
 
 /** Dependencies required by the SpellcastingService. */
 export interface SpellcastingDeps {
@@ -18,7 +19,7 @@ export interface SpellcastingDeps {
 
 /** Service interface for spell casting, ritual casting, spellbook management, and resource usage. */
 export interface SpellcastingService {
-  cast_spell(characterId: string, spellId: string, slotLevel?: number, targets?: string[], targetSaveResults?: Record<string, boolean>, reaction?: boolean): Promise<MCPResponse>;
+  cast_spell(characterId: string, spellId: string, slotLevel?: number, targets?: string[], targetSaveResults?: Record<string, boolean>, reaction?: boolean, metamagic?: { option?: string }): Promise<MCPResponse>;
   resolve_dot_damage(spellId: string, targetId: string, casterId?: string): Promise<MCPResponse>;
   cast_ritual(characterId: string, spellId: string): Promise<MCPResponse>;
   spell_effect(mode: 'counter' | 'dispel', casterId: string, targetSpellLevel: number, targetId?: string): Promise<MCPResponse>;
@@ -144,7 +145,7 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
     applyWeaponBuff,
     abilityCheckForSpell,
 
-    async cast_spell(characterId, spellId, slotLevel = 0, targets = [], targetSaveResults, reaction) {
+    async cast_spell(characterId, spellId, slotLevel = 0, targets = [], targetSaveResults, reaction, metamagic) {
       const char = deps.getTarget(characterId);
       if (!char) return fail('Character not found.');
 
@@ -205,6 +206,54 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
           char.runtime.concentrationEffectiveDuration = parsed?.unit === 'minute' ? parsed.value : undefined;
         }
       }
+
+      if (metamagic && metamagic.option) {
+        const opt = metamagic.option;
+        if (!char.metamagicOptions?.length) {
+          if (result.success) {
+            return { success: false, data: result, message: `${char.name} does not have metamagic options (requires Sorcerer L3+).` };
+          }
+        }
+        const pointCosts: Record<string, number> = {
+          twinned: (spellDef?.level || 1) >= 1 ? (spellDef?.level || 1) : 1,
+          heightened: 3,
+          quickened: 2,
+          subtle: 1,
+          empowered: 1,
+          careful: 1,
+          distant: 1,
+          extended: 1,
+        };
+        const pointCost = pointCosts[opt] || 1;
+
+        const ptsSpent = classEngineSpendResource(char, 'sorcery-points', pointCost);
+        if (!ptsSpent) {
+          return fail(`Insufficient sorcery points for ${opt} spell (needs ${pointCost}).`);
+        }
+
+        if (opt === 'twinned' && targets.length === 1) {
+          targets = [...targets, targets[0]];
+        }
+        if (opt === 'heightened' && targets.length > 0 && state.combat?.isActive) {
+          const affected = targets[0];
+          state.sessionLogs.push(`${char.name} uses Heightened Spell — ${affected} has disadvantage on the save.`);
+        }
+        if (opt === 'empowered' && result.damage?.perTarget) {
+          const chaMod = getMod(char.stats.cha);
+          let rerolled = 0;
+          for (const t of result.damage.perTarget) {
+            if (rerolled >= chaMod) break;
+            t.damage = rollDice(parseDiceFormula(spellDef?.damage || '1d6').count, parseDiceFormula(spellDef?.damage || '1d6').sides);
+            rerolled++;
+          }
+          if (result.damage.perTarget.length > 0) {
+            result.damage.total = result.damage.perTarget.reduce((sum, t) => sum + t.damage, 0);
+          }
+        }
+        // subtle, careful, distant, extended: narrative only (engine records the choice)
+        result.message = (result.message || '') + ` [Metamagic: ${opt}]`;
+      }
+      // ---- end metamagic ----
 
       if (result.damage && targets.length > 0 && state.combat?.isActive) {
         const validatedTargets: string[] = [];
@@ -818,36 +867,10 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
       if (!char) return fail('Character not found.');
       const ok = classEngineSpendResource(char, resourceId, amount ?? 1);
       if (!ok) return fail(`Insufficient ${resourceId} remaining.`);
-      if (resourceId === 'second-wind') {
-        const heal = cryptoRoll(10) + char.level;
-        char.hp.current = Math.min(char.hp.max, char.hp.current + heal);
-        return { success: true, data: { healed: heal }, message: `Second Wind restored ${heal} HP.` };
-      }
-      if (resourceId === 'rage') {
-        breakConcentrationWithCleanup(char);
-        char.raging = true;
-        const rageBonus = char.level >= 16 ? 4 : char.level >= 9 ? 3 : 2;
-        return { success: true, data: { raging: true, rageBonus }, message: `Entered rage. +${rageBonus} melee damage, resistance to B/P/S, advantage on STR checks/saves. While raging you can't cast or concentrate on spells.` };
-      }
-      if (resourceId === 'lay-on-hands-pool' && targetId && amount) {
-        const target = deps.getTarget(targetId);
-        if (target) {
-          const healed = Math.min(amount, char.hp.max - char.hp.current);
-          target.hp.current = Math.min(target.hp.max, target.hp.current + healed);
-          return { success: true, data: { healed }, message: `Lay on Hands healed ${healed} HP for ${target.name}.` };
-        }
-      }
-      if (resourceId === 'breath-weapon') {
-        const conMod = getMod(char.stats.con);
-        const profBonus = getProficiencyBonus(char as unknown as Character);
-        const dc = 8 + conMod + profBonus;
-        const dmgDice = char.level >= 16 ? '5d6' : char.level >= 11 ? '4d6' : char.level >= 6 ? '3d6' : '2d6';
-        const parsed = parseDiceFormula(dmgDice);
-        const damage = rollDice(parsed.count, parsed.sides);
-        const ancestryDmgTypes: Record<string, string> = { black: 'acid', blue: 'lightning', brass: 'fire', bronze: 'lightning', copper: 'acid', gold: 'fire', green: 'poison', red: 'fire', silver: 'cold', white: 'cold' };
-        const dmgType = ancestryDmgTypes[char.draconicAncestry || 'red'] || 'fire';
-        char.draconicDamageType = dmgType;
-        return { success: true, data: { saveDC: dc, damage: { total: damage, type: dmgType } }, message: `Breath weapon used. DEX save DC ${dc}, ${dmgDice} ${dmgType} damage on fail, half on success.` };
+
+      const handler = RESOURCE_HANDLERS[resourceId];
+      if (handler) {
+        return handler({ state, deps }, characterId, targetId, amount);
       }
       return { success: true, data: {}, message: `Used ${resourceId}.` };
     },

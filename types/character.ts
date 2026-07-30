@@ -71,6 +71,54 @@ export type ClassFeatureKind =
   | 'proficiency'
   | 'spell-like';
 
+/** Known effect kind identifiers used by class/race/feat effect payloads. */
+export type EffectKind =
+  | 'ac-formula'
+  | 'speed-bonus'
+  | 'damage-resistance'
+  | 'damage-immunity'
+  | 'damage-vulnerability'
+  | 'damage-reduction'
+  | 'advantage-on-save'
+  | 'condition-immunity'
+  | 'crit-bonus-dice'
+  | 'crit-range'
+  | 'reroll-ones'
+  | 'damage-bonus'
+  | 'sneak-attack'
+  | 'healing-bonus'
+  | 'attack-bonus'
+  | 'reckless-attack'
+  | 'extra-attack'
+  | 'pact-magic'
+  | 'spellcasting'
+  | 'save-proficiency'
+  | 'skill-proficiency'
+  | 'skill-expertise'
+  | 'offhand-modifier'
+  | 'gwf-reroll'
+  | 'hp-per-level'
+  | 'shield-bonus-to-save'
+  | 'dual-wielder-ac'
+  | 'initiative-bonus'
+  | 'passive-skill-bonus'
+  | 'armor-proficiency'
+  | 'death-save-bonus'
+  | 'extra-skill-profs'
+  | 'charge-damage'
+  | 'grapple-advantage'
+  | 'elemental-adept'
+  | 'reaction-ac-bonus'
+  | 'ignore-ranged-penalty'
+  | 'magic-initiate'
+  | 'ritual-caster'
+  | 'spell-sniper'
+  | 'temp-hp-from-level-and-cha'
+  | 'metamagic-option'
+  | 'breath-weapon'
+  | 'language'
+  | 'weapon-proficiency';
+
 /** A feature granted by a character class at a specific level. */
 export interface ClassFeature {
   id: string;
@@ -78,7 +126,7 @@ export interface ClassFeature {
   description: string;
   level: number;
   kind: ClassFeatureKind;
-  effect?: { kind: string; payload?: Record<string, unknown> };
+  effect?: { kind: EffectKind; payload?: Record<string, unknown> };
   grantsResource?: string;
   choice?: {
     label: string;
@@ -95,7 +143,7 @@ export interface SubclassFeature {
   description: string;
   level: number;
   kind: ClassFeatureKind;
-  effect?: { kind: string; payload?: Record<string, unknown> };
+  effect?: { kind: EffectKind; payload?: Record<string, unknown> };
   grantsResource?: string;
   choice?: ClassFeature['choice'];
 }
@@ -107,6 +155,7 @@ export interface SubclassSummary {
   name: string;
   description: string;
   features: SubclassFeature[];
+  domainSpells?: string[];
 }
 
 /** A trait granted by a character's race. */
@@ -115,7 +164,7 @@ export interface RacialTrait {
   name: string;
   description: string;
   kind: 'passive' | 'resource' | 'action' | 'spell-like';
-  effect?: { kind: string; payload?: Record<string, unknown> };
+  effect?: { kind: EffectKind; payload?: Record<string, unknown> };
   grantsResource?: string;
 }
 
@@ -219,6 +268,12 @@ export interface Character {
   knownSpells?: string[];
   preparedSpells?: string[];
   racialTraits?: string[];
+  /** Languages the character knows (e.g. 'common', 'elvish'). Populated on creation
+   *  via the onCharacterCreated hook from race/background data. */
+  languages?: string[];
+  /** Bardic Inspiration dice granted TO this character by other Bards.
+   *  Each entry records the source character id and the die size (d6/d8/d10/d12). */
+  inspirationDice?: Array<{ sourceCharId: string; dieSize: number }>;
   acBonus?: number;
   speedBonus?: number;
   concentrationSpellId?: string;

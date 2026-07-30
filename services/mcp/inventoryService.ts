@@ -5,6 +5,7 @@ import { getHeavyArmorMasterReduction } from '../featsService';
 import { breakConcentration as engineBreakConcentration } from '../spellcastingEngine';
 import { awardEnemyDefeatXp } from './progressionService';
 import { markTokenDead } from '../gridService';
+import { applyEffects, DamageTakenContext } from '../effectDispatcher';
 
 function parseCost(srdCost: string): { gp: number; sp: number; cp: number } | null {
   if (!srdCost) return null;
@@ -196,8 +197,16 @@ export function createInventoryService(state: GameState, deps: InventoryDeps): I
 
       let effectiveDmg = safeAmount;
       if (!options?.skipTargetDerivedReductions) {
+        const dmgCtx: DamageTakenContext = {
+          _hook: 'onDamageTaken',
+          amount: safeAmount,
+          damageType: damageType || '',
+          target,
+        };
+        const afterEffects = applyEffects(target, 'onDamageTaken', dmgCtx);
+        effectiveDmg = afterEffects.amount;
         const ham = getHeavyArmorMasterReduction(target, damageType);
-        effectiveDmg = Math.max(0, safeAmount - ham);
+        effectiveDmg = Math.max(0, effectiveDmg - ham);
         if (target.tempHp && target.tempHp > 0) {
           const absorbed = Math.min(target.tempHp, effectiveDmg);
           target.tempHp -= absorbed;

@@ -65,7 +65,8 @@ export const tools = [
                     isOffHand: { type: 'boolean', description: 'Set true for off-hand bonus attack.' },
                     isSneakAttack: { type: 'boolean', description: 'Set true for Rogue Sneak Attack.' },
                     sharpshooter: { type: 'boolean', description: 'Use Sharpshooter feat: -5 to hit, +10 damage.' },
-                    greatWeaponMaster: { type: 'boolean', description: 'Use Great Weapon Master feat: -5 to hit, +10 damage.' }
+                    greatWeaponMaster: { type: 'boolean', description: 'Use Great Weapon Master feat: -5 to hit, +10 damage.' },
+                    divineSmite: { type: 'object', description: 'Optional. Use Divine Smite on a melee hit (Paladin L2+). Expend a spell slot to deal extra radiant d8s.', properties: { slotLevel: { type: 'integer', description: 'Spell slot level to expend (1-5)' } }, required: ['slotLevel'] }
                 },
                 required: ['attackerId', 'weaponName']
             }

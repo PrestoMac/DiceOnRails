@@ -12,7 +12,15 @@ export const tools = [
                     spellId: { type: 'string', description: 'Spell ID (e.g. "fireball")' },
                     slotLevel: { type: 'integer', description: 'Spell slot level to use' },
                     targets: { type: 'array', items: { type: 'string' }, description: 'Target enemy IDs/names. Pass a single-element array for one target.' },
-                    reaction: { type: 'boolean', description: 'Optional: Set true to cast this spell as a reaction.' }
+                    reaction: { type: 'boolean', description: 'Optional: Set true to cast this spell as a reaction.' },
+                    metamagic: {
+                        type: 'object',
+                        description: 'Optional. Sorcerer metamagic option to modify the spell.',
+                        properties: {
+                            option: { type: 'string', enum: ['twinned', 'quickened', 'subtle', 'empowered', 'careful', 'distant', 'extended', 'heightened'], description: 'Metamagic option to apply' }
+                        },
+                        required: ['option']
+                    }
                 },
                 required: ['casterId', 'spellId', 'slotLevels']
             }
