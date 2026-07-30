@@ -307,10 +307,11 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
         roll,
         skillName: matchedSkill || cleanSkill,
         character: target,
+        skillBonus: 0,
       };
       const afterSkill = applyEffects(target, 'onSkillCheck', skillCtx);
       const finalRoll = afterSkill.roll;
-      const total = finalRoll + modifier + skillRank - getExhaustionPenalty(target);
+      const total = finalRoll + modifier + skillRank + afterSkill.skillBonus - getExhaustionPenalty(target);
       const success = total >= difficulty;
 
       let xpGained = 0;

@@ -1,6 +1,7 @@
 # Classes & Races Implementation Report — Dice On Rails vs 5e SRD
 
-> **Assessment date**: July 29, 2026 (updated — dispatcher analysis)
+> **Assessment date**: July 30, 2026 (updated — effect dispatcher fixes applied)
+> **Fixes applied**: Brutal Critical / Savage Attacks (crit-bonus-dice), Dragonborn resistance (from-draconic-ancestry resolution), Rage B/P/S resistance (condition-gated damage-resistance), Font of Inspiration (short rest at L5+), Fast Movement / Unarmored Movement conditions, skill-expertise reducer. See commit for details.
 > **Scope**: All 9 races and 12 classes defined in the codebase, compared against the 5e SRD to determine how faithfully each can actually play mechanically.
 > **Method**: Comprehensive review of data catalogs (`data/classes.ts`, `data/races.ts`, `data/feats.ts`), engine services (`classEngine.ts`, `combatService.ts`, `spellcastingService.ts`, `spellcastingEngine.ts`, `conditionEngine.ts`, `inventoryService.ts`, `travelService.ts`, `progressionService.ts`, `featsService.ts`, `mcpService.ts`, `effectDispatcher.ts`, `resourceHandlers.ts`, `diceEngine.ts`), LLM prompt instructions (`toolModePrompt.ts`), and agent loop integration.
 
@@ -18,30 +19,30 @@
 
 ## CLASSES
 
-### Barbarian — **Moderately Working**
+### Barbarian — **Moderately Working** (↑ was ~40%)
 
 **Working:**
 - Rage resource pool (scales correctly by level, resets on long rest) — `classEngine.ts:257-268`
 - Rage damage bonus — `effectDispatcher.ts` `damage-bonus` reducer checks `character.raging`
+- **Rage resistance to B/P/S damage** — `damage-resistance` effect with `condition: 'raging'`; three effects (bludgeoning/piercing/slashing) in `data/classes.ts`. Mechanically enforced.
 - Unarmored Defense (`10 + DEX + CON`) — `ac-formula` reducer, functional
-- Danger Sense (DEX save advantage) — `advantage-on-save` reducer, functional
-- Brutal Critical — `crit-bonus-dice` reducer fires but **extra damage is LOST** — writes to `_extraCritDice` which is never read by the caller. Also uses d20 instead of weapon die. Non-functional.
+- Danger Sense (DEX save advantage) — `advantage-on-save` reducer, stat-gated to DEX, functional
+- **Brutal Critical** — `crit-bonus-dice` reducer accumulates `_extraCritDiceCount`; `combatService.ts` rolls that many weapon dice and adds to damage. Functional.
+- **Fast Movement (L5)** — `speed-bonus` reducer checks `no-heavy-armor` condition via `meetsCondition()`. Correctly disabled in heavy armor.
 
 **Prompt-Only / Broken:**
-- **Rage resistance to B/P/S damage** — NOT mechanically enforced. The LLM is told to apply it but the engine does not.
-- **Rage advantage on STR checks/saves** — NOT enforced.
-- **Reckless Attack** — advantage on your attacks AND disadvantage on attacks against you are both prompt-only.
-- **Extra Attack (L5)** — no mechanical enforcement; relies on LLM calling `player_attack` twice.
-- **Fast Movement (L5)** — speed bonus fires unconditionally; the `no-heavy-armor` condition is NOT checked by the reducer.
-- **Feral Instinct (L7)** — surprise immunity NOT implemented.
-- **Relentless Rage (L11)** — NOT implemented.
-- **Persistent Rage (L15)** — NOT implemented.
-- **Indomitable Might (L18)** — NOT implemented.
-- **Primal Champion (L20)** — +4 STR/CON NOT implemented.
+- Rage advantage on STR checks/saves — NOT enforced.
+- Reckless Attack — advantage on your attacks AND disadvantage on attacks against you are both prompt-only.
+- Extra Attack (L5) — no mechanical enforcement; relies on LLM calling `player_attack` twice.
+- Feral Instinct (L7) — surprise immunity NOT implemented.
+- Relentless Rage (L11) — NOT implemented.
+- Persistent Rage (L15) — NOT implemented.
+- Indomitable Might (L18) — NOT implemented.
+- Primal Champion (L20) — +4 STR/CON NOT implemented.
 
 **Subclass (Berserker):** Frenzy exhaustion on rage-end is implemented (`travelService.ts:491-494`), but the bonus-action attack is prompt-only. Mindless Rage, Intimidating Presence, Retaliation — all NOT implemented.
 
-**SRD Fidelity:** ~40%. The rage loop works but the signature defensive benefit (resistance) is not enforced, making Barbarians far squishier than SRD.
+**SRD Fidelity:** ~60%. Rage resistance and damage bonus are now mechanically enforced. Brutal Critical works. Fast Movement is conditional.
 
 ---
 
@@ -55,14 +56,14 @@
 **Prompt-Only / Broken:**
 - **Jack of All Trades (L2)** — NOT implemented. No half-proficiency to non-proficient checks.
 - **Song of Rest (L2)** — NOT implemented. No extra 1d6 HP on short rests.
-- **Expertise (L3/L10)** — NOT mechanically enforced. The `skill-expertise` effect kind exists in `types/character.ts` but has **no reducer** in `effectDispatcher.ts`.
-- **Font of Inspiration (L5)** — BUG: Bardic Inspiration still resets on **long** rest (`classEngine.ts:273`). Should be short rest at L5+.
+- **Expertise (L3/L10)** — `skill-expertise` reducer now functional. Adds proficiency bonus on top of base skill rank for expertise skills (rank > 1) via `onSkillCheck` hook.
+- **Font of Inspiration (L5)** — FIXED: `classEngine.ts:274-276` now checks `level >= 5` and sets `resetOn = 'short'`.
 - **Countercharm (L6)** — NOT implemented.
 - **Superior Inspiration (L20)** — NOT implemented.
 
 **Subclass (Lore):** Cutting Words, Bonus Proficiencies, Additional Magical Secrets, Peerless Skill — all NOT implemented.
 
-**SRD Fidelity:** ~50%. The core spellcasting + inspiration loop works, but Bard's identity features (expertise, Song of Rest, Jack of All Trades) are missing.
+**SRD Fidelity:** ~65%. Expertise and Font of Inspiration are now enforced. Core spellcasting + inspiration loop works.
 
 ---
 
@@ -156,7 +157,7 @@
 - **Diamond Soul (L14)** — proficiency in ALL saves NOT implemented.
 - **Empty Body (L18)** — NOT implemented.
 - **Perfect Self (L20)** — NOT implemented.
-- **Unarmored Movement** — speed bonus fires but `no-armor` condition NOT checked.
+- **Unarmored Movement** — `speed-bonus` reducer now checks `no-armor` condition via `meetsCondition()`. Correctly disabled when wearing armor or shield.
 
 **Subclass (Open Hand):** Open Hand Technique, Wholeness of Body, Tranquility, Quivering Palm — all NOT implemented.
 
@@ -218,7 +219,7 @@
 - Thieves' tools and skills work via normal skill check system.
 
 **Prompt-Only / Broken:**
-- **Expertise (L1/L10)** — NOT mechanically enforced. `skill-expertise` effect kind has no reducer.
+- **Expertise (L1/L10)** — `skill-expertise` reducer now functional. Adds proficiency bonus on top of base skill rank via `onSkillCheck` hook.
 - **Cunning Action (L2)** — bonus action Dash/Disengage/Hide NOT implemented.
 - **Uncanny Dodge (L5)** — reaction to halve damage NOT implemented.
 - **Evasion (L7)** — half damage on failed DEX saves NOT implemented.
@@ -230,7 +231,7 @@
 
 **Subclass (Thief):** Fast Hands, Second-Story Work, Supreme Sneak, Use Magic Device, Thief's Reflexes — all NOT implemented.
 
-**SRD Fidelity:** ~40%. Sneak Attack is the Rogue's core and it works, but Cunning Action, Expertise, Evasion, and Uncanny Dodge are all missing.
+**SRD Fidelity:** ~55%. Sneak Attack is the Rogue's core and it works. Expertise now enforced. Cunning Action, Evasion, and Uncanny Dodge are still missing.
 
 ---
 
@@ -330,12 +331,12 @@
 - Small size NOT mechanically enforced (no grappling/stealth modifiers).
 - **No subraces** (Lightfoot, Stout missing).
 
-### Dragonborn — **Moderately Working**
+### Dragonborn — **Clearly Working** (↑ was Moderately Working)
 - +2 STR, +1 CHA — functional.
 - Breath Weapon — `resourceHandlers.ts:51-65`, fully functional. Damage scales 2d6→3d6→4d6→5d6, save DC calculated, damage type from ancestry.
-- Damage Resistance — `damage-resistance` effect with `type: 'from-draconic-ancestry'` placeholder; `getDamageResistances()` (`classEngine.ts:221-237`) resolves it but is **display-only** (never called in damage path). Dispatcher reducer cannot match `'from-draconic-ancestry'` to a real damage type. **Mechanically non-functional.**
+- **Damage Resistance** — `damage-resistance` reducer now resolves `from-draconic-ancestry` placeholder to `character.draconicDamageType` at runtime. Mechanically enforced.
 - Draconic Ancestry stored on character but no UI for selection.
-- **Chromatic vs Metallic ancestry options NOT distinguished.**
+- Chromatic vs Metallic ancestry options NOT distinguished.
 
 ### Gnome — **Moderately Working**
 - +2 INT — functional.
@@ -355,7 +356,7 @@
 - +2 STR, +1 CON — functional.
 - Darkvision — functional.
 - Relentless Endurance — `resourceHandlers.ts:185-192`, fully functional. Sets HP to 1 when at 0, once per long rest.
-- Savage Attacks — `crit-bonus-dice` effect declared but **non-functional** — same bug as Brutal Critical (`_extraCritDice` never read by caller).
+- **Savage Attacks** — FIXED: `crit-bonus-dice` reducer accumulates count; `combatService.ts` rolls that many weapon dice and adds to damage. Functional.
 - **Menacing (Intimidation proficiency) NOT implemented.**
 
 ### Tiefling — **Moderately Working**
@@ -380,8 +381,8 @@
 | Bard | **Moderately Working** | ~50% | Expertise, Song of Rest, Jack of All Trades missing |
 | Cleric | **Moderately Working** | ~55% | Domain features mostly prompt-only |
 | Fighter | **Moderately Working** | ~45% | Fighting styles, Action Surge, Extra Attack all prompt-only |
-| Barbarian | **Moderately Working** | ~40% | Rage resistance NOT enforced; Brutal Critical non-functional |
-| Rogue | **Moderately Working** | ~40% | Sneak Attack works; Cunning Action, Expertise, Evasion missing |
+| Barbarian | **Moderately Working** | ~60% | Rage resistance, Brutal Critical, Fast Movement all fixed |
+| Rogue | **Moderately Working** | ~55% | Sneak Attack works; Expertise now enforced |
 | Monk | **Clearly Broken** | ~30% | Ki abilities beyond Stunning Strike missing |
 | Warlock | **Clearly Broken** | ~20% | Invocations, Pact Boon, Mystic Arcanum all missing |
 | Druid | **Clearly Broken** | ~25% | Wild Shape has no mechanical transformation |
@@ -392,8 +393,8 @@
 | Race | Rating | Key Gap |
 |------|--------|---------|
 | Halfling | **Clearly Working** | Lucky + Brave both work |
-| Dragonborn | **Moderately Working** | Breath weapon works; resistance display-only (non-functional) |
-| Half-Orc | **Clearly Working** | Relentless Endurance works; Savage Attacks non-functional |
+| Dragonborn | **Clearly Working** | Breath weapon + damage resistance both work |
+| Half-Orc | **Clearly Working** | Relentless Endurance + Savage Attacks both work |
 | Human | **Clearly Working** | Basic ASI works; Variant missing |
 | Half-Elf | **Clearly Working** | ASI + Fey Ancestry work |
 | Elf | **Moderately Working** | Fey Ancestry charm-save needs LLM cooperation |
@@ -405,12 +406,13 @@
 
 ## CRITICAL BUGS
 
-1. **Brutal Critical / Savage Attacks extra damage is LOST** — `crit-bonus-dice` reducer writes to `_extraCritDice` (`effectDispatcher.ts:251`) but the caller (`combatService.ts:1207`) only reads `afterDmg.damage`. The extra dice are never added to the damage total. Also uses d20 instead of weapon damage die.
-2. **Dragonborn damage resistance is display-only** — `getDamageResistances()` (`classEngine.ts:221-237`) resolves `from-draconic-ancestry` but is never called in the damage path. The dispatcher's `damage-resistance` reducer can't match the placeholder string.
-3. **Bardic Inspiration resets on long rest** at all levels — should be short rest at L5+ (`classEngine.ts:273`).
-4. **Rage resistance to B/P/S is not enforced** — the most impactful Barbarian feature is prompt-only.
-5. **`skill-expertise` effect kind has no reducer** — Bard and Rogue expertise is never applied.
-6. **Fast Movement / Unarmored Movement conditions not checked** — speed bonuses fire regardless of armor.
+1. ~~**Brutal Critical / Savage Attacks extra damage is LOST**~~ — FIXED. Reducer now accumulates `_extraCritDiceCount`; `combatService.ts:1209-1214` rolls that many weapon dice and adds to damage.
+2. ~~**Dragonborn damage resistance is display-only**~~ — FIXED. `damage-resistance` reducer resolves `from-draconic-ancestry` to `character.draconicDamageType` at runtime.
+3. ~~**Bardic Inspiration resets on long rest** at all levels~~ — FIXED. `classEngine.ts:276` now uses `level >= 5 ? 'short' : 'long'`.
+4. ~~**Rage resistance to B/P/S is not enforced**~~ — FIXED. Three `damage-resistance` effects with `condition: 'raging'` added to Barbarian features in `data/classes.ts`.
+5. ~~**`skill-expertise` effect kind has no reducer**~~ — FIXED. New `skill-expertise` reducer adds proficiency bonus to `skillBonus` on `SkillCheckContext`. `travelService.ts` caller adds it to the check total.
+6. ~~**Fast Movement / Unarmored Movement conditions not checked**~~ — FIXED. `speed-bonus` reducer now calls `meetsCondition(character, condition)` for `no-heavy-armor`/`no-armor`.
+7. **Divine Health** — Uses non-standard `'diseased'` condition ID (minor, display-only).
 
 ---
 
@@ -431,13 +433,14 @@ The following effect kinds now have working `applyEffects`-based reducers wired 
 | `reroll-ones` | `onAttackRoll`, `onSkillCheck` | Halfling Lucky |
 | `crit-range` | `onAttackRoll` | Champion Fighter (19-20 @ L3, 18-20 @ L15) |
 | `damage-bonus` | `onAttackDamage` | Rage damage, Improved Divine Smite (Paladin L11) |
-| `crit-bonus-dice` | `onAttackDamage` | Brutal Critical, Savage Attacks — **BUG: stores to `_extraCritDice` never read by caller (damage lost) |
+| `crit-bonus-dice` | `onAttackDamage` | Brutal Critical, Savage Attacks — FIXED. Accumulates `_extraCritDiceCount`; caller rolls weapon dice |
 | `sneak-attack` | `getEffects()` (hardcoded, not `applyEffects`) | Rogue Sneak Attack — data-driven scaling, hardcoded condition check |
 | `ac-formula` | `computeAc` | Barbarian Unarmored Defense, Monk Unarmored Defense, Draconic Resilience |
 | `dual-wielder-ac` | `computeAc` | Dual Wielder feat |
-| `speed-bonus` | `computeSpeed` | Fast Movement, Unarmored Movement, Mobile feat |
+| `speed-bonus` | `computeSpeed` | Fast Movement, Unarmored Movement, Mobile feat — FIXED: conditions now checked |
 | `hp-per-level` | `computeMaxHp` | Tough feat, Draconic Resilience HP bonus (hardcoded) |
 | `skill-proficiency` | `onCharacterCreated` | Elf Keen Senses, Skill Versatility |
+| `skill-expertise` | `onSkillCheck` | Bard/Rogue Expertise — FIXED: adds proficiency bonus for expertise skills |
 | `language` | `onCharacterCreated` | Race languages |
 | `armor-proficiency` | `onCharacterCreated` | **Reducer is a no-op** — does nothing |
 
@@ -457,7 +460,6 @@ These effect kinds have NO `applyEffects` reducer but ARE read at runtime via di
 These effect kinds exist in the type system and reference data but are **never consumed** by any engine code:
 
 - `damage-reduction` — Heavy Armor Master feat (flat -3 damage)
-- `skill-expertise` — Bard/Rogue expertise (double proficiency)
 - `extra-skill-profs` — Skilled feat
 - `passive-skill-bonus` — Observant feat
 - `charge-damage` — Charger feat
@@ -528,22 +530,14 @@ Despite the effect dispatcher, the following hardcoded checks remain (mostly for
 ### High-Priority Missing Implementations
 
 1. **Extra Attack** — No class gets mechanically enforced extra attacks. All rely on LLM calling `player_attack` multiple times.
-2. **Rage resistance** — Barbarian rage B/P/S resistance is prompt-only, not enforced.
-3. **Expertise** — Bard/Rogue double proficiency is not enforced.
-4. **Fighting Style bonuses** — No +2 attack, +2 damage, or +1 AC is applied.
-5. **Sneak Attack conditions** — Advantage/ally adjacency is not checked; LLM must self-report.
-6. **Subclass features** — Most subclass features beyond level 1-3 are not implemented.
-7. **High-level capstone features** — Nearly all L18-20 features are missing.
+2. **Fighting Style bonuses** — No +2 attack, +2 damage, or +1 AC is applied.
+3. **Sneak Attack conditions** — Advantage/ally adjacency is not checked; LLM must self-report.
+4. **Subclass features** — Most subclass features beyond level 1-3 are not implemented.
+5. **High-level capstone features** — Nearly all L18-20 features are missing.
 
 ### Medium-Priority Issues
 
-1. **Brutal Critical / Savage Attacks** — Extra damage written to `_extraCritDice` but never read by caller. Also uses d20 instead of weapon damage die. Non-functional.
-2. **Dragonborn damage resistance** — `from-draconic-ancestry` placeholder never resolved to actual damage type by the dispatcher. `getDamageResistances()` is display-only.
-3. **Font of Inspiration** — Bardic Inspiration should reset on short rest at L5+, currently long rest.
-4. **Fast Movement condition** — `no-heavy-armor` condition not checked by speed-bonus reducer.
-5. **Danger Sense** — `seen-effect` case grants advantage unconditionally (should also check the save is DEX).
-6. **Divine Health** — Uses non-standard `'diseased'` condition ID.
-7. **Skill expertise** — `skill-expertise` effect kind has no reducer.
+1. **Divine Health** — Uses non-standard `'diseased'` condition ID.
 
 ### Low-Priority (Flavor-Only)
 

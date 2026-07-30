@@ -34,15 +34,15 @@ const RACE_ASSESSMENTS: AssessmentMap = {
     reason: 'Hellish Resistance (fire resistance) works. Hellish Rebuke resource handler works (3d10 fire damage). Thaumaturgy cantrip and Darkness spell NOT implemented. Infernal Legacy not level-gated.',
   },
   dragonborn: {
-    status: 'warning',
-    reason: 'Breath Weapon fully wired with scaling DC (2d6→5d6) and damage type. BUT damage resistance is display-only — the `from-draconic-ancestry` placeholder is never resolved to an actual damage type in the damage calculation path. Chromatic vs Metallic distinction not available.',
+    status: 'ok',
+    reason: 'Breath Weapon fully wired with scaling DC (2d6→5d6) and damage type. Damage resistance resolved from draconic ancestry — mechanically enforced via effect dispatcher (resolves `from-draconic-ancestry` placeholder to character\'s ancestry damage type). Chromatic vs Metallic distinction not available.',
   },
 };
 
 const RACE_OK_REASONS: Record<string, string> = {
   human: 'All racial features (+1 all stats, speed 30, medium size) are fully wired. Variant Human (feat at L1) not available.',
   halfling: 'Lucky (reroll 1s on attacks/checks) fully wired via reroll-ones reducer. Brave (frightened save advantage) wired. Halfling Nimbleness not implemented. No subraces available.',
-  'half-orc': 'Relentless Endurance fully wired (sets HP to 1 when at 0, once per long rest). Savage Attacks (crit bonus die) non-functional — writes to _extraCritDice which is never read by the caller. Menacing (Intimidation proficiency) not implemented.',
+  'half-orc': 'Relentless Endurance fully wired (sets HP to 1 when at 0, once per long rest). Savage Attacks (crit bonus die) now functional — rolls weapon damage die and adds to total. Menacing (Intimidation proficiency) not implemented.',
 };
 
 /* ------------------------------------------------------------------ */
@@ -68,11 +68,11 @@ const CLASS_ASSESSMENTS: AssessmentMap = {
   },
   barbarian: {
     status: 'warning',
-    reason: 'Rage resource pool and activation work. Unarmored Defense (10+DEX+CON) works. Danger Sense (DEX save advantage) works. Rage damage bonus applied via dispatcher. BUT Rage resistance to B/P/S damage is NOT mechanically enforced. Reckless Attack advantage/disadvantage is prompt-only. Brutal Critical non-functional (damage lost). Fast Movement condition not checked.',
+    reason: 'Rage resource pool, damage bonus, and B/P/S damage resistance (condition-gated via dispatcher) all work. Unarmored Defense (10+DEX+CON) works. Brutal Critical now functional (accumulates weapon dice on crit). Fast Movement respects no-heavy-armor condition. Danger Sense (DEX save advantage) works. BUT Reckless Attack (advantage/disadvantage) is prompt-only. Extra Attack not enforced.',
   },
   bard: {
     status: 'warning',
-    reason: 'Full CHA spellcasting with ritual support works. Bardic Inspiration pool tracked and die scales correctly (d6→d12). BUT Bardic Inspiration has no mechanical die application — target must apply manually. Jack of All Trades, Song of Rest, and Expertise not mechanically enforced.',
+    reason: 'Full CHA spellcasting with ritual support works. Bardic Inspiration pool tracked and die scales correctly (d6→d12). Font of Inspiration (short rest at L5+) now enforced. Expertise (double proficiency) now enforced via skill-expertise reducer. BUT Bardic Inspiration has no mechanical die application — target must apply manually. Jack of All Trades and Song of Rest not mechanically enforced.',
   },
   cleric: {
     status: 'warning',
@@ -88,7 +88,7 @@ const CLASS_ASSESSMENTS: AssessmentMap = {
   },
   rogue: {
     status: 'warning',
-    reason: 'Sneak Attack dice calculate and scale correctly (1d6→10d6). BUT Sneak Attack conditions (advantage, ally adjacency, finesse/ranged weapon) are NOT checked — relies on LLM honesty. Expertise, Cunning Action, Uncanny Dodge, and Evasion not mechanically enforced.',
+    reason: 'Sneak Attack dice calculate and scale correctly (1d6→10d6). Expertise (double proficiency) now enforced via skill-expertise reducer. BUT Sneak Attack conditions (advantage, ally adjacency, finesse/ranged weapon) are NOT checked — relies on LLM honesty. Cunning Action, Uncanny Dodge, and Evasion not mechanically enforced.',
   },
   sorcerer: {
     status: 'warning',
