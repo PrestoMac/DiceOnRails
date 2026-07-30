@@ -74,12 +74,12 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
         name: 'Champion',
         description: 'The archetypal Champion focuses on the development of raw physical power honed to deadly perfection.',
         features: [
-          { id: 'improved-critical', name: 'Improved Critical', description: 'Your weapon attacks score a critical hit on a roll of 19 or 20.', level: 3, kind: 'passive' },
+          { id: 'improved-critical', name: 'Improved Critical', description: 'Your weapon attacks score a critical hit on a roll of 19 or 20.', level: 3, kind: 'passive', effect: { kind: 'crit-range', payload: { min: 19 } } },
           { id: 'remarkable-athlete', name: 'Remarkable Athlete', description: 'Add half your proficiency bonus (round up) to any Strength, Dexterity, or Constitution check you make that doesn\'t already use your proficiency bonus.', level: 7, kind: 'passive' },
           { id: 'additional-fighting-style', name: 'Additional Fighting Style', description: 'Choose a second fighting style.', level: 10, kind: 'subclass',
             choice: { label: 'Choose a second Fighting Style', options: FIGHTING_STYLE_OPTIONS }
           },
-          { id: 'superior-critical', name: 'Superior Critical', description: 'Your weapon attacks score a critical hit on a roll of 18-20.', level: 15, kind: 'passive' },
+          { id: 'superior-critical', name: 'Superior Critical', description: 'Your weapon attacks score a critical hit on a roll of 18-20.', level: 15, kind: 'passive', effect: { kind: 'crit-range', payload: { min: 18 } } },
           { id: 'survivor', name: 'Survivor', description: 'At the start of each of your turns, you regain hit points equal to 5 + your Constitution modifier if you have no more than half your hit points left.', level: 18, kind: 'passive' },
         ],
       },
@@ -104,7 +104,9 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     recommendedStats: { str: 15, dex: 13, con: 14, int: 8, wis: 10, cha: 12 },
     statPriority: ['str', 'con', 'dex', 'wis', 'cha', 'int'],
     features: [
-      { id: 'rage', name: 'Rage', description: 'In battle, you fight with primal ferocity. On your turn, you can enter a rage as a bonus action. While raging: advantage on STR checks/saves, +2 rage damage on melee attacks with STR, resistance to bludgeoning/piercing/slashing. Rage ends early if you end your turn with no attack or no hostile creature within reach. 2 uses per long rest (3 at L3, 4 at L6, 5 at L12, 6 at L17, unlimited at L20).', level: 1, kind: 'resource', grantsResource: 'rage' },
+      { id: 'rage', name: 'Rage', description: 'In battle, you fight with primal ferocity. On your turn, you can enter a rage as a bonus action. While raging: advantage on STR checks/saves, +2 rage damage on melee attacks with STR, resistance to bludgeoning/piercing/slashing. Rage ends early if you end your turn with no attack or no hostile creature within reach. 2 uses per long rest (3 at L3, 4 at L6, 5 at L12, 6 at L17, unlimited at L20).', level: 1, kind: 'resource', grantsResource: 'rage', effect: { kind: 'damage-bonus', payload: { amount: '2', condition: 'raging' } } },
+      { id: 'rage-damage-2', name: 'Rage (Improved Damage)', description: 'Rage damage increases to +3 at Barbarian level 9.', level: 9, kind: 'passive', effect: { kind: 'damage-bonus', payload: { amount: '1', condition: 'raging' } } },
+      { id: 'rage-damage-3', name: 'Rage (Greater Damage)', description: 'Rage damage increases to +4 at Barbarian level 16.', level: 16, kind: 'passive', effect: { kind: 'damage-bonus', payload: { amount: '1', condition: 'raging' } } },
       { id: 'unarmored-defense-barb', name: 'Unarmored Defense', description: 'Without armor, AC = 10 + DEX mod + CON mod. You can use a shield and still gain this benefit.', level: 1, kind: 'passive', effect: { kind: 'ac-formula', payload: { formula: '10 + DEX + CON' } } },
       { id: 'reckless-attack', name: 'Reckless Attack', description: 'When you make your first attack on your turn, you can decide to attack recklessly, gaining advantage on all melee weapon attacks this turn but attack rolls against you have advantage until your next turn.', level: 2, kind: 'passive', effect: { kind: 'reckless-attack' } },
       { id: 'danger-sense', name: 'Danger Sense', description: 'Advantage on DEX saves against effects you can see (e.g. traps, spells).', level: 2, kind: 'passive', effect: { kind: 'advantage-on-save', payload: { against: 'seen-effect', stat: 'dex' } } },
@@ -269,6 +271,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
         parentClass: 'cleric',
         name: 'Life Domain',
         description: 'The Life domain focuses on the positive energy that sustains all life.',
+        domainSpells: ['bless', 'cure-wounds', 'lesser-restoration', 'spiritual-weapon', 'beacon-of-hope', 'revivify', 'death-ward', 'guardian-of-faith', 'mass-cure-wounds', 'raise-dead'],
         features: [
           { id: 'disciple-of-life', name: 'Disciple of Life', description: 'Your healing spells restore an additional 2 + spell level HP.', level: 1, kind: 'passive' },
           { id: 'heavy-armor-prof', name: 'Heavy Armor Proficiency', description: 'You gain proficiency with heavy armor.', level: 1, kind: 'proficiency' },
@@ -292,7 +295,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     primaryStat: 'wis',
     savingThrowProfs: ['int', 'wis'],
     armorProfs: ['light', 'medium', 'shield'],
-    weaponProfs: { simple: true, martial: false, specific: ['scimitar', 'sickle', 'club', 'dagger', 'dart', 'javelin', 'mace', 'quarterstaff', 'shortbow', 'sling', 'spear'] },
+    weaponProfs: { simple: true, martial: false, specific: ['scimitar', 'sickle', 'club', 'dagger', 'dart', 'javelin', 'mace', 'quarterstaff', 'sling', 'spear'] },
     skillChoices: { count: 2, from: ['animal handling', 'arcana', 'insight', 'medicine', 'nature', 'perception', 'religion', 'survival'] },
     startingEquipment: ['quarterstaff', 'leather armor', 'shield'],
     recommendedStats: { str: 8, dex: 12, con: 14, int: 10, wis: 15, cha: 13 },
@@ -381,7 +384,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
       { id: 'stunning-strike', name: 'Stunning Strike', description: 'Spend 1 ki when you hit with a melee attack to force the target to make a CON save or be stunned until the end of your next turn.', level: 5, kind: 'passive' },
       { id: 'unarmored-movement', name: 'Unarmored Movement', description: 'Speed increases by 10 feet while not wearing armor or wielding a shield.', level: 2, kind: 'passive', effect: { kind: 'speed-bonus', payload: { bonus: 10, condition: 'no-armor' } } },
       { id: 'stillness-of-mind', name: 'Stillness of Mind', description: 'Use an action to end one effect causing you to be charmed or frightened.', level: 7, kind: 'passive' },
-      { id: 'purity-of-body', name: 'Purity of Body', description: 'You are immune to disease and poison.', level: 10, kind: 'passive' },
+      { id: 'purity-of-body', name: 'Purity of Body', description: 'You are immune to disease and poison.', level: 10, kind: 'passive', effect: { kind: 'condition-immunity', payload: { condition: 'poisoned' } } },
       { id: 'tongue-of-sun-and-moon', name: 'Tongue of the Sun and Moon', description: 'You understand all spoken languages.', level: 13, kind: 'passive' },
       { id: 'diamond-soul', name: 'Diamond Soul', description: 'Proficiency in all saving throws.', level: 14, kind: 'passive' },
       { id: 'empty-body', name: 'Empty Body', description: 'Spend 4 ki to become invisible and gain resistance to all damage except force damage for 1 minute.', level: 18, kind: 'passive' },
@@ -456,11 +459,11 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
       { id: 'fighting-style-pal', name: 'Fighting Style', description: 'You adopt a fighting style as your specialty.', level: 2, kind: 'subclass',
         choice: { label: 'Choose a Fighting Style', options: FIGHTING_STYLE_OPTIONS }
       },
-      { id: 'divine-health', name: 'Divine Health', description: 'You are immune to disease.', level: 3, kind: 'passive' },
+      { id: 'divine-health', name: 'Divine Health', description: 'You are immune to disease.', level: 3, kind: 'passive', effect: { kind: 'condition-immunity', payload: { condition: 'diseased' } } },
       { id: 'extra-attack-pal', name: 'Extra Attack', description: 'You can attack twice when you take the Attack action.', level: 5, kind: 'passive', effect: { kind: 'extra-attack', payload: { count: 2 } } },
       { id: 'aura-of-protection', name: 'Aura of Protection', description: 'You and friendly creatures within 10 ft add your CHA mod to all saving throws.', level: 6, kind: 'passive' },
       { id: 'aura-of-courage', name: 'Aura of Courage', description: 'You and friendly creatures within 10 ft can\'t be frightened.', level: 10, kind: 'passive' },
-      { id: 'improved-divine-smite', name: 'Improved Divine Smite', description: 'Your melee weapon attacks deal an extra 1d8 radiant damage on top of any other damage.', level: 11, kind: 'passive' },
+      { id: 'improved-divine-smite', name: 'Improved Divine Smite', description: 'Your melee weapon attacks deal an extra 1d8 radiant damage on top of any other damage.', level: 11, kind: 'passive', effect: { kind: 'damage-bonus', payload: { amount: '1d8', condition: 'always' } } },
       { id: 'cleansing-touch', name: 'Cleansing Touch', description: 'Use an action to end one spell affecting a creature you touch. Uses: CHA mod per long rest.', level: 14, kind: 'passive' },
     ],
     subclasses: [
@@ -654,9 +657,9 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     features: [
       { id: 'sorcerous-origin', name: 'Sorcerous Origin', description: 'Choose your sorcerous origin, which defines the source of your innate magic.', level: 1, kind: 'subclass' },
       { id: 'sorcery-points', name: 'Sorcery Points', description: 'You have sorcery points equal to your sorcerer level. Spend on metamagic or convert to spell slots (recover on long rest).', level: 2, kind: 'resource', grantsResource: 'sorcery-points' },
-      { id: 'metamagic', name: 'Metamagic', description: 'Choose two metamagic options (at L3, L10, L17). Spend sorcery points to modify spells.', level: 3, kind: 'passive' },
-      { id: 'metamagic-2', name: 'Metamagic (2 more)', description: 'Choose two additional metamagic options.', level: 10, kind: 'passive' },
-      { id: 'metamagic-3', name: 'Metamagic (3 more)', description: 'Choose two additional metamagic options.', level: 17, kind: 'passive' },
+      { id: 'metamagic', name: 'Metamagic', description: 'Choose two metamagic options (at L3, L10, L17). Spend sorcery points to modify spells.', level: 3, kind: 'passive', effect: { kind: 'metamagic-option', payload: { options: ['twinned', 'quickened', 'subtle', 'empowered', 'careful', 'distant', 'extended', 'heightened'] } } },
+      { id: 'metamagic-2', name: 'Metamagic (1 more)', description: 'Choose one additional metamagic option.', level: 10, kind: 'passive' },
+      { id: 'metamagic-3', name: 'Metamagic (1 more)', description: 'Choose one additional metamagic option.', level: 17, kind: 'passive' },
       { id: 'sorcerous-restoration', name: 'Sorcerous Restoration', description: 'When you finish a short rest, regain 4 sorcery points.', level: 20, kind: 'passive' },
     ],
     subclasses: [
@@ -666,7 +669,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
         name: 'Draconic Bloodline',
         description: 'Your innate magic comes from draconic blood that runs through your veins.',
         features: [
-          { id: 'draconic-resilience', name: 'Draconic Resilience', description: 'Your HP maximum increases by 1 per sorcerer level. AC = 13 + DEX when unarmored.', level: 1, kind: 'passive', effect: { kind: 'unarmored-defense-13-dex' } },
+          { id: 'draconic-resilience', name: 'Draconic Resilience', description: 'Your HP maximum increases by 1 per sorcerer level. AC = 13 + DEX when unarmored.', level: 1, kind: 'passive', effect: { kind: 'ac-formula', payload: { formula: '13 + DEX' } } },
           { id: 'elemental-affinity', name: 'Elemental Affinity', description: 'When you cast a spell that deals damage of your draconic ancestry type, add your CHA mod to the damage. Spend 1 sorcery point to gain resistance to that damage type for 1 hour.', level: 6, kind: 'passive' },
           { id: 'dragon-wings', name: 'Dragon Wings', description: 'Draconic wings sprout from your back, granting you a flying speed equal to your current speed.', level: 14, kind: 'passive' },
           { id: 'draconic-presence', name: 'Draconic Presence', description: 'Exude an aura of awe or fear (your choice) as an action. Creatures within 60 ft are charmed or frightened (WIS save). Spend 5 sorcery points.', level: 18, kind: 'passive' },

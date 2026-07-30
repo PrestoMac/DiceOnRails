@@ -4,6 +4,7 @@ import { RACES_CATALOG, RaceDefinition } from '../utils/races';
 import { SubclassSummary } from '../types';
 import { getMod } from '../utils/dice';
 import { getExhaustionPenalty } from './conditionEngine';
+import { applyEffects, AcContext, SpeedContext, MaxHpContext } from './effectDispatcher';
 
 const abilityMod = getMod;
 export { getMod };
@@ -30,16 +31,17 @@ export function getSubclassDef(classId: string, subclassId: string): SubclassSum
   return getClassDef(classId)?.subclasses.find(s => s.id === subclassId.toLowerCase());
 }
 
-/** Calculates the maximum HP for a character accounting for class, CON, feats (Tough), Draconic Bloodline, and bonuses. */
+/** Calculates the maximum HP for a character accounting for class, CON, Tough feat (via dispatcher), Draconic Bloodline, and bonuses. */
 export function calculateMaxHp(character: Character): number {
   const classDef = getClassDef(character.class);
   if (!classDef) return character.hp?.max ?? 10;
   const conMod = getMod(character.stats.con);
   const draconicBonus = character.sorcerousOrigin === 'draconic-bloodline' ? character.level : 0;
-  const toughBonus = character.feats?.includes('tough') ? 2 * character.level : 0;
-  const total = classDef.hpBase + conMod + (classDef.hpPerLevel + conMod) * (character.level - 1)
-              + draconicBonus + toughBonus + (character.maxHpBonus || 0);
-  return Math.max(1, total);
+  const base = classDef.hpBase + conMod + (classDef.hpPerLevel + conMod) * (character.level - 1)
+              + draconicBonus + (character.maxHpBonus || 0);
+  const ctx: MaxHpContext = { _hook: 'computeMaxHp', hp: base, character };
+  const result = applyEffects(character, 'computeMaxHp', ctx);
+  return Math.max(1, result.hp);
 }
 
 /** Checks whether a character can equip a given armor type based on class proficiencies and domain features. */
@@ -62,13 +64,8 @@ export function getArmorTypeFromItem(item: InventoryItem): 'light' | 'medium' | 
   return 'light';
 }
 
-/** Checks whether the character has Draconic Resilience from the Draconic Bloodline sorcerer subclass. */
-function hasDraconicResilience(character: Character): boolean {
-  return character.class === 'sorcerer' && character.sorcerousOrigin === 'draconic-bloodline';
-}
-
 /** Evaluates whether a character meets a named condition (e.g. 'no-heavy-armor', 'no-armor'). */
-function meetsCondition(character: Character, condition: string | undefined): boolean {
+export function meetsCondition(character: Character, condition: string | undefined): boolean {
   if (!condition) return true;
   if (condition === 'no-heavy-armor') {
     const equipped = character.inventory.find(i => i.equipped && i.type === 'armor');
@@ -87,44 +84,52 @@ function parseArmorFormula(formula: string, dexMod: number): number {
   return parseInt(formula);
 }
 
-/** Adds +1 AC from the Dual Wielder feat if the character has two weapons equipped. */
-function addDualWielderBonus(character: Character, ac: number): number {
-  if (character.feats?.includes('dual-wielder')) {
-    const equippedWeapons = character.inventory.filter(i => i.equipped && i.type === 'weapon');
-    if (equippedWeapons.length >= 2) ac += 1;
-  }
-  return ac;
-}
-
-/** Calculates a character's full Armor Class considering armor, shield, class features (Barbarian/Monk/Draconic), feats, and bonuses. */
+/** Calculates a character's full Armor Class considering armor, shield, class features (AC formulas from dispatcher), feats, and bonuses. */
 export function calculateAc(character: Character, equippedArmor: InventoryItem | null): number {
   const dexMod = abilityMod(character.stats.dex);
-  const conMod = abilityMod(character.stats.con);
-  const wisMod = abilityMod(character.stats.wis);
   const hasShield = character.inventory.some(i => i.equipped && i.type === 'shield');
   const shieldBonus = hasShield ? 2 : 0;
   const acBonus = character.acBonus || 0;
+  const equippedWeapons = character.inventory.filter(i => i.equipped && i.type === 'weapon');
 
-  if (!equippedArmor) {
-    if (character.class === 'barbarian') {
-      return addDualWielderBonus(character, 10 + dexMod + conMod + shieldBonus + acBonus);
-    }
-    if (character.class === 'monk') {
-      return addDualWielderBonus(character, 10 + dexMod + wisMod + shieldBonus + acBonus);
-    }
-    if (hasDraconicResilience(character)) {
-      return addDualWielderBonus(character, 13 + dexMod + shieldBonus + acBonus);
-    }
-    return addDualWielderBonus(character, 10 + dexMod + shieldBonus + acBonus);
+  if (!equippedArmor || equippedArmor.type === 'shield') {
+    const ctx: AcContext = {
+      _hook: 'computeAc',
+      baseAc: 10 + dexMod,
+      character,
+      equippedArmor: null,
+      equippedWeaponCount: equippedWeapons.length,
+    };
+    const result = applyEffects(character, 'computeAc', ctx);
+    let ac = result.baseAc + shieldBonus + acBonus;
+    if (character.acMinimum && ac < character.acMinimum) ac = character.acMinimum;
+    return ac;
   }
 
   if (equippedArmor.type === 'shield') {
-    return addDualWielderBonus(character, 10 + dexMod + acBonus + (hasShield ? 2 : 0));
+    const ctx: AcContext = {
+      _hook: 'computeAc',
+      baseAc: 10 + dexMod + acBonus + shieldBonus,
+      character,
+      equippedArmor,
+      equippedWeaponCount: equippedWeapons.length,
+    };
+    const result = applyEffects(character, 'computeAc', ctx);
+    let ac = result.baseAc;
+    if (character.acMinimum && ac < character.acMinimum) ac = character.acMinimum;
+    return ac;
   }
 
   const formula = equippedArmor.stats?.acFormula || '10 + DEX';
   let ac = parseArmorFormula(formula, dexMod) + shieldBonus + acBonus;
-  ac = addDualWielderBonus(character, ac);
+  const ctx: AcContext = {
+    _hook: 'computeAc',
+    baseAc: ac,
+    character,
+    equippedArmor,
+    equippedWeaponCount: equippedWeapons.length,
+  };
+  ac = applyEffects(character, 'computeAc', ctx).baseAc;
   if (character.acMinimum && ac < character.acMinimum) ac = character.acMinimum;
   return ac;
 }
@@ -168,19 +173,17 @@ export function getSpellAttackBonus(character: Character): number {
   return ability !== null ? getProficiencyBonus(character) + ability : 0;
 }
 
-/** Calculates a character's speed in feet, accounting for race, feats (Mobile, Athlete), bonuses, and exhaustion penalties. */
+/** Calculates a character's speed in feet, accounting for all sources via the dispatcher, plus exhaustion penalties. */
 export function calculateSpeed(character: Character): number {
   const race = getRaceDef(character.race);
   if (!race) return 30;
-  let speed = race.speed;
-  for (const trait of race.traits) {
-    if (trait.effect?.kind === 'speed-bonus' && meetsCondition(character, trait.effect.payload?.condition)) {
-      speed += trait.effect.payload.bonus as number;
-    }
-  }
-  if (character.feats?.includes('mobile') || character.feats?.includes('athlete')) speed += 10;
-  speed += character.speedBonus || 0;
-  speed -= getExhaustionPenalty(character) * 5;
+  const ctx: SpeedContext = {
+    _hook: 'computeSpeed',
+    speed: race.speed + (character.speedBonus || 0),
+    character,
+  };
+  const result = applyEffects(character, 'computeSpeed', ctx);
+  const speed = result.speed - getExhaustionPenalty(character) * 5;
   return Math.max(0, speed);
 }
 
@@ -222,24 +225,12 @@ export function getDamageResistances(character: Character): string[] {
   for (const traitId of (character.racialTraits || [])) {
     const trait = race?.traits.find(t => t.id === traitId);
     if (trait?.effect?.kind === 'damage-resistance') {
-      if (trait.effect.payload?.type === 'from-draconic-ancestry') {
+      const p = trait.effect.payload as Record<string, unknown> | undefined;
+      if (p?.type === 'from-draconic-ancestry') {
         result.push(character.draconicDamageType || 'fire');
       } else {
-        result.push(trait.effect.payload.type as string);
+        result.push(p?.type as string);
       }
-    }
-  }
-  return result;
-}
-
-/** Collects all condition immunities for a character from racial traits. */
-export function getConditionsImmunities(character: Character): string[] {
-  const result: string[] = [];
-  const race = getRaceDef(character.race);
-  for (const traitId of (character.racialTraits || [])) {
-    const trait = race?.traits.find(t => t.id === traitId);
-    if (trait?.effect?.kind === 'condition-immunity') {
-      result.push(trait.effect.payload.condition as string);
     }
   }
   return result;
@@ -365,7 +356,7 @@ export function recalculateResourcePools(character: Character): ResourcePool[] {
       if (t.kind === 'resource' && t.grantsResource) {
         const max = 1;
         let resetOn: 'short' | 'long' = 'short';
-        if (t.grantsResource === 'relentless-endurance' || t.grantsResource === 'hellish-rebuke' || t.grantsResource === 'hellish-rebellion') {
+        if (t.grantsResource === 'relentless-endurance' || t.grantsResource === 'hellish-rebuke') {
           resetOn = 'long';
         }
         resources.push({

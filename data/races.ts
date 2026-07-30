@@ -38,7 +38,7 @@ export const RACES_CATALOG: RaceDefinition[] = [
     size: 'medium',
     darkvision: 60,
     traits: [
-      { id: 'keen-senses', name: 'Keen Senses', description: 'You have proficiency in the Perception skill.', kind: 'passive' },
+      { id: 'keen-senses', name: 'Keen Senses', description: 'You have proficiency in the Perception skill.', kind: 'passive', effect: { kind: 'skill-proficiency', payload: { skills: ['perception'] } } },
       { id: 'fey-ancestry', name: 'Fey Ancestry', description: 'You have advantage on saving throws against being charmed, and magic can\'t put you to sleep.', kind: 'passive', effect: { kind: 'advantage-on-save', payload: { against: 'charmed' } } },
       { id: 'trance', name: 'Trance', description: 'Elves don\'t need to sleep. Instead, they meditate deeply, remaining semiconscious, for 4 hours a day.', kind: 'passive' },
     ],
@@ -56,7 +56,9 @@ export const RACES_CATALOG: RaceDefinition[] = [
     darkvision: 60,
     traits: [
       { id: 'dwarven-resilience', name: 'Dwarven Resilience', description: 'You have advantage on saving throws against poison, and you have resistance against poison damage.', kind: 'passive', effect: { kind: 'damage-resistance', payload: { type: 'poison' } } },
-      { id: 'stonecunning', name: 'Stonecunning', description: 'Whenever you make an Intelligence (History) check related to the origin of stonework, you are considered proficient in the History skill and add double your proficiency bonus.', kind: 'passive' },
+      { id: 'dwarven-resilience-saves', name: 'Dwarven Resilience (Poison Saves)', description: 'Advantage on saving throws against poison.', kind: 'passive', effect: { kind: 'advantage-on-save', payload: { against: 'poison' } } },
+      { id: 'stonecunning', name: 'Stonecunning', description: 'Whenever you make an Intelligence (History) check related to the origin of stonework, you are considered proficient in the History skill and add double your proficiency bonus.', kind: 'passive', effect: { kind: 'skill-proficiency', payload: { skills: ['history'] } } },
+      { id: 'dwarven-combat-training', name: 'Dwarven Combat Training', description: 'You have proficiency with the battleaxe, handaxe, throwing hammer, and warhammer.', kind: 'passive' },
     ],
     languages: ['common', 'dwarvish'],
     icon: 'fa-mountain',
@@ -121,7 +123,7 @@ export const RACES_CATALOG: RaceDefinition[] = [
     darkvision: 60,
     traits: [
       { id: 'fey-ancestry', name: 'Fey Ancestry', description: 'You have advantage on saving throws against being charmed, and magic can\'t put you to sleep.', kind: 'passive', effect: { kind: 'advantage-on-save', payload: { against: 'charmed' } } },
-      { id: 'skill-versatility', name: 'Skill Versatility', description: 'You gain proficiency in two skills of your choice.', kind: 'passive' },
+      { id: 'skill-versatility', name: 'Skill Versatility', description: 'You gain proficiency in two skills of your choice.', kind: 'passive', effect: { kind: 'skill-proficiency', payload: { skills: ['_choice_', '_choice_'] } } },
     ],
     languages: ['common', 'elvish', 'one-of-choice'],
     icon: 'fa-user-graduate',
@@ -137,7 +139,7 @@ export const RACES_CATALOG: RaceDefinition[] = [
     darkvision: 60,
     traits: [
       { id: 'relentless-endurance', name: 'Relentless Endurance', description: 'When you are reduced to 0 HP but not killed outright, you drop to 1 HP instead. Once per long rest.', kind: 'resource', grantsResource: 'relentless-endurance' },
-      { id: 'savage-attacks', name: 'Savage Attacks', description: 'On a melee weapon crit, roll one additional damage die and add it to the total.', kind: 'passive', effect: { kind: 'weapon-damage-extra-die', payload: { dieSize: 0 } } },
+      { id: 'savage-attacks', name: 'Savage Attacks', description: 'On a melee weapon crit, roll one additional damage die and add it to the total.', kind: 'passive', effect: { kind: 'crit-bonus-dice', payload: { count: 1 } } },
     ],
     languages: ['common', 'orc'],
     icon: 'fa-fist-raised',

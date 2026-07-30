@@ -8,6 +8,7 @@ import { computeSkillBudget } from '../components/creation/skillPoints';
 import { RACES_BY_ID } from '../utils/races';
 import { CLASSES_BY_ID } from '../utils/classes';
 import { lookupSRDItem } from '../utils/srdItems';
+import { applyEffects, CharacterCreatedContext } from './effectDispatcher';
 
 /** Builds a fully-formed Character object from wizard creation state, validating name, location, stats, feats, and subclass choices. */
 export function buildCharacterFromWizard(
@@ -73,61 +74,78 @@ export function buildCharacterFromWizard(
   const tempChar = { id: 'player-temp', name, race: selectedRace.id, class: selectedClass.id, level, stats: fs, inventory, racialTraits };
   const resources = recalculateResourcePools(tempChar as unknown as Character);
 
-  return {
-    character: {
-      id: 'player-' + Date.now(), name, race: selectedRace.id, class: selectedClass.id, level,
-      hp: {
-        current: selectedClass.hpBase + conMod + (selectedClass.hpPerLevel + conMod) * (level - 1),
-        max: selectedClass.hpBase + conMod + (selectedClass.hpPerLevel + conMod) * (level - 1),
-      },
-      stats: fs, inventory,
-      currency: (() => {
-        let gp = Math.floor(goldPool);
-        let sp = Math.round((goldPool - gp) * 10);
-        if (sp >= 10) { gp += Math.floor(sp / 10); sp = sp % 10; }
-        return { gp, sp, cp: 0 };
-      })(),
-      location: loc?.name || '', experience: 0, experienceToNextLevel: calculateXPToNextLevel(level),
-      unusedStatPoints: Math.max(0, (level - 1) * 2 - bonusAllocated), maxHpBonus: 0, hitDice: { current: level, max: level },
-      skills: updatedSkills, unusedSkillPoints: remainingSkillPoints || 0,
-      feats: collectedFeats, featSelections, featChoices, pendingFeatChoice: false,
-      resources, racialTraits,
-      conditionsImmunities: (selectedRace.id === 'elf' || selectedRace.id === 'half-elf') ? ['sleep'] : undefined,
-      knownSpells: !selectedClass.spellcasting ? [] : (
-        selectedClass.id === 'wizard' || selectedClass.spellcasting.prepMode === 'known'
-          ? [...selectedCantrips, ...selectedSpells]
-          : [...selectedCantrips]
-      ),
-      preparedSpells: !selectedClass.spellcasting ? [] : (
-        selectedClass.id === 'wizard'
-          ? [...selectedCantrips, ...selectedSpells.slice(0, Math.max(1, level + getMod(fs.int)))]
-          : selectedClass.spellcasting.prepMode === 'prepared'
-          ? [...selectedCantrips, ...selectedSpells]
-          : [...selectedCantrips]
-      ),
-      subclassId: selectedSubclassId || undefined,
-      backstory: backstory || undefined,
-      alignment: alignment || undefined,
-      background: background || undefined,
-      personalityTraits: personalityTraits.length ? personalityTraits : undefined,
-      ideals: ideals.length ? ideals : undefined,
-      bonds: bonds.length ? bonds : undefined,
-      flaws: flaws.length ? flaws : undefined,
-      appearance: appearance || undefined,
-      halfElfStatChoices: (typeof selectedRace.asi === 'string' && halfElfChoice1 && halfElfChoice2) ? [halfElfChoice1, halfElfChoice2] as unknown as [string, string] : undefined,
-      draconicAncestry: (() => {
-        if (selectedRace.id === 'dragonborn' && draconicAncestry) return draconicAncestry;
-        if (selectedClass.id === 'sorcerer' && selectedSubclassId === 'draconic-bloodline' && draconicAncestry) return draconicAncestry;
-        return undefined;
-      })(),
-      draconicDamageType: (() => {
-        const a = (selectedRace.id === 'dragonborn' && draconicAncestry) ? draconicAncestry
-          : (selectedClass.id === 'sorcerer' && selectedSubclassId === 'draconic-bloodline' && draconicAncestry) ? draconicAncestry : null;
-        if (!a) return undefined;
-        return (DRAGON_ANCESTRIES.find(d => d.id === a)?.damageType as string) || undefined;
-      })(),
-      unlockedSubclassFeatures: [],
+  const builtChar: Character = {
+    id: 'player-' + Date.now(), name, race: selectedRace.id, class: selectedClass.id, level,
+    hp: {
+      current: selectedClass.hpBase + conMod + (selectedClass.hpPerLevel + conMod) * (level - 1),
+      max: selectedClass.hpBase + conMod + (selectedClass.hpPerLevel + conMod) * (level - 1),
     },
+    stats: fs, inventory,
+    currency: (() => {
+      let gp = Math.floor(goldPool);
+      let sp = Math.round((goldPool - gp) * 10);
+      if (sp >= 10) { gp += Math.floor(sp / 10); sp = sp % 10; }
+      return { gp, sp, cp: 0 };
+    })(),
+    location: loc?.name || '', experience: 0, experienceToNextLevel: calculateXPToNextLevel(level),
+    unusedStatPoints: Math.max(0, (level - 1) * 2 - bonusAllocated), maxHpBonus: 0, hitDice: { current: level, max: level },
+    skills: updatedSkills, unusedSkillPoints: remainingSkillPoints || 0,
+    feats: collectedFeats, featSelections, featChoices, pendingFeatChoice: false,
+    resources, racialTraits,
+    conditionsImmunities: (selectedRace.id === 'elf' || selectedRace.id === 'half-elf') ? ['sleep'] : undefined,
+    knownSpells: !selectedClass.spellcasting ? [] : (
+      selectedClass.id === 'wizard' || selectedClass.spellcasting.prepMode === 'known'
+        ? [...selectedCantrips, ...selectedSpells]
+        : [...selectedCantrips]
+    ),
+    preparedSpells: !selectedClass.spellcasting ? [] : (
+      selectedClass.id === 'wizard'
+        ? [...selectedCantrips, ...selectedSpells.slice(0, Math.max(1, level + getMod(fs.int)))]
+        : selectedClass.spellcasting.prepMode === 'prepared'
+        ? [...selectedCantrips, ...selectedSpells]
+        : [...selectedCantrips]
+    ),
+    subclassId: selectedSubclassId || undefined,
+    backstory: backstory || undefined,
+    alignment: alignment || undefined,
+    background: background || undefined,
+    personalityTraits: personalityTraits.length ? personalityTraits : undefined,
+    ideals: ideals.length ? ideals : undefined,
+    bonds: bonds.length ? bonds : undefined,
+    flaws: flaws.length ? flaws : undefined,
+    appearance: appearance || undefined,
+    halfElfStatChoices: (typeof selectedRace.asi === 'string' && halfElfChoice1 && halfElfChoice2) ? [halfElfChoice1, halfElfChoice2] as unknown as [string, string] : undefined,
+    draconicAncestry: (() => {
+      if (selectedRace.id === 'dragonborn' && draconicAncestry) return draconicAncestry;
+      if (selectedClass.id === 'sorcerer' && selectedSubclassId === 'draconic-bloodline' && draconicAncestry) return draconicAncestry;
+      return undefined;
+    })(),
+    draconicDamageType: (() => {
+      const a = (selectedRace.id === 'dragonborn' && draconicAncestry) ? draconicAncestry
+        : (selectedClass.id === 'sorcerer' && selectedSubclassId === 'draconic-bloodline' && draconicAncestry) ? draconicAncestry : null;
+      if (!a) return undefined;
+      return (DRAGON_ANCESTRIES.find(d => d.id === a)?.damageType as string) || undefined;
+    })(),
+    unlockedSubclassFeatures: [],
+    languages: (() => {
+      const r = RACES_BY_ID[selectedRace.id];
+      return r?.languages ? [...r.languages] : ['common'];
+    })(),
+  };
+
+  // Grant domain spells at character creation
+  if (selectedSubclassId) {
+    const subDef = CLASSES_BY_ID[selectedClass.id]?.subclasses?.find(s => s.id === selectedSubclassId);
+    if (subDef?.domainSpells?.length) {
+      builtChar.preparedSpells = [...(builtChar.preparedSpells || []), ...subDef.domainSpells];
+    }
+  }
+
+  const creationCtx: CharacterCreatedContext = { _hook: 'onCharacterCreated', character: builtChar };
+  applyEffects(builtChar, 'onCharacterCreated', creationCtx);
+
+  return {
+    character: builtChar,
     errors,
   };
 }

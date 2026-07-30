@@ -2,6 +2,7 @@ import { Character, InventoryItem, Currency, Enemy, MCPResponse } from '../types
 import { canEquipArmor, getArmorTypeFromItem } from './classEngine';
 import { supabase } from './supabaseClient';
 import { getHeavyArmorMasterReduction } from './featsService';
+import { applyEffects, DamageTakenContext } from './effectDispatcher';
 
 /** Normalizes a total copper-piece amount into GP/SP/CP currency values, ensuring non-negative. */
 export function normalizeCurrency(totalCp: number): Currency {
@@ -157,7 +158,15 @@ export function inflictDamageOnTarget(
   }
 
   if ('hp' in target && 'stats' in target) {
-    dmg = Math.max(0, dmg - getHeavyArmorMasterReduction(target as Character, damageType));
+    const char = target as Character;
+    const ctx: DamageTakenContext = {
+      _hook: 'onDamageTaken',
+      amount: dmg,
+      damageType: damageType || '',
+      target: char,
+    };
+    const afterEffects = applyEffects(char, 'onDamageTaken', ctx);
+    dmg = Math.max(0, afterEffects.amount - getHeavyArmorMasterReduction(char, damageType));
   }
 
   const currentHp = target.hp.current;

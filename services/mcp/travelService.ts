@@ -7,6 +7,7 @@ import { getMod, getClassDef, recoverResources as classEngineRecoverResources } 
 import { computeXp, awardXpToParty, formatXpAwardLine } from '../xpEngine';
 import { getConditionEffects, applyCondition, tickConditionsByTime, tickConditionsByRounds, hasCondition, getExhaustionPenalty, executeConditionOnRemove } from '../conditionEngine';
 import { getTimePeriod, AMBIENT_LINES } from '../../utils/timeUtils';
+import { applyEffects, SkillCheckContext, RestContext } from '../effectDispatcher';
 import { SPELLS_BY_ID } from '../../utils/spells';
 import { breakConcentration as engineBreakConcentration, checkConcentrationExpiry } from '../spellcastingEngine';
 import { ensureGameStateFields } from './stateService';
@@ -301,18 +302,26 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
       const skillRank = matchedSkill ? (target.skills?.[matchedSkill] || 0) : 0;
 
       const roll = cryptoRoll(20);
-      const total = roll + modifier + skillRank - getExhaustionPenalty(target);
+      const skillCtx: SkillCheckContext = {
+        _hook: 'onSkillCheck',
+        roll,
+        skillName: matchedSkill || cleanSkill,
+        character: target,
+      };
+      const afterSkill = applyEffects(target, 'onSkillCheck', skillCtx);
+      const finalRoll = afterSkill.roll;
+      const total = finalRoll + modifier + skillRank - getExhaustionPenalty(target);
       const success = total >= difficulty;
 
       let xpGained = 0;
       let xpMsg = "";
 
       if (success) {
-        const amount = computeXp('skill', { dc: difficulty, nat20: roll === 20 });
+        const amount = computeXp('skill', { dc: difficulty, nat20: finalRoll === 20 });
         xpGained = amount;
         const xpResult = awardXpToParty(state, amount);
         xpMsg = ' ' + formatXpAwardLine('skill', xpResult);
-        if (roll === 20) xpMsg += ' [Nat 20: XP doubled!]';
+        if (finalRoll === 20) xpMsg += ' [Nat 20: XP doubled!]';
       }
 
       if (success && onSuccess) {
@@ -326,8 +335,8 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
 
       return {
         success: true,
-        data: { roll, modifier, skillRank, total, difficulty, success, character: target.name, skillName: labelName, xpGained },
-        message: `${target.name} ${labelName}: ${success ? 'SUCCESS' : 'FAILURE'} (Total ${total} vs DC ${difficulty}) [Roll: ${roll}, Stat Mod: ${modifier >= 0 ? '+' : ''}${modifier}, Skill Rank: +${skillRank}].${xpMsg}`
+        data: { roll: finalRoll, modifier, skillRank, total, difficulty, success, character: target.name, skillName: labelName, xpGained },
+        message: `${target.name} ${labelName}: ${success ? 'SUCCESS' : 'FAILURE'} (Total ${total} vs DC ${difficulty}) [Roll: ${finalRoll}, Stat Mod: ${modifier >= 0 ? '+' : ''}${modifier}, Skill Rank: +${skillRank}].${xpMsg}`
       };
     },
 
@@ -611,6 +620,8 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
           hitDiceMax: char.hitDice.max,
         });
         classEngineRecoverResources(char, 'long');
+        const restCtx: RestContext = { _hook: 'onLongRest', character: char };
+        applyEffects(char, 'onLongRest', restCtx);
         // 2024 rule: each caster can replace one cantrip after a long rest, and prepared casters can re-prepare spells.
         if (classDef?.spellcasting) {
           char.cantripSwapAvailable = true;
@@ -695,6 +706,8 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
       ensureAllCharacterFields(state.party);
       for (const char of state.party) {
         classEngineRecoverResources(char, 'short');
+        const shortCtx: RestContext = { _hook: 'onShortRest', character: char };
+        applyEffects(char, 'onShortRest', shortCtx);
         const classDef = getClassDef(char.class);
         if (classDef?.spellcasting) {
           char.shortRestSpellSwapAvailable = true;

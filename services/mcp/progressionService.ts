@@ -2,6 +2,7 @@ import { Character, GameState, MCPResponse, Enemy } from '../../types';
 import { fail } from './_shared';
 import { applyStatAllocation, getProgressionContext } from '../progressionService';
 import { computeXp, awardXpToParty, formatXpAwardLine } from '../xpEngine';
+import { applyEffects, LevelUpContext } from '../effectDispatcher';
 
 /**
  * Auto-awards an enemy's XP to the party on defeat. Combat XP is CR-based (via the
@@ -90,6 +91,9 @@ export function createProgressionService(state: GameState): ProgressionService {
       if (!target.conditionsImmunities && (target.racialTraits || []).includes('fey-ancestry')) {
         target.conditionsImmunities = ['sleep'];
       }
+
+      const levelUpCtx: LevelUpContext = { _hook: 'onLevelUp', character: target, newLevel: target.level };
+      applyEffects(target, 'onLevelUp', levelUpCtx);
 
       return {
         success: true,

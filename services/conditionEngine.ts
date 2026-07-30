@@ -1,6 +1,7 @@
 import { Character, Enemy, ActiveCondition } from '../types';
 import { cryptoRoll } from '../utils/random';
 import { getMod } from '../utils/dice';
+import { applyEffects, ConditionAppliedContext } from './effectDispatcher';
 
 type Target = Character | Enemy;
 
@@ -32,6 +33,18 @@ export function applyCondition(target: Target, condition: ActiveCondition): bool
     const immunities = (target as Enemy).conditionsImmunities ?? [];
     const lowerId = condition.id.toLowerCase();
     if (immunities.some(i => lowerId === i.toLowerCase() || lowerId.startsWith(i.toLowerCase() + '-'))) {
+      return false;
+    }
+  }
+  if ('stats' in target && 'level' in target && 'race' in target && !('cr' in target)) {
+    const char = target as Character;
+    const condCtx: ConditionAppliedContext = {
+      _hook: 'onConditionApplied',
+      condition: condition.id,
+      target: char,
+    };
+    const afterEffects = applyEffects(char, 'onConditionApplied', condCtx);
+    if ((afterEffects as unknown as Record<string, unknown>)._blocked) {
       return false;
     }
   }

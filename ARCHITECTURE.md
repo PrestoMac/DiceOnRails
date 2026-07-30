@@ -501,7 +501,64 @@ The math layer behind `mcp/combatService.ts`. `addEnemyToCombat` auto-fills stat
 
 ### `classEngine.ts`
 
-~350 lines. The class/race/Subsystem authority. Key exports: `getClassDef`, `getRaceDef`, `getSubclassDef`, `calculateMaxHp`, `calculateAc`, `calculateSpeed`, `getDarkvisionRange`, `getSavingThrowBonus`, `getProficiencyBonus`, `getSpellSaveDc`, `getSpellAttackBonus`, `getDamageResistances`, `canEquipArmor`, `recalculateResourcePools`. Handles Unarmored Defense (Barbarian/Monk), Draconic Resilience, fighting styles, armor proficiency gating, etc.
+~380 lines. The class/race subsystem authority. Key exports: `getClassDef`, `getRaceDef`, `getSubclassDef`, `calculateMaxHp`, `calculateAc`, `calculateSpeed`, `getDarkvisionRange`, `getSavingThrowBonus`, `getProficiencyBonus`, `getSpellSaveDc`, `getSpellAttackBonus`, `getDamageResistances`, `canEquipArmor`, `recalculateResourcePools`. All mechanical stat queries (AC, speed, max HP, saving throws) now delegate to the **Effect Dispatcher** (`services/effectDispatcher.ts`) for class/race/feat effect resolution.
+
+### `effectDispatcher.ts` — Hook-Aggregator Effect Dispatcher
+
+~440 lines. The central effect evaluation engine. Reads structured effect payloads (`effect: { kind, payload }`) from race/class/subclass/feat data catalogs at runtime and folds them into typed hook contexts at well-defined event points. This eliminates the hardcoded class-ID, race-ID, and feat-ID string branches that previously littered the engine services.
+
+**Two public APIs:**
+- **`getEffects(char, kind)`** — collects raw effect payloads from all four sources matching a given `EffectKind`. Used for inline logic where the call site needs the raw payload (e.g. sneak-attack dice count, GWF reroll eligibility, off-hand modifier availability).
+- **`applyEffects(char, hook, ctx)`** — folds all matching effect payloads through registered per-kind reducers into a typed hook context. The single entry point services call per event.
+
+**Hook catalog (13 hooks):**
+
+| Hook | Context | Called from | Effect kinds consumed |
+|------|---------|-------------|----------------------|
+| `computeAc` | `AcContext` | `classEngine.calculateAc` | `ac-formula`, `dual-wielder-ac` |
+| `computeSpeed` | `SpeedContext` | `classEngine.calculateSpeed` | `speed-bonus` |
+| `computeMaxHp` | `MaxHpContext` | `classEngine.calculateMaxHp` | `hp-per-level` |
+| `onAttackRoll` | `AttackRollContext` | `combatService.player_attack` | `reroll-ones`, `crit-range` |
+| `onAttackDamage` | `AttackDamageContext` | `combatService.player_attack` | `damage-bonus` (rage, Improved Divine Smite), `crit-bonus-dice` |
+| `onDamageTaken` | `DamageTakenContext` | `inventoryEngine.inflictDamageOnTarget` + `inventoryService.inflict_damage` | `damage-resistance`, `damage-immunity`, `damage-vulnerability` |
+| `onSaveRoll` | `SaveRollContext` | `combatService.make_save` | `advantage-on-save`, `save-proficiency` |
+| `onSkillCheck` | `SkillCheckContext` | `travelService.check_skill` | `reroll-ones` |
+| `onConditionApplied` | `ConditionAppliedContext` | `conditionEngine.applyCondition` | `condition-immunity` |
+| `onCharacterCreated` | `CharacterCreatedContext` | `characterCreationService.buildCharacterFromWizard` | `skill-proficiency`, `armor-proficiency`, `language` |
+| `onLongRest` | `RestContext` | `travelService.long_rest` | _(extension point)_ |
+| `onShortRest` | `RestContext` | `travelService.short_rest` | _(extension point)_ |
+| `onLevelUp` | `LevelUpContext` | `progressionService.level_up` | _(extension point)_ |
+
+**Stacking rules** (SRD-faithful, enforced by reducer ordering):
+- Damage resistances/immunities/vulnerabilities: no stacking (single application per type; immunity overrides resistance)
+- Speed bonuses: additive across sources
+- AC formulas: mutually exclusive (highest wins); other bonuses (shields, Dual Wielder) stack on top
+- Save advantage: binary (multiple qualifying sources = still one advantage)
+- Dice-additive effects (`crit-bonus-dice`): stacks by source (Brutal Critical + Half-Orc Savage Attacks = 2 extra dice)
+- Flat damage bonuses: single value per active source (Rage at +2/+3/+4 via additive L1/L9/L16 features)
+
+**Caching strategy:** `getEffects()` iterates ~10-30 features per high-level character — sub-millisecond per call. The engine's deep-clone transaction pattern (`JSON.parse(JSON.stringify(...))`) provides automatic invalidation if a WeakMap cache is added later.
+
+### `resourceHandlers.ts` — Resource Spender Registry
+
+~190 lines. A registry of `use_resource` handlers called via `RESOURCE_HANDLERS[resourceId](ctx, characterId, targetId, amount)`. Adding a new spendable resource = one handler function, zero changes to `spellcastingService.ts`.
+
+**15 handlers:**
+- `second-wind` — Fighter: `1d10 + level` heal
+- `rage` — Barbarian: enters rage, breaks concentration
+- `lay-on-hands-pool` — Paladin: cross-character heal by amount
+- `breath-weapon` — Dragonborn: computed DC + level-scaled damage
+- `ki` — Monk: Stunning Strike (target CON save or stunned)
+- `bardic-inspiration` — Bard: grants inspiration die to target
+- `channel-divinity` — Cleric: Turn Undead (WIS save or turned) + Destroy Undead (CR thresholds)
+- `hellish-rebuke` — Tiefling: `3d10` fire damage, DEX save, once per long rest
+- `wild-shape` — Druid: CR/fly/swim level-gating info
+- `sorcery-points` — Sorcerer: metamagic readiness info
+- `action-surge` — Fighter: extra action flag
+- `indomitable` — Fighter: save reroll flag
+- `divine-sense` — Paladin: celestial/fiend/undead detection
+- `arcane-recovery` — Wizard: max spell level recovery info
+- `relentless-endurance` — Half-Orc: drop to 1 HP instead of 0
 
 ### `spellcastingEngine.ts`
 
