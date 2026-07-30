@@ -33,13 +33,16 @@ const RACE_ASSESSMENTS: AssessmentMap = {
     status: 'warning',
     reason: 'Hellish Resistance (fire resistance) works. Hellish Rebuke resource handler works (3d10 fire damage). Thaumaturgy cantrip and Darkness spell NOT implemented. Infernal Legacy not level-gated.',
   },
+  dragonborn: {
+    status: 'warning',
+    reason: 'Breath Weapon fully wired with scaling DC (2d6→5d6) and damage type. BUT damage resistance is display-only — the `from-draconic-ancestry` placeholder is never resolved to an actual damage type in the damage calculation path. Chromatic vs Metallic distinction not available.',
+  },
 };
 
 const RACE_OK_REASONS: Record<string, string> = {
   human: 'All racial features (+1 all stats, speed 30, medium size) are fully wired. Variant Human (feat at L1) not available.',
   halfling: 'Lucky (reroll 1s on attacks/checks) fully wired via reroll-ones reducer. Brave (frightened save advantage) wired. Halfling Nimbleness not implemented. No subraces available.',
-  dragonborn: 'Breath Weapon fully wired with scaling DC (2d6→5d6) and damage type. Damage resistance from draconic ancestry works. Chromatic vs Metallic distinction not available.',
-  'half-orc': 'Relentless Endurance fully wired (sets HP to 1 when at 0, once per long rest). Savage Attacks (crit bonus die) wired but uses d20 instead of weapon damage die (known bug). Menacing (Intimidation proficiency) not implemented.',
+  'half-orc': 'Relentless Endurance fully wired (sets HP to 1 when at 0, once per long rest). Savage Attacks (crit bonus die) non-functional — writes to _extraCritDice which is never read by the caller. Menacing (Intimidation proficiency) not implemented.',
 };
 
 /* ------------------------------------------------------------------ */
@@ -65,7 +68,7 @@ const CLASS_ASSESSMENTS: AssessmentMap = {
   },
   barbarian: {
     status: 'warning',
-    reason: 'Rage resource pool and activation work. Unarmored Defense (10+DEX+CON) works. Danger Sense (DEX save advantage) works. BUT Rage resistance to B/P/S damage is NOT mechanically enforced, and Rage damage bonus is not applied by the attack pipeline. Reckless Attack advantage/disadvantage is prompt-only.',
+    reason: 'Rage resource pool and activation work. Unarmored Defense (10+DEX+CON) works. Danger Sense (DEX save advantage) works. Rage damage bonus applied via dispatcher. BUT Rage resistance to B/P/S damage is NOT mechanically enforced. Reckless Attack advantage/disadvantage is prompt-only. Brutal Critical non-functional (damage lost). Fast Movement condition not checked.',
   },
   bard: {
     status: 'warning',
