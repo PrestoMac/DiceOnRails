@@ -1206,6 +1206,13 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       const afterDmg = applyEffects(attacker, 'onAttackDamage', dmgCtx);
       damageTotal = afterDmg.damage;
 
+      const extraCritDiceCount = (afterDmg as unknown as Record<string, unknown>)._extraCritDiceCount as number | undefined;
+      if (extraCritDiceCount && extraCritDiceCount > 0) {
+        for (let i = 0; i < extraCritDiceCount; i++) {
+          damageTotal += cryptoRoll(dieSides);
+        }
+      }
+
       if (divineSmite && divineSmite.slotLevel && !isOffHand) {
         const smiteLevel = Math.min(divineSmite.slotLevel, 5);
         const smiteDice = 2 + smiteLevel;

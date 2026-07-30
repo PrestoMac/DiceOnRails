@@ -273,7 +273,7 @@ export function recalculateResourcePools(character: Character): ResourcePool[] {
           resetOn = 'long';
         } else if (feat.grantsResource === 'bardic-inspiration') {
           max = Math.max(1, chaMod);
-          resetOn = 'long';
+          resetOn = level >= 5 ? 'short' : 'long';
         } else if (feat.grantsResource === 'second-wind') {
           max = 1;
           resetOn = 'short';

@@ -519,10 +519,10 @@ The math layer behind `mcp/combatService.ts`. `addEnemyToCombat` auto-fills stat
 | `computeSpeed` | `SpeedContext` | `classEngine.calculateSpeed` | `speed-bonus` |
 | `computeMaxHp` | `MaxHpContext` | `classEngine.calculateMaxHp` | `hp-per-level` |
 | `onAttackRoll` | `AttackRollContext` | `combatService.player_attack` | `reroll-ones`, `crit-range` |
-| `onAttackDamage` | `AttackDamageContext` | `combatService.player_attack` | `damage-bonus` (rage, Improved Divine Smite), `crit-bonus-dice` |
-| `onDamageTaken` | `DamageTakenContext` | `inventoryEngine.inflictDamageOnTarget` + `inventoryService.inflict_damage` | `damage-resistance`, `damage-immunity`, `damage-vulnerability` |
+| `onAttackDamage` | `AttackDamageContext` | `combatService.player_attack` | `damage-bonus` (rage, Improved Divine Smite), `crit-bonus-dice` (Brutal Critical, Savage Attacks — accumulated counter, caller rolls weapon dice) |
+| `onDamageTaken` | `DamageTakenContext` | `inventoryEngine.inflictDamageOnTarget` + `inventoryService.inflict_damage` | `damage-resistance` (condition-gated for rage, `from-draconic-ancestry` resolution), `damage-immunity`, `damage-vulnerability` |
 | `onSaveRoll` | `SaveRollContext` | `combatService.make_save` | `advantage-on-save`, `save-proficiency` |
-| `onSkillCheck` | `SkillCheckContext` | `travelService.check_skill` | `reroll-ones` |
+| `onSkillCheck` | `SkillCheckContext` | `travelService.check_skill` | `reroll-ones`, `skill-expertise` |
 | `onConditionApplied` | `ConditionAppliedContext` | `conditionEngine.applyCondition` | `condition-immunity` |
 | `onCharacterCreated` | `CharacterCreatedContext` | `characterCreationService.buildCharacterFromWizard` | `skill-proficiency`, `armor-proficiency`, `language` |
 | `onLongRest` | `RestContext` | `travelService.long_rest` | _(extension point)_ |

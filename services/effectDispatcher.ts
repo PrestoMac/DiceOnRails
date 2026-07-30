@@ -1,5 +1,5 @@
 import { Character, EffectKind } from '../types';
-import { getClassDef, getRaceDef, getSubclassDef } from './classEngine';
+import { getClassDef, getRaceDef, getSubclassDef, meetsCondition, getProficiencyBonus } from './classEngine';
 import { getFeatById } from '../utils/feats';
 
 export type SourceKind = 'race' | 'class' | 'subclass' | 'feat';
@@ -90,6 +90,7 @@ export interface SkillCheckContext extends HookContext {
   roll: number;
   skillName: string;
   character: Character;
+  skillBonus: number;
 }
 
 export interface ConditionAppliedContext extends HookContext {
@@ -175,8 +176,10 @@ const HOOK_REGISTRY: Record<HookName, ReducerEntry[]> = {
   computeSpeed: [
     {
       kind: 'speed-bonus',
-      reduce: (ctx, payload) => {
+      reduce: (ctx, payload, character) => {
         const spdCtx = ctx as unknown as SpeedContext;
+        const condition = payload.condition as string | undefined;
+        if (condition && !meetsCondition(character, condition)) return ctx;
         spdCtx.speed += (payload.bonus as number) || 0;
         return ctx;
       },
@@ -248,11 +251,7 @@ const HOOK_REGISTRY: Record<HookName, ReducerEntry[]> = {
         if (!dmgCtx.isCrit) return ctx;
         const count = (payload.count as number) || 1;
         const asExtras = dmgCtx as unknown as Record<string, unknown>;
-        const extraDice: number[] = (asExtras._extraCritDice as number[]) || [];
-        for (let i = 0; i < count; i++) {
-          extraDice.push(Math.floor(Math.random() * 20) + 1);
-        }
-        asExtras._extraCritDice = extraDice;
+        asExtras._extraCritDiceCount = ((asExtras._extraCritDiceCount as number) || 0) + count;
         return ctx;
       },
     },
@@ -270,9 +269,15 @@ const HOOK_REGISTRY: Record<HookName, ReducerEntry[]> = {
     },
     {
       kind: 'damage-resistance',
-      reduce: (ctx, payload) => {
+      reduce: (ctx, payload, character) => {
         const dmgCtx = ctx as unknown as DamageTakenContext;
-        if (dmgCtx.amount > 0 && matchesType(dmgCtx.damageType, (payload.type as string) || '')) {
+        const condition = payload.condition as string | undefined;
+        if (condition === 'raging' && !character.raging) return ctx;
+        let type = (payload.type as string) || '';
+        if (type === 'from-draconic-ancestry') {
+          type = character.draconicDamageType || 'fire';
+        }
+        if (dmgCtx.amount > 0 && matchesType(dmgCtx.damageType, type)) {
           dmgCtx.amount = Math.floor(dmgCtx.amount / 2);
         }
         return ctx;
@@ -333,6 +338,17 @@ const HOOK_REGISTRY: Record<HookName, ReducerEntry[]> = {
         const skillCtx = ctx as unknown as SkillCheckContext;
         if (skillCtx.roll === 1) {
           skillCtx.roll = Math.floor(Math.random() * 20) + 1;
+        }
+        return ctx;
+      },
+    },
+    {
+      kind: 'skill-expertise',
+      reduce: (ctx, _payload, character) => {
+        const skillCtx = ctx as unknown as SkillCheckContext;
+        const rank = character.skills?.[skillCtx.skillName] || 0;
+        if (rank > 1) {
+          skillCtx.skillBonus += getProficiencyBonus(character);
         }
         return ctx;
       },
