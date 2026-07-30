@@ -1,6 +1,6 @@
-# Dice on Rails — Reboot Blueprint v3
+# Dice on Rails — Reboot Blueprint v4
 
-> **Version:** 3.0 (Production-Ready Architecture)  
+> **Version:** 4.0 (Production-Hardened Architecture)  
 > **Status:** Approved for execution  
 > **Last updated:** 2025
 
@@ -24,12 +24,13 @@ The **Effect Dispatcher** (the "spine") is the universal mechanism that performs
 
 | Subsystem | Viability | Risk | Mitigation |
 |---|---|---|---|
-| **Kernel Store & Schema** | High | Cyclical derived data dependencies | Stratified two-stage data preparation |
-| **Effect Dispatcher** | High (revised) | Scalar folds cannot process control-flow overrides | Post-Evaluation Override phase added |
-| **Async Reaction Handling** | High (revised) | Inline async yield causes state locks | Event-driven State Suspension + Continuation |
-| **Dice Families** | High | Meta-currency breaks determinism | Pre/post-resolution hooks standardized |
-| **AI Cognition Layer** | High (revised) | Dynamic context invalidates prompt cache | Strict prefix-matching + static system prompts |
-| **System Module SDK** | High | Unvalidated property bags | Build-time JSON Schema + runtime type guards |
+| **Kernel Store & Schema** | High | Dynamic runtime mutations bypassing schema | Build-time JSON Schema + runtime type guards |
+| **Data Preparation** | High | Cross-tier feedback loops | Strict unidirectional dependency graph |
+| **Effect Dispatcher** | High | Priority deadlocks in overrides | Multi-tier deterministic sorting tuple |
+| **Async Interrupts** | High | Stack explosion, context staleness | Bounded snapshot frames + checksum verification |
+| **Dice Families** | High | External entropy breaking determinism | Pure functional execution with injected RNG |
+| **AI Cognition Layer** | High | Cache eviction, illegal fallbacks | Multi-vendor cache boundaries + action-aware fallbacks |
+| **System Module SDK** | High | Contract breaking | Build-time validation + runtime guards |
 
 ---
 
@@ -45,9 +46,9 @@ The **Effect Dispatcher** (the "spine") is the universal mechanism that performs
 
 5. **Determinism via injection.** RNG, time, persistence, and the LLM client are all injected ports. Core is pure functions → fully testable, fully replayable.
 
-6. **Strictly synchronous dispatcher.** The dispatcher is a pure, synchronous function. Async operations (reactions, user input) are handled via state suspension snapshots and continuation — never inline blocking.
+6. **Strictly synchronous dispatcher.** The dispatcher is a pure, synchronous function. Async operations (reactions, user input) are handled via bounded state suspension snapshots — never inline blocking.
 
-7. **Stratified data preparation.** Entity data resolves in strict tiers (Base → Modifiers → Derived) to prevent cyclical dependencies.
+7. **Stratified data preparation.** Entity data resolves in strict unidirectional tiers (Base → Modifiers → Derived → Override) to prevent cyclical dependencies.
 
 8. **Prompt cache hygiene.** System prompts are strictly static. Dynamic state lives in user messages. Timestamps are quantized to turn indices.
 
@@ -58,12 +59,13 @@ The **Effect Dispatcher** (the "spine") is the universal mechanism that performs
 | Decision | Choice |
 |---|---|
 | Entity model | Schema + codegen (runtime property-bag, dev-time typed interfaces) |
-| AI authority | Cooperative with rejection budgeting (max 2 retries, then passive fallback) |
+| AI authority | Cooperative with rejection budgeting (max 2 retries, then action-aware fallback) |
 | AI tool model | Static universal verbs with parametric payloads (preserves prompt caching) |
 | Dice families v1 | d20, dice-pool, percentile, Fudge (4 `RollPolicy` implementations) |
-| Dispatcher model | Strictly synchronous; reactions via State Suspension + Continuation |
-| Data preparation | Stratified: Base → Modifiers → Derived (prevents cycles) |
-| Stacking model | Typed multi-pass (Item/Status/Circumstance/Untyped) + Post-Evaluation Override |
+| Dispatcher model | Strictly synchronous; reactions via bounded State Suspension + Continuation |
+| Data preparation | Stratified unidirectional: Base → Modifiers → Derived → Override |
+| Stacking model | Typed multi-pass (Item/Status/Circumstance/Untyped) |
+| Override sorting | Multi-tier deterministic: (subPhase, priority, timestamp, entityId) |
 | Build path | Fresh engine in a monorepo; current app's 5e data + UI port over as first system module + host |
 | Repo | Single pnpm workspace, one CI gate |
 | Engine brand | **Dice on Rails** (the universal platform itself) |
@@ -82,7 +84,7 @@ dice-on-rails/                          # Project root
     dice/           @dor/dice           Four v1 RollPolicy implementations:
                                         d20, pool, percentile, fudge
     cognition/      @dor/cognition      AI layer: Static Verb Dispatcher • ContextAssembler •
-                                        PromptAssembler • Cooperative Authority with rejection budgeting
+                                        PromptAssembler • Cooperative Authority with action-aware fallbacks
     system-sdk/     @dor/system-sdk     Schema format • Codegen • SystemLoader • CLI
                                         (validate / codegen / replay)
   systems/
@@ -140,27 +142,31 @@ Each system declares a **schema** (JSON Schema + custom annotations); a codegen 
 
 **Derived values are never stored.** AC, max HP, initiative, spell DC — always computed via `resolve()`.
 
-### Stratified Data Preparation
+### Stratified Data Preparation (Unidirectional)
 
-To prevent cyclical dependencies, entity data resolves in strict tiers:
+To prevent cyclical dependencies, entity data resolves in strict unidirectional tiers. Data flows only downward — higher tiers can read lower tiers, but never write back.
 
 ```
 Tier 1: Base Properties        ──► Raw entity props (stats, level, class, race)
         │                              No computation, just data access
+        │                              READ-ONLY for all other tiers
         ▼
 Tier 2: Base Ability Scores  ──► Ability modifiers, proficiency bonus
         │                              Depends only on Tier 1
+        │                              READ-ONLY for Tiers 3-4
         ▼
 Tier 3: Modifier Aggregation ──► Active effects from all sources
         │                              Depends on Tiers 1-2
+        │                              Applies typed stacking rules
         ▼
-Tier 4: Derived Values       ──► AC, Save DC, Initiative, Max HP
-                                       Depends on Tiers 1-3, never feeds back
+Tier 4: Derived + Override   ──► AC, Save DC, Initiative, Max HP, control-flow
+                                       Depends on Tiers 1-3
+                                       NEVER feeds back into lower tiers
 ```
 
-This strict ordering guarantees no circular dependencies. A derived value cannot influence the tiers it depends on.
+**Invariant:** A value computed in Tier N cannot modify any value in Tier M where M < N within the same evaluation pass. This guarantees termination in predictable linear time.
 
-### Synchronous Dispatcher with State Suspension (The Spine, v3)
+### Synchronous Dispatcher with Bounded State Suspension (The Spine, v4)
 
 The dispatcher is a **pure, synchronous function**. It never blocks on async operations.
 
@@ -170,14 +176,14 @@ type HookName = string;  // base set + system-registered
 interface HookContext {
   readonly _hook: HookName;
   readonly _phase: 'base' | 'modifiers' | 'derived' | 'override';
-  readonly _tier: 1 | 2 | 3 | 4;  // stratified data tier
+  readonly _tier: 1 | 2 | 3 | 4;
   [key: string]: unknown;
 }
 
 interface Modifier {
   kind: string;
   payload: Record<string, unknown>;
-  stackGroup?: string;       // for stacking rules
+  stackGroup?: string;
   stackCategory?: 'item' | 'status' | 'circumstance' | 'untyped';
   source: SourceRef;
 }
@@ -203,13 +209,13 @@ function resolve(
   entity: Entity,
   hook: HookName,
   ctx: HookContext
-): HookContext;
+): HookContext | StateSnapshot;
 ```
 
 #### Execution Lifecycle
 
 ```
-Phase 1: Base Initialization (Tier 1-2)
+Phase 1: Base Initialization (Tiers 1-2)
         ──► Raw properties → ability scores → proficiency
         │
         ▼
@@ -230,7 +236,10 @@ Phase 4: Post-Evaluation Override
         │
         ├──► No triggers: Return result synchronously
         │
-        └──► Triggers present: Suspend state → Return snapshot
+        └──► Triggers present: Create bounded snapshot frame
+                                      │
+                                      ▼
+                            Return snapshot to host (synchronous)
                                       │
                                       ▼
                             Host handles async notification out-of-band
@@ -242,19 +251,22 @@ Phase 4: Post-Evaluation Override
                             Host calls continueWithReaction(snapshot, decision)
                                       │
                                       ▼
-                            Engine restores snapshot, completes synchronously
+                            Engine verifies checksum, restores, completes
 ```
 
-### State Suspension and Continuation
+### Bounded State Suspension and Continuation
 
-Instead of inline async blocking, the engine uses explicit state snapshots:
+Instead of inline async blocking, the engine uses bounded frame stacks with checksum verification:
 
 ```typescript
 interface StateSnapshot {
   id: string;                    // Unique suspension ID
+  frameDepth: number;            // Nested reaction depth (max: 5)
+  parentSnapshotId?: string;     // Parent frame for nested reactions
   entityId: string;
   hook: HookName;
   context: HookContext;          // Frozen at suspension point
+  stateChecksum: string;         // SHA-256 of entity store at suspension
   timestamp: number;             // For timeout tracking
   reactionTriggers: ReactionTrigger[];
 }
@@ -274,53 +286,131 @@ interface ReactionDecision {
   }>;
 }
 
-// Synchronous resolution
-function resolve(store, entity, hook, ctx): HookContext | StateSnapshot;
-
-// Continuation after async reaction decision
-function continueWithReaction(snapshot: StateSnapshot, decision: ReactionDecision): HookContext;
+// Constants
+const MAX_SNAPSHOT_DEPTH = 5;   // Prevents infinite reaction chains
+const SNAPSHOT_TTL_MS = 30000;  // 30 second timeout
 ```
 
-**Why this matters:**
-- Dispatcher remains pure and synchronous
-- No thread locks or race conditions
-- Deterministic replay preserved (snapshots are serializable)
-- Network latency doesn't block engine threads
+**Why bounded frames:**
+- Prevents stack explosion from nested reactions (Shield → Counterspell → Counterspell...)
+- Frame depth ceiling ensures termination
+- Parent-child linking enables proper resumption order
+- Checksum verification detects stale state
 
-### Post-Evaluation Override Phase
+### Checksum Verification
 
-Certain mechanics are control-flow overrides, not scalar modifiers. They execute in Phase 4, after all numeric stacking is complete:
+To prevent world state desynchronization during suspension windows:
+
+```typescript
+function computeStateChecksum(store: EntityStore): string {
+  // SHA-256 of all entity props + collections
+  // Changes if ANY entity mutates during suspension
+  const stateString = JSON.stringify({
+    entities: store.query(() => true).map(e => ({
+      id: e.id,
+      props: e.props,
+      collections: e.collections,
+    })),
+  });
+  return sha256(stateString);
+}
+
+function continueWithReaction(snapshot: StateSnapshot, decision: ReactionDecision): HookContext {
+  // Verify state hasn't changed during suspension
+  const currentChecksum = computeStateChecksum(store);
+  if (currentChecksum !== snapshot.stateChecksum) {
+    throw new StateDesynchronizationError(
+      `Snapshot ${snapshot.id} is stale. ` +
+      `Expected checksum ${snapshot.stateChecksum}, got ${currentChecksum}`
+    );
+  }
+  
+  // Verify timeout
+  if (Date.now() - snapshot.timestamp > SNAPSHOT_TTL_MS) {
+    throw new SnapshotTimeoutError(`Snapshot ${snapshot.id} expired`);
+  }
+  
+  // Restore frozen context and apply reactions
+  let ctx = { ...snapshot.context };
+  for (const reaction of decision.reactions) {
+    const ability = getAbility(reaction.ability);
+    ctx = ability.run(ctx, reaction.actor, reaction.payload);
+  }
+  
+  return finalizeResolution(ctx);
+}
+```
+
+### Multi-Tier Override Sorting
+
+To eliminate priority parity deadlocks, override rules use a deterministic sorting tuple:
 
 ```typescript
 interface OverrideRule {
-  // Condition: when does this override apply?
   condition: (ctx: HookContext) => boolean;
-  
-  // Mutation: what changes?
   apply: (ctx: HookContext) => HookContext;
   
-  // Priority: higher overrides lower
-  priority: number;
+  // Multi-tier sorting key for deterministic execution order
+  sortKey: {
+    subPhase: 'transform' | 'clamp' | 'floor' | 'boolean';  // Execution band
+    priority: number;                                        // Within-band priority
+    timestamp: number;                                       // Tiebreaker 1
+    entityId: string;                                        // Tiebreaker 2
+  };
 }
 
-// Examples:
+// Sub-phase execution order (deterministic):
+// 1. transform — Absolute property transformations (set roll = 20)
+// 2. clamp     — Numerical value clamps (speed ≤ maxSpeed)
+// 3. floor     — Minimum thresholds (roll ≥ 10)
+// 4. boolean   — State flag overrides (isCrit = false)
+
+// Example: Reliable Talent
 const RELIABLE_TALENT: OverrideRule = {
   condition: (ctx) => ctx._hook === 'onSkillCheck' && ctx.roll <= 9,
   apply: (ctx) => ({ ...ctx, roll: 10 }),
-  priority: 100,
+  sortKey: {
+    subPhase: 'floor',
+    priority: 100,
+    timestamp: Date.now(),
+    entityId: ctx.character.id,
+  },
 };
 
+// Example: Critical Immunity
 const CRITICAL_IMMUNITY: OverrideRule = {
   condition: (ctx) => ctx._hook === 'onAttackDamage' && ctx.isCrit,
   apply: (ctx) => ({ ...ctx, isCrit: false }),
-  priority: 200,
+  sortKey: {
+    subPhase: 'boolean',
+    priority: 200,
+    timestamp: Date.now(),
+    entityId: ctx.target.id,
+  },
 };
+```
 
-const SPEED_CAP: OverrideRule = {
-  condition: (ctx) => ctx._hook === 'computeSpeed' && ctx.speed > ctx.maxSpeed,
-  apply: (ctx) => ({ ...ctx, speed: ctx.maxSpeed }),
-  priority: 50,
-};
+**Sorting algorithm:**
+```typescript
+function compareOverrides(a: OverrideRule, b: OverrideRule): number {
+  // 1. Sub-phase order (transform < clamp < floor < boolean)
+  const subPhaseOrder = { transform: 0, clamp: 1, floor: 2, boolean: 3 };
+  const subDiff = subPhaseOrder[a.sortKey.subPhase] - subPhaseOrder[b.sortKey.subPhase];
+  if (subDiff !== 0) return subDiff;
+  
+  // 2. Priority (higher first)
+  if (a.sortKey.priority !== b.sortKey.priority) {
+    return b.sortKey.priority - a.sortKey.priority;
+  }
+  
+  // 3. Timestamp (earlier first)
+  if (a.sortKey.timestamp !== b.sortKey.timestamp) {
+    return a.sortKey.timestamp - b.sortKey.timestamp;
+  }
+  
+  // 4. Entity ID (deterministic string sort)
+  return a.sortKey.entityId.localeCompare(b.sortKey.entityId);
+}
 ```
 
 ### Dependency-Tracked Reactive Caching
@@ -331,16 +421,20 @@ interface DependencyGraph {
   dependencies: Map<string, Set<string>>;
   // Maps source ID → set of computed properties that become dirty
   reverseDeps: Map<string, Set<string>>;
+  // Spatial dependency tracking (for auras, adjacency)
+  spatialDeps: Map<string, Set<string>>;  // entityId → set of affected entityIds
   
   markDirty(sourceId: string): void;
+  markSpatialDirty(entityId: string): void;  // Special handling for position changes
   isDirty(propertyId: string): boolean;
   clearDirty(propertyId: string): void;
 }
 ```
 
-1. Each entity maintains a dependency map linking computed properties to active modifier sources.
-2. When a modifier source changes (equipping armor, expiring condition), downstream calculated properties are flagged as dirty.
-3. Subsequent `resolve()` calls return cached values unless flagged dirty.
+**Spatial dependency optimization:**
+- Position changes mark only nearby entities dirty (within aura range)
+- Distant entities retain cached values
+- Prevents cascade invalidation during tactical combat
 
 ### Dice Engine: Expression + Policy
 
@@ -392,8 +486,8 @@ interface MetaCurrencyHook {
 // Examples:
 const LUCK: MetaCurrencyHook = {
   timing: 'post-roll',
-  condition: (ctx) => ctx.roll < 10,  // Only when roll is low
-  apply: (ctx) => ({ ...ctx, roll: cryptoRoll(20) }),  // Reroll
+  condition: (ctx) => ctx.roll < 10,
+  apply: (ctx, rng) => ({ ...ctx, roll: rng.roll(20) }),
   resourceCost: { pool: 'luck', amount: 1 },
 };
 
@@ -404,8 +498,6 @@ const BARDC_INSPIRATION: MetaCurrencyHook = {
   resourceCost: { pool: 'bardic-inspiration', amount: 1 },
 };
 ```
-
-These hooks execute at defined points, consuming resources deterministically.
 
 ### Resources
 
@@ -573,30 +665,68 @@ interface UniversalVerbs {
 
 System packages provide JSON Schema definitions for the `payload` object.
 
+### Multi-Vendor Cache Boundary Managers
+
+To optimize token usage across different LLM providers, the cognition layer uses provider-specific payload formatters:
+
+```typescript
+interface CacheBoundaryConfig {
+  provider: 'anthropic' | 'openai' | 'google';
+  formatPayload(request: LLMRequest): LLMRequest;
+}
+
+// Anthropic: Explicit cache_control markers
+const ANTHROPIC_CACHE: CacheBoundaryConfig = {
+  provider: 'anthropic',
+  formatPayload: (request) => ({
+    ...request,
+    system: [
+      {
+        type: 'text',
+        text: STATIC_SYSTEM_PROMPT,
+        cache_control: { type: 'ephemeral' },  // 5-minute TTL
+      },
+    ],
+    tools: request.tools.map(tool => ({
+      ...tool,
+      cache_control: { type: 'ephemeral' },
+    })),
+  }),
+};
+
+// OpenAI: Automatic prefix hash matching (requires 1024+ token static prefix)
+const OPENAI_CACHE: CacheBoundaryConfig = {
+  provider: 'openai',
+  formatPayload: (request) => ({
+    ...request,
+    // Ensure static prefix exceeds 1024 tokens for automatic caching
+    messages: [
+      { role: 'system', content: STATIC_SYSTEM_PROMPT },  // Static, cached
+      { role: 'system', content: STATIC_TOOL_DEFINITIONS },  // Static, cached
+      ...request.messages,  // Dynamic, processed fresh
+    ],
+  }),
+};
+```
+
 ### Prompt Cache Hygiene
 
 **CRITICAL:** To preserve prompt caching benefits, the cognition module enforces strict structural prompt hygiene:
 
 ```typescript
-// ✅ CORRECT: Static system prompt
-const SYSTEM_PROMPT = `
-You are a Game Master for a tabletop role-playing game.
+// ✅ CORRECT: Static system prompt (cacheable)
+const SYSTEM_PROMPT = `You are a Game Master for a tabletop role-playing game.
 Follow the rules of the system module.
 Use the provided tools to resolve actions.
-Never narrate numbers you did not roll through the engine.
-`;
+Never narrate numbers you did not roll through the engine.`;
 
 // ❌ WRONG: Dynamic content in system prompt (breaks cache)
-const BAD_SYSTEM_PROMPT = `
-You are a Game Master. Current time: ${new Date().toISOString()}.
-Player HP: ${player.hp.current}/${player.hp.max}.
-Turn: ${gameState.turnCounter}.
-`;
+const BAD_SYSTEM_PROMPT = `You are a GM. Turn: ${gameState.turnCounter}. HP: ${hp}. Time: ${new Date().toISOString()}.`;
 
-// ✅ CORRECT: Dynamic content in user message
+// ✅ CORRECT: Dynamic state in user message
 const userMessage = {
   role: 'user',
-  content: `Current state: ${JSON.stringify(getDynamicState())}`,
+  content: `Turn ${gameState.turnCounter}. Party status: ${partyStatus}.`,
 };
 ```
 
@@ -606,7 +736,7 @@ const userMessage = {
 3. Timestamps are quantized to turn indices (`turn: 5`), not ISO dates
 4. Cache control markers share normalized TTL settings
 
-### Cooperative Authority with Rejection Budgeting
+### Cooperative Authority with Action-Aware Fallbacks
 
 | Engine Validates | AI Owns |
 |---|---|
@@ -622,13 +752,35 @@ interface RejectionBudget {
   currentRetries: number;
   
   canRetry(): boolean;
-  exhaust(): FallbackAction;     // Passive, non-resource-consuming
+  exhaust(): FallbackAction;     // Action-aware fallback
 }
 
-// Fallback actions are strictly passive:
-const PASSIVE_FALLBACKS = ['dodge', 'defend', 'wait', 'describe'];
-// Never: attack, cast_spell, use_resource (could consume resources unintentionally)
+// Action-aware fallback matrix
+function selectFallback(ctx: {
+  isReactionWindow: boolean;
+  currentTurn: string;
+  actorTurn: string;
+  availableActions: string[];
+}): FallbackAction {
+  // Out-of-turn reaction window: decline the reaction
+  if (ctx.isReactionWindow && ctx.currentTurn !== ctx.actorTurn) {
+    return { type: 'decline_reaction', reason: 'fallback' };
+  }
+  
+  // In-turn: passive defensive action
+  if (ctx.availableActions.includes('dodge')) {
+    return { type: 'dodge' };
+  }
+  if (ctx.availableActions.includes('defend')) {
+    return { type: 'defend' };
+  }
+  
+  // Last resort: wait
+  return { type: 'wait' };
+}
 ```
+
+**Why action-aware:** Forcing a `dodge` action during another player's turn (as a reaction fallback) violates action economy. The fallback must respect turn context.
 
 **Repeated fallback detection:**
 ```typescript
@@ -660,7 +812,7 @@ systems/<system-id>/
     reducers/                one file per effect family
     sources/                 condition catalog, aura definitions
     abilities/               active abilities
-    overrides/               Post-evaluation override rules
+    overrides/               Post-evaluation override rules with sortKeys
     verbs.json               Payload schemas for static universal verbs
   prompt/
     system.md                Static system prompt (no dynamic content)
@@ -670,7 +822,7 @@ systems/<system-id>/
     glossary.md
 ```
 
-**The contract:** a loader reads `manifest.json`, registers schemas + reducers + sources + abilities + dice policy + initiative model + prompt fragments + verb schemas. The engine is ready. Swap the folder → different game.
+**The contract:** a loader reads `manifest.json`, registers schemas + reducers + sources + abilities + dice policy + initiative model + prompt fragments + verb schemas. The engine is ready. Swap the folder → different game. Multiple systems can coexist (a campaign picks one).
 
 ---
 
@@ -692,12 +844,12 @@ systems/<system-id>/
 
 ### Overrides (`systems/dnd5e/rules/overrides/`)
 
-| Override | Phase | Fixes |
-|---|---|---|
-| `reliable-talent` | override | Rogue Reliable Talent (roll floor = 10) |
-| `critical-immunity` | override | Monster immunity to crits |
-| `speed-cap` | override | Encumbrance, armor speed limits |
-| `death-on-exhaustion` | override | Exhaustion level 10 = death |
+| Override | Sub-Phase | SortKey | Fixes |
+|---|---|---|---|
+| `reliable-talent` | floor | `{subPhase: 'floor', priority: 100}` | Rogue Reliable Talent (roll floor = 10) |
+| `critical-immunity` | boolean | `{subPhase: 'boolean', priority: 200}` | Monster immunity to crits |
+| `speed-cap` | clamp | `{subPhase: 'clamp', priority: 50}` | Encumbrance, armor speed limits |
+| `death-on-exhaustion` | transform | `{subPhase: 'transform', priority: 300}` | Exhaustion level 10 = death |
 
 ### Conditions (`systems/dnd5e/rules/sources/`)
 
@@ -752,25 +904,26 @@ systems/<system-id>/
 
 **Deliverables:**
 - EntityStore with schema-driven property bags
-- **Stratified data preparation** (4 tiers, no cycles)
+- **Stratified unidirectional data preparation** (4 tiers, no backward reads)
 - **Synchronous dispatcher** with 4 phases (base, modifiers, derived, override)
-- **State Suspension + Continuation** for reactions (no inline async)
-- Dependency-tracked reactive caching (dirty-flag graph)
+- **Bounded State Suspension + Continuation** for reactions (max depth 5, checksum verification)
+- **Multi-tier override sorting** (subPhase → priority → timestamp → entityId)
+- Dependency-tracked reactive caching with spatial optimization
 - Dice engine with 4 RollPolicy implementations
 - Resource pool engine
 - TurnModel interface + CyclicModel
 - Typed stacking engine (Item/Status/Circumstance/Untyped)
-- Post-evaluation override rules engine
 - Meta-currency hooks (pre-roll, post-roll)
 
-**Gate:** Headless engine resolves a 5e combat from fixtures; deterministic replays pass; 1,000 parallel `resolve()` calls complete within performance budget.
+**Gate:** Headless engine resolves a 5e combat from fixtures; deterministic replays pass; 1,000 parallel `resolve()` calls complete within performance budget; nested reaction chains (depth ≤ 5) resolve without memory leaks.
 
 **Tests:**
 - Property tests with injected RNG
 - Replay fixtures (golden state)
 - Each dice policy: pure unit tests
 - Stratified lifecycle verification (no cycles)
-- State suspension/continuation scenarios
+- Bounded snapshot frame tests (depth limit, checksum verification)
+- Multi-tier override sorting tests (deterministic order)
 - Performance benchmarking (1,000 parallel resolves)
 
 ---
@@ -807,13 +960,14 @@ systems/<system-id>/
 - Static Verb Dispatcher (4 universal verbs: act, query, narrate, advance_turn)
 - Payload schema registry (system-provided verb schemas)
 - ContextAssembler (token-budgeted state serialization)
+- **Multi-vendor cache boundary managers** (Anthropic, OpenAI, Google)
 - **Prompt cache hygiene enforcement** (static system prompts, dynamic state in user messages)
 - PromptAssembler (kernel + system + mode + persona)
-- Cooperative authority with rejection budgeting (max 2 retries → passive fallback)
+- Cooperative authority with **action-aware fallbacks** (respects turn context)
 - Fallback alert system (repeated failures → downgrade actor)
 - Mock LLM test harness
 
-**Gate:** Headless AI GM runs a full 5e turn via static verbs under cooperative authority with rejection budgeting enforced and prompt cache hit-rate verified.
+**Gate:** Headless AI GM runs a full 5e turn via static verbs under cooperative authority with rejection budgeting enforced and prompt cache hit-rate verified (>85%).
 
 **Tests:**
 - Mock-LLM tests on verb dispatch
@@ -821,6 +975,7 @@ systems/<system-id>/
 - Agent loop scenario tests
 - Rejection budget enforcement tests
 - **Prompt cache hit-rate verification** (must exceed 85%)
+- Action-aware fallback tests (out-of-turn → decline_reaction)
 
 ---
 
@@ -832,7 +987,7 @@ systems/<system-id>/
 - engineAdapter (GameState ↔ EntityStore mapping)
 - HumanAdapter (UI events → action intents)
 - AgentAdapter (LLM tool calls → action intents)
-- **State Continuation Handler** (restores snapshots on reaction decisions)
+- **State Continuation Handler** (restores snapshots, verifies checksums)
 - Persistence port (Supabase + local)
 - Realtime port (presence/sync)
 - Migrated React UI
@@ -843,7 +998,7 @@ systems/<system-id>/
 - Ported vitest suite (behavioral parity)
 - UI integration tests
 - Multiplayer sync tests
-- Reaction continuation tests
+- Reaction continuation tests (checksum verification)
 
 ---
 
@@ -866,7 +1021,7 @@ systems/<system-id>/
 | Game System | Primary Mechanics | Modifier Model | Compatibility | Notes |
 |---|---|---|---|---|
 | **D&D 5e** | d20 + Additive Modifiers | Additive bonuses, Adv/Dis | Native (95%) | Primary baseline |
-| **Pathfinder 2e** | d20 + Modifiers; 4 DoS | Typed stacking (Status/Item/Circumstance) | High (85%) | Fully supported via typed stacking |
+| **Pathfinder 2e** | d20 + Modifiers; 4 DoS | Typed stacking (Status/Item/Circumstance) | High (90%) | Fully supported via typed stacking |
 | **Call of Cthulhu 7e** | d100 vs Skill; Hard/Extreme | Binary tiers, Sanity tracking | High (85%) | Sanity resource track needed |
 | **Shadowrun 6e** | d6 pool vs Threshold | Glitch, exploding dice | Moderate (75%) | Physical/Stun tracks needed |
 | **Fate Core** | 4dF vs Ladder | Aspects, Compels, Stress | Low (40%) | Scalar dispatcher insufficient for narrative aspects |
@@ -883,8 +1038,9 @@ systems/<system-id>/
 | **Dice policies** | Pure unit tests, one per kind | d20 advantage, pool hit-count, percentile fumble |
 | **Reducers** | Pure unit tests, one per effect kind | extra-attack count, damage-bonus, resistance |
 | **Overrides** | Control-flow tests | Reliable Talent floor, immunity, speed cap |
+| **Snapshots** | Bounded frame tests | Depth limit, checksum verification, TTL |
 | **System packages** | Golden-state turn replays → exact state-diff | Full 5e combat scenario |
-| **Cognition** | Mock-LLM tests | Verb dispatch, context assembly, rejection budgeting |
+| **Cognition** | Mock-LLM tests | Verb dispatch, context assembly, fallbacks |
 | **Host** | Ported vitest suite | UI behavior, multiplayer sync |
 | **Integration** | Headless scenarios per system | End-to-end turn resolution |
 | **Performance** | Benchmark suite | 1,000 parallel `resolve()` calls |
@@ -897,15 +1053,19 @@ systems/<system-id>/
 | Risk | Impact | Mitigation |
 |---|---|---|
 | Codegen friction | High | `dor codegen --watch`; schema is single source of truth |
-| Dispatcher perf | Medium | Dependency-tracked reactive caching; dirty-flag graph |
+| Dispatcher perf | Medium | Dependency-tracked reactive caching; spatial optimization |
 | Over-abstraction | High | No kernel feature ships without Phase E's second system needing it |
 | Cooperative-authority drift | Medium | One authoritative table per verb (engine validates / AI owns) |
 | Big-bang risk | High | Strangler via adapter; current game stays playable through Phase D |
 | Scope creep | Medium | Phase E enforces "does a second system need this?" |
-| LLM rejection loops | Medium | Rejection budgeting (max 2 retries → passive fallback) |
-| Prompt cache misses | High | Static universal verbs + static system prompts + quantized timestamps |
-| State lock from async | High | State Suspension + Continuation (no inline async blocking) |
-| Cyclical dependencies | Medium | Stratified 4-tier data preparation (Base → Modifiers → Derived → Override) |
+| LLM rejection loops | Medium | Rejection budgeting (max 2 retries → action-aware fallback) |
+| Prompt cache misses | High | Static universal verbs + multi-vendor cache boundaries |
+| State lock from async | High | Bounded State Suspension (no inline async blocking) |
+| Cyclical dependencies | Medium | Stratified unidirectional 4-tier data preparation |
+| Snapshot stack explosion | Medium | Bounded frame depth (max 5) + parent-child linking |
+| Stale snapshot continuation | Medium | SHA-256 checksum verification before resumption |
+| Override priority deadlocks | Medium | Multi-tier deterministic sorting (subPhase, priority, timestamp, entityId) |
+| Spatial cache cascades | Medium | Spatial dependency tracking (only nearby entities invalidated) |
 
 ---
 
@@ -958,20 +1118,21 @@ systems/<system-id>/
 | **Cooperative Authority** | Engine validates mechanics; AI owns narration; numbers engine-truthful |
 | **Rejection Budgeting** | Max retries before fallback (prevents LLM infinite loops) |
 | **Static Verbs** | Fixed top-level AI tools (act, query, narrate, advance_turn) with system payload schemas |
-| **State Suspension** | Snapshot-based async handling (no inline blocking) |
-| **Continuation** | Resuming suspended state after reaction decision |
-| **Stratified Data** | 4-tier preparation (Base → Modifiers → Derived → Override) |
+| **State Suspension** | Bounded snapshot-based async handling (no inline async blocking) |
+| **Continuation** | Resuming suspended state after reaction decision with checksum verification |
+| **Stratified Data** | Unidirectional 4-tier preparation (Base → Modifiers → Derived → Override) |
 | **Post-Evaluation Override** | Phase 4 for control-flow mutations (Reliable Talent, immunity, caps) |
 | **Meta-Currency Hooks** | Pre-roll/post-roll expenditure (luck, inspiration) |
 | **Prompt Cache Hygiene** | Static system prompts, dynamic state in user messages, quantized timestamps |
+| **Multi-Vendor Cache** | Provider-specific cache boundary formatting (Anthropic, OpenAI, Google) |
 | **Schema + Codegen** | Runtime property-bag, dev-time typed interfaces generated from schema |
-| **Dependency Graph** | Dirty-flag caching for derived values |
+| **Dependency Graph** | Dirty-flag caching for derived values with spatial optimization |
 
 ---
 
 ## Appendices
 
-### A. Synchronous Dispatcher with State Suspension
+### A. Synchronous Dispatcher with Bounded State Suspension
 
 ```typescript
 function resolve(store, entity, hook, initialCtx): HookContext | StateSnapshot {
@@ -1004,17 +1165,26 @@ function resolve(store, entity, hook, initialCtx): HookContext | StateSnapshot {
   
   // Phase 4: Post-Evaluation Override
   ctx._phase = 'override';
-  ctx = applyOverrides(store, entity, ctx);
+  const overrides = getOverrides(hook)
+    .filter(o => o.condition(ctx))
+    .sort(compareOverrides);  // Multi-tier deterministic sort
+  
+  for (const override of overrides) {
+    ctx = override.apply(ctx);
+  }
   
   // Check for reaction triggers
   const triggers = evaluateReactionTriggers(ctx);
   if (triggers.length > 0) {
-    // Suspend state, return snapshot for async handling
+    // Create bounded snapshot frame
     return {
       id: generateSnapshotId(),
+      frameDepth: getCurrentFrameDepth() + 1,
+      parentSnapshotId: getCurrentSnapshotId(),
       entityId: entity.id,
       hook,
       context: ctx,
+      stateChecksum: computeStateChecksum(store),
       timestamp: Date.now(),
       reactionTriggers: triggers,
     };
@@ -1024,19 +1194,35 @@ function resolve(store, entity, hook, initialCtx): HookContext | StateSnapshot {
 }
 
 function continueWithReaction(snapshot: StateSnapshot, decision: ReactionDecision): HookContext {
-  // Restore frozen context
-  let ctx = { ...snapshot.context };
+  // Verify frame depth
+  if (snapshot.frameDepth > MAX_SNAPSHOT_DEPTH) {
+    throw new MaxReactionDepthExceededError(
+      `Reaction chain exceeded maximum depth of ${MAX_SNAPSHOT_DEPTH}`
+    );
+  }
   
-  // Apply reaction decisions
+  // Verify state checksum
+  const currentChecksum = computeStateChecksum(store);
+  if (currentChecksum !== snapshot.stateChecksum) {
+    throw new StateDesynchronizationError(
+      `Snapshot ${snapshot.id} is stale. ` +
+      `Expected ${snapshot.stateChecksum}, got ${currentChecksum}`
+    );
+  }
+  
+  // Verify timeout
+  if (Date.now() - snapshot.timestamp > SNAPSHOT_TTL_MS) {
+    throw new SnapshotTimeoutError(`Snapshot ${snapshot.id} expired`);
+  }
+  
+  // Restore frozen context and apply reactions
+  let ctx = { ...snapshot.context };
   for (const reaction of decision.reactions) {
     const ability = getAbility(reaction.ability);
     ctx = ability.run(ctx, reaction.actor, reaction.payload);
   }
   
-  // Complete any remaining phases
-  ctx = finalizeResolution(ctx);
-  
-  return ctx;
+  return finalizeResolution(ctx);
 }
 ```
 
@@ -1105,7 +1291,12 @@ const RELIABLE_TALENT: OverrideRule = {
            ctx.isProficient === true;
   },
   apply: (ctx) => ({ ...ctx, roll: 10 }),
-  priority: 100,
+  sortKey: {
+    subPhase: 'floor',
+    priority: 100,
+    timestamp: Date.now(),
+    entityId: ctx.character.id,
+  },
 };
 ```
 
@@ -1177,6 +1368,40 @@ What happens next?`
 const BAD_PROMPT = `You are a GM. Turn: ${gameState.turnCounter}. HP: ${hp}. Time: ${new Date().toISOString()}.`;
 ```
 
+### G. Multi-Vendor Cache Formatting
+
+```typescript
+// Anthropic: Explicit cache_control markers
+const anthropicRequest = {
+  model: 'claude-sonnet-4-20250514',
+  max_tokens: 4096,
+  system: [
+    {
+      type: 'text',
+      text: STATIC_SYSTEM_PROMPT,
+      cache_control: { type: 'ephemeral' },
+    },
+  ],
+  tools: STATIC_TOOLS.map(tool => ({
+    ...tool,
+    cache_control: { type: 'ephemeral' },
+  })),
+  messages: [
+    { role: 'user', content: dynamicStatePayload },
+  ],
+};
+
+// OpenAI: Automatic prefix hashing (requires 1024+ token static prefix)
+const openaiRequest = {
+  model: 'gpt-4o',
+  messages: [
+    { role: 'system', content: STATIC_SYSTEM_PROMPT + STATIC_TOOL_DEFINITIONS },  // >1024 tokens
+    { role: 'user', content: dynamicStatePayload },
+  ],
+  tools: STATIC_TOOLS,
+};
+```
+
 ---
 
 ## Next Steps
@@ -1184,7 +1409,7 @@ const BAD_PROMPT = `You are a GM. Turn: ${gameState.turnCounter}. HP: ${hp}. Tim
 1. **Review this blueprint** with the team
 2. **Confirm Phase A scope** (kernel + rules + dice)
 3. **Scaffold the monorepo** (pnpm workspace, package structure)
-4. **Implement Phase A** (stratified dispatcher + state suspension + typed stacking + override phase)
+4. **Implement Phase A** (stratified dispatcher + bounded snapshots + multi-tier overrides + typed stacking)
 5. **Proceed through phases B–E**
 
 The plan is complete and ready for execution.
