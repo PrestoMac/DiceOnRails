@@ -889,7 +889,8 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
         let advantageNote = '';
         if (afterEffects.hasAdvantage) {
           const second = cryptoRoll(20);
-          advantageNote = ` [Advantage: ${roll} vs ${second}]`;
+          const srcLabel = afterEffects.advantageSources?.length ? ` (${afterEffects.advantageSources.join(', ')})` : '';
+          advantageNote = ` [Advantage${srcLabel}: ${roll} vs ${second}]`;
           roll = Math.max(roll, second);
         }
         const total = roll + totalMod - getExhaustionPenalty(partyTarget);

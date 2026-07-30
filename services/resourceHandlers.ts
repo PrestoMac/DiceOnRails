@@ -64,10 +64,24 @@ export const RESOURCE_HANDLERS: Record<string, ResourceHandler> = {
     return { success: true, data: { saveDC: dc, damage: { total: damage, type: dmgType } }, message: `Breath weapon used. DEX save DC ${dc}, ${dmgDice} ${dmgType} damage on fail, half on success.` };
   },
 
-  ki: async (ctx, characterId, targetId) => {
+  ki: async (ctx, characterId, targetId, _amount) => {
     const char = ctx.deps.getTarget(characterId);
     if (!char) return fail('Character not found.');
-    if (!targetId) return fail('Ki features require a targetId. Use targetId with the intended effect.');
+
+    const subAction = targetId && ['flurry-of-blows', 'patient-defense', 'step-of-the-wind'].includes(targetId) ? targetId : 'stunning-strike';
+
+    if (subAction === 'flurry-of-blows') {
+      return { success: true, data: { flurryOfBlows: true }, message: `${char.name} uses Flurry of Blows (1 Ki)! You can make two unarmed strikes as a bonus action.` };
+    }
+    if (subAction === 'patient-defense') {
+      applyCondition(char, { id: 'dodging-' + Date.now(), source: char.id, duration: 1 });
+      return { success: true, data: { patientDefense: true }, message: `${char.name} uses Patient Defense (1 Ki)! You take the Dodge action as a bonus action (attacks against you have disadvantage).` };
+    }
+    if (subAction === 'step-of-the-wind') {
+      return { success: true, data: { stepOfTheWind: true }, message: `${char.name} uses Step of the Wind (1 Ki)! You take the Dash or Disengage action as a bonus action, and your jump distance is doubled.` };
+    }
+
+    if (!targetId) return fail('Stunning Strike requires a targetId.');
     const enemy = ctx.state.combat?.enemies?.find(e => fuzzyMatchEntity(e, targetId));
     if (!enemy) return fail(`Target "${targetId}" not found in combat.`);
     if (enemy.isDead) return fail(`${enemy.name} is already defeated.`);
@@ -136,7 +150,7 @@ export const RESOURCE_HANDLERS: Record<string, ResourceHandler> = {
     return { success: true, data: { damage, saveDC }, message: `Hellish Rebuke deals ${damage} fire damage to ${actualTarget.name}.${result.message ? ' ' + result.message : ''}` };
   },
 
-  'wild-shape': async (ctx, characterId, targetId) => {
+  'wild-shape': async (ctx, characterId, _targetId) => {
     const char = ctx.deps.getTarget(characterId);
     if (!char) return fail('Character not found.');
     if (char.class !== 'druid') return fail('Only Druids can use Wild Shape.');
@@ -189,5 +203,13 @@ export const RESOURCE_HANDLERS: Record<string, ResourceHandler> = {
     if (char.hp.current > 0) return fail(`${char.name} must be at 0 HP to use Relentless Endurance.`);
     char.hp.current = 1;
     return { success: true, data: { revived: true }, message: `${char.name} endures! Drops to 1 HP instead of 0 HP. Once per long rest.` };
+  },
+
+  'natural-recovery': async (ctx, characterId) => {
+    const char = ctx.deps.getTarget(characterId);
+    if (!char) return fail('Character not found.');
+    if (char.class !== 'druid') return fail('Only Druids can use Natural Recovery.');
+    const maxLevels = Math.ceil(char.level / 2);
+    return { success: true, data: { maxLevels }, message: `Natural Recovery ready. Choose up to ${maxLevels} combined spell slot levels during short rest.` };
   },
 };

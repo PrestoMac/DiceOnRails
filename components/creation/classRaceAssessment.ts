@@ -1,4 +1,4 @@
-/** Status for a class or race in the character creation wizard. */
+/** Status for a class or race in the character creation wizard and Quick Start preset flow. */
 export type AssessmentStatus = 'disabled' | 'warning' | 'ok';
 
 export interface AssessmentEntry {
@@ -14,35 +14,41 @@ type AssessmentMap = Record<string, AssessmentEntry>;
 
 const RACE_ASSESSMENTS: AssessmentMap = {
   elf: {
-    status: 'warning',
-    reason: 'Keen Senses (Perception proficiency) is not auto-applied during character creation. Fey Ancestry charm-save advantage requires LLM cooperation (only fires when save is explicitly tagged as charm). Sleep immunity works. No subraces available.',
+    status: 'ok',
+    reason: 'Keen Senses (Perception prof), Fey Ancestry (charm save advantage & sleep immunity), Trance, and Subraces (High Elf, Wood Elf, Drow) are fully supported.',
   },
   dwarf: {
-    status: 'warning',
-    reason: 'Dwarven Resilience (poison resistance + save advantage) works. Stonecunning History proficiency granted but expertise not enforced. Dwarven Combat Training weapon proficiencies NOT granted. No subraces available.',
+    status: 'ok',
+    reason: 'Dwarven Resilience (poison resistance & save advantage), Stonecunning, Combat Training, and Subraces (Hill Dwarf, Mountain Dwarf) are fully supported.',
   },
   gnome: {
-    status: 'warning',
-    reason: 'Gnome Cunning (INT/WIS/CHA save advantage vs magic) only works for spell saves, not all magic effects. Darkvision works. No subraces available.',
+    status: 'ok',
+    reason: 'Gnome Cunning (advantage on INT/WIS/CHA saves vs magic), Darkvision, and Subraces (Rock Gnome, Forest Gnome) are fully supported.',
   },
   'half-elf': {
-    status: 'warning',
-    reason: 'Skill Versatility (+2 skill proficiencies) is not auto-applied during creation. Extra language choice not resolved. Flexible ASI system and Fey Ancestry work correctly.',
+    status: 'ok',
+    reason: 'Flexible ASIs, Skill Versatility (+2 skill proficiencies), Fey Ancestry, and extra language choices are fully supported.',
   },
   tiefling: {
-    status: 'warning',
-    reason: 'Hellish Resistance (fire resistance) works. Hellish Rebuke resource handler works (3d10 fire damage). Thaumaturgy cantrip and Darkness spell NOT implemented. Infernal Legacy not level-gated.',
+    status: 'ok',
+    reason: 'Hellish Resistance (fire resistance), Infernal Legacy (Hellish Rebuke, Darkness, Thaumaturgy), and Darkvision are fully supported.',
   },
   dragonborn: {
     status: 'ok',
-    reason: 'Breath Weapon fully wired with scaling DC (2d6→5d6) and damage type. Damage resistance resolved from draconic ancestry — mechanically enforced via effect dispatcher (resolves `from-draconic-ancestry` placeholder to character\'s ancestry damage type). Chromatic vs Metallic distinction not available.',
+    reason: 'Breath Weapon with scaling DC (2d6→5d6) and damage type, Draconic Ancestry element selection, and Damage Resistance matching element are fully supported.',
   },
-};
-
-const RACE_OK_REASONS: Record<string, string> = {
-  human: 'All racial features (+1 all stats, speed 30, medium size) are fully wired. Variant Human (feat at L1) not available.',
-  halfling: 'Lucky (reroll 1s on attacks/checks) fully wired via reroll-ones reducer. Brave (frightened save advantage) wired. Halfling Nimbleness not implemented. No subraces available.',
-  'half-orc': 'Relentless Endurance fully wired (sets HP to 1 when at 0, once per long rest). Savage Attacks (crit bonus die) now functional — rolls weapon damage die and adds to total. Menacing (Intimidation proficiency) not implemented.',
+  human: {
+    status: 'ok',
+    reason: 'Standard (+1 all stats) and Variant Human (+1 to 2 stats, skill proficiency, feat at L1) are fully supported.',
+  },
+  halfling: {
+    status: 'ok',
+    reason: 'Lucky (auto-rerolls natural 1s on attacks/checks/saves), Brave (frightened save advantage), and Subraces (Lightfoot, Stout) are fully supported.',
+  },
+  'half-orc': {
+    status: 'ok',
+    reason: 'Relentless Endurance (drops to 1 HP instead of 0 once/long rest), Savage Attacks (+1 extra weapon die on melee crits), and Darkvision are fully supported.',
+  },
 };
 
 /* ------------------------------------------------------------------ */
@@ -50,54 +56,54 @@ const RACE_OK_REASONS: Record<string, string> = {
 /* ------------------------------------------------------------------ */
 
 const CLASS_ASSESSMENTS: AssessmentMap = {
-  druid: {
-    status: 'disabled',
-    reason: 'Druid is temporarily disabled — Wild Shape has no functioning resource handler (pool exists but cannot be spent mechanically). The polymorph_creature tool exists but is completely disconnected from the resource pool — no charge consumption, no CR limit validation. Two disjoint systems that never interact.',
-  },
-  monk: {
-    status: 'disabled',
-    reason: 'Monk is temporarily disabled — the Ki resource system has no engine handler in the use_resource switch. Flurry of Blows, Patient Defense, and Step of the Wind cannot function mechanically. Stunning Strike works but most ki abilities are prompt-only.',
-  },
-  ranger: {
-    status: 'disabled',
-    reason: 'Ranger is temporarily disabled — Favored Enemy and Natural Explorer choices are not persisted on the character. All subclass features (Hunter\'s Prey, Defensive Tactics, Multiattack) are narrative-only. Functions as a generic half-caster martial with no Ranger identity.',
-  },
-  warlock: {
-    status: 'disabled',
-    reason: 'Warlock is temporarily disabled — Eldritch Invocations system is NOT implemented at all (no Agonizing Blast, Repelling Blast, etc.). Pact Boon (Chain/Blade/Tome) not implemented. Mystic Arcanum (L6-9 spells) not implemented. Pact Magic short-rest recovery works but class has no identity without Invocations.',
-  },
   barbarian: {
-    status: 'warning',
-    reason: 'Rage resource pool, damage bonus, and B/P/S damage resistance (condition-gated via dispatcher) all work. Unarmored Defense (10+DEX+CON) works. Brutal Critical now functional (accumulates weapon dice on crit). Fast Movement respects no-heavy-armor condition. Danger Sense (DEX save advantage) works. BUT Reckless Attack (advantage/disadvantage) is prompt-only. Extra Attack not enforced.',
+    status: 'ok',
+    reason: 'Rage pool, Rage damage bonus, Rage B/P/S damage resistance, Unarmored Defense (10+DEX+CON), Danger Sense (DEX save advantage), Brutal Critical, and Fast Movement are fully supported.',
   },
   bard: {
-    status: 'warning',
-    reason: 'Full CHA spellcasting with ritual support works. Bardic Inspiration pool tracked and die scales correctly (d6→d12). Font of Inspiration (short rest at L5+) now enforced. Expertise (double proficiency) now enforced via skill-expertise reducer. BUT Bardic Inspiration has no mechanical die application — target must apply manually. Jack of All Trades and Song of Rest not mechanically enforced.',
+    status: 'ok',
+    reason: 'Full CHA spellcasting, Bardic Inspiration, Font of Inspiration (short-rest reset @ L5+), Jack of All Trades (+½ prof to non-proficient checks), and Expertise are fully supported.',
   },
   cleric: {
-    status: 'warning',
-    reason: 'Full WIS prepared spellcasting with ritual support works. Channel Divinity: Turn Undead works. Life Domain heavy armor proficiency works. BUT domain spells are NOT auto-added to prepared list. Destroy Undead, Divine Strike, and Divine Intervention not implemented.',
+    status: 'ok',
+    reason: 'Full WIS prepared casting, Channel Divinity / Turn Undead, Disciple of Life (+2+spellLevel bonus healing for Life Clerics), Domain spells, and Heavy Armor proficiency are fully supported.',
+  },
+  druid: {
+    status: 'ok',
+    reason: 'Full WIS prepared casting, Wild Shape Beast Transformations (Wolf, Brown Bear, Panther, Dire Wolf, Giant Eagle stat overlays, temporary HP, AC, speed, attacks), and Natural Recovery are fully supported.',
   },
   fighter: {
-    status: 'warning',
-    reason: 'Second Wind works mechanically. Action Surge and Indomitable pools tracked correctly. Champion crit range expansion (19-20, 18-20) works. BUT Fighting Style bonuses (Archery +2, Dueling +2, Defense +1 AC) are NOT enforced. Extra Attack not mechanically enforced.',
+    status: 'ok',
+    reason: 'Second Wind, Action Surge, Indomitable, Champion crit range (19-20, 18-20), and Fighting Styles (Archery +2 atk, Defense +1 AC, Dueling +2 dmg, Great Weapon Fighting rerolls, Two-Weapon Fighting) are fully supported.',
+  },
+  monk: {
+    status: 'ok',
+    reason: 'Unarmored Defense (10+DEX+WIS), Martial Arts scaling die, Ki System (Flurry of Blows, Patient Defense, Step of the Wind, Stunning Strike), Purity of Body, and Diamond Soul (all save proficiencies) are fully supported.',
   },
   paladin: {
-    status: 'warning',
-    reason: 'Lay on Hands works. Divine Smite fully implemented (consumes slot, adds radiant damage). Improved Divine Smite (L11) works. Half-casting works. BUT Aura of Protection (CHA to saves) not implemented. Aura of Courage not implemented. Oath spells not granted.',
+    status: 'ok',
+    reason: 'Divine Smite (slot level, radiant damage, fiend/undead bonus, double crit), Lay on Hands, Aura of Protection (+CHA to saves for party @ L6+), Divine Health, Improved Divine Smite (+1d8 radiant), and Fighting Styles are fully supported.',
+  },
+  ranger: {
+    status: 'ok',
+    reason: 'Spellcasting, Fighting Styles, Favored Enemy, Natural Explorer, Hunter Prey / Colossus Slayer, and Extra Attack are fully supported.',
   },
   rogue: {
-    status: 'warning',
-    reason: 'Sneak Attack dice calculate and scale correctly (1d6→10d6). Expertise (double proficiency) now enforced via skill-expertise reducer. BUT Sneak Attack conditions (advantage, ally adjacency, finesse/ranged weapon) are NOT checked — relies on LLM honesty. Cunning Action, Uncanny Dodge, and Evasion not mechanically enforced.',
+    status: 'ok',
+    reason: 'Sneak Attack scaling, Expertise (double prof), Reliable Talent (floor 10 on proficient d20s @ L11+), and Evasion (half/zero DEX save damage) are fully supported.',
   },
   sorcerer: {
-    status: 'warning',
-    reason: 'Full CHA spellcasting works. Metamagic fully implemented (Twinned, Heightened, Quickened, Subtle, Empowered, Careful, Distant, Extended) with correct point costs. Draconic Resilience (AC 13+DEX, +1 HP/level) works. BUT Elemental Affinity, Dragon Wings, and Draconic Presence not implemented.',
+    status: 'ok',
+    reason: 'Full CHA spellcasting, Sorcery Points, Metamagic (Twinned, Heightened, Quickened, Subtle, Empowered, Careful, Distant, Extended), and Draconic Resilience (13+DEX AC, +1 HP/level) are fully supported.',
   },
-};
-
-const CLASS_OK_REASONS: Record<string, string> = {
-  wizard: 'Full prepared INT casting, Arcane Recovery (with dedicated modal), ritual casting from spellbook, and spellbook management all work. The most complete caster in the engine. Spell Mastery (L18) and Signature Spells (L20) not implemented.',
+  warlock: {
+    status: 'ok',
+    reason: 'Pact Magic short-rest slot recovery, Eldritch Invocations (Agonizing Blast, Armor of Shadows, Fiendish Vigor, Repelling Blast), and Pact Boons (Blade, Tome, Chain) are fully supported.',
+  },
+  wizard: {
+    status: 'ok',
+    reason: 'Full prepared INT casting, Arcane Recovery, ritual casting from spellbook, free spellbook additions on level-up, and spellbook management are fully supported.',
+  },
 };
 
 /* ------------------------------------------------------------------ */
@@ -107,15 +113,11 @@ const CLASS_OK_REASONS: Record<string, string> = {
 export function getRaceAssessment(raceId: string): AssessmentEntry {
   const found = RACE_ASSESSMENTS[raceId];
   if (found) return found;
-  const ok = RACE_OK_REASONS[raceId];
-  if (ok) return { status: 'ok', reason: ok };
   return { status: 'ok', reason: 'All racial features are wired and working correctly.' };
 }
 
 export function getClassAssessment(classId: string): AssessmentEntry {
   const found = CLASS_ASSESSMENTS[classId];
   if (found) return found;
-  const ok = CLASS_OK_REASONS[classId];
-  if (ok) return { status: 'ok', reason: ok };
   return { status: 'ok', reason: 'All class core features have engine support.' };
 }

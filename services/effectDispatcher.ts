@@ -1,4 +1,4 @@
-import { Character, EffectKind } from '../types';
+import { Character, EffectKind, SaveStat } from '../types';
 import { getClassDef, getRaceDef, getSubclassDef, meetsCondition, getProficiencyBonus } from './classEngine';
 import { getFeatById } from '../utils/feats';
 
@@ -83,6 +83,7 @@ export interface SaveRollContext extends HookContext {
   spellContext?: { spellName?: string; isMagical?: boolean };
   hasAdvantage: boolean;
   extraModifier: number;
+  advantageSources?: string[];
 }
 
 export interface SkillCheckContext extends HookContext {
@@ -172,6 +173,17 @@ const HOOK_REGISTRY: Record<HookName, ReducerEntry[]> = {
         return ctx;
       },
     },
+    {
+      kind: 'fighting-style',
+      reduce: (ctx, payload, character) => {
+        const acCtx = ctx as unknown as AcContext;
+        const style = (payload.style as string) || character.fightingStyle;
+        if (style === 'defense' && acCtx.equippedArmor && acCtx.equippedArmor.type !== 'none') {
+          acCtx.baseAc += 1;
+        }
+        return ctx;
+      },
+    },
   ],
   computeSpeed: [
     {
@@ -217,6 +229,17 @@ const HOOK_REGISTRY: Record<HookName, ReducerEntry[]> = {
         return ctx;
       },
     },
+    {
+      kind: 'fighting-style',
+      reduce: (ctx, payload, character) => {
+        const atkCtx = ctx as unknown as AttackRollContext;
+        const style = (payload.style as string) || character.fightingStyle;
+        if (style === 'archery' && atkCtx.isRanged) {
+          atkCtx.roll += 2;
+        }
+        return ctx;
+      },
+    },
   ],
   onAttackDamage: [
     {
@@ -252,6 +275,17 @@ const HOOK_REGISTRY: Record<HookName, ReducerEntry[]> = {
         const count = (payload.count as number) || 1;
         const asExtras = dmgCtx as unknown as Record<string, unknown>;
         asExtras._extraCritDiceCount = ((asExtras._extraCritDiceCount as number) || 0) + count;
+        return ctx;
+      },
+    },
+    {
+      kind: 'fighting-style',
+      reduce: (ctx, payload, character) => {
+        const dmgCtx = ctx as unknown as AttackDamageContext;
+        const style = (payload.style as string) || character.fightingStyle;
+        if (style === 'dueling' && !dmgCtx.isRanged) {
+          dmgCtx.damage += 2;
+        }
         return ctx;
       },
     },
@@ -302,18 +336,24 @@ const HOOK_REGISTRY: Record<HookName, ReducerEntry[]> = {
         const against = (payload.against as string) || '';
         const stat = (payload.stat as string) || '';
         if (stat && saveCtx.stat.toLowerCase() !== stat.toLowerCase()) return ctx;
+        if (!saveCtx.advantageSources) saveCtx.advantageSources = [];
         if (against === 'poison') {
           saveCtx.hasAdvantage = true;
+          saveCtx.advantageSources.push((payload.name as string) || 'Poison Resistance advantage');
         } else if (against === 'magic') {
           if (saveCtx.spellContext?.isMagical) {
             saveCtx.hasAdvantage = true;
+            saveCtx.advantageSources.push((payload.name as string) || 'Gnome Cunning advantage');
           }
         } else if (against === 'charmed' && saveCtx.spellContext?.isMagical) {
           saveCtx.hasAdvantage = true;
+          saveCtx.advantageSources.push((payload.name as string) || 'Fey Ancestry advantage');
         } else if (against === 'frightened') {
           saveCtx.hasAdvantage = true;
+          saveCtx.advantageSources.push((payload.name as string) || 'Brave advantage');
         } else if (against === 'seen-effect') {
           saveCtx.hasAdvantage = true;
+          saveCtx.advantageSources.push((payload.name as string) || 'Danger Sense advantage');
         }
         return ctx;
       },
@@ -326,6 +366,18 @@ const HOOK_REGISTRY: Record<HookName, ReducerEntry[]> = {
         if (!saveStat || saveCtx.stat.toLowerCase() === saveStat.toLowerCase()) {
           const profBonus = Math.floor((character.level - 1) / 4) + 2;
           saveCtx.extraModifier += profBonus;
+        }
+        return ctx;
+      },
+    },
+    {
+      kind: 'diamond-soul',
+      reduce: (ctx, _payload, character) => {
+        const saveCtx = ctx as unknown as SaveRollContext;
+        const classDef = getClassDef(character.class);
+        const isProficient = classDef?.savingThrowProfs.includes(saveCtx.stat as SaveStat);
+        if (!isProficient) {
+          saveCtx.extraModifier += getProficiencyBonus(character);
         }
         return ctx;
       },
@@ -349,6 +401,28 @@ const HOOK_REGISTRY: Record<HookName, ReducerEntry[]> = {
         const rank = character.skills?.[skillCtx.skillName] || 0;
         if (rank > 1) {
           skillCtx.skillBonus += getProficiencyBonus(character);
+        }
+        return ctx;
+      },
+    },
+    {
+      kind: 'jack-of-all-trades',
+      reduce: (ctx, _payload, character) => {
+        const skillCtx = ctx as unknown as SkillCheckContext;
+        const rank = character.skills?.[skillCtx.skillName] || 0;
+        if (rank === 0) {
+          skillCtx.skillBonus += Math.floor(getProficiencyBonus(character) / 2);
+        }
+        return ctx;
+      },
+    },
+    {
+      kind: 'reliable-talent',
+      reduce: (ctx, _payload, character) => {
+        const skillCtx = ctx as unknown as SkillCheckContext;
+        const rank = character.skills?.[skillCtx.skillName] || 0;
+        if (rank > 0 && skillCtx.roll < 10) {
+          skillCtx.roll = 10;
         }
         return ctx;
       },
