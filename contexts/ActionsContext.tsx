@@ -19,6 +19,7 @@ interface ActionsContextValue {
   handleResolveEnemyTurn: () => Promise<void>;
   resetContextState: () => void;
   handleArcaneRecovery: (characterId: string, selections: Array<{ level: number; count: number }>) => Promise<boolean>;
+  handleNaturalRecovery: (characterId: string, selections: Array<{ level: number; count: number }>) => Promise<boolean>;
   handleManageSpellbook: (
     characterId: string,
     action: 'learn' | 'prepare' | 'unprepare' | 'forget' | 'finish_prep',

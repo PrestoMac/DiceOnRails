@@ -20,6 +20,10 @@ vi.mock('../../utils/feats', () => ({
   getFeatById: vi.fn(),
 }));
 
+vi.mock('../../utils/random', () => ({
+  cryptoRoll: vi.fn(),
+}));
+
 function makeChar(overrides: Partial<Character> = {}): Character {
   return {
     id: 'test-char',
@@ -183,8 +187,9 @@ describe('applyEffects — onDamageTaken', () => {
 });
 
 describe('applyEffects — onAttackRoll', () => {
-  it('rerolls natural 1s for Halfling Lucky', () => {
-    const mathSpy = vi.spyOn(Math, 'random').mockReturnValue(0.9); // reroll -> 19
+  it('rerolls natural 1s for Halfling Lucky', async () => {
+    const { cryptoRoll } = await import('../../utils/random');
+    vi.mocked(cryptoRoll).mockReturnValue(19); // reroll -> 19
     vi.mocked(getRaceDef).mockReturnValue({
       id: 'halfling',
       name: 'Halfling',
@@ -213,13 +218,13 @@ describe('applyEffects — onAttackRoll', () => {
     };
     const result = applyEffects(char, 'onAttackRoll', ctx);
     expect(result.roll).not.toBe(1);
-    mathSpy.mockRestore();
   });
 });
 
 describe('applyEffects — onSaveRoll', () => {
-  it('rerolls natural 1s on saving throws for Halfling Lucky', () => {
-    const mathSpy = vi.spyOn(Math, 'random').mockReturnValue(0.9); // reroll -> 19
+  it('rerolls natural 1s on saving throws for Halfling Lucky', async () => {
+    const { cryptoRoll } = await import('../../utils/random');
+    vi.mocked(cryptoRoll).mockReturnValue(19); // reroll -> 19
     vi.mocked(getRaceDef).mockReturnValue({
       id: 'halfling',
       name: 'Halfling',
@@ -248,6 +253,5 @@ describe('applyEffects — onSaveRoll', () => {
     };
     const result = applyEffects(char, 'onSaveRoll', ctx);
     expect(result.roll).not.toBe(1);
-    mathSpy.mockRestore();
   });
 });

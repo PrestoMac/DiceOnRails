@@ -904,6 +904,24 @@ export const useGameActions = (
       }
     };
 
+    const handleNaturalRecovery = async (characterId: string, selections: Array<{ level: number; count: number }>): Promise<boolean> => {
+      if (!characterId || selections.length === 0) return false;
+      try {
+        const result = await mcpServer.natural_recovery(characterId, selections);
+        if (result.success) {
+          syncState();
+          const cleanedMsgs = messagesRef.current.filter(m => m.text !== `[System] ${result.message}`);
+          storageService.syncCampaignState(currentCampaignId, mcpServer.getFullState(), cleanedMsgs).catch((e: unknown) => console.warn('[Sync] failed:', e));
+          return true;
+        }
+        console.warn('[Natural Recovery] failed:', result.message);
+        return false;
+      } catch (err) {
+        console.error('[Natural Recovery] error:', err instanceof Error ? err.message : String(err));
+        return false;
+      }
+    };
+
     /** UI-direct spellbook management (bypasses the LLM agent loop). Mirrors
      *  handleArcaneRecovery. Used by SpellbookModal for prepared casters. */
     const handleManageSpellbook = async (
@@ -952,5 +970,5 @@ export const useGameActions = (
       }
     };
 
-    return { handleSendMessage, handleProcessBatch, handleRemovePendingMessage, handleCharacterCreated, handleUndo, handleRewind, resetContextState, handleArcaneRecovery, handleManageSpellbook, handleSwapKnownSpell };
+    return { handleSendMessage, handleProcessBatch, handleRemovePendingMessage, handleCharacterCreated, handleUndo, handleRewind, resetContextState, handleArcaneRecovery, handleNaturalRecovery, handleManageSpellbook, handleSwapKnownSpell };
 };

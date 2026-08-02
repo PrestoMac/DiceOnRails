@@ -113,13 +113,11 @@ describe('savesTools', () => {
     it('Halfling Lucky rerolls a natural-1 saving throw', async () => {
       // Halfling Lucky: natural 1 on a save is rerolled. make_save rolls before
       // applying onSaveRoll effects so the reroll-ones reducer sees the d20.
-      vi.spyOn(Math, 'random').mockReturnValue(0.95); // reroll -> 20
-      mockRoll(1); // initial natural 1
+      mockRollSequence(1, 20); // initial natural 1, reroll -> 20
       server.joinParty(makeCharacter({ race: 'halfling', racialTraits: ['lucky'] }));
       const result = await server.make_save('Valerius', 'dex', 10);
       expect(result.data.success).toBe(true); // 20 + DEX mod >= 10
       expect(result.data.roll).not.toBe(1);
-      vi.restoreAllMocks();
     });
 
     it('Gnome Cunning grants advantage on spell-originated WIS save vs magic', async () => {

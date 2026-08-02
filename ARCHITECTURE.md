@@ -558,7 +558,7 @@ The math layer behind `mcp/combatService.ts`. `addEnemyToCombat` auto-fills stat
 - `indomitable` — Fighter: save reroll flag
 - `divine-sense` — Paladin: celestial/fiend/undead detection
 - `arcane-recovery` — Wizard: max spell level recovery info
-- `natural-recovery` — Druid: max spell level recovery info (actual slot recovery via `travelService.natural_recovery()`)
+- `natural-recovery` — Druid (Circle of the Land): max spell level recovery info (actual slot recovery via the `NaturalRecoveryModal` UI path → `travelService.natural_recovery()`)
 - `relentless-endurance` — Half-Orc: drop to 1 HP instead of 0
 
 ### `spellcastingEngine.ts`
@@ -786,6 +786,7 @@ Differences:
 | `DiceRollModal` | Big animated dice popup for skill checks / attacks. |
 | `LevelUpModal` | Allocates stat points, picks ASI vs. Feat, picks subclass features. |
 | `ArcaneRecoveryModal` | Wizard-only modal for choosing which spell slots to recover via Arcane Recovery (once per long rest). Opens from InputArea. |
+| `NaturalRecoveryModal` | Circle of the Land Druid-only modal for choosing which spell slots to recover via Natural Recovery (once per long rest). Clone of `ArcaneRecoveryModal`. Opens from InputArea. |
 | `SpellbookModal` | Caster spell management with class archetype badges (`Prepared (Spellbook)`, `Prepared (Full List)`, `Known Spontaneous`), dynamic rule banners, and tooltip guidance. Prepared casters (including Wizards) use a consolidated 1-section master list layout with 1-click toggle buttons (`[ ✓ Prepared ]` / `[ + Prepare ]`), with prepared spells sorted to the top. Known casters use a 2-column Swap Tracker Grid ("Leveled Swap" and "Cantrip Swap") to swap spells per level-up (Tasha's rule) or long rest (2024 cantrip rule). Opens from CharacterSheet "Manage" button + InputArea Quick Action. Locked in combat. |
 
 
@@ -809,7 +810,7 @@ The story view. Notable features:
 ### `InputArea.tsx`
 
 The input box. Notable features:
-- **Quick Actions** — auto-generated from the character's prepared/known spells, equipped weapons, and class resources. Plus hardcoded Short Rest / Long Rest shortcuts, Arcane Recovery modal button (wizard only, once per long rest), and Manage Spells modal button (any caster, locked in combat).
+- **Quick Actions** — auto-generated from the character's prepared/known spells, equipped weapons, and class resources. Plus hardcoded Short Rest / Long Rest shortcuts, Arcane Recovery modal button (wizard only, once per long rest), Natural Recovery modal button (Circle of the Land druid only, once per long rest), and Manage Spells modal button (any caster, locked in combat).
 - **Voice input** via `webkitSpeechRecognition` (browser support gated).
 - **Pending-message send** (multiplayer only, `party.length > 1`): pressing Enter appends the USER message with `pending: true` instead of triggering the LLM. Pending messages render with a dashed amber border + "Pending" pill + owner-gated × delete. Any player presses "Take the Turn" (rendered in `ChatLog`) to flush all pending messages through one LLM turn via `handleProcessBatch`. The per-character tab bar and onboarding "Take the Turn" step are likewise gated on multiplayer; solo is byte-identical to before.
 - **Typing indicators** (`components/shared/TypingIndicator.tsx`) rendered above InputArea for syncable multiplayer campaigns — built on Supabase Presence (ephemeral, no DB writes).

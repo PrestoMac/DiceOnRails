@@ -6,6 +6,7 @@ import { CLASSES_BY_ID } from '../utils/classes';
 import { SKILLS_LIST } from '../constants';
 import Tooltip from './ui/Tooltip';
 import ArcaneRecoveryModal from './ArcaneRecoveryModal';
+import NaturalRecoveryModal from './NaturalRecoveryModal';
 import SpellbookModal from './SpellbookModal';
 
 interface QuickAction {
@@ -30,6 +31,7 @@ interface InputAreaProps {
   /** Optional typing-indicator onChange hook (used in multiplayer so other players see "is writing…"). */
   onInputChanged?: (value: string) => void;
   onArcaneRecovery?: (characterId: string, selections: Array<{ level: number; count: number }>) => void;
+  onNaturalRecovery?: (characterId: string, selections: Array<{ level: number; count: number }>) => void;
   /** Spellbook management for casters (prepare/unprepare + known-caster swaps). */
   onManageSpellbook?: (characterId: string, action: 'prepare' | 'unprepare' | 'learn' | 'forget' | 'finish_prep', spellId: string) => Promise<boolean>;
 
@@ -67,7 +69,7 @@ const QuickActionBtn: React.FC<{ action: QuickAction; locked: boolean; onClick: 
 );
 
 /** Chat input area with quick-action buttons (spells, weapons, features, rests), speech-to-text, and submit controls. */
-const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onResolveEnemyTurn, isLoading, combat, character, onInputChanged, onArcaneRecovery, onManageSpellbook, onSwapKnownSpell }) => {
+const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onResolveEnemyTurn, isLoading, combat, character, onInputChanged, onArcaneRecovery, onNaturalRecovery, onManageSpellbook, onSwapKnownSpell }) => {
   const [input, setInput] = useState('');
   const [isListening, setIsListening] = useState(false);
   // Ref mirror so the speech-recognition effect (mount-only deps) can read the
@@ -76,6 +78,7 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onResolveEnemyTurn
   onInputChangedRef.current = onInputChanged;
   const [recognition, setRecognition] = useState<{ continuous: boolean; interimResults: boolean; lang: string; onresult: (e: unknown) => void; onerror: (e: unknown) => void; onend: () => void; start: () => void; abort: () => void } | null>(null);
   const [showArcaneRecovery, setShowArcaneRecovery] = useState(false);
+  const [showNaturalRecovery, setShowNaturalRecovery] = useState(false);
   const [showSpellbook, setShowSpellbook] = useState(false);
   const isEnemyTurn = combat?.isActive && (combat.initiative[combat.turnIndex]?.type === 'enemy');
   const effectivelyLocked = isLoading || isEnemyTurn;
@@ -83,6 +86,13 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onResolveEnemyTurn
   const arcaneRecoveryAvailable = useMemo(() => {
     if (!character || character.class !== 'wizard') return false;
     const pool = character.resources?.find(r => r.id === 'arcane-recovery');
+    return pool ? pool.current > 0 : true;
+  }, [character]);
+
+  /** Natural Recovery (Circle of the Land Druid L2): recover spell slot levels on a short rest, once per long rest. */
+  const naturalRecoveryAvailable = useMemo(() => {
+    if (!character || character.class !== 'druid' || character.subclassId !== 'circle-of-the-land') return false;
+    const pool = character.resources?.find(r => r.id === 'natural-recovery');
     return pool ? pool.current > 0 : true;
   }, [character]);
 
@@ -287,6 +297,11 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onResolveEnemyTurn
               <QuickActionBtn action={{ id: 'arcane-recovery', label: 'Arcane Recovery', icon: 'fa-hat-wizard', fillText: '', category: 'feature' }} locked={effectivelyLocked} onClick={() => setShowArcaneRecovery(true)} extraTitle="Choose spell slots to recover" />
             </Tooltip>
           )}
+          {naturalRecoveryAvailable && onNaturalRecovery && (
+            <Tooltip content={`Natural Recovery: recover up to ${Math.ceil((character?.level ?? 1) / 2)} levels of spell slots on a short rest. Once per long rest.`} side="top">
+              <QuickActionBtn action={{ id: 'natural-recovery', label: 'Natural Recovery', icon: 'fa-leaf', fillText: '', category: 'feature' }} locked={effectivelyLocked} onClick={() => setShowNaturalRecovery(true)} extraTitle="Choose spell slots to recover" />
+            </Tooltip>
+          )}
           {spellbookAvailable && (
             <Tooltip content="Manage Spells: prepare/unprepare spells (prepared casters) or swap a known spell (known casters with a pending level-up swap). Locked in combat." side="top">
               <QuickActionBtn action={{ id: 'manage-spells', label: 'Manage Spells', icon: 'fa-book', fillText: '', category: 'feature' }} locked={effectivelyLocked} onClick={() => setShowSpellbook(true)} extraTitle="Open spellbook" />
@@ -349,6 +364,14 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, onResolveEnemyTurn
           isOpen={showArcaneRecovery}
           onClose={() => setShowArcaneRecovery(false)}
           onRecover={(selections) => onArcaneRecovery(character.id, selections)}
+        />
+      )}
+      {character && onNaturalRecovery && (
+        <NaturalRecoveryModal
+          character={character}
+          isOpen={showNaturalRecovery}
+          onClose={() => setShowNaturalRecovery(false)}
+          onRecover={(selections) => onNaturalRecovery(character.id, selections)}
         />
       )}
       {character && onManageSpellbook && (

@@ -50,7 +50,7 @@ const MobileLayout: React.FC = () => {
     setStage, resetGame, handleUpdateInventory, handleUpdateCharacterFields,
     syncState,
   } = useGameContext();
-  const { handleSendMessage, handleUndo, handleRewind, handleProcessBatch, handleRemovePendingMessage, handleResolveEnemyTurn, handleArcaneRecovery, handleManageSpellbook, handleSwapKnownSpell } = useActionsContext();
+  const { handleSendMessage, handleUndo, handleRewind, handleProcessBatch, handleRemovePendingMessage, handleResolveEnemyTurn, handleArcaneRecovery, handleNaturalRecovery, handleManageSpellbook, handleSwapKnownSpell } = useActionsContext();
   const {
     showLevelUpModal, levelUpCharacter, selectedAllocations, remainingPoints,
     previewHp, allocationError, handleOpenLevelUp, handleCloseLevelUp,
@@ -217,7 +217,7 @@ const MobileLayout: React.FC = () => {
           </button>
           {isMultiplayer && typingUsers.length > 0 && <div className="relative z-10 shrink-0"><TypingIndicator users={typingUsers} /></div>}
           {charToShow&&<div className="relative z-10 shrink-0"><HpStatusBar character={charToShow} /></div>}
-          <div className="relative z-10 shrink-0"><InputArea onSendMessage={handleSendMessage} onResolveEnemyTurn={handleResolveEnemyTurn} isLoading={isLoading||gameState.isProcessing===true} combat={gameState.combat} character={charToShow} onInputChanged={(v)=>setTyping(v.length>0)} onArcaneRecovery={(id, sel) => handleArcaneRecovery(id, sel)} onManageSpellbook={handleManageSpellbook} onSwapKnownSpell={handleSwapKnownSpell}/></div>
+          <div className="relative z-10 shrink-0"><InputArea onSendMessage={handleSendMessage} onResolveEnemyTurn={handleResolveEnemyTurn} isLoading={isLoading||gameState.isProcessing===true} combat={gameState.combat} character={charToShow} onInputChanged={(v)=>setTyping(v.length>0)} onArcaneRecovery={(id, sel) => handleArcaneRecovery(id, sel)} onNaturalRecovery={(id, sel) => handleNaturalRecovery(id, sel)} onManageSpellbook={handleManageSpellbook} onSwapKnownSpell={handleSwapKnownSpell}/></div>
         </>}
         {mobileTab==='character'&&<div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
           {isMultiplayer && <div className="flex gap-2 overflow-x-auto pb-2 mb-2">{gameState.party.map((char: Character) => <button key={char.id} onClick={() => setViewingCharacterId(char.id)} className={`p-2 rounded text-xs whitespace-nowrap ${viewingCharacterId===char.id?'bg-amber-700 text-white':'bg-stone-800 text-stone-400'}`}>{char.name}{char.id===myCharacterId?' (You)':''}</button>)}</div>}

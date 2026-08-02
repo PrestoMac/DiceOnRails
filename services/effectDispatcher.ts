@@ -1,6 +1,7 @@
 import { Character, EffectKind, SaveStat } from '../types';
 import { getClassDef, getRaceDef, getSubclassDef, meetsCondition, getProficiencyBonus } from './classEngine';
 import { getFeatById } from '../utils/feats';
+import { cryptoRoll } from '../utils/random';
 
 export type SourceKind = 'race' | 'class' | 'subclass' | 'feat';
 
@@ -213,7 +214,7 @@ const HOOK_REGISTRY: Record<HookName, ReducerEntry[]> = {
       reduce: (ctx) => {
         const atkCtx = ctx as unknown as AttackRollContext;
         if (atkCtx.roll === 1) {
-          atkCtx.roll = Math.floor(Math.random() * 20) + 1;
+          atkCtx.roll = cryptoRoll(20);
         }
         return ctx;
       },
@@ -255,7 +256,7 @@ const HOOK_REGISTRY: Record<HookName, ReducerEntry[]> = {
         if (diceMatch) {
           let sum = 0;
           for (let i = 0; i < parseInt(diceMatch[1]); i++) {
-            sum += Math.floor(Math.random() * parseInt(diceMatch[2])) + 1;
+            sum += cryptoRoll(parseInt(diceMatch[2]));
           }
           dmgCtx.damage += sum;
         } else {
@@ -334,7 +335,7 @@ const HOOK_REGISTRY: Record<HookName, ReducerEntry[]> = {
       reduce: (ctx) => {
         const saveCtx = ctx as unknown as SaveRollContext;
         if (saveCtx.roll === 1) {
-          saveCtx.roll = Math.floor(Math.random() * 20) + 1;
+          saveCtx.roll = cryptoRoll(20);
         }
         return ctx;
       },
@@ -401,7 +402,7 @@ const HOOK_REGISTRY: Record<HookName, ReducerEntry[]> = {
       reduce: (ctx) => {
         const skillCtx = ctx as unknown as SkillCheckContext;
         if (skillCtx.roll === 1) {
-          skillCtx.roll = Math.floor(Math.random() * 20) + 1;
+          skillCtx.roll = cryptoRoll(20);
         }
         return ctx;
       },

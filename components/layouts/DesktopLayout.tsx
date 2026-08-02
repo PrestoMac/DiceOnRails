@@ -33,7 +33,7 @@ const DesktopLayout: React.FC = () => {
     setStage, resetGame, handleUpdateInventory, handleUpdateCharacterFields,
     syncState,
   } = useGameContext();
-  const { handleSendMessage, handleUndo, handleRewind, handleProcessBatch, handleRemovePendingMessage, handleResolveEnemyTurn, handleArcaneRecovery, handleManageSpellbook, handleSwapKnownSpell } = useActionsContext();
+  const { handleSendMessage, handleUndo, handleRewind, handleProcessBatch, handleRemovePendingMessage, handleResolveEnemyTurn, handleArcaneRecovery, handleNaturalRecovery, handleManageSpellbook, handleSwapKnownSpell } = useActionsContext();
   const {
     showLevelUpModal, levelUpCharacter, selectedAllocations, remainingPoints,
     previewHp, allocationError, handleOpenLevelUp, handleCloseLevelUp,
@@ -286,7 +286,7 @@ const DesktopLayout: React.FC = () => {
         </div>
       )}
       <div className="relative z-10 shrink-0">
-        <InputArea onSendMessage={handleSendMessage} onResolveEnemyTurn={handleResolveEnemyTurn} isLoading={isLoading || gameState.isProcessing} combat={gameState.combat} character={charToShow} onInputChanged={(v) => setTyping(v.length > 0)} onArcaneRecovery={(id, sel) => handleArcaneRecovery(id, sel)} onManageSpellbook={handleManageSpellbook} onSwapKnownSpell={handleSwapKnownSpell} />
+        <InputArea onSendMessage={handleSendMessage} onResolveEnemyTurn={handleResolveEnemyTurn} isLoading={isLoading || gameState.isProcessing} combat={gameState.combat} character={charToShow} onInputChanged={(v) => setTyping(v.length > 0)} onArcaneRecovery={(id, sel) => handleArcaneRecovery(id, sel)} onNaturalRecovery={(id, sel) => handleNaturalRecovery(id, sel)} onManageSpellbook={handleManageSpellbook} onSwapKnownSpell={handleSwapKnownSpell} />
       </div>
     </main>
     {isAtmosphereExpanded && myAtmosphereUrl && <div className="fixed inset-0 z-[110] bg-black/95 backdrop-blur-2xl flex flex-col items-center justify-center p-4 md:p-12 animate-in fade-in zoom-in-95 duration-300" onClick={() => setIsAtmosphereExpanded(false)}>
