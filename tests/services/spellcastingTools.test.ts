@@ -978,4 +978,73 @@ describe('spell correctness fixes (S3/S6/S7 + Fey Ancestry)', () => {
     expect(r.data?.success).toBe(false); // single roll 5 + WIS(1) = 6 < 14
     expect(r.message).not.toContain('Fey Ancestry');
   });
+
+  it('Disciple of Life adds 2 + spell level to healing spells', async () => {
+    // Life Domain Cleric L1: healing spells restore an extra 2 + slot level HP.
+    // cure-wounds at slot level 1: 1d8 + WIS(3) + Disciple(2+1=3) = 1d8 + 6
+    const cleric = makeCleric({
+      subclassId: 'life-domain',
+      hp: { current: 10, max: 22 }, // damaged so healing has room
+      preparedSpells: ['cure-wounds', 'bless', 'healing-word', 'shield-of-faith'],
+    });
+    server.joinParty(cleric);
+    vi.mocked(cryptoRoll).mockReturnValue(5); // 1d8 = 5
+
+    const r = await server.cast_spell('cleric-1', 'cure-wounds', 1, ['cleric-1']);
+    expect(r.success).toBe(true);
+    const updated = server.getTarget('cleric-1') as Character;
+    // cure-wounds: 1d8(5) + WIS(3) + Disciple(2+1=3) = 11 healed
+    expect(updated.hp.current).toBe(10 + 11); // started at 10
+  });
+
+  it('Disciple of Life scales with upcast slot level', async () => {
+    // cure-wounds at slot level 2: 2d8 + WIS(3) + Disciple(2+2=4) per target
+    const cleric = makeCleric({
+      subclassId: 'life-domain',
+      level: 3,
+      hp: { current: 10, max: 28 }, // damaged so healing has room
+      preparedSpells: ['cure-wounds', 'bless', 'healing-word', 'shield-of-faith'],
+    });
+    server.joinParty(cleric);
+    vi.mocked(cryptoRoll).mockReturnValue(4); // each d8 = 4, so 2d8 = 8
+
+    const r = await server.cast_spell('cleric-1', 'cure-wounds', 2, ['cleric-1']);
+    expect(r.success).toBe(true);
+    const updated = server.getTarget('cleric-1') as Character;
+    // 2d8(4+4=8) + WIS(3) + Disciple(2+2=4) = 15 healed
+    expect(updated.hp.current).toBe(10 + 15);
+  });
+
+  it('Agonizing Blast adds CHA mod to each Eldritch Blast beam', async () => {
+    // Warlock with Agonizing Blast invocation: each beam of eldritch blast adds CHA mod.
+    const warlock = makeCharacter({
+      id: 'warlock-1',
+      name: 'Warlock',
+      class: 'warlock',
+      level: 5,
+      stats: { str: 8, dex: 14, con: 12, int: 10, wis: 10, cha: 16 },
+      invocations: ['agonizing-blast'],
+      knownSpells: ['eldritch-blast'],
+      preparedSpells: ['eldritch-blast'],
+      resources: [
+        { id: 'pactMagic', name: 'Pact Magic', current: 2, max: 2, resetOn: 'short', source: 'class', sourceId: 'warlock' },
+      ],
+    });
+    server.joinParty(warlock);
+    await server.add_enemy('Goblin', 10, 20);
+    await server.start_combat();
+    const enemyId = firstEnemyId(server);
+    // At L5, eldritch blast fires 2 beams. Each beam: 1d10 + CHA(3).
+    // Mock: attack roll 20 (hit), damage 8; attack roll 20 (hit), damage 6.
+    vi.mocked(cryptoRoll)
+      .mockReturnValueOnce(20).mockReturnValueOnce(8)
+      .mockReturnValueOnce(20).mockReturnValueOnce(6);
+
+    const r = await server.cast_spell('warlock-1', 'eldritch-blast', 1, [enemyId]);
+    expect(r.success).toBe(true);
+    const stateAfter = server.getFullState();
+    const damageDealt = 20 - stateAfter.combat.enemies[0].hp.current;
+    // Beam 1: 8 + 3 = 11, Beam 2: 6 + 3 = 9. Total = 20
+    expect(damageDealt).toBe(20);
+  });
 });

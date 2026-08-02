@@ -147,6 +147,88 @@ describe('savesTools', () => {
       expect(result.message).not.toContain('Gnome Cunning');
     });
 
+    it('Aura of Protection adds Paladin CHA mod to a party member save', async () => {
+      // Aura of Protection: conscious Paladin L6+ adds CHA mod (min +1) to all party saves.
+      // We set up a Paladin with CHA 16 (+3 mod) and a second party member making the save.
+      mockRoll(10);
+      server.joinParty(makeCharacter({
+        id: 'paladin-1',
+        name: 'Paladin',
+        class: 'paladin',
+        level: 6,
+        stats: { str: 16, dex: 10, con: 14, int: 8, wis: 12, cha: 16 },
+        subclassId: 'devotion',
+      }));
+      server.joinParty(makeCharacter({
+        id: 'fighter-1',
+        name: 'Fighter',
+        class: 'fighter',
+        level: 1,
+        stats: { str: 16, dex: 10, con: 14, int: 8, wis: 10, cha: 8 },
+      }));
+      const result = await server.make_save('Fighter', 'dex', 12);
+      // Roll 10 + DEX mod 0 + Aura bonus 3 (CHA +3) = 13 >= 12 -> success
+      expect(result.data.success).toBe(true);
+      expect(result.message).toContain('Aura of Protection');
+    });
+
+    it('Aura of Protection uses the highest CHA mod among multiple Paladins', async () => {
+      // When multiple Paladins have the aura, only the highest CHA mod applies.
+      mockRoll(10);
+      server.joinParty(makeCharacter({
+        id: 'paladin-low',
+        name: 'PaladinLow',
+        class: 'paladin',
+        level: 6,
+        stats: { str: 16, dex: 10, con: 14, int: 8, wis: 12, cha: 14 }, // +2 mod
+        subclassId: 'devotion',
+      }));
+      server.joinParty(makeCharacter({
+        id: 'paladin-high',
+        name: 'PaladinHigh',
+        class: 'paladin',
+        level: 6,
+        stats: { str: 16, dex: 10, con: 14, int: 8, wis: 12, cha: 18 }, // +4 mod
+        subclassId: 'devotion',
+      }));
+      server.joinParty(makeCharacter({
+        id: 'fighter-1',
+        name: 'Fighter',
+        class: 'fighter',
+        level: 1,
+        stats: { str: 16, dex: 10, con: 14, int: 8, wis: 10, cha: 8 },
+      }));
+      const result = await server.make_save('Fighter', 'dex', 14);
+      // Roll 10 + DEX mod 0 + Aura bonus 4 (highest CHA +4) = 14 >= 14 -> success
+      expect(result.data.success).toBe(true);
+      expect(result.message).toContain('+4');
+    });
+
+    it('Aura of Protection does NOT apply when the Paladin is unconscious', async () => {
+      // An unconscious (0 HP) Paladin cannot project their aura.
+      mockRoll(10);
+      server.joinParty(makeCharacter({
+        id: 'paladin-1',
+        name: 'Paladin',
+        class: 'paladin',
+        level: 6,
+        hp: { current: 0, max: 40 },
+        stats: { str: 16, dex: 10, con: 14, int: 8, wis: 12, cha: 16 },
+        subclassId: 'devotion',
+      }));
+      server.joinParty(makeCharacter({
+        id: 'fighter-1',
+        name: 'Fighter',
+        class: 'fighter',
+        level: 1,
+        stats: { str: 16, dex: 10, con: 14, int: 8, wis: 10, cha: 8 },
+      }));
+      const result = await server.make_save('Fighter', 'dex', 12);
+      // Roll 10 + DEX mod 0 + no aura = 10 < 12 -> fail
+      expect(result.data.success).toBe(false);
+      expect(result.message).not.toContain('Aura of Protection');
+    });
+
     it('enemy target uses fallback stats', async () => {
       mockRoll(15);
       await server.add_enemy('Goblin');

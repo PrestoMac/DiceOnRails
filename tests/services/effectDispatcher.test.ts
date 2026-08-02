@@ -5,8 +5,9 @@ import {
   DamageTakenContext,
   AttackRollContext,
   SaveRollContext,
+  SkillCheckContext,
 } from '../../services/effectDispatcher';
-import { getClassDef, getRaceDef, getSubclassDef } from '../../services/classEngine';
+import { getClassDef, getRaceDef, getSubclassDef, getProficiencyBonus } from '../../services/classEngine';
 import { getFeatById } from '../../utils/feats';
 import { Character } from '../../types';
 
@@ -14,6 +15,7 @@ vi.mock('../../services/classEngine', () => ({
   getClassDef: vi.fn(),
   getRaceDef: vi.fn(),
   getSubclassDef: vi.fn(),
+  getProficiencyBonus: vi.fn(),
 }));
 
 vi.mock('../../utils/feats', () => ({
@@ -254,5 +256,189 @@ describe('applyEffects — onSaveRoll', () => {
     };
     const result = applyEffects(char, 'onSaveRoll', ctx);
     expect(result.roll).not.toBe(1);
+  });
+});
+
+describe('applyEffects — onSkillCheck', () => {
+  it('Jack of All Trades adds half proficiency to non-proficient skills', () => {
+    vi.mocked(getRaceDef).mockReturnValue(undefined);
+    vi.mocked(getClassDef).mockReturnValue({
+      id: 'bard', name: 'Bard', hitDie: 8, hpBase: 8, hpPerLevel: 6,
+      primaryStat: 'cha', savingThrowProfs: ['dex', 'cha'], armorProfs: ['light'],
+      weaponProfs: { simple: true, martial: false },
+      skillChoices: { count: 3, from: ['performance'] },
+      startingEquipment: [], recommendedStats: { str: 8, dex: 14, con: 12, int: 10, wis: 10, cha: 16 },
+      statPriority: ['cha', 'dex', 'con', 'int', 'wis', 'str'],
+      features: [
+        { id: 'jack-of-all-trades', name: 'Jack of All Trades', description: '', level: 2, kind: 'passive', effect: { kind: 'jack-of-all-trades' } },
+      ],
+      subclasses: [], subclassLevel: 3, icon: '', description: '', flavor: '',
+    });
+    vi.mocked(getSubclassDef).mockReturnValue(undefined);
+    vi.mocked(getProficiencyBonus).mockReturnValue(2); // L2 proficiency bonus
+
+    // Bard L2 with no skill ranks in athletics (rank 0 = non-proficient)
+    const char = makeChar({ class: 'bard', level: 2, skills: { athletics: 0 } });
+    const ctx: SkillCheckContext = {
+      _hook: 'onSkillCheck',
+      roll: 10,
+      skillName: 'athletics',
+      skillBonus: 0,
+      character: char,
+    };
+    const result = applyEffects(char, 'onSkillCheck', ctx);
+    // Proficiency bonus at L2 is +2, half = +1
+    expect(result.skillBonus).toBe(1);
+  });
+
+  it('Jack of All Trades does NOT add bonus to proficient skills', () => {
+    vi.mocked(getRaceDef).mockReturnValue(undefined);
+    vi.mocked(getClassDef).mockReturnValue({
+      id: 'bard', name: 'Bard', hitDie: 8, hpBase: 8, hpPerLevel: 6,
+      primaryStat: 'cha', savingThrowProfs: ['dex', 'cha'], armorProfs: ['light'],
+      weaponProfs: { simple: true, martial: false },
+      skillChoices: { count: 3, from: ['performance'] },
+      startingEquipment: [], recommendedStats: { str: 8, dex: 14, con: 12, int: 10, wis: 10, cha: 16 },
+      statPriority: ['cha', 'dex', 'con', 'int', 'wis', 'str'],
+      features: [
+        { id: 'jack-of-all-trades', name: 'Jack of All Trades', description: '', level: 2, kind: 'passive', effect: { kind: 'jack-of-all-trades' } },
+      ],
+      subclasses: [], subclassLevel: 3, icon: '', description: '', flavor: '',
+    });
+    vi.mocked(getSubclassDef).mockReturnValue(undefined);
+
+    // Bard L2 with Athletics rank 1 (proficient) — note: skill keys are lowercase
+    const char = makeChar({ class: 'bard', level: 2, skills: { athletics: 1 } });
+    const ctx: SkillCheckContext = {
+      _hook: 'onSkillCheck',
+      roll: 10,
+      skillName: 'athletics',
+      skillBonus: 2,
+      character: char,
+    };
+    const result = applyEffects(char, 'onSkillCheck', ctx);
+    expect(result.skillBonus).toBe(2); // unchanged
+  });
+
+  it('Reliable Talent floors proficient skill rolls at 10', () => {
+    vi.mocked(getRaceDef).mockReturnValue(undefined);
+    vi.mocked(getClassDef).mockReturnValue({
+      id: 'rogue', name: 'Rogue', hitDie: 8, hpBase: 8, hpPerLevel: 6,
+      primaryStat: 'dex', savingThrowProfs: ['dex', 'int'], armorProfs: ['light'],
+      weaponProfs: { simple: true, martial: true },
+      skillChoices: { count: 4, from: ['stealth'] },
+      startingEquipment: [], recommendedStats: { str: 8, dex: 16, con: 14, int: 10, wis: 12, cha: 10 },
+      statPriority: ['dex', 'con', 'int', 'wis', 'cha', 'str'],
+      features: [
+        { id: 'reliable-talent', name: 'Reliable Talent', description: '', level: 11, kind: 'passive', effect: { kind: 'reliable-talent' } },
+      ],
+      subclasses: [], subclassLevel: 3, icon: '', description: '', flavor: '',
+    });
+    vi.mocked(getSubclassDef).mockReturnValue(undefined);
+
+    // Rogue L11 with stealth rank 1 (proficient), rolls a 5
+    const char = makeChar({ class: 'rogue', level: 11, skills: { stealth: 1 } });
+    const ctx: SkillCheckContext = {
+      _hook: 'onSkillCheck',
+      roll: 5,
+      skillName: 'stealth',
+      skillBonus: 4,
+      character: char,
+    };
+    const result = applyEffects(char, 'onSkillCheck', ctx);
+    expect(result.roll).toBe(10);
+  });
+
+  it('Reliable Talent does NOT floor non-proficient skill rolls', () => {
+    vi.mocked(getRaceDef).mockReturnValue(undefined);
+    vi.mocked(getClassDef).mockReturnValue({
+      id: 'rogue', name: 'Rogue', hitDie: 8, hpBase: 8, hpPerLevel: 6,
+      primaryStat: 'dex', savingThrowProfs: ['dex', 'int'], armorProfs: ['light'],
+      weaponProfs: { simple: true, martial: true },
+      skillChoices: { count: 4, from: ['stealth'] },
+      startingEquipment: [], recommendedStats: { str: 8, dex: 16, con: 14, int: 10, wis: 12, cha: 10 },
+      statPriority: ['dex', 'con', 'int', 'wis', 'cha', 'str'],
+      features: [
+        { id: 'reliable-talent', name: 'Reliable Talent', description: '', level: 11, kind: 'passive', effect: { kind: 'reliable-talent' } },
+      ],
+      subclasses: [], subclassLevel: 3, icon: '', description: '', flavor: '',
+    });
+    vi.mocked(getSubclassDef).mockReturnValue(undefined);
+
+    // Rogue L11 with no athletics rank (non-proficient), rolls a 5
+    const char = makeChar({ class: 'rogue', level: 11, skills: { athletics: 0 } });
+    const ctx: SkillCheckContext = {
+      _hook: 'onSkillCheck',
+      roll: 5,
+      skillName: 'athletics',
+      skillBonus: 0,
+      character: char,
+    };
+    const result = applyEffects(char, 'onSkillCheck', ctx);
+    expect(result.roll).toBe(5); // unchanged
+  });
+});
+
+describe('applyEffects — onSaveRoll (Diamond Soul)', () => {
+  it('Diamond Soul adds proficiency bonus to non-proficient saves', () => {
+    vi.mocked(getRaceDef).mockReturnValue(undefined);
+    vi.mocked(getClassDef).mockReturnValue({
+      id: 'monk', name: 'Monk', hitDie: 8, hpBase: 8, hpPerLevel: 6,
+      primaryStat: 'dex', savingThrowProfs: ['str', 'dex'], armorProfs: ['none'],
+      weaponProfs: { simple: true, martial: true },
+      skillChoices: { count: 2, from: ['acrobatics'] },
+      startingEquipment: [], recommendedStats: { str: 10, dex: 16, con: 14, int: 10, wis: 16, cha: 8 },
+      statPriority: ['dex', 'wis', 'con', 'int', 'cha', 'str'],
+      features: [
+        { id: 'diamond-soul', name: 'Diamond Soul', description: '', level: 14, kind: 'passive', effect: { kind: 'diamond-soul' } },
+      ],
+      subclasses: [], subclassLevel: 3, icon: '', description: '', flavor: '',
+    });
+    vi.mocked(getSubclassDef).mockReturnValue(undefined);
+    vi.mocked(getProficiencyBonus).mockReturnValue(5); // L14 proficiency bonus
+
+    // Monk L14 — proficient in STR/DEX saves, NOT WIS
+    const char = makeChar({ class: 'monk', level: 14 });
+    const ctx: SaveRollContext = {
+      _hook: 'onSaveRoll',
+      roll: 10,
+      stat: 'wis',
+      character: char,
+      hasAdvantage: false,
+      extraModifier: 0,
+    };
+    const result = applyEffects(char, 'onSaveRoll', ctx);
+    // Proficiency bonus at L14 is +5
+    expect(result.extraModifier).toBe(5);
+  });
+
+  it('Diamond Soul does NOT add proficiency to already-proficient saves', () => {
+    vi.mocked(getRaceDef).mockReturnValue(undefined);
+    vi.mocked(getClassDef).mockReturnValue({
+      id: 'monk', name: 'Monk', hitDie: 8, hpBase: 8, hpPerLevel: 6,
+      primaryStat: 'dex', savingThrowProfs: ['str', 'dex'], armorProfs: ['none'],
+      weaponProfs: { simple: true, martial: true },
+      skillChoices: { count: 2, from: ['acrobatics'] },
+      startingEquipment: [], recommendedStats: { str: 10, dex: 16, con: 14, int: 10, wis: 16, cha: 8 },
+      statPriority: ['dex', 'wis', 'con', 'int', 'cha', 'str'],
+      features: [
+        { id: 'diamond-soul', name: 'Diamond Soul', description: '', level: 14, kind: 'passive', effect: { kind: 'diamond-soul' } },
+      ],
+      subclasses: [], subclassLevel: 3, icon: '', description: '', flavor: '',
+    });
+    vi.mocked(getSubclassDef).mockReturnValue(undefined);
+    vi.mocked(getProficiencyBonus).mockReturnValue(5); // L14 proficiency bonus
+
+    const char = makeChar({ class: 'monk', level: 14 });
+    const ctx: SaveRollContext = {
+      _hook: 'onSaveRoll',
+      roll: 10,
+      stat: 'dex', // Monk IS proficient in DEX saves
+      character: char,
+      hasAdvantage: false,
+      extraModifier: 0,
+    };
+    const result = applyEffects(char, 'onSaveRoll', ctx);
+    expect(result.extraModifier).toBe(0);
   });
 });

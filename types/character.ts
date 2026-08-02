@@ -289,7 +289,6 @@ export interface Character {
   draconicDamageType?: DamageType;
   subraceId?: string;
   invocations?: string[];
-  pactBoon?: string;
   halfElfStatChoices?: ('str'|'dex'|'con'|'int'|'wis'|'cha')[];
   backstory?: string;
   /** Background & persona — SRD 5.1 narrative fields (no mechanical effects).
