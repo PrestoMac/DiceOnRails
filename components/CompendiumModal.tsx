@@ -70,6 +70,11 @@ const CompendiumModal: React.FC<CompendiumModalProps> = ({ isOpen, onClose }) =>
           {tab === 'spells' && <SpellsTab />}
           {tab === 'items' && <ItemsTab />}
         </div>
+        <div className="px-4 py-2 border-t border-stone-800">
+          <p className="text-[10px] leading-relaxed text-stone-600">
+            Rules content derived from the System Reference Document 5.1 (Wizards of the Coast), licensed under the Creative Commons Attribution 4.0 International License.
+          </p>
+        </div>
       </div>
     </div>
   );

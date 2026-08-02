@@ -354,6 +354,11 @@ Binary dice tools (`check_skill`, `make_save`) support **branch finalization** v
 - **Dice roll auto-trigger** (`ChatLog.tsx`): a `useEffect` watches for newly-arrived messages (by ID) that carry `rollData` and calls `onTriggerDiceRoll(buildReplayData(roll))` for each, with 4 s staggered delays to prevent modal overlap. A `mounted` ref skips initial-load messages so campaign hydration doesn't trigger animations. Runs on every client — local and remote via Supabase realtime — so all players see the dice roll modal popup, not just the one that submitted the turn. `DiceRollCard` remains clickable for manual replay.
 - **`formatToolResult`** (`narration.ts:58-83`): produces a slim per-tool JSON for the LLM context (the `tool` messages fed to each subsequent iteration). This is the single source of truth for what the LLM sees; the full `data` blob is never sent back.
 
+## IP & Licensing policy
+- Content catalogs (`data/`) must stay **within SRD 5.1** — the only licensed content source (OGL 1.0a / CC-BY 4.0; compliance via CC-BY 4.0). PHB-only or other WotC-copyrighted content must NOT be added verbatim; re-express mechanics in original wording and avoid PHB-only names (e.g. the `shield-master`/`heavily-armored`/`healer` feats were re-expressed as "Shield Discipline"/"Bulwark Training"/"Field Medic" — ids and mechanics unchanged).
+- Attribution lives in `NOTICE.md` + `README.md` (License) + `LICENSE-CC-BY-4.0.md` (full license text) + the CompendiumModal footer. Keep these in sync when content sources change.
+- Internal feat/race/class **ids are not copyrightable** (functional slugs) and are persisted in saves — never rename them casually; prefer rewriting display names + descriptions only.
+
 ## Environment
 - Required: `VITE_LLM_API_KEY`. Others optional. See `.env.example`.
 - Default LLM model: `deepseek/deepseek-v4-flash`. Default summarizer: `xiaomi/mimo-v2.5`.

@@ -73,11 +73,11 @@ export const FEATS_CATALOG: FeatDefinition[] = [
   },
   {
     id: 'shield-master',
-    name: 'Shield Master',
+    name: 'Shield Discipline',
     category: 'combat',
-    shortName: 'Shield Master',
+    shortName: 'Shield Disc.',
     icon: 'fa-shield-halved',
-    description: 'If you take the Attack action on your turn, you can use a bonus action to try to shove a creature within 5 feet of you with your shield. You add your shield\'s AC bonus to any Dexterity saving throw you make against a spell or other harmful effect.',
+    description: 'You fight with a shield as a weapon, not just a wall. When you take the Attack action, you can spend your bonus action to shove a creature within 5 feet using your shield. While holding a shield, you add its armor bonus to Dexterity saving throws against spells and other harmful effects.',
     mechanicalEffect: 'Add shield AC bonus (+2) to Dexterity saving throws.',
     effectType: 'modifier',
     effect: { kind: 'shield-bonus-to-save', payload: { saveStat: 'dex', bonus: 2 } }
@@ -274,11 +274,11 @@ export const FEATS_CATALOG: FeatDefinition[] = [
   },
   {
     id: 'heavily-armored',
-    name: 'Heavily Armored',
+    name: 'Bulwark Training',
     category: 'armor',
-    shortName: 'Heavy Armor',
+    shortName: 'Bulwark',
     icon: 'fa-shield',
-    description: 'You have trained to master the use of heavy armor, gaining the following benefits: increase your Strength score by 1, to a maximum of 20. You gain proficiency with heavy armor.',
+    description: 'Endless drill in the heaviest plating has made bulky armor feel like a second skin. Your Strength increases by 1, to a maximum of 20, and you gain proficiency with heavy armor.',
     mechanicalEffect: 'Gain heavy armor proficiency. The +1 ASI is applied separately.',
     effectType: 'flag',
     effect: { kind: 'armor-proficiency', payload: { prof: 'heavy' } },
@@ -348,11 +348,11 @@ export const FEATS_CATALOG: FeatDefinition[] = [
   },
   {
     id: 'healer',
-    name: 'Healer',
+    name: 'Field Medic',
     category: 'flavor',
-    shortName: 'Healer',
+    shortName: 'Field Medic',
     icon: 'fa-briefcase-medical',
-    description: 'You are an able physician, allowing you to mend wounds quickly and get your allies back in the fight. You gain the following benefits: when you use a healer\'s kit to stabilize a dying creature, that creature also regains 1 hit point. As an action, you can spend one use of a healer\'s kit to tend to a creature and restore 1d6 + 4 hit points to that creature.',
+    description: 'You have a surgeon\'s steady hands and keep your kit ready for the worst moments. When you use a healer\'s kit to stabilize a dying ally, that ally also regains 1 hit point. As an action, you can expend one use of a healer\'s kit to tend a creature and restore 1d6 + 4 hit points to it.',
     mechanicalEffect: 'Flavor feat — the LLM narrates healer\'s kit bonuses.',
     effectType: 'flavor'
   }

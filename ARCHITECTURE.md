@@ -888,6 +888,8 @@ These same catalogs are re-exported via `utils/classes.ts`, `utils/races.ts`, `u
 
 The `data/constants.ts` file is re-exported via the top-level `constants.ts`, which also defines `SYSTEM_INSTRUCTION`, `PROGRESSION_SYSTEM_PROMPT`, and `INITIAL_CHARACTER` (a frozen default character template — used in tests and as a fallback).
 
+**Licensing**: all `data/` catalogs stay within SRD 5.1 (OGL 1.0a / CC-BY 4.0; this project complies via CC-BY 4.0). Attribution is in `NOTICE.md`, `README.md` (License), `LICENSE-CC-BY-4.0.md`, and the CompendiumModal footer. PHB-only content is excluded or re-expressed in original wording with display-name changes only (internal ids are functional slugs, persisted in saves, and are not renamed).
+
 ### System prompts
 
 `constants.ts:8-83` — two large prompt strings:
