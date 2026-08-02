@@ -474,6 +474,14 @@ const HOOK_REGISTRY: Record<HookName, ReducerEntry[]> = {
         return ctx;
       },
     },
+    {
+      kind: 'metamagic-option',
+      reduce: (ctx, payload, character) => {
+        const opts = (payload.options as string[]) || [];
+        if (opts.length) character.metamagicOptions = opts;
+        return ctx;
+      },
+    },
   ],
 };
 
@@ -485,6 +493,18 @@ export function getEffects(character: Character, effectKind: string): EffectSour
     const trait = race?.traits.find(t => t.id === traitId);
     if (trait?.effect?.kind === effectKind) {
       results.push({ source: 'race', payload: (trait.effect.payload || {}) as Record<string, unknown> });
+    }
+  }
+
+  // Also check subrace traits (e.g. Hill Dwarf's Dwarven Toughness, Stout's poison resistance)
+  if (character.subraceId && race?.subraces) {
+    const subrace = race.subraces.find(sr => sr.id === character.subraceId);
+    if (subrace?.traits) {
+      for (const trait of subrace.traits) {
+        if (trait.effect?.kind === effectKind) {
+          results.push({ source: 'race', payload: (trait.effect.payload || {}) as Record<string, unknown> });
+        }
+      }
     }
   }
 

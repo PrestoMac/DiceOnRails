@@ -1,6 +1,6 @@
 import { Character, Enemy } from '../types';
 import type { TransformationState } from '../types';
-import { getMod } from './classEngine';
+import { calculateAc } from './classEngine';
 
 const BEAST_TEMPLATES: Record<string, Omit<Enemy, 'id' | 'isDead' | 'hp'> & { hp: number; speed: number; fly?: boolean; swim?: boolean }> = {
   'wolf': {
@@ -31,6 +31,14 @@ const BEAST_TEMPLATES: Record<string, Omit<Enemy, 'id' | 'isDead' | 'hp'> & { hp
     speed: 50, swim: false, fly: false,
     type: 'beast',
     stats: { str: 17, dex: 15, con: 15, int: 3, wis: 12, cha: 7 }
+  },
+  'panther': {
+    name: 'Panther', cr: 0.25, hp: 13, ac: 12,
+    attacks: [{ name: 'Bite', toHit: 4, damageDice: '1d6+2', damageType: 'piercing' },
+              { name: 'Claws', toHit: 4, damageDice: '1d4+2', damageType: 'slashing' }],
+    speed: 50, swim: false, fly: false,
+    type: 'beast',
+    stats: { str: 14, dex: 15, con: 10, int: 3, wis: 14, cha: 7 }
   },
   'giant-crocodile': {
     name: 'Giant Crocodile', cr: 5, hp: 78, ac: 14,
@@ -105,7 +113,7 @@ function createTransformationState(
     originalForm: {
       stats: { ...character.stats },
       hp: { ...character.hp },
-      ac: calculateBeastAC(character, beastForm),
+      ac: calculateAc(character),
       attacks: []
     },
     transformedInto: beastForm.name,
@@ -113,9 +121,4 @@ function createTransformationState(
     duration,
     casterId: character.id
   };
-}
-
-function calculateBeastAC(character: Character, beast: Enemy): number {
-  const dexMod = beast.stats ? getMod(beast.stats.dex) : 0;
-  return Math.max(10 + dexMod, beast.ac);
 }

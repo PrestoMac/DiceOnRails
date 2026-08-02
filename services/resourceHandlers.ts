@@ -210,6 +210,6 @@ export const RESOURCE_HANDLERS: Record<string, ResourceHandler> = {
     if (!char) return fail('Character not found.');
     if (char.class !== 'druid') return fail('Only Druids can use Natural Recovery.');
     const maxLevels = Math.ceil(char.level / 2);
-    return { success: true, data: { maxLevels }, message: `Natural Recovery ready. Choose up to ${maxLevels} combined spell slot levels during short rest.` };
+    return { success: true, data: { maxLevels }, message: `Natural Recovery ready. The druid can recover up to ${maxLevels} combined spell slot levels during a short rest. Use the natural recovery action to select which slots to restore.` };
   },
 };

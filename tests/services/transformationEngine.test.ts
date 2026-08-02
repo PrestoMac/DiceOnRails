@@ -124,11 +124,13 @@ describe('applyPolymorph', () => {
     expect(state.casterId).toBe(char.id);
   });
 
-  it('calculates AC using beast AC or 10+DEX', () => {
+  it('preserves the character original AC (not the beast AC)', () => {
     const direWolf = BEAST_FORMS['dire-wolf'];
     const char = makeCharacter();
     const state = applyPolymorph(char, direWolf, 60);
-    expect(state.originalForm?.ac).toBe(14);
+    // originalForm.ac should be the character's computed AC, not the beast's (14).
+    expect(state.originalForm?.ac).not.toBe(direWolf.ac);
+    expect(state.originalForm?.ac).toBeGreaterThan(0);
   });
 });
 

@@ -56,6 +56,9 @@ const WizardShell: React.FC<WizardShellProps> = ({
     isGeneratingLocs: false, isRerolling: false,
     statsGenMode: 'buy', rolledStatValues: [], rollHistory: [],
     bonusStatAllocations: {},
+    fightingStyleChoice: null,
+    invocationChoices: [],
+    selectedSubraceId: null,
   });
 
   const updateWizard = useCallback((updates: Partial<WizardState>) => {

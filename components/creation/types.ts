@@ -39,6 +39,12 @@ export interface WizardState {
   rollHistory: Array<{ dice: number[]; dropped: number; total: number }>;
   /** Bonus stat points allocated on the Stats step (spends down `(level-1)*2`). */
   bonusStatAllocations: Record<string, number>;
+  /** Fighting style choice (Fighter L1, Paladin L2, Ranger L2). Stored on the character as `fightingStyle`. */
+  fightingStyleChoice: string | null;
+  /** Eldritch Invocation ids chosen by Warlocks (L2+). Stored on the character as `invocations`. */
+  invocationChoices: string[];
+  /** Subrace id for races that have subraces (e.g. 'high-elf', 'hill-dwarf'). Stored as `subraceId`. */
+  selectedSubraceId: string | null;
 }
 
 /** Base props shared by all wizard step components. */

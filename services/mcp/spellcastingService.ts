@@ -8,6 +8,7 @@ import { rollDice } from '../diceEngine';
 import { parseDiceFormula } from '../../utils/dice';
 import { applyCondition, removeCondition, getConditionEffects, getExhaustionPenalty } from '../conditionEngine';
 import { RESOURCE_HANDLERS } from '../resourceHandlers';
+import { getEffects } from '../effectDispatcher';
 
 /** Dependencies required by the SpellcastingService. */
 export interface SpellcastingDeps {
@@ -310,7 +311,18 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
           const savePassed = llmOverride !== undefined
             ? llmOverride === true
             : (await deps.make_save(t.targetId, saveStat, saveDC, isCharmSpell)).data?.success === true;
-          if (savePassed) {
+          // Evasion (Rogue L7 / Monk L7): on a successful DEX save, take 0 damage
+          // instead of half; on a failed DEX save, take half instead of full.
+          const targetChar = deps.getTarget(t.targetId);
+          const hasEvasion = targetChar && getEffects(targetChar, 'evasion').length > 0;
+          const isDexSave = saveStat.toLowerCase() === 'dex';
+          if (hasEvasion && isDexSave) {
+            if (savePassed) {
+              dmg = 0;
+            } else {
+              dmg = Math.floor(dmg / 2);
+            }
+          } else if (savePassed) {
             dmg = onSuccess === 'half' ? Math.floor(dmg / 2) : 0;
           }
           const resolvedTargetId = resolvedTargets.find(rt => {
@@ -347,6 +359,9 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
         // Temp-HP spells (e.g. False Life, Armor of Agathys) grant only temporary
         // hit points — they must NOT also heal real HP.
         const isTempHpSpell = !!(spellDef?.description?.toLowerCase().includes('temporary hit points') || spellDef?.description?.toLowerCase().includes('temp hp'));
+        // Disciple of Life (Life Domain Cleric L1): healing spells restore an extra
+        // 2 + spell level HP. Applied per target (matches SRD multi-target healing).
+        const discipleBonus = getEffects(char, 'healing-bonus').length > 0 ? 2 + slotLevel : 0;
         for (const targetId of targets) {
           const target = deps.getTarget(targetId);
           if (target) {
@@ -356,7 +371,7 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
               }
             } else {
               const previousHp = target.hp.current;
-              target.hp.current = Math.min(target.hp.max, target.hp.current + result.healing);
+              target.hp.current = Math.min(target.hp.max, target.hp.current + result.healing + discipleBonus);
               if (previousHp === 0 && target.hp.current > 0) {
                 delete target.deathSaves;
               }

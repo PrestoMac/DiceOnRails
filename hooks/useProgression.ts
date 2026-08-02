@@ -3,7 +3,7 @@ import { Character } from '../types';
 import { mcpServer } from '../services/mcpService';
 import { applyStatAllocation } from '../services/progressionService';
 import { applyAsiChoice, applyFeatChoice } from '../services/featsService';
-import { getSubclassDef } from '../services/classEngine';
+import { getSubclassDef, getClassDef } from '../services/classEngine';
 import { storageService } from '../services/storageService';
 
 /** Options passed when confirming a feat choice during level-up, including optional ASI bonuses and skill selections. */
@@ -132,10 +132,23 @@ export const useProgression = (
       const newLevels = subclassDef
         ? subclassDef.features.filter((f: { level: number }) => f.level === char.level).map((f: { level: number }) => f.level)
         : [];
+      // Auto-assign fighting style if a class feature with a fighting-style choice
+      // is unlocked at this level and the character doesn't already have one.
+      // Default to 'defense' (always applicable). The player can change it later.
+      const classDef = getClassDef(char.class);
+      const fsFeature = classDef?.features.find(
+        (f: { level: number; effect?: { kind?: string }; choice?: unknown }) =>
+          f.level === char.level && f.effect?.kind === 'fighting-style' && f.choice
+      );
+      const fightingStyleUpdate: Partial<Character> = {};
+      if (fsFeature && !char.fightingStyle) {
+        fightingStyleUpdate.fightingStyle = 'defense';
+      }
       mcpServer.getFullState().party[idx] = {
         ...char,
         pendingSubclassFeature: false,
         unlockedSubclassFeatures: Array.from(new Set([...existing, ...newLevels])),
+        ...fightingStyleUpdate,
       };
     }
     syncState();

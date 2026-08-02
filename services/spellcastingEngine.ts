@@ -323,6 +323,15 @@ export function castSpell(
         const abilityMod = addAbilityMod ? getAbilityMod(character, classDef.spellcasting.ability) : 0;
         beamDamage = finalDiceDamage + flatBonus + abilityMod;
 
+        // Agonizing Blast invocation: add CHA mod to Eldritch Blast damage per beam
+        if (spell.id === 'eldritch-blast' && character.invocations?.includes('agonizing-blast')) {
+          const agonizingMod = getAbilityMod(character, classDef.spellcasting.ability);
+          beamDamage += agonizingMod;
+          if (result.damageRollDetails) {
+            result.damageRollDetails += ` + ${agonizingMod} [Agonizing Blast]`;
+          }
+        }
+
         const baseFormula = `${count}d${sides}`;
         const rollsStr = rolls.join('+');
         const critMult = isCrit ? ' * 2' : '';

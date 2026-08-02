@@ -82,8 +82,11 @@ CLASS FEATURES:
 - Aura of Protection (Paladin L6): **ENGINE APPLIED**. Adds Paladin's CHA modifier (min +1) to all saving throws for conscious Paladins and party members.
 - Reliable Talent (Rogue L11): **ENGINE APPLIED**. Rolls of 1-9 on proficient skill checks automatically become 10.
 - Evasion (Rogue L7 / Monk L7): **ENGINE APPLIED**. Takes 0 damage on successful DEX save, half damage on failed save.
+- Diamond Soul (Monk L14): **ENGINE APPLIED**. Monks gain proficiency in all saving throws automatically.
 - Ki (Monk L2): Spend on Flurry of Blows (1 Ki, 2 unarmed strikes), Patient Defense (1 Ki, Dodge bonus action), Step of the Wind (1 Ki, Dash/Disengage bonus action), Stunning Strike (1 Ki, CON save vs stun).
-- Wild Shape (Druid L2): use polymorph_creature to transform into beast forms (Wolf, Brown Bear, Panther, Dire Wolf, Giant Eagle). Engine auto-consumes charges, enforces CR limits, and manages beast stat overlays.
+- Wild Shape (Druid L2): use polymorph_creature to transform into beast forms (Wolf, Panther, Brown Bear, Dire Wolf, Giant Eagle, Giant Crocodile, Tyrannosaurus Rex). Engine auto-consumes charges, enforces CR limits, and manages beast stat overlays.
+- Natural Recovery (Druid Circle of Land L2): Once per long rest, recover expended spell slots up to half druid level (round up). Use_resource(resourceId="natural-recovery") to check availability.
+- Eldritch Invocations (Warlock L2): Agonizing Blast (add CHA mod to Eldritch Blast damage), Armor of Shadows (mage armor at will), Fiendish Vigor (false life at will), and others are **ENGINE APPLIED** based on the warlock's chosen invocations.
 - Fighting Styles: **ENGINE APPLIED**. Archery (+2 attack), Defense (+1 AC in armor), Dueling (+2 damage), GWF (rerolls 1s/2s), and TWF (offhand mod) are mechanically applied.
 
 RACE TRAITS:

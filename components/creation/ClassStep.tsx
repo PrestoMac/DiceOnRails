@@ -1,6 +1,7 @@
 import React from 'react';
 import { StepProps } from './types';
 import { CLASSES_CATALOG } from '../../utils/classes';
+import { INVOCATIONS_CATALOG, getInvocationCount } from '../../data/invocations';
 import { StepH, NavBtn } from './SharedComponents';
 import Tooltip from '../ui/Tooltip';
 import { getClassAssessment } from './classRaceAssessment';
@@ -34,6 +35,8 @@ const ClassStep: React.FC<StepProps> = ({ wizardState, updateWizard, onNext }) =
                   draconicAncestry: cls.id !== 'sorcerer' ? null : wizardState.draconicAncestry,
                   selectedSpells: [],
                   selectedCantrips: [],
+                  fightingStyleChoice: null,
+                  invocationChoices: [],
                 });
               }}
               className={`relative p-4 rounded-xl border-2 text-left transition-all ${isSelected && isDisabled ? 'border-red-900/50 bg-red-950/10' : isSelected ? 'border-amber-600 bg-amber-900/10' : 'border-stone-800 bg-stone-900/40 hover:border-stone-600'} ${isDisabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
@@ -102,6 +105,82 @@ const ClassStep: React.FC<StepProps> = ({ wizardState, updateWizard, onNext }) =
           </div>
         </div>
       )}
+      {/* Fighting Style picker — shown when the class has a fighting-style feature at or below the current level */}
+      {(() => {
+        const fsFeature = selectedClass.features.find(
+          f => f.effect?.kind === 'fighting-style' && f.level <= wizardState.level && f.choice
+        );
+        if (!fsFeature || !fsFeature.choice) return null;
+        const options = fsFeature.choice.options;
+        return (
+          <div className="bg-amber-950/20 border border-amber-800/50 rounded-lg p-3">
+            <p className="text-xs font-bold text-amber-400 mb-2">
+              <i className="fas fa-sword mr-1"></i>{fsFeature.choice.label}
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {options.map(opt => (
+                <button
+                  key={opt.id}
+                  onClick={() => updateWizard({ fightingStyleChoice: opt.id })}
+                  className={`text-left p-2 rounded-lg border text-xs transition-all ${
+                    wizardState.fightingStyleChoice === opt.id
+                      ? 'border-amber-500 bg-amber-900/30 text-amber-200'
+                      : 'border-stone-700 bg-stone-900/40 text-stone-400 hover:border-stone-600'
+                  }`}
+                >
+                  <span className="font-bold">{opt.label}</span>
+                  <p className="text-[10px] text-stone-500 mt-0.5">{opt.description}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+      {/* Eldritch Invocations picker — shown for Warlocks at L2+ */}
+      {selectedClass.id === 'warlock' && wizardState.level >= 2 && (() => {
+        const maxInvocations = getInvocationCount(wizardState.level);
+        const available = INVOCATIONS_CATALOG.filter(i => i.minLevel <= wizardState.level);
+        const selected = wizardState.invocationChoices;
+        const toggle = (id: string) => {
+          if (selected.includes(id)) {
+            updateWizard({ invocationChoices: selected.filter(x => x !== id) });
+          } else if (selected.length < maxInvocations) {
+            updateWizard({ invocationChoices: [...selected, id] });
+          }
+        };
+        return (
+          <div className="bg-purple-950/20 border border-purple-800/50 rounded-lg p-3">
+            <p className="text-xs font-bold text-purple-400 mb-2">
+              <i className="fas fa-hand-sparkles mr-1"></i>
+              Eldritch Invocations ({selected.length}/{maxInvocations})
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {available.map(inv => {
+                const isSelected = selected.includes(inv.id);
+                const isFull = !isSelected && selected.length >= maxInvocations;
+                return (
+                  <button
+                    key={inv.id}
+                    onClick={() => toggle(inv.id)}
+                    disabled={isFull}
+                    className={`text-left p-2 rounded-lg border text-xs transition-all ${
+                      isSelected
+                        ? 'border-purple-500 bg-purple-900/30 text-purple-200'
+                        : isFull
+                          ? 'border-stone-850 bg-stone-900/20 text-stone-600 cursor-not-allowed'
+                          : 'border-stone-700 bg-stone-900/40 text-stone-400 hover:border-stone-600'
+                    }`}
+                  >
+                    <span className="font-bold">{inv.name}</span>
+                    {inv.prerequisite && <span className="text-[9px] text-stone-600 block">Requires: {inv.prerequisite}</span>}
+                    <p className="text-[10px] text-stone-500 mt-0.5">{inv.description}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
       <NavBtn disabled={selectedAssessment.status === 'disabled'} onClick={onNext}>
         {showSubclassInline ? 'Choose Path' : 'Shape Attributes'}
       </NavBtn>

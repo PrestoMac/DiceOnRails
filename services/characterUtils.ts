@@ -39,6 +39,10 @@ export function ensureCharacterFields(char: Character): void {
   char.flaws ??= [];
   char.appearance ??= '';
   char.portraitUrl ??= '';
+  char.fightingStyle ??= '';
+  char.invocations ??= [];
+  char.pactBoon ??= '';
+  char.subraceId ??= '';
   if (!char.conditionsImmunities && (char.racialTraits || []).includes('fey-ancestry')) {
     // Fey Ancestry: magic can't put elf/half-elf to sleep. (Charm-save advantage
     // is applied via the charmSave flag on the make_save path.)

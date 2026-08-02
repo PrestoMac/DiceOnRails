@@ -9,6 +9,7 @@ import { RACES_BY_ID } from '../utils/races';
 import { CLASSES_BY_ID } from '../utils/classes';
 import { lookupSRDItem } from '../utils/srdItems';
 import { applyEffects, CharacterCreatedContext } from './effectDispatcher';
+import { INVOCATIONS_BY_ID } from '../data/invocations';
 
 /** Builds a fully-formed Character object from wizard creation state, validating name, location, stats, feats, and subclass choices. */
 export function buildCharacterFromWizard(
@@ -16,7 +17,7 @@ export function buildCharacterFromWizard(
   options: { isNewCampaign: boolean; campaignStartingLocation?: StartingLocation; remainingSkillPoints?: number; onSetStartingLocation?: (location: StartingLocation) => void }
 ): { character: Character; errors: string[] } {
   const errors: string[] = [];
-  const { name, selectedRace, selectedClass, stats, inventory, goldPool, level, allocatedSkills, asiFeatSlots, selectedSubclassId, selectedCantrips, selectedSpells, draconicAncestry, halfElfChoice1, halfElfChoice2, backstory, alignment, background, personalityTraits, ideals, bonds, flaws, appearance } = wizard;
+  const { name, selectedRace, selectedClass, stats, inventory, goldPool, level, allocatedSkills, asiFeatSlots, selectedSubclassId, selectedCantrips, selectedSpells, draconicAncestry, halfElfChoice1, halfElfChoice2, backstory, alignment, background, personalityTraits, ideals, bonds, flaws, appearance, fightingStyleChoice, invocationChoices, selectedSubraceId } = wizard;
   const { isNewCampaign, campaignStartingLocation, remainingSkillPoints, onSetStartingLocation } = options;
 
   if (!name.trim()) { errors.push("Your character must have a name before beginning their chronicle."); return { character: null as unknown as Character, errors }; }
@@ -27,6 +28,14 @@ export function buildCharacterFromWizard(
 
   const fs = { ...stats };
   if (typeof selectedRace.asi === 'object') Object.entries(selectedRace.asi).forEach(([s, v]) => { (fs as Record<string, number>)[s] += v as number; });
+
+  // Apply subrace ASI bonuses on top of the base race ASI
+  const subrace = selectedSubraceId ? selectedRace.subraces?.find(sr => sr.id === selectedSubraceId) : undefined;
+  if (subrace?.asi) {
+    for (const [s, v] of Object.entries(subrace.asi)) {
+      (fs as Record<string, number>)[s] = ((fs as Record<string, number>)[s] || 0) + (v as number);
+    }
+  }
 
   if (typeof selectedRace.asi === 'string') {
     const halfElfStats = { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 2 };
@@ -70,6 +79,8 @@ export function buildCharacterFromWizard(
   const racialTraits: string[] = [];
   const raceDef = getRaceDef(selectedRace.id);
   if (raceDef) for (const t of raceDef.traits) { racialTraits.push(t.id); }
+  // Add subrace trait ids
+  if (subrace?.traits) for (const t of subrace.traits) { racialTraits.push(t.id); }
 
   const tempChar = { id: 'player-temp', name, race: selectedRace.id, class: selectedClass.id, level, stats: fs, inventory, racialTraits };
   const resources = recalculateResourcePools(tempChar as unknown as Character);
@@ -135,6 +146,8 @@ export function buildCharacterFromWizard(
         : [...selectedCantrips]
     ),
     subclassId: selectedSubclassId || undefined,
+    subraceId: selectedSubraceId || undefined,
+    fightingStyle: fightingStyleChoice || undefined,
     backstory: backstory || undefined,
     alignment: alignment || undefined,
     background: background || undefined,
@@ -156,6 +169,7 @@ export function buildCharacterFromWizard(
       return (DRAGON_ANCESTRIES.find(d => d.id === a)?.damageType as string) || undefined;
     })(),
     unlockedSubclassFeatures: [],
+    invocations: (invocationChoices?.length) ? invocationChoices : undefined,
     languages: (() => {
       const raceDef = getRaceDef(selectedRace.id);
       if (!raceDef) return [];
@@ -168,6 +182,23 @@ export function buildCharacterFromWizard(
     const subDef = CLASSES_BY_ID[selectedClass.id]?.subclasses?.find(s => s.id === selectedSubclassId);
     if (subDef?.domainSpells?.length) {
       builtChar.preparedSpells = [...(builtChar.preparedSpells || []), ...subDef.domainSpells];
+    }
+  }
+
+  // Grant at-will spells from Eldritch Invocations (e.g. Armor of Shadows → mage armor)
+  if (invocationChoices?.length) {
+    const invocationSpells: string[] = [];
+    for (const invId of invocationChoices) {
+      const inv = INVOCATIONS_BY_ID[invId];
+      if (inv?.effect === 'at-will-spell' && inv.grantsSpells) {
+        invocationSpells.push(...inv.grantsSpells);
+      }
+    }
+    if (invocationSpells.length) {
+      const existing = new Set(builtChar.knownSpells || []);
+      for (const s of invocationSpells) {
+        if (!existing.has(s)) (builtChar.knownSpells = builtChar.knownSpells || []).push(s);
+      }
     }
   }
 
@@ -222,6 +253,12 @@ export interface PresetCharacterSpec {
   bonds?: string[];
   flaws?: string[];
   appearance?: string;
+  /** Fighting style id for Fighter L1 (e.g. 'archery', 'defense', 'dueling'). */
+  fightingStyle?: string;
+  /** Eldritch Invocation ids for Warlocks (e.g. ['agonizing-blast', 'armor-of-shadows']). */
+  invocations?: string[];
+  /** Subrace id for races with subraces (e.g. 'high-elf', 'hill-dwarf'). */
+  subraceId?: string;
 }
 
 /**
@@ -302,6 +339,9 @@ export function buildPresetCharacter(spec: PresetCharacterSpec): Character {
     rolledStatValues: [],
     rollHistory: [],
     bonusStatAllocations: {},
+    fightingStyleChoice: spec.fightingStyle ?? null,
+    invocationChoices: spec.invocations ?? [],
+    selectedSubraceId: spec.subraceId ?? null,
   };
 
   // Replicate the skill-points formula at level 1 (no per-level bonus term).

@@ -36,6 +36,7 @@ export const FIGHTING_STYLE_OPTIONS = [
   { id: 'defense', label: 'Defense', description: '+1 AC while wearing armor.' },
   { id: 'dueling', label: 'Dueling', description: '+2 damage with one-handed melee weapons and no other weapon.' },
   { id: 'great-weapon-fighting', label: 'Great Weapon Fighting', description: 'Reroll 1s/2s on heavy melee damage dice.' },
+  { id: 'two-weapon-fighting', label: 'Two-Weapon Fighting', description: 'Add your ability modifier to off-hand attack damage.' },
   { id: 'protection', label: 'Protection', description: 'Reaction: impose disadvantage on an attack against an adjacent ally.' },
 ];
 
@@ -56,7 +57,8 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     statPriority: ['str', 'con', 'cha', 'dex', 'wis', 'int'],
     features: [
       { id: 'fighting-style', name: 'Fighting Style', description: 'You adopt a particular style of fighting as your specialty.', level: 1, kind: 'subclass',
-        choice: { label: 'Choose a Fighting Style', options: FIGHTING_STYLE_OPTIONS }
+        choice: { label: 'Choose a Fighting Style', options: FIGHTING_STYLE_OPTIONS },
+        effect: { kind: 'fighting-style' }
       },
       { id: 'second-wind', name: 'Second Wind', description: 'Bonus action: regain 1d10 + fighter level HP, once per short rest.', level: 1, kind: 'resource', grantsResource: 'second-wind' },
       { id: 'action-surge-1', name: 'Action Surge (1 use)', description: 'On your turn, take one additional action.', level: 2, kind: 'resource', grantsResource: 'action-surge' },
@@ -77,7 +79,8 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
           { id: 'improved-critical', name: 'Improved Critical', description: 'Your weapon attacks score a critical hit on a roll of 19 or 20.', level: 3, kind: 'passive', effect: { kind: 'crit-range', payload: { min: 19 } } },
           { id: 'remarkable-athlete', name: 'Remarkable Athlete', description: 'Add half your proficiency bonus (round up) to any Strength, Dexterity, or Constitution check you make that doesn\'t already use your proficiency bonus.', level: 7, kind: 'passive' },
           { id: 'additional-fighting-style', name: 'Additional Fighting Style', description: 'Choose a second fighting style.', level: 10, kind: 'subclass',
-            choice: { label: 'Choose a second Fighting Style', options: FIGHTING_STYLE_OPTIONS }
+            choice: { label: 'Choose a second Fighting Style', options: FIGHTING_STYLE_OPTIONS },
+            effect: { kind: 'fighting-style' }
           },
           { id: 'superior-critical', name: 'Superior Critical', description: 'Your weapon attacks score a critical hit on a roll of 18-20.', level: 15, kind: 'passive', effect: { kind: 'crit-range', payload: { min: 18 } } },
           { id: 'survivor', name: 'Survivor', description: 'At the start of each of your turns, you regain hit points equal to 5 + your Constitution modifier if you have no more than half your hit points left.', level: 18, kind: 'passive' },
@@ -189,7 +192,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     },
     features: [
       { id: 'bardic-inspiration', name: 'Bardic Inspiration', description: 'Bonus action: grant a creature a d6 inspiration die (d8 at L5, d10 at L10, d12 at L15) to add to one ability check, attack roll, or save. Uses equal to CHA mod per long rest.', level: 1, kind: 'resource', grantsResource: 'bardic-inspiration' },
-      { id: 'jack-of-all-trades', name: 'Jack of All Trades', description: 'Add half your proficiency bonus (round down) to any ability check you make that doesn\'t already include your proficiency bonus.', level: 2, kind: 'passive' },
+      { id: 'jack-of-all-trades', name: 'Jack of All Trades', description: 'Add half your proficiency bonus (round down) to any ability check you make that doesn\'t already include your proficiency bonus.', level: 2, kind: 'passive', effect: { kind: 'jack-of-all-trades' } },
       { id: 'song-of-rest', name: 'Song of Rest', description: 'You and friendly creatures who hear your song regain 1d6 extra HP on a short rest.', level: 2, kind: 'passive' },
       { id: 'expertise-1', name: 'Expertise', description: 'Choose two skill proficiencies. Your proficiency bonus is doubled for those skills.', level: 3, kind: 'passive' },
       { id: 'font-of-inspiration', name: 'Font of Inspiration', description: 'You regain all uses of Bardic Inspiration on a short rest.', level: 5, kind: 'passive' },
@@ -276,7 +279,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
         description: 'The Life domain focuses on the positive energy that sustains all life.',
         domainSpells: ['bless', 'cure-wounds', 'lesser-restoration', 'spiritual-weapon', 'beacon-of-hope', 'revivify', 'death-ward', 'guardian-of-faith', 'mass-cure-wounds', 'raise-dead'],
         features: [
-          { id: 'disciple-of-life', name: 'Disciple of Life', description: 'Your healing spells restore an additional 2 + spell level HP.', level: 1, kind: 'passive' },
+          { id: 'disciple-of-life', name: 'Disciple of Life', description: 'Your healing spells restore an additional 2 + spell level HP.', level: 1, kind: 'passive', effect: { kind: 'healing-bonus', payload: { amount: '2 + spellLevel' } } },
           { id: 'heavy-armor-prof', name: 'Heavy Armor Proficiency', description: 'You gain proficiency with heavy armor.', level: 1, kind: 'proficiency' },
           { id: 'blessed-healer', name: 'Blessed Healer', description: 'When you cast a healing spell, you regain HP equal to 2 + the spell level.', level: 6, kind: 'passive' },
           { id: 'divine-strike-life', name: 'Divine Strike', description: 'Once per turn when you hit with a weapon attack, add 1d8 radiant damage.', level: 8, kind: 'passive' },
@@ -386,10 +389,11 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
       { id: 'extra-attack-monk', name: 'Extra Attack', description: 'You can attack twice when you take the Attack action.', level: 5, kind: 'passive', effect: { kind: 'extra-attack', payload: { count: 2 } } },
       { id: 'stunning-strike', name: 'Stunning Strike', description: 'Spend 1 ki when you hit with a melee attack to force the target to make a CON save or be stunned until the end of your next turn.', level: 5, kind: 'passive' },
       { id: 'unarmored-movement', name: 'Unarmored Movement', description: 'Speed increases by 10 feet while not wearing armor or wielding a shield.', level: 2, kind: 'passive', effect: { kind: 'speed-bonus', payload: { bonus: 10, condition: 'no-armor' } } },
+      { id: 'evasion-monk', name: 'Evasion', description: 'When you make a DEX save against an effect that deals half damage on success, you take no damage on success and half on failure.', level: 7, kind: 'passive', effect: { kind: 'evasion' } },
       { id: 'stillness-of-mind', name: 'Stillness of Mind', description: 'Use an action to end one effect causing you to be charmed or frightened.', level: 7, kind: 'passive' },
       { id: 'purity-of-body', name: 'Purity of Body', description: 'You are immune to disease and poison.', level: 10, kind: 'passive', effect: { kind: 'condition-immunity', payload: { condition: 'poisoned' } } },
       { id: 'tongue-of-sun-and-moon', name: 'Tongue of the Sun and Moon', description: 'You understand all spoken languages.', level: 13, kind: 'passive' },
-      { id: 'diamond-soul', name: 'Diamond Soul', description: 'Proficiency in all saving throws.', level: 14, kind: 'passive' },
+      { id: 'diamond-soul', name: 'Diamond Soul', description: 'Proficiency in all saving throws.', level: 14, kind: 'passive', effect: { kind: 'diamond-soul' } },
       { id: 'empty-body', name: 'Empty Body', description: 'Spend 4 ki to become invisible and gain resistance to all damage except force damage for 1 minute.', level: 18, kind: 'passive' },
       { id: 'perfect-self', name: 'Perfect Self', description: 'When you roll initiative and have 0 ki, you regain 4 ki.', level: 20, kind: 'passive' },
     ],
@@ -460,11 +464,12 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
       { id: 'divine-sense', name: 'Divine Sense', description: 'As an action, detect celestial, fiend, or undead within 60 ft. Uses: 1 + CHA mod per long rest.', level: 1, kind: 'resource', grantsResource: 'divine-sense' },
       { id: 'divine-smite', name: 'Divine Smite', description: 'When you hit with a melee weapon attack, you can expend a spell slot to deal extra radiant damage: 2d8 for L1, +1d8 per level above 1 (max 5d8).', level: 2, kind: 'passive' },
       { id: 'fighting-style-pal', name: 'Fighting Style', description: 'You adopt a fighting style as your specialty.', level: 2, kind: 'subclass',
-        choice: { label: 'Choose a Fighting Style', options: FIGHTING_STYLE_OPTIONS }
+        choice: { label: 'Choose a Fighting Style', options: FIGHTING_STYLE_OPTIONS },
+        effect: { kind: 'fighting-style' }
       },
       { id: 'divine-health', name: 'Divine Health', description: 'You are immune to disease.', level: 3, kind: 'passive', effect: { kind: 'condition-immunity', payload: { condition: 'diseased' } } },
       { id: 'extra-attack-pal', name: 'Extra Attack', description: 'You can attack twice when you take the Attack action.', level: 5, kind: 'passive', effect: { kind: 'extra-attack', payload: { count: 2 } } },
-      { id: 'aura-of-protection', name: 'Aura of Protection', description: 'You and friendly creatures within 10 ft add your CHA mod to all saving throws.', level: 6, kind: 'passive' },
+      { id: 'aura-of-protection', name: 'Aura of Protection', description: 'You and friendly creatures within 10 ft add your CHA mod to all saving throws.', level: 6, kind: 'passive', effect: { kind: 'aura-of-protection', payload: { stat: 'cha', radius: 10 } } },
       { id: 'aura-of-courage', name: 'Aura of Courage', description: 'You and friendly creatures within 10 ft can\'t be frightened.', level: 10, kind: 'passive' },
       { id: 'improved-divine-smite', name: 'Improved Divine Smite', description: 'Your melee weapon attacks deal an extra 1d8 radiant damage on top of any other damage.', level: 11, kind: 'passive', effect: { kind: 'damage-bonus', payload: { amount: '1d8', condition: 'always' } } },
       { id: 'cleansing-touch', name: 'Cleansing Touch', description: 'Use an action to end one spell affecting a creature you touch. Uses: CHA mod per long rest.', level: 14, kind: 'passive' },
@@ -537,7 +542,8 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
       { id: 'favored-enemy', name: 'Favored Enemy', description: 'Choose a favored enemy type: beasts, fey, humanoids, monstrosities, or undead. Advantage on Survival to track them and Intelligence checks to recall info about them.', level: 1, kind: 'passive' },
       { id: 'natural-explorer', name: 'Natural Explorer', description: 'Choose a favored terrain. Your proficiency bonus is doubled for certain skills in that terrain, and movement through difficult terrain doesn\'t slow you.', level: 1, kind: 'passive' },
       { id: 'fighting-style-rgr', name: 'Fighting Style', description: 'Choose a fighting style.', level: 2, kind: 'subclass',
-        choice: { label: 'Choose a Fighting Style', options: FIGHTING_STYLE_OPTIONS.filter(fs => fs.id !== 'great-weapon-fighting' && fs.id !== 'protection') }
+        choice: { label: 'Choose a Fighting Style', options: FIGHTING_STYLE_OPTIONS.filter(fs => fs.id !== 'great-weapon-fighting' && fs.id !== 'protection') },
+        effect: { kind: 'fighting-style' }
       },
       { id: 'primeval-awareness', name: 'Primeval Awareness', description: 'Use your action to sense the presence of your favored enemy type within 1 mile (or 6 miles in your favored terrain).', level: 3, kind: 'passive' },
       { id: 'extra-attack-rgr', name: 'Extra Attack', description: 'You can attack twice when you take the Attack action.', level: 5, kind: 'passive', effect: { kind: 'extra-attack', payload: { count: 2 } } },
@@ -586,8 +592,8 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
       { id: 'thieves-cant', name: 'Thieves\' Cant', description: 'You know the secret language of thieves.', level: 1, kind: 'passive' },
       { id: 'cunning-action', name: 'Cunning Action', description: 'Use a bonus action to Dash, Disengage, or Hide.', level: 2, kind: 'passive' },
       { id: 'uncanny-dodge', name: 'Uncanny Dodge', description: 'When an attacker you can see hits you, use your reaction to halve the attack\'s damage.', level: 5, kind: 'passive' },
-      { id: 'evasion', name: 'Evasion', description: 'When you make a DEX save against an effect that deals half damage on success, you take no damage on success and half on failure.', level: 7, kind: 'passive' },
-      { id: 'reliable-talent', name: 'Reliable Talent', description: 'Whenever you make an ability check you\'re proficient in, a roll of 9 or lower counts as 10.', level: 11, kind: 'passive' },
+      { id: 'evasion', name: 'Evasion', description: 'When you make a DEX save against an effect that deals half damage on success, you take no damage on success and half on failure.', level: 7, kind: 'passive', effect: { kind: 'evasion' } },
+      { id: 'reliable-talent', name: 'Reliable Talent', description: 'Whenever you make an ability check you\'re proficient in, a roll of 9 or lower counts as 10.', level: 11, kind: 'passive', effect: { kind: 'reliable-talent' } },
       { id: 'blindsense', name: 'Blindsense', description: 'If you can hear, you know the location of any hidden or invisible creature within 10 ft.', level: 14, kind: 'passive' },
       { id: 'slippery-mind', name: 'Slippery Mind', description: 'You gain proficiency in WIS saving throws.', level: 15, kind: 'passive' },
       { id: 'elusive', name: 'Elusive', description: 'No attack roll has advantage against you while you aren\'t incapacitated.', level: 18, kind: 'passive' },

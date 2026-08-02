@@ -67,6 +67,7 @@ export interface TravelService {
   long_rest(narration?: string, autoAdvanceTime?: boolean): Promise<MCPResponse>;
   short_rest(targetId?: string, narration?: string, autoAdvanceTime?: boolean): Promise<MCPResponse>;
   arcane_recovery(characterId: string, selections: Array<{ level: number; count: number }>): Promise<MCPResponse>;
+  natural_recovery(characterId: string, selections: Array<{ level: number; count: number }>): Promise<MCPResponse>;
 }
 
 /** Creates a new TravelService instance operating on the given GameState. */
@@ -701,6 +702,42 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
       arPool.current = 0;
       const detail = recovered.map(r => `${r.count} level-${r.level} slot${r.count > 1 ? 's' : ''}`).join(', ');
       return { success: true, data: { recovered }, message: `${char.name} uses Arcane Recovery to restore ${detail} (${maxLevels} levels max).` };
+    },
+
+    async natural_recovery(characterId, selections) {
+      const char = state.party.find(c => c.id === characterId);
+      if (!char) return fail('Character not found.');
+      if (char.class !== 'druid') return fail('Only Druids can use Natural Recovery.');
+
+      let nrPool = char.resources?.find(r => r.id === 'natural-recovery');
+      if (!nrPool) {
+        if (!char.resources) char.resources = [];
+        char.resources.push({ id: 'natural-recovery', name: 'Natural Recovery', current: 1, max: 1, resetOn: 'long', source: 'class', sourceId: 'druid' });
+        nrPool = char.resources[char.resources.length - 1];
+      }
+      if (nrPool.current <= 0) return fail('Natural Recovery already used. Finish a long rest to regain it.');
+
+      const maxLevels = Math.ceil(char.level / 2);
+      const totalRequested = selections.reduce((sum, s) => sum + s.level * s.count, 0);
+      if (totalRequested > maxLevels) return fail(`Cannot recover ${totalRequested} levels of spell slots. Maximum is ${maxLevels} (half your druid level, rounded up).`);
+
+      const recovered: Array<{ level: number; count: number }> = [];
+      for (const sel of selections) {
+        if (sel.level < 1 || sel.level > 5) return fail(`Natural Recovery cannot target level ${sel.level} slots. Only levels 1-5 are eligible.`);
+        if (sel.count < 1) continue;
+        const slot = char.resources?.find(r => r.id === `spell-slot-${sel.level}`);
+        if (!slot) return fail(`No level ${sel.level} spell slot resource found on ${char.name}.`);
+        const actual = Math.min(sel.count, slot.max - slot.current);
+        if (actual > 0) {
+          slot.current += actual;
+          recovered.push({ level: sel.level, count: actual });
+        }
+      }
+      if (recovered.length === 0) return fail('No spell slots to recover — all selected slots are already at maximum.');
+
+      nrPool.current = 0;
+      const detail = recovered.map(r => `${r.count} level-${r.level} slot${r.count > 1 ? 's' : ''}`).join(', ');
+      return { success: true, data: { recovered }, message: `${char.name} uses Natural Recovery to restore ${detail} (${maxLevels} levels max).` };
     },
 
     async short_rest(targetId, narration, autoAdvanceTime) {

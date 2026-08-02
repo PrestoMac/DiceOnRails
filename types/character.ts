@@ -117,7 +117,14 @@ export type EffectKind =
   | 'metamagic-option'
   | 'breath-weapon'
   | 'language'
-  | 'weapon-proficiency';
+  | 'weapon-proficiency'
+  | 'fighting-style'
+  | 'jack-of-all-trades'
+  | 'reliable-talent'
+  | 'diamond-soul'
+  | 'aura-of-protection'
+  | 'evasion'
+  | 'two-weapon-fighting';
 
 /** A feature granted by a character class at a specific level. */
 export interface ClassFeature {

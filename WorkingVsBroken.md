@@ -4,8 +4,8 @@
 > **Fixes applied**:
 > - **Effect Dispatcher Reducers**: Added `fighting-style` (Defense AC, Archery attack, Dueling damage), `jack-of-all-trades` (half prof on non-proficient skill/ability checks), `reliable-talent` (floor proficient skill d20s at 10), `diamond-soul` (all save proficiencies), and `aura-of-protection` (Paladin CHA to party saves).
 > - **Resource Handlers**: Expanded `ki` for Flurry of Blows (2 unarmed strikes), Patient Defense (Dodge bonus action), Step of the Wind (Dash/Disengage bonus action), and Stunning Strike. Added `natural-recovery` for Druids.
-> - **Spellcasting & Subclasses**: Life Cleric `disciple-of-life` bonus healing (`2 + spellLevel`), Warlock `agonizing-blast` (+CHA damage per Eldritch Blast beam), Warlock `INVOCATIONS_CATALOG` (`data/invocations.ts`).
-> - **Wild Shape & Transformations**: Druid `BEAST_FORMS_CATALOG` (`data/beasts.ts`) with Wolf, Brown Bear, Panther, Dire Wolf, Giant Eagle stat overlays.
+> - **Spellcasting & Subclasses**: Life Cleric `disciple-of-life` bonus healing (`2 + spellLevel` per target, wired via `healing-bonus` effect), Sorcerer `metamagic-option` reducer populates `metamagicOptions` at creation (Metamagic now functional), Warlock `agonizing-blast` (+CHA damage per Eldritch Blast beam), Warlock `INVOCATIONS_CATALOG` (`data/invocations.ts`) with at-will spell grants.
+> - **Wild Shape & Transformations**: Druid `BEAST_FORMS_CATALOG` (`data/beasts.ts`, re-exported from `transformationEngine.ts`) with Wolf, Panther, Brown Bear, Dire Wolf, Giant Eagle, Giant Crocodile (CR 5, swim), and Tyrannosaurus Rex (CR 8) stat overlays. `originalForm.ac` now stores the character's pre-shape AC (was incorrectly the beast's AC).
 > - **Subraces & Variant Human**: Subraces for Elves (High Elf, Wood Elf, Drow), Dwarves (Hill Dwarf, Mountain Dwarf), Halflings (Lightfoot, Stout), Gnomes (Rock Gnome, Forest Gnome), and Variant Human.
 > **Scope**: All 9 races and 12 classes defined in the codebase, compared against the 5e SRD.
 
@@ -54,9 +54,9 @@
 
 ### Druid — **Clearly Working** (↑ was ~25%)
 - **Full Spellcasting**: WIS-based prepared casting with ritual support.
-- **Wild Shape Beast Transformations**: Full beast form stat overlays via `BEAST_FORMS_CATALOG` (`data/beasts.ts`) for Wolf, Brown Bear, Panther, Dire Wolf, Giant Eagle with AC, HP, speed, and beast attack actions.
-- **Natural Recovery (L2)**: Short rest spell slot recovery handler (`natural-recovery`).
-**SRD Fidelity:** ~75%.
+- **Wild Shape Beast Transformations**: Full beast form stat overlays via `BEAST_FORMS_CATALOG` (`data/beasts.ts`) for Wolf, Panther, Brown Bear, Dire Wolf, Giant Eagle, Giant Crocodile, and Tyrannosaurus Rex with AC, HP, speed, and beast attack actions.
+- **Natural Recovery (L2)**: Short-rest spell slot recovery via the `natural_recovery()` engine method (`travelService.ts`), mirroring Arcane Recovery.
+**SRD Fidelity:** ~80%.
 
 ---
 
@@ -110,8 +110,8 @@
 
 ### Warlock — **Clearly Working** (↑ was ~20%)
 - **Pact Magic**: Short rest slot recovery, max castable slot level.
-- **Eldritch Invocations**: Cataloged in `data/invocations.ts`. `agonizing-blast` adds CHA modifier to Eldritch Blast damage per beam.
-- **Pact Boons**: Pact of the Blade, Tome, and Chain supported.
+- **Eldritch Invocations**: Cataloged in `data/invocations.ts`. `agonizing-blast` adds CHA modifier to Eldritch Blast damage per beam. At-will spell invocations (Armor of Shadows → mage armor, Fiendish Vigor → false life, etc.) are granted at creation.
+- **Pact Boons**: Blade, Tome, and Chain are narrative-only for now (no mechanical effect).
 **SRD Fidelity:** ~70%.
 
 ---

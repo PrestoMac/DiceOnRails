@@ -70,7 +70,7 @@ const CLASS_ASSESSMENTS: AssessmentMap = {
   },
   druid: {
     status: 'ok',
-    reason: 'Full WIS prepared casting, Wild Shape Beast Transformations (Wolf, Brown Bear, Panther, Dire Wolf, Giant Eagle stat overlays, temporary HP, AC, speed, attacks), and Natural Recovery are fully supported.',
+    reason: 'Full WIS prepared casting, Wild Shape Beast Transformations (Wolf, Panther, Brown Bear, Dire Wolf, Giant Eagle, Giant Crocodile, Tyrannosaurus Rex stat overlays, temporary HP, AC, speed, attacks), and Natural Recovery are fully supported.',
   },
   fighter: {
     status: 'ok',
@@ -86,7 +86,7 @@ const CLASS_ASSESSMENTS: AssessmentMap = {
   },
   ranger: {
     status: 'ok',
-    reason: 'Spellcasting, Fighting Styles, Favored Enemy, Natural Explorer, Hunter Prey / Colossus Slayer, and Extra Attack are fully supported.',
+    reason: 'Spellcasting, Fighting Styles, Favored Enemy, Natural Explorer, and Extra Attack are fully supported. (Hunter subclass features are narrative-only for now.)',
   },
   rogue: {
     status: 'ok',
@@ -98,7 +98,7 @@ const CLASS_ASSESSMENTS: AssessmentMap = {
   },
   warlock: {
     status: 'ok',
-    reason: 'Pact Magic short-rest slot recovery, Eldritch Invocations (Agonizing Blast, Armor of Shadows, Fiendish Vigor, Repelling Blast), and Pact Boons (Blade, Tome, Chain) are fully supported.',
+    reason: 'Pact Magic short-rest slot recovery and Eldritch Invocations (Agonizing Blast adds CHA to Eldritch Blast damage; Armor of Shadows / Fiendish Vigor grant at-will spells) are fully supported. (Pact Boons are narrative-only for now.)',
   },
   wizard: {
     status: 'ok',

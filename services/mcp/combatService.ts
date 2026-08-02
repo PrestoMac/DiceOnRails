@@ -885,6 +885,38 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
         const afterEffects = applyEffects(partyTarget, 'onSaveRoll', saveCtx);
         totalMod += afterEffects.extraModifier;
 
+        // Aura of Protection: scan party for any conscious Paladin (L6+) with this
+        // aura. Each such Paladin grants their CHA mod (min +1) to all party saves.
+        // Multiple auras don't stack — only the highest applies.
+        let auraBonus = 0;
+        let auraSource = '';
+        for (const member of state.party) {
+          if (member.id === partyTarget.id) continue;
+          if (member.hp.current <= 0) continue;
+          const auraEffects = getEffects(member, 'aura-of-protection');
+          if (auraEffects.length > 0) {
+            const chaMod = getMod(member.stats.cha);
+            const bonus = Math.max(chaMod, 1);
+            if (bonus > auraBonus) {
+              auraBonus = bonus;
+              auraSource = member.name;
+            }
+          }
+        }
+        // Paladin also benefits from their own aura
+        const selfAura = getEffects(partyTarget, 'aura-of-protection');
+        if (selfAura.length > 0) {
+          const chaMod = getMod(partyTarget.stats.cha);
+          const bonus = Math.max(chaMod, 1);
+          if (bonus > auraBonus) {
+            auraBonus = bonus;
+            auraSource = '';
+          }
+        }
+        if (auraBonus > 0) {
+          totalMod += auraBonus;
+        }
+
         let roll = cryptoRoll(20);
         let advantageNote = '';
         if (afterEffects.hasAdvantage) {
@@ -901,6 +933,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
         const bonusParts: string[] = [];
         if (resilientBonus > 0) bonusParts.push(`Resilient +${resilientBonus}`);
         if (shieldMasterBonus > 0) bonusParts.push(`Shield Master +${shieldMasterBonus}`);
+        if (auraBonus > 0) bonusParts.push(`Aura of Protection${auraSource ? ' (' + auraSource + ')' : ''} +${auraBonus}`);
 
         return {
           success: true,
@@ -1157,7 +1190,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       const dieSides = parsed.sides;
       const flatMod = parsed.bonus;
 
-      const hasGWF = getEffects(attacker, 'gwf-reroll').length > 0 && !isOffHand;
+      const hasGWF = (getEffects(attacker, 'gwf-reroll').length > 0 || attacker.fightingStyle === 'great-weapon-fighting') && !isOffHand;
       const damageResults: number[] = [];
       for (let i = 0; i < diceCount; i++) {
         let v = cryptoRoll(dieSides);
@@ -1170,7 +1203,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       if (isUnarmed && !isMonk) {
         damageTotal += abilityMod;
       } else if (isOffHand) {
-        if (getEffects(attacker, 'offhand-modifier').length > 0) damageTotal += abilityMod;
+        if (getEffects(attacker, 'offhand-modifier').length > 0 || attacker.fightingStyle === 'two-weapon-fighting') damageTotal += abilityMod;
       } else {
         damageTotal += abilityMod;
       }

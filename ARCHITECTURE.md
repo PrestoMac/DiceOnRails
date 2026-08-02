@@ -508,23 +508,23 @@ The math layer behind `mcp/combatService.ts`. `addEnemyToCombat` auto-fills stat
 ~440 lines. The central effect evaluation engine. Reads structured effect payloads (`effect: { kind, payload }`) from race/class/subclass/feat data catalogs at runtime and folds them into typed hook contexts at well-defined event points. This eliminates the hardcoded class-ID, race-ID, and feat-ID string branches that previously littered the engine services.
 
 **Two public APIs:**
-- **`getEffects(char, kind)`** — collects raw effect payloads from all four sources matching a given `EffectKind`. Used for inline logic where the call site needs the raw payload (e.g. sneak-attack dice count, GWF reroll eligibility, off-hand modifier availability).
+- **`getEffects(char, kind)`** — collects raw effect payloads from all five sources matching a given `EffectKind`: race traits, class features, subclass features, **subrace traits**, and feats. Used for inline logic where the call site needs the raw payload (e.g. sneak-attack dice count, GWF reroll eligibility, off-hand modifier availability, Evasion checks in the save-damage path).
 - **`applyEffects(char, hook, ctx)`** — folds all matching effect payloads through registered per-kind reducers into a typed hook context. The single entry point services call per event.
 
 **Hook catalog (13 hooks):**
 
 | Hook | Context | Called from | Effect kinds consumed |
 |------|---------|-------------|----------------------|
-| `computeAc` | `AcContext` | `classEngine.calculateAc` | `ac-formula`, `dual-wielder-ac` |
+| `computeAc` | `AcContext` | `classEngine.calculateAc` | `ac-formula`, `dual-wielder-ac`, `fighting-style` (Defense +1 in armor) |
 | `computeSpeed` | `SpeedContext` | `classEngine.calculateSpeed` | `speed-bonus` |
 | `computeMaxHp` | `MaxHpContext` | `classEngine.calculateMaxHp` | `hp-per-level` |
-| `onAttackRoll` | `AttackRollContext` | `combatService.player_attack` | `reroll-ones`, `crit-range` |
-| `onAttackDamage` | `AttackDamageContext` | `combatService.player_attack` | `damage-bonus` (rage, Improved Divine Smite), `crit-bonus-dice` (Brutal Critical, Savage Attacks — accumulated counter, caller rolls weapon dice) |
+| `onAttackRoll` | `AttackRollContext` | `combatService.player_attack` | `reroll-ones`, `crit-range`, `fighting-style` (Archery +2 ranged) |
+| `onAttackDamage` | `AttackDamageContext` | `combatService.player_attack` | `damage-bonus` (rage, Improved Divine Smite), `crit-bonus-dice` (Brutal Critical, Savage Attacks — accumulated counter, caller rolls weapon dice), `fighting-style` (Dueling +2 melee; GWF rerolls + TWF offhand mod checked via `character.fightingStyle` in combatService) |
 | `onDamageTaken` | `DamageTakenContext` | `inventoryEngine.inflictDamageOnTarget` + `inventoryService.inflict_damage` | `damage-resistance` (condition-gated for rage, `from-draconic-ancestry` resolution), `damage-immunity`, `damage-vulnerability` |
-| `onSaveRoll` | `SaveRollContext` | `combatService.make_save` | `advantage-on-save`, `save-proficiency` |
-| `onSkillCheck` | `SkillCheckContext` | `travelService.check_skill` | `reroll-ones`, `skill-expertise` |
+| `onSaveRoll` | `SaveRollContext` | `combatService.make_save` | `advantage-on-save`, `save-proficiency`, `diamond-soul`; `aura-of-protection` is applied cross-character in `make_save` (scans party for conscious Paladins L6+, adds highest CHA mod min +1) |
+| `onSkillCheck` | `SkillCheckContext` | `travelService.check_skill` | `reroll-ones`, `skill-expertise`, `jack-of-all-trades` (+½ prof on non-proficient), `reliable-talent` (floor proficient rolls at 10) |
 | `onConditionApplied` | `ConditionAppliedContext` | `conditionEngine.applyCondition` | `condition-immunity` |
-| `onCharacterCreated` | `CharacterCreatedContext` | `characterCreationService.buildCharacterFromWizard` | `skill-proficiency`, `armor-proficiency`, `language` |
+| `onCharacterCreated` | `CharacterCreatedContext` | `characterCreationService.buildCharacterFromWizard` | `skill-proficiency`, `armor-proficiency`, `language`, `metamagic-option` (populates `character.metamagicOptions`) |
 | `onLongRest` | `RestContext` | `travelService.long_rest` | _(extension point)_ |
 | `onShortRest` | `RestContext` | `travelService.short_rest` | _(extension point)_ |
 | `onLevelUp` | `LevelUpContext` | `progressionService.level_up` | _(extension point)_ |
@@ -543,12 +543,12 @@ The math layer behind `mcp/combatService.ts`. `addEnemyToCombat` auto-fills stat
 
 ~190 lines. A registry of `use_resource` handlers called via `RESOURCE_HANDLERS[resourceId](ctx, characterId, targetId, amount)`. Adding a new spendable resource = one handler function, zero changes to `spellcastingService.ts`.
 
-**15 handlers:**
+**16 handlers:**
 - `second-wind` — Fighter: `1d10 + level` heal
 - `rage` — Barbarian: enters rage, breaks concentration
 - `lay-on-hands-pool` — Paladin: cross-character heal by amount
 - `breath-weapon` — Dragonborn: computed DC + level-scaled damage
-- `ki` — Monk: Stunning Strike (target CON save or stunned)
+- `ki` — Monk: Stunning Strike (target CON save or stunned), plus Flurry of Blows / Patient Defense / Step of the Wind sub-actions (targetId routes to the sub-action)
 - `bardic-inspiration` — Bard: grants inspiration die to target
 - `channel-divinity` — Cleric: Turn Undead (WIS save or turned) + Destroy Undead (CR thresholds)
 - `hellish-rebuke` — Tiefling: `3d10` fire damage, DEX save, once per long rest
@@ -558,6 +558,7 @@ The math layer behind `mcp/combatService.ts`. `addEnemyToCombat` auto-fills stat
 - `indomitable` — Fighter: save reroll flag
 - `divine-sense` — Paladin: celestial/fiend/undead detection
 - `arcane-recovery` — Wizard: max spell level recovery info
+- `natural-recovery` — Druid: max spell level recovery info (actual slot recovery via `travelService.natural_recovery()`)
 - `relentless-endurance` — Half-Orc: drop to 1 HP instead of 0
 
 ### `spellcastingEngine.ts`
@@ -617,7 +618,7 @@ Designed as a single config table (`XP_CONFIG`) to make tuning game feel a one-l
 
 ### `summoningEngine.ts` / `teleportationEngine.ts` / `transformationEngine.ts`
 
-Specialized mechanics for summons (create summoned creatures with CR caps), teleportation (Misty Step, Dimension Door range checks), and transformations (Polymorph, Wild Shape, True Polymorph with beast CR caps by level / class).
+Specialized mechanics for summons (create summoned creatures with CR caps), teleportation (Misty Step, Dimension Door range checks), and transformations (Polymorph, Wild Shape, True Polymorph with beast CR caps by level / class). The beast form templates (`BEAST_TEMPLATES` → `BEAST_FORMS`) include Wolf, Panther, Brown Bear, Dire Wolf, Giant Eagle, Giant Crocodile (CR 5, swim), and Tyrannosaurus Rex (CR 8). `data/beasts.ts` re-exports these as the `BEAST_FORMS_CATALOG` — the engine is the single source of truth. `createTransformationState.originalForm.ac` preserves the character's pre-shape AC.
 
 ### `auditor.ts`
 
@@ -859,7 +860,7 @@ types/
 - `RollData.type` is one of `'attack' | 'skill' | 'damage' | 'cast_spell' | 'save' | 'death_save'`.
 - `MCPResponse = { success: boolean; data: Record<string, unknown>; message?: string }` — every tool returns this shape.
 
-The `Character` interface has ~50 optional fields covering every subclass choice (divine domain, sorcerous origin, warlock patron, arcane tradition, fighting style, draconic ancestry, sneak attack dice, …). The `stateService.ensureCharacterFields` function (in `mcp/stateService.ts:46`) hydrates sane defaults whenever a character enters the engine.
+The `Character` interface has ~50 optional fields covering every subclass choice (divine domain, sorcerous origin, warlock patron, arcane tradition, fighting style, draconic ancestry, sneak attack dice, …) plus race-level choices (`subraceId`) and Warlock options (`invocations`, `pactBoon`). The `stateService.ensureCharacterFields` function (in `mcp/stateService.ts:46`) hydrates sane defaults whenever a character enters the engine.
 
 ---
 
@@ -868,8 +869,10 @@ The `Character` interface has ~50 optional fields covering every subclass choice
 ```
 data/
 ├── constants.ts          # SKILLS_LIST (18 skills), XP_TABLE (levels 1-20), STAT_POINTS_PER_LEVEL, MAX_STAT_VALUE, ASI_LEVELS, FALLBACK_STARTING_LOCATION
-├── classes.ts            # 12 SRD classes with full class features, subclasses, spellcasting profiles, proficiencies
-├── races.ts              # 9 SRD races with ASIs, traits (darkvision, lucky, relentless endurance, …), size, speed
+├── classes.ts            # 12 SRD classes with full class features, subclasses, spellcasting profiles, proficiencies, fighting-style choices
+├── races.ts              # 9 SRD races with ASIs, traits (darkvision, lucky, relentless endurance, …), size, speed, and subraces (Elf/Dwarf/Halfling/Gnome/Human)
+├── invocations.ts        # 8 Warlock Eldritch Invocations with effect tags (agonizing-blast, at-will-spell, extra-attack, passive) + getInvocationCount()
+├── beasts.ts             # Wild Shape / Polymorph beast forms — re-exported from services/transformationEngine.ts (single source of truth)
 ├── feats.ts              # SRD feat catalog (Alert, Great Weapon Master, Sharpshooter, Tough, Resilient, …)
 ├── spells.ts             # SRD spell definitions (level, school, damage, save, scaling, components, …)
 ├── monsters.ts           # SRD monster stat blocks (goblin, orc, dragon, …) — used by lookupMonster

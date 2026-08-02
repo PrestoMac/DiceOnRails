@@ -29,7 +29,7 @@ const RaceStep: React.FC<StepProps> = ({ wizardState, updateWizard, onNext }) =>
               disabled={isDisabled}
               onClick={() => {
                 if (isDisabled) return;
-                updateWizard({ selectedRace: race });
+                updateWizard({ selectedRace: race, selectedSubraceId: null });
                 if (race.id !== 'dragonborn') updateWizard({ draconicAncestry: null });
               }}
               className={`relative p-4 rounded-xl border-2 text-left transition-all ${isSelected && isDisabled ? 'border-red-900/50 bg-red-950/10' : isSelected ? 'border-amber-600 bg-amber-900/10' : 'border-stone-800 bg-stone-900/40 hover:border-stone-600'} ${isDisabled ? 'opacity-40 cursor-not-allowed' : ''}`}
@@ -87,6 +87,45 @@ const RaceStep: React.FC<StepProps> = ({ wizardState, updateWizard, onNext }) =>
           onSelect={(id) => updateWizard({ draconicAncestry: id })}
           flavor="race"
         />
+      )}
+      {/* Subrace picker — shown when the selected race has subraces */}
+      {selectedRace.subraces && selectedRace.subraces.length > 0 && (
+        <div className="bg-amber-950/20 border border-amber-800/50 rounded-lg p-3">
+          <p className="text-xs font-bold text-amber-400 mb-2">
+            <i className="fas fa-users mr-1"></i>Choose Subrace
+          </p>
+          <div className="grid grid-cols-1 gap-2">
+            {selectedRace.subraces.map(sr => {
+              const isSelected = wizardState.selectedSubraceId === sr.id;
+              return (
+                <button
+                  key={sr.id}
+                  onClick={() => updateWizard({ selectedSubraceId: sr.id })}
+                  className={`text-left p-2 rounded-lg border text-xs transition-all ${
+                    isSelected
+                      ? 'border-amber-500 bg-amber-900/30 text-amber-200'
+                      : 'border-stone-700 bg-stone-900/40 text-stone-400 hover:border-stone-600'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold">{sr.name}</span>
+                    {sr.asi && (
+                      <span className="text-[9px] text-amber-700 font-bold">
+                        {Object.entries(sr.asi).map(([s, v]) => `+${v} ${s}`).join(', ')}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-stone-500 mt-0.5">{sr.description}</p>
+                  {sr.traits && sr.traits.length > 0 && (
+                    <p className="text-[9px] text-stone-600 mt-1">
+                      Traits: {sr.traits.map(t => t.name).join(', ')}
+                    </p>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       )}
       {selectedAssessment.status === 'disabled' && (
         <p className="text-[10px] text-red-500/70 text-center">The currently selected lineage has been temporarily disabled. Please choose a different lineage.</p>
