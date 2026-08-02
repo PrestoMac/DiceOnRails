@@ -4,9 +4,10 @@
 > **Fixes applied**:
 > - **Effect Dispatcher Reducers**: Added `fighting-style` (Defense AC, Archery attack, Dueling damage), `jack-of-all-trades` (half prof on non-proficient skill/ability checks), `reliable-talent` (floor proficient skill d20s at 10), `diamond-soul` (all save proficiencies), and `aura-of-protection` (Paladin CHA to party saves).
 > - **Resource Handlers**: Expanded `ki` for Flurry of Blows (2 unarmed strikes), Patient Defense (Dodge bonus action), Step of the Wind (Dash/Disengage bonus action), and Stunning Strike. Added `natural-recovery` for Druids.
-> - **Spellcasting & Subclasses**: Life Cleric `disciple-of-life` bonus healing (`2 + spellLevel` per target, wired via `healing-bonus` effect), Sorcerer `metamagic-option` reducer populates `metamagicOptions` at creation (Metamagic now functional), Warlock `agonizing-blast` (+CHA damage per Eldritch Blast beam), Warlock `INVOCATIONS_CATALOG` (`data/invocations.ts`) with at-will spell grants.
+> - **Spellcasting & Subclasses**: Life Cleric `disciple-of-life` bonus healing (`2 + spellLevel` per target, wired via `healing-bonus` effect), Sorcerer `metamagic-option` reducer populates `metamagicOptions` at creation AND on level-up (Metamagic now functional through progression), Warlock `agonizing-blast` (+CHA damage per Eldritch Blast beam), Warlock `INVOCATIONS_CATALOG` (`data/invocations.ts`) with at-will spell grants.
 > - **Wild Shape & Transformations**: Druid `BEAST_FORMS_CATALOG` (`data/beasts.ts`, re-exported from `transformationEngine.ts`) with Wolf, Panther, Brown Bear, Dire Wolf, Giant Eagle, Giant Crocodile (CR 5, swim), and Tyrannosaurus Rex (CR 8) stat overlays. `originalForm.ac` now stores the character's pre-shape AC (was incorrectly the beast's AC).
 > - **Subraces & Variant Human**: Subraces for Elves (High Elf, Wood Elf, Drow), Dwarves (Hill Dwarf, Mountain Dwarf), Halflings (Lightfoot, Stout), Gnomes (Rock Gnome, Forest Gnome), and Variant Human.
+> - **Combat-save wiring (latest)**: Champion Superior Critical now correctly crits on a natural 18 (crit check reads the reducer's expanded range instead of a hardcoded `roll >= 19`); Halfling Lucky now rerolls natural-1 **saving throws** (roll happens before `onSaveRoll` effects; `reroll-ones` registered on the save hook); Gnome Cunning advantage now applies to ALL spell-originated INT/WIS/CHA saves (spell saves pass `{ isMagical: true, isCharm }` spell context instead of only charm spells); Protection fighting style is no longer offered as a selectable option (it required battle-map adjacency the engine can't enforce) — Fighter, Paladin, and Ranger pickers exclude it.
 > **Scope**: All 9 races and 12 classes defined in the codebase, compared against the 5e SRD.
 
 ---
@@ -54,7 +55,7 @@
 
 ### Druid — **Clearly Working** (↑ was ~25%)
 - **Full Spellcasting**: WIS-based prepared casting with ritual support.
-- **Wild Shape Beast Transformations**: Full beast form stat overlays via `BEAST_FORMS_CATALOG` (`data/beasts.ts`) for Wolf, Panther, Brown Bear, Dire Wolf, Giant Eagle, Giant Crocodile, and Tyrannosaurus Rex with AC, HP, speed, and beast attack actions.
+- **Wild Shape Beast Transformations**: Full beast form stat overlays via `BEAST_FORMS_CATALOG` (`data/beasts.ts`) for Wolf, Panther, Brown Bear, Dire Wolf, Giant Eagle, Giant Crocodile, and Tyrannosaurus Rex with AC, HP, speed, and beast attack actions. CR-limited by druid level (`floor(level/3)`): Giant Crocodile needs L15; T-Rex is unreachable via Wild Shape (CR 8 needs L24) and is polymorph-only.
 - **Natural Recovery (L2)**: Short-rest spell slot recovery via the `natural_recovery()` engine method (`travelService.ts`), mirroring Arcane Recovery.
 **SRD Fidelity:** ~80%.
 
@@ -102,7 +103,7 @@
 ---
 
 ### Sorcerer — **Clearly Working** (↑ was ~60%)
-- **Sorcery Points & Metamagic**: Twinned, Heightened, Quickened, Subtle, Empowered, Careful, Distant, Extended point costs and mechanical effects.
+- **Sorcery Points & Metamagic**: Twinned, Heightened, Quickened, Subtle, Empowered, Careful, Distant, Extended point costs and mechanical effects. Options are granted at L3 and re-applied on level-up (survives progression).
 - **Draconic Resilience**: AC `13 + DEX` and +1 HP/level.
 **SRD Fidelity:** ~75%.
 
@@ -129,9 +130,9 @@
 | **Human** | Standard (+1 all stats), Variant Human (+1 to two stats, 1 skill prof, 1 feat at L1) | ~90% |
 | **Elf** | High Elf (+1 INT, cantrip), Wood Elf (+1 WIS, +5ft speed), Drow (+1 CHA, 120ft darkvision), Fey Ancestry charm save advantage | ~85% |
 | **Dwarf** | Hill Dwarf (+1 WIS, +1 HP/level), Mountain Dwarf (+2 STR, medium armor prof), Dwarven Resilience poison resistance/save advantage | ~85% |
-| **Halfling** | Lightfoot (+1 CHA), Stout (+1 CON, poison resistance), Lucky reroll 1s, Brave advantage vs frightened | ~90% |
+| **Halfling** | Lightfoot (+1 CHA), Stout (+1 CON, poison resistance), Lucky reroll 1s on attacks/checks/saves, Brave advantage vs frightened | ~90% |
 | **Dragonborn** | Breath Weapon (damage + save DC), Draconic Ancestry selection, Damage Resistance matching element | ~85% |
-| **Gnome** | Rock Gnome (+1 CON), Forest Gnome (+1 DEX), Gnome Cunning advantage vs magic saves | ~85% |
+| **Gnome** | Rock Gnome (+1 CON), Forest Gnome (+1 DEX), Gnome Cunning advantage vs magic saves (all spell-originated saves) | ~85% |
 | **Half-Elf** | Flexible ASIs, Skill Versatility, Fey Ancestry charm save advantage | ~90% |
 | **Half-Orc** | Relentless Endurance (revive to 1 HP), Savage Attacks (+1 extra crit damage die), Darkvision | ~90% |
 | **Tiefling** | Hellish Resistance (fire resistance), Infernal Legacy (Hellish Rebuke, Darkness, Thaumaturgy) | ~85% |

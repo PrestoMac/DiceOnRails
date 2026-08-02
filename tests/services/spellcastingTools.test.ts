@@ -964,7 +964,7 @@ describe('spell correctness fixes (S3/S6/S7 + Fey Ancestry)', () => {
     server.joinParty(wizard);
     vi.mocked(cryptoRoll).mockReturnValueOnce(5).mockReturnValueOnce(15).mockReturnValue(10);
 
-    const r = await server.make_save('wizard-1', 'wis', 14, true);
+    const r = await server.make_save('wizard-1', 'wis', 14, { isMagical: true, isCharm: true });
     expect(r.data?.success).toBe(true); // advantage kept 15; +WIS(1) = 16 >= 14
     expect(r.message).toContain('Fey Ancestry advantage');
   });
@@ -974,7 +974,7 @@ describe('spell correctness fixes (S3/S6/S7 + Fey Ancestry)', () => {
     server.joinParty(wizard);
     vi.mocked(cryptoRoll).mockReturnValueOnce(5).mockReturnValue(10);
 
-    const r = await server.make_save('wizard-1', 'wis', 14, false);
+    const r = await server.make_save('wizard-1', 'wis', 14, { isMagical: true, isCharm: false });
     expect(r.data?.success).toBe(false); // single roll 5 + WIS(1) = 6 < 14
     expect(r.message).not.toContain('Fey Ancestry');
   });

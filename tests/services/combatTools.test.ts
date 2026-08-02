@@ -246,6 +246,29 @@ describe('combatTools', () => {
       expect(stateAfter.combat.enemies[0].hp.current).toBeLessThan(hpBefore);
     });
 
+    it('Champion Superior Critical (18-20) crits on a natural 18', async () => {
+      // Champion L15 with Superior Critical — a natural 18 must be a critical hit.
+      server.joinParty(makeCharacter({ level: 15, subclassId: 'champion' }));
+      await server.add_enemy('Goblin');
+      await server.start_combat();
+      mockRoll(18);
+      const result = await server.player_attack('Valerius', 'Longsword', 'Goblin');
+      expect(result.success).toBe(true);
+      expect(result.data?.isCritical).toBe(true);
+      expect(result.data?.isHit).toBe(true);
+      expect(result.message).toContain('CRITICAL');
+    });
+
+    it('Improved Critical (19-20) does NOT crit on a natural 18', async () => {
+      // Champion L3 (Improved Critical 19-20) — a natural 18 is NOT a crit.
+      server.joinParty(makeCharacter({ level: 3, subclassId: 'champion' }));
+      await server.add_enemy('Goblin');
+      await server.start_combat();
+      mockRoll(18);
+      const result = await server.player_attack('Valerius', 'Longsword', 'Goblin');
+      expect(result.data?.isCritical).toBe(false);
+    });
+
     it('applies sharpshooter and sneak attack feat flags', async () => {
       mockRoll(20);
       server.joinParty(makeCharacter({

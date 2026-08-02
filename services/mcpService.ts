@@ -87,7 +87,7 @@ export class MockMCPServer {
     this.spells = createSpellcastingService(this.state, {
       getTarget: (id) => this.party.getTarget(id),
       inflict_damage: (amount, targetId, dmgType) => this.inventory.inflict_damage(amount, targetId, dmgType),
-      make_save: (targetId, stat, dc, charmSave) => this.combat.make_save(targetId, stat, dc, charmSave),
+      make_save: (targetId, stat, dc, spellContext) => this.combat.make_save(targetId, stat, dc, spellContext),
       syncInitiativeConditions: () => this.combat.syncInitiativeConditions(),
     });
     this.progression = createProgressionService(this.state);
@@ -159,7 +159,7 @@ export class MockMCPServer {
   public async next_turn(autoResolveEnemies?: boolean): Promise<MCPResponse> { return this.combat.next_turn(autoResolveEnemies); }
   public async end_combat(): Promise<MCPResponse> { return this.combat.end_combat(); }
   public async enemy_attack(enemyId: string, targetId?: string, attackIndex?: number): Promise<MCPResponse> { return this.combat.enemy_attack(enemyId, targetId, attackIndex); }
-  public async make_save(targetId: string, stat: string, dc: number, charmSave = false): Promise<MCPResponse> { return this.combat.make_save(targetId, stat, dc, charmSave); }
+  public async make_save(targetId: string, stat: string, dc: number, spellContext?: { isMagical?: boolean; isCharm?: boolean }): Promise<MCPResponse> { return this.combat.make_save(targetId, stat, dc, spellContext); }
   public async roll_death_save(targetId?: string): Promise<MCPResponse> { return this.combat.roll_death_save(targetId); }
   public getCurrentTurnInfo(): { name: string; type: 'player' | 'enemy'; id: string } | null { return this.combat.getCurrentTurnInfo(); }
   public updateInitiativeDeathStatus(id: string, isDead: boolean): void { this.combat.updateInitiativeDeathStatus(id, isDead); }

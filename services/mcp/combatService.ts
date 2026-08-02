@@ -29,7 +29,7 @@ export interface CombatService {
   next_turn(autoResolveEnemies?: boolean): Promise<MCPResponse>;
   end_combat(): Promise<MCPResponse>;
   enemy_attack(enemyId: string, targetId?: string, attackIndex?: number): Promise<MCPResponse>;
-  make_save(targetId: string, stat: string, dc: number, charmSave?: boolean): Promise<MCPResponse>;
+  make_save(targetId: string, stat: string, dc: number, spellContext?: { isMagical?: boolean; isCharm?: boolean }): Promise<MCPResponse>;
   roll_death_save(targetId?: string): Promise<MCPResponse>;
   getCurrentTurnInfo(): { name: string; type: 'player' | 'enemy'; id: string } | null;
   updateInitiativeDeathStatus(id: string, isDead: boolean): void;
@@ -847,7 +847,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       };
     },
 
-    async make_save(targetId, stat, dc, charmSave = false) {
+    async make_save(targetId, stat, dc, spellContext?) {
       const validStats = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
       const cleanStat = stat.toLowerCase().trim() as string;
       const mappedStat = validStats.find(s => cleanStat.includes(s) || s.includes(cleanStat)) || 'dex';
@@ -873,17 +873,20 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
         const shieldMasterBonus = getShieldMasterSaveBonus(partyTarget, mappedStat as 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha');
         let totalMod = mod + resilientBonus + shieldMasterBonus;
 
+        const initialRoll = cryptoRoll(20);
         const saveCtx: SaveRollContext = {
           _hook: 'onSaveRoll',
-          roll: 0,
+          roll: initialRoll,
           stat: mappedStat,
           character: partyTarget,
           hasAdvantage: false,
           extraModifier: 0,
-          spellContext: charmSave ? { isMagical: true } : undefined,
+          spellContext,
         };
         const afterEffects = applyEffects(partyTarget, 'onSaveRoll', saveCtx);
         totalMod += afterEffects.extraModifier;
+        // reroll-ones (Halfling Lucky) may have replaced a natural 1 on the save
+        let roll = afterEffects.roll;
 
         // Aura of Protection: scan party for any conscious Paladin (L6+) with this
         // aura. Each such Paladin grants their CHA mod (min +1) to all party saves.
@@ -917,7 +920,6 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
           totalMod += auraBonus;
         }
 
-        let roll = cryptoRoll(20);
         let advantageNote = '';
         if (afterEffects.hasAdvantage) {
           const second = cryptoRoll(20);
@@ -1144,7 +1146,9 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       const hasExpandedCrit = !!(afterRoll as unknown as Record<string, unknown>)._critRangeExpanded;
 
       const attackRoll = roll + atkBonus - getExhaustionPenalty(attacker);
-      const isCrit = roll === 20 || (hasExpandedCrit && roll >= 19);
+      // The crit-range reducer already sets _critRangeExpanded only when roll >= minCrit,
+      // so the flag alone encodes the full crit range (Champion 19-20, 18-20).
+      const isCrit = roll === 20 || hasExpandedCrit;
       const isFumble = roll === 1;
       const enemyAc = typeof enemy.ac === 'number' ? enemy.ac : 10;
       const isHit = isCrit || (!isFumble && attackRoll >= enemyAc);

@@ -88,6 +88,7 @@ CLASS FEATURES:
 - Natural Recovery (Druid Circle of Land L2): Once per long rest, recover expended spell slots up to half druid level (round up). Use_resource(resourceId="natural-recovery") to check availability.
 - Eldritch Invocations (Warlock L2): Agonizing Blast (add CHA mod to Eldritch Blast damage), Armor of Shadows (mage armor at will), Fiendish Vigor (false life at will), and others are **ENGINE APPLIED** based on the warlock's chosen invocations.
 - Fighting Styles: **ENGINE APPLIED**. Archery (+2 attack), Defense (+1 AC in armor), Dueling (+2 damage), GWF (rerolls 1s/2s), and TWF (offhand mod) are mechanically applied.
+- Extra Attack (Fighter L5, Barbarian L5, Monk L5, Paladin L5, Ranger L5): when the character has the Extra Attack class feature and takes the Attack action, call player_attack TWICE (a second attack at the same target or a new one). The engine does NOT auto-repeat the attack — you must issue both player_attack calls.
 
 RACE TRAITS:
 - Darkvision: Don't narrate "you can't see in this dark room" if the character has darkvision.
@@ -96,7 +97,7 @@ RACE TRAITS:
 - Savage Attacks (Half-Orc): **ENGINE APPLIED.** Adds an extra weapon damage die on melee critical hits.
 - Brutal Critical (Barbarian L9+): **ENGINE APPLIED.** Adds extra weapon damage dice on melee critical hits.
 - Fey Ancestry (Elf/Half-Elf): **ENGINE APPLIED**. Advantage vs charmed saves, immune to magical sleep.
-- Gnome Cunning (Gnome): **ENGINE APPLIED**. Advantage on INT/WIS/CHA saves vs magic.
+- Gnome Cunning (Gnome): **ENGINE APPLIED**. Advantage on INT/WIS/CHA saves vs magic (auto-applied to all spell-originated saves).
 - Halfling Brave: **ENGINE APPLIED**. Advantage on saves vs frightened.
 - Damage Resistances: **ENGINE APPLIED**. Dwarf poison, Tiefling fire, Dragonborn draconic element, and Barbarian rage resistances are automatically calculated on damage taken.
 - Breath Weapon (Dragonborn): 'use_resource' with resourceId="breath-weapon" returns the save DC and rolled damage.

@@ -23,7 +23,7 @@ const RACE_ASSESSMENTS: AssessmentMap = {
   },
   gnome: {
     status: 'ok',
-    reason: 'Gnome Cunning (advantage on INT/WIS/CHA saves vs magic), Darkvision, and Subraces (Rock Gnome, Forest Gnome) are fully supported.',
+    reason: 'Gnome Cunning (advantage on INT/WIS/CHA saves vs magic, auto-applied to spell saves), Darkvision, and Subraces (Rock Gnome, Forest Gnome) are fully supported.',
   },
   'half-elf': {
     status: 'ok',
@@ -43,7 +43,7 @@ const RACE_ASSESSMENTS: AssessmentMap = {
   },
   halfling: {
     status: 'ok',
-    reason: 'Lucky (auto-rerolls natural 1s on attacks/checks/saves), Brave (frightened save advantage), and Subraces (Lightfoot, Stout) are fully supported.',
+    reason: 'Lucky (auto-rerolls natural 1s on attacks, checks, and saving throws), Brave (frightened save advantage), and Subraces (Lightfoot, Stout) are fully supported.',
   },
   'half-orc': {
     status: 'ok',
@@ -70,7 +70,7 @@ const CLASS_ASSESSMENTS: AssessmentMap = {
   },
   druid: {
     status: 'ok',
-    reason: 'Full WIS prepared casting, Wild Shape Beast Transformations (Wolf, Panther, Brown Bear, Dire Wolf, Giant Eagle, Giant Crocodile, Tyrannosaurus Rex stat overlays, temporary HP, AC, speed, attacks), and Natural Recovery are fully supported.',
+    reason: 'Full WIS prepared casting, Wild Shape (Wolf, Panther, Brown Bear, Dire Wolf, Giant Eagle at L3+; CR-limited by level — Giant Crocodile needs L15, T-Rex needs L24 via polymorph), and Natural Recovery are fully supported.',
   },
   fighter: {
     status: 'ok',
@@ -94,7 +94,7 @@ const CLASS_ASSESSMENTS: AssessmentMap = {
   },
   sorcerer: {
     status: 'ok',
-    reason: 'Full CHA spellcasting, Sorcery Points, Metamagic (Twinned, Heightened, Quickened, Subtle, Empowered, Careful, Distant, Extended), and Draconic Resilience (13+DEX AC, +1 HP/level) are fully supported.',
+    reason: 'Full CHA spellcasting, Sorcery Points, Metamagic (Twinned, Heightened, Quickened, Subtle, Empowered, Careful, Distant, Extended — granted at L3 and on level-up), and Draconic Resilience (13+DEX AC, +1 HP/level) are fully supported.',
   },
   warlock: {
     status: 'ok',

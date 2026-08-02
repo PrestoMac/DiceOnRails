@@ -4,6 +4,7 @@ import {
   applyEffects,
   DamageTakenContext,
   AttackRollContext,
+  SaveRollContext,
 } from '../../services/effectDispatcher';
 import { getClassDef, getRaceDef, getSubclassDef } from '../../services/classEngine';
 import { getFeatById } from '../../utils/feats';
@@ -183,6 +184,7 @@ describe('applyEffects — onDamageTaken', () => {
 
 describe('applyEffects — onAttackRoll', () => {
   it('rerolls natural 1s for Halfling Lucky', () => {
+    const mathSpy = vi.spyOn(Math, 'random').mockReturnValue(0.9); // reroll -> 19
     vi.mocked(getRaceDef).mockReturnValue({
       id: 'halfling',
       name: 'Halfling',
@@ -211,5 +213,41 @@ describe('applyEffects — onAttackRoll', () => {
     };
     const result = applyEffects(char, 'onAttackRoll', ctx);
     expect(result.roll).not.toBe(1);
+    mathSpy.mockRestore();
+  });
+});
+
+describe('applyEffects — onSaveRoll', () => {
+  it('rerolls natural 1s on saving throws for Halfling Lucky', () => {
+    const mathSpy = vi.spyOn(Math, 'random').mockReturnValue(0.9); // reroll -> 19
+    vi.mocked(getRaceDef).mockReturnValue({
+      id: 'halfling',
+      name: 'Halfling',
+      description: '',
+      asi: { str: 0, dex: 2, con: 0, int: 0, wis: 0, cha: 1 },
+      speed: 25,
+      size: 'small',
+      traits: [
+        { id: 'lucky', name: 'Lucky', description: '', kind: 'passive', effect: { kind: 'reroll-ones', payload: { scope: 'all' } } },
+      ],
+      languages: ['common', 'halfling'],
+      icon: '',
+      flavor: '',
+    });
+    vi.mocked(getClassDef).mockReturnValue(undefined);
+    vi.mocked(getSubclassDef).mockReturnValue(undefined);
+
+    const char = makeChar({ race: 'halfling', racialTraits: ['lucky'] });
+    const ctx: SaveRollContext = {
+      _hook: 'onSaveRoll',
+      roll: 1,
+      stat: 'dex',
+      character: char,
+      hasAdvantage: false,
+      extraModifier: 0,
+    };
+    const result = applyEffects(char, 'onSaveRoll', ctx);
+    expect(result.roll).not.toBe(1);
+    mathSpy.mockRestore();
   });
 });

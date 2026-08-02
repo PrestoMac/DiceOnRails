@@ -57,7 +57,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     statPriority: ['str', 'con', 'cha', 'dex', 'wis', 'int'],
     features: [
       { id: 'fighting-style', name: 'Fighting Style', description: 'You adopt a particular style of fighting as your specialty.', level: 1, kind: 'subclass',
-        choice: { label: 'Choose a Fighting Style', options: FIGHTING_STYLE_OPTIONS },
+        choice: { label: 'Choose a Fighting Style', options: FIGHTING_STYLE_OPTIONS.filter(fs => fs.id !== 'protection') },
         effect: { kind: 'fighting-style' }
       },
       { id: 'second-wind', name: 'Second Wind', description: 'Bonus action: regain 1d10 + fighter level HP, once per short rest.', level: 1, kind: 'resource', grantsResource: 'second-wind' },
@@ -79,7 +79,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
           { id: 'improved-critical', name: 'Improved Critical', description: 'Your weapon attacks score a critical hit on a roll of 19 or 20.', level: 3, kind: 'passive', effect: { kind: 'crit-range', payload: { min: 19 } } },
           { id: 'remarkable-athlete', name: 'Remarkable Athlete', description: 'Add half your proficiency bonus (round up) to any Strength, Dexterity, or Constitution check you make that doesn\'t already use your proficiency bonus.', level: 7, kind: 'passive' },
           { id: 'additional-fighting-style', name: 'Additional Fighting Style', description: 'Choose a second fighting style.', level: 10, kind: 'subclass',
-            choice: { label: 'Choose a second Fighting Style', options: FIGHTING_STYLE_OPTIONS },
+            choice: { label: 'Choose a second Fighting Style', options: FIGHTING_STYLE_OPTIONS.filter(fs => fs.id !== 'protection') },
             effect: { kind: 'fighting-style' }
           },
           { id: 'superior-critical', name: 'Superior Critical', description: 'Your weapon attacks score a critical hit on a roll of 18-20.', level: 15, kind: 'passive', effect: { kind: 'crit-range', payload: { min: 18 } } },
@@ -464,7 +464,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
       { id: 'divine-sense', name: 'Divine Sense', description: 'As an action, detect celestial, fiend, or undead within 60 ft. Uses: 1 + CHA mod per long rest.', level: 1, kind: 'resource', grantsResource: 'divine-sense' },
       { id: 'divine-smite', name: 'Divine Smite', description: 'When you hit with a melee weapon attack, you can expend a spell slot to deal extra radiant damage: 2d8 for L1, +1d8 per level above 1 (max 5d8).', level: 2, kind: 'passive' },
       { id: 'fighting-style-pal', name: 'Fighting Style', description: 'You adopt a fighting style as your specialty.', level: 2, kind: 'subclass',
-        choice: { label: 'Choose a Fighting Style', options: FIGHTING_STYLE_OPTIONS },
+        choice: { label: 'Choose a Fighting Style', options: FIGHTING_STYLE_OPTIONS.filter(fs => fs.id !== 'protection') },
         effect: { kind: 'fighting-style' }
       },
       { id: 'divine-health', name: 'Divine Health', description: 'You are immune to disease.', level: 3, kind: 'passive', effect: { kind: 'condition-immunity', payload: { condition: 'diseased' } } },

@@ -518,16 +518,16 @@ The math layer behind `mcp/combatService.ts`. `addEnemyToCombat` auto-fills stat
 | `computeAc` | `AcContext` | `classEngine.calculateAc` | `ac-formula`, `dual-wielder-ac`, `fighting-style` (Defense +1 in armor) |
 | `computeSpeed` | `SpeedContext` | `classEngine.calculateSpeed` | `speed-bonus` |
 | `computeMaxHp` | `MaxHpContext` | `classEngine.calculateMaxHp` | `hp-per-level` |
-| `onAttackRoll` | `AttackRollContext` | `combatService.player_attack` | `reroll-ones`, `crit-range`, `fighting-style` (Archery +2 ranged) |
+| `onAttackRoll` | `AttackRollContext` | `combatService.player_attack` | `reroll-ones`, `crit-range` (sets `_critRangeExpanded` flag at `roll >= minCrit`; combat reads the flag directly — not a hardcoded `>= 19` — so Champion Superior Critical 18-20 crits on 18), `fighting-style` (Archery +2 ranged) |
 | `onAttackDamage` | `AttackDamageContext` | `combatService.player_attack` | `damage-bonus` (rage, Improved Divine Smite), `crit-bonus-dice` (Brutal Critical, Savage Attacks — accumulated counter, caller rolls weapon dice), `fighting-style` (Dueling +2 melee; GWF rerolls + TWF offhand mod checked via `character.fightingStyle` in combatService) |
 | `onDamageTaken` | `DamageTakenContext` | `inventoryEngine.inflictDamageOnTarget` + `inventoryService.inflict_damage` | `damage-resistance` (condition-gated for rage, `from-draconic-ancestry` resolution), `damage-immunity`, `damage-vulnerability` |
-| `onSaveRoll` | `SaveRollContext` | `combatService.make_save` | `advantage-on-save`, `save-proficiency`, `diamond-soul`; `aura-of-protection` is applied cross-character in `make_save` (scans party for conscious Paladins L6+, adds highest CHA mod min +1) |
+| `onSaveRoll` | `SaveRollContext` | `combatService.make_save` | `reroll-ones` (Halfling Lucky — the d20 is rolled before effects so the reducer sees a natural 1), `advantage-on-save` (spell-context-gated: Gnome Cunning via `isMagical`+`stats`, Fey Ancestry via `isCharm`), `save-proficiency`, `diamond-soul`; `aura-of-protection` is applied cross-character in `make_save` (scans party for conscious Paladins L6+, adds highest CHA mod min +1) |
 | `onSkillCheck` | `SkillCheckContext` | `travelService.check_skill` | `reroll-ones`, `skill-expertise`, `jack-of-all-trades` (+½ prof on non-proficient), `reliable-talent` (floor proficient rolls at 10) |
 | `onConditionApplied` | `ConditionAppliedContext` | `conditionEngine.applyCondition` | `condition-immunity` |
 | `onCharacterCreated` | `CharacterCreatedContext` | `characterCreationService.buildCharacterFromWizard` | `skill-proficiency`, `armor-proficiency`, `language`, `metamagic-option` (populates `character.metamagicOptions`) |
 | `onLongRest` | `RestContext` | `travelService.long_rest` | _(extension point)_ |
 | `onShortRest` | `RestContext` | `travelService.short_rest` | _(extension point)_ |
-| `onLevelUp` | `LevelUpContext` | `progressionService.level_up` | _(extension point)_ |
+| `onLevelUp` | `LevelUpContext` | `progressionService.level_up` | `metamagic-option` (re-applies metamagic on level-up so L3+ sorcerers get options through progression) |
 
 **Stacking rules** (SRD-faithful, enforced by reducer ordering):
 - Damage resistances/immunities/vulnerabilities: no stacking (single application per type; immunity overrides resistance)

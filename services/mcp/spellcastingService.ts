@@ -14,7 +14,7 @@ import { getEffects } from '../effectDispatcher';
 export interface SpellcastingDeps {
   getTarget: (id?: string) => Character | undefined;
   inflict_damage: (amount: number, targetId?: string, damageType?: string, options?: { skipTargetDerivedReductions?: boolean }) => Promise<MCPResponse>;
-  make_save: (targetId: string, stat: string, dc: number, charmSave?: boolean) => Promise<MCPResponse>;
+  make_save: (targetId: string, stat: string, dc: number, spellContext?: { isMagical?: boolean; isCharm?: boolean }) => Promise<MCPResponse>;
   syncInitiativeConditions: () => void;
 }
 
@@ -310,7 +310,7 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
           // damage on a success; 'none' negates it entirely (0 damage on success).
           const savePassed = llmOverride !== undefined
             ? llmOverride === true
-            : (await deps.make_save(t.targetId, saveStat, saveDC, isCharmSpell)).data?.success === true;
+            : (await deps.make_save(t.targetId, saveStat, saveDC, { isMagical: true, isCharm: isCharmSpell })).data?.success === true;
           // Evasion (Rogue L7 / Monk L7): on a successful DEX save, take 0 damage
           // instead of half; on a failed DEX save, take half instead of full.
           const targetChar = deps.getTarget(t.targetId);
@@ -453,7 +453,7 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
             const llmOverride = targetSaveResults?.[targetId];
             const savePassed = llmOverride !== undefined
               ? llmOverride === true
-              : (await deps.make_save(targetId, saveStat, resolvedSaveDC, isCharmCondition)).data?.success === true;
+              : (await deps.make_save(targetId, saveStat, resolvedSaveDC, { isMagical: true, isCharm: isCharmCondition })).data?.success === true;
             if (savePassed) continue;
           }
 

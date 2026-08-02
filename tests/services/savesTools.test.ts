@@ -110,6 +110,45 @@ describe('savesTools', () => {
       expect(result.data.roll).toBe(12);
     });
 
+    it('Halfling Lucky rerolls a natural-1 saving throw', async () => {
+      // Halfling Lucky: natural 1 on a save is rerolled. make_save rolls before
+      // applying onSaveRoll effects so the reroll-ones reducer sees the d20.
+      vi.spyOn(Math, 'random').mockReturnValue(0.95); // reroll -> 20
+      mockRoll(1); // initial natural 1
+      server.joinParty(makeCharacter({ race: 'halfling', racialTraits: ['lucky'] }));
+      const result = await server.make_save('Valerius', 'dex', 10);
+      expect(result.data.success).toBe(true); // 20 + DEX mod >= 10
+      expect(result.data.roll).not.toBe(1);
+      vi.restoreAllMocks();
+    });
+
+    it('Gnome Cunning grants advantage on spell-originated WIS save vs magic', async () => {
+      // Gnome Cunning: INT/WIS/CHA saves vs magic get advantage. The 4th make_save
+      // arg now carries { isMagical: true } for ALL spell saves (not just charm).
+      mockRollSequence(5, 15); // first roll 5, advantage roll 15 -> keep 15
+      server.joinParty(makeCharacter({ race: 'gnome', racialTraits: ['gnome-cunning'] }));
+      const result = await server.make_save('Valerius', 'wis', 14, { isMagical: true });
+      expect(result.data.success).toBe(true); // 15 + WIS(1) = 16 >= 14
+      expect(result.message).toContain('Gnome Cunning advantage');
+    });
+
+    it('Gnome Cunning does NOT grant advantage on a non-magical save', async () => {
+      mockRoll(5);
+      server.joinParty(makeCharacter({ race: 'gnome', racialTraits: ['gnome-cunning'] }));
+      const result = await server.make_save('Valerius', 'wis', 14);
+      expect(result.data.success).toBe(false); // single roll 5 + WIS(1) = 6 < 14
+      expect(result.message).not.toContain('Gnome Cunning');
+    });
+
+    it('Gnome Cunning does NOT grant advantage on a non-INT/WIS/CHA save', async () => {
+      // Gnome Cunning only covers INT/WIS/CHA saves; a DEX save (even magical) is unaffected.
+      mockRoll(5);
+      server.joinParty(makeCharacter({ race: 'gnome', racialTraits: ['gnome-cunning'] }));
+      const result = await server.make_save('Valerius', 'dex', 14, { isMagical: true });
+      expect(result.data.success).toBe(false);
+      expect(result.message).not.toContain('Gnome Cunning');
+    });
+
     it('enemy target uses fallback stats', async () => {
       mockRoll(15);
       await server.add_enemy('Goblin');

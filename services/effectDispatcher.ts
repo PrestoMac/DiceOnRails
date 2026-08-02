@@ -80,7 +80,7 @@ export interface SaveRollContext extends HookContext {
   stat: string;
   character: Character;
   source?: string;
-  spellContext?: { spellName?: string; isMagical?: boolean };
+  spellContext?: { spellName?: string; isMagical?: boolean; isCharm?: boolean };
   hasAdvantage: boolean;
   extraModifier: number;
   advantageSources?: string[];
@@ -330,12 +330,24 @@ const HOOK_REGISTRY: Record<HookName, ReducerEntry[]> = {
   ],
   onSaveRoll: [
     {
+      kind: 'reroll-ones',
+      reduce: (ctx) => {
+        const saveCtx = ctx as unknown as SaveRollContext;
+        if (saveCtx.roll === 1) {
+          saveCtx.roll = Math.floor(Math.random() * 20) + 1;
+        }
+        return ctx;
+      },
+    },
+    {
       kind: 'advantage-on-save',
       reduce: (ctx, payload) => {
         const saveCtx = ctx as unknown as SaveRollContext;
         const against = (payload.against as string) || '';
         const stat = (payload.stat as string) || '';
+        const stats = (payload.stats as string[] | undefined) || [];
         if (stat && saveCtx.stat.toLowerCase() !== stat.toLowerCase()) return ctx;
+        if (stats.length > 0 && !stats.some(s => s.toLowerCase() === saveCtx.stat.toLowerCase())) return ctx;
         if (!saveCtx.advantageSources) saveCtx.advantageSources = [];
         if (against === 'poison') {
           saveCtx.hasAdvantage = true;
@@ -345,7 +357,7 @@ const HOOK_REGISTRY: Record<HookName, ReducerEntry[]> = {
             saveCtx.hasAdvantage = true;
             saveCtx.advantageSources.push((payload.name as string) || 'Gnome Cunning advantage');
           }
-        } else if (against === 'charmed' && saveCtx.spellContext?.isMagical) {
+        } else if (against === 'charmed' && saveCtx.spellContext?.isCharm) {
           saveCtx.hasAdvantage = true;
           saveCtx.advantageSources.push((payload.name as string) || 'Fey Ancestry advantage');
         } else if (against === 'frightened') {
@@ -442,7 +454,16 @@ const HOOK_REGISTRY: Record<HookName, ReducerEntry[]> = {
   ],
   onLongRest: [],
   onShortRest: [],
-  onLevelUp: [],
+  onLevelUp: [
+    {
+      kind: 'metamagic-option',
+      reduce: (ctx, payload, character) => {
+        const opts = (payload.options as string[]) || [];
+        if (opts.length) character.metamagicOptions = opts;
+        return ctx;
+      },
+    },
+  ],
   onCharacterCreated: [
     {
       kind: 'skill-proficiency',

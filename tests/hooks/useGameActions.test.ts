@@ -140,6 +140,7 @@ describe('useGameActions', () => {
   beforeEach(() => {
     defaultProps.messages = [];
     vi.clearAllMocks();
+    vi.useFakeTimers();
     vi.stubGlobal('Date', { now: () => 1000 });
     mcpServerMock.getFullState.mockReturnValue(makeBaseState());
     mcpServerMock.getTarget.mockReturnValue(makeBaseState().party[0]);
@@ -155,6 +156,7 @@ describe('useGameActions', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.useRealTimers();
   });
 
   const render = () =>

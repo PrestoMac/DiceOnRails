@@ -139,7 +139,7 @@ export const RACES_CATALOG: RaceDefinition[] = [
     size: 'small',
     darkvision: 60,
     traits: [
-      { id: 'gnome-cunning', name: 'Gnome Cunning', description: 'You have advantage on all Intelligence, Wisdom, and Charisma saving throws against magic.', kind: 'passive', effect: { kind: 'advantage-on-save', payload: { against: 'magic' } } },
+      { id: 'gnome-cunning', name: 'Gnome Cunning', description: 'You have advantage on all Intelligence, Wisdom, and Charisma saving throws against magic.', kind: 'passive', effect: { kind: 'advantage-on-save', payload: { against: 'magic', stats: ['int', 'wis', 'cha'] } } },
     ],
     languages: ['common', 'gnomish'],
     icon: 'fa-hat-wizard',
