@@ -224,6 +224,20 @@ describe('conditionEngine', () => {
             expect(effects.speedModifier).toBe(1);
         });
 
+        it('dodging grants attacksAgainstHaveDisadvantage', () => {
+            const char = makeCharacter();
+            applyCondition(char, { id: 'dodging', source: char.id, duration: 1 });
+            const effects = getConditionEffects(char);
+            expect(effects.attacksAgainstHaveDisadvantage).toBe(true);
+        });
+
+        it('no dodging means attacksAgainstHaveDisadvantage is false', () => {
+            const char = makeCharacter();
+            applyCondition(char, { id: 'blinded', source: 'test', duration: 5 });
+            const effects = getConditionEffects(char);
+            expect(effects.attacksAgainstHaveDisadvantage).toBe(false);
+        });
+
         it.each([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])('exhaustion level %i: returns d20Modifier -%i and speedPenaltyFt -%ift', (level) => {
             const char = makeCharacter();
             applyCondition(char, { id: `exhaustion-${level}`, source: 'fatigue', duration: Infinity, durationUnit: 'minute' });

@@ -21,6 +21,7 @@ export function filterTools(tools: Array<{ function: { name: string } }>, state:
   const hasCaster = state.party.some(c =>
     (c.knownSpells?.length ?? 0) > 0 || (c.preparedSpells?.length ?? 0) > 0
   );
+  const hasDruid = state.party.some(c => c.class === 'druid');
 
   return tools.filter(t => {
     const name = t.function.name;
@@ -58,6 +59,8 @@ export function filterTools(tools: Array<{ function: { name: string } }>, state:
          'cast_ritual'].includes(name)) {
       return hasCaster;
     }
+
+    if (name === 'natural_recovery') return hasDruid;
 
     return true;
   });

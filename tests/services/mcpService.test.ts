@@ -2094,6 +2094,49 @@ const roundTripped = deepClone(char.conditions);
     });
   });
 
+  describe('natural_recovery (executeToolCall dispatch)', () => {
+    function makeDruid(overrides: Partial<Character> = {}): Character {
+      return {
+        id: 'druid-1', name: 'Willow', class: 'druid', race: 'half-elf', level: 4,
+        hp: { current: 30, max: 30 },
+        stats: { str: 8, dex: 14, con: 12, int: 12, wis: 16, cha: 10 },
+        inventory: [],
+        currency: { gp: 10, sp: 0, cp: 0 },
+        location: 'Test Grove',
+        experience: 0, experienceToNextLevel: 2700,
+        unusedStatPoints: 0, maxHpBonus: 0,
+        hitDice: { current: 4, max: 4 },
+        skills: {},
+        resources: [
+          { id: 'spell-slot-1', name: 'Level 1 Spell Slot', current: 4, max: 4, resetOn: 'long', source: 'class', sourceId: 'druid' },
+          { id: 'spell-slot-2', name: 'Level 2 Spell Slot', current: 0, max: 3, resetOn: 'long', source: 'class', sourceId: 'druid' },
+        ],
+        ...overrides,
+      };
+    }
+
+    it('recovers expended spell slots for a druid via executeToolCall', async () => {
+      const druid = makeDruid();
+      const server = new MockMCPServer();
+      server.joinParty(druid);
+      const result = await server.executeToolCall('natural_recovery', { characterId: 'druid-1', selections: [{ level: 2, count: 1 }] });
+      expect(result.success).toBe(true);
+      const slot2 = druid.resources?.find(r => r.id === 'spell-slot-2');
+      expect(slot2?.current).toBe(1);
+      const nrPool = druid.resources?.find(r => r.id === 'natural-recovery');
+      expect(nrPool).toBeDefined();
+      expect(nrPool?.current).toBe(0);
+    });
+
+    it('rejects non-druids via executeToolCall', async () => {
+      const server = new MockMCPServer();
+      server.joinParty(makeCharacter());
+      const result = await server.executeToolCall('natural_recovery', { characterId: 'hero-1', selections: [{ level: 1, count: 1 }] });
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('Only Druids');
+    });
+  });
+
   describe('player_attack', () => {
     it('performs an attack roll against an enemy', async () => {
       vi.mocked(cryptoRoll).mockReturnValue(10);

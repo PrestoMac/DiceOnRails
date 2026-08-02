@@ -25,7 +25,7 @@ const ReviewStep: React.FC<ReviewStepProps> = ({
   wizardState, finalizeError, isNewCampaign, campaignStartingLocation, needsSpellsStep, onFinalize, onGoToStart,
 }) => {
   const { name, selectedRace, selectedClass, stats, level, allocatedSkills, goldPool, inventory, asiFeatSlots, selectedSubclassId, selectedCantrips, selectedSpells, alignment, background, personalityTraits, ideals, bonds, flaws, backstory } = wizardState;
-  const asiMap = getEffectiveAsiMap(selectedRace, wizardState.halfElfChoice1, wizardState.halfElfChoice2);
+  const asiMap = getEffectiveAsiMap(selectedRace, wizardState.selectedSubraceId, wizardState.halfElfChoice1, wizardState.halfElfChoice2);
   const stepCls = "space-y-6 animate-in fade-in duration-500";
 
   return (

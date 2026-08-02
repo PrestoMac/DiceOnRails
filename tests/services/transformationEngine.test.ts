@@ -7,6 +7,7 @@ import {
   revertTransformation,
   TransformationState,
 } from '../../services/transformationEngine';
+import { calculateAc } from '../../services/classEngine';
 import { makeCharacter } from '../helpers/characters';
 
 beforeEach(() => {
@@ -128,7 +129,11 @@ describe('applyPolymorph', () => {
     const direWolf = BEAST_FORMS['dire-wolf'];
     const char = makeCharacter();
     const state = applyPolymorph(char, direWolf, 60);
-    // originalForm.ac should be the character's computed AC, not the beast's (14).
+    const equippedArmor = char.inventory.find(i => i.equipped && (i.type === 'armor' || i.type === 'shield')) ?? null;
+    const expectedAc = calculateAc(char, equippedArmor);
+    // originalForm.ac should be the character's computed AC (e.g. 18 with chain mail
+    // + shield), not the beast's (14).
+    expect(state.originalForm?.ac).toBe(expectedAc);
     expect(state.originalForm?.ac).not.toBe(direWolf.ac);
     expect(state.originalForm?.ac).toBeGreaterThan(0);
   });

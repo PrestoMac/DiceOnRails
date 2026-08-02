@@ -68,13 +68,14 @@ export const RESOURCE_HANDLERS: Record<string, ResourceHandler> = {
     const char = ctx.deps.getTarget(characterId);
     if (!char) return fail('Character not found.');
 
-    const subAction = targetId && ['flurry-of-blows', 'patient-defense', 'step-of-the-wind'].includes(targetId) ? targetId : 'stunning-strike';
+    const normalized = String(targetId || '').toLowerCase().trim().replace(/[_\s]+/g, '-');
+    const subAction = ['flurry-of-blows', 'patient-defense', 'step-of-the-wind'].includes(normalized) ? normalized : 'stunning-strike';
 
     if (subAction === 'flurry-of-blows') {
       return { success: true, data: { flurryOfBlows: true }, message: `${char.name} uses Flurry of Blows (1 Ki)! You can make two unarmed strikes as a bonus action.` };
     }
     if (subAction === 'patient-defense') {
-      applyCondition(char, { id: 'dodging-' + Date.now(), source: char.id, duration: 1 });
+      applyCondition(char, { id: 'dodging', source: char.id, duration: 1 });
       return { success: true, data: { patientDefense: true }, message: `${char.name} uses Patient Defense (1 Ki)! You take the Dodge action as a bonus action (attacks against you have disadvantage).` };
     }
     if (subAction === 'step-of-the-wind') {
@@ -89,7 +90,7 @@ export const RESOURCE_HANDLERS: Record<string, ResourceHandler> = {
     const profBonus = getProficiencyBonus(char);
     const dc = 8 + profBonus + wisMod;
     const saveResult = await ctx.deps.make_save(enemy.id, 'con', dc);
-    const saved = saveResult.data && typeof saveResult.data === 'object' ? (saveResult.data as Record<string, unknown>).success === false : true;
+    const saved = saveResult.data && typeof saveResult.data === 'object' ? (saveResult.data as Record<string, unknown>).success === true : true;
     if (saved) {
       return { success: true, data: { stunned: false, dc }, message: `${enemy.name} made the CON save (DC ${dc}) and resisted Stunning Strike.` };
     }

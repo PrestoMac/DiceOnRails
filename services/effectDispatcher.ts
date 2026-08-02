@@ -56,6 +56,8 @@ export interface AttackRollContext extends HookContext {
   weaponName: string;
   targetId: string;
   isRanged: boolean;
+  /** Flat bonus added to the attack roll's total (kept separate from the d20 so crit checks use the natural die). */
+  attackBonus: number;
 }
 
 export interface AttackDamageContext extends HookContext {
@@ -236,7 +238,7 @@ const HOOK_REGISTRY: Record<HookName, ReducerEntry[]> = {
         const atkCtx = ctx as unknown as AttackRollContext;
         const style = (payload.style as string) || character.fightingStyle;
         if (style === 'archery' && atkCtx.isRanged) {
-          atkCtx.roll += 2;
+          atkCtx.attackBonus += 2;
         }
         return ctx;
       },

@@ -94,6 +94,7 @@ describe('classEngine', () => {
     it('Dwarf base speed is 25', () => expect(calculateSpeed(makeChar({ race: 'dwarf' }))).toBe(25));
     it('Halfling base speed is 25', () => expect(calculateSpeed(makeChar({ race: 'halfling' }))).toBe(25));
     it('Mobile feat adds 10', () => expect(calculateSpeed(makeChar({ feats: ['mobile'] }))).toBe(40));
+    it('Wood Elf subrace speedBonus adds 5', () => expect(calculateSpeed(makeChar({ race: 'elf', subraceId: 'wood-elf', speedBonus: 5 }))).toBe(35));
     it('exhaustion level 3 reduces speed by 15 ft', () => {
       const char = makeChar();
       applyCondition(char, { id: 'exhaustion-3', source: 'fatigue', duration: Infinity, durationUnit: 'minute' });
@@ -104,6 +105,7 @@ describe('classEngine', () => {
 
   describe('getDarkvisionRange', () => {
     it('Elf has 60 ft darkvision', () => expect(getDarkvisionRange(makeChar({ race: 'elf' }))).toBe(60));
+    it('Drow subrace darkvision override is 120 ft', () => expect(getDarkvisionRange(makeChar({ race: 'elf', subraceId: 'drow' }))).toBe(120));
     it('Human has no darkvision', () => expect(getDarkvisionRange(makeChar({ race: 'human' }))).toBe(0));
     it('Dwarf has 60 ft darkvision', () => expect(getDarkvisionRange(makeChar({ race: 'dwarf' }))).toBe(60));
     it('Half-Orc has 60 ft darkvision', () => expect(getDarkvisionRange(makeChar({ race: 'half-orc' }))).toBe(60));

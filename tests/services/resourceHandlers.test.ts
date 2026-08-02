@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { RESOURCE_HANDLERS, ResourceHandlerContext } from '../../services/resourceHandlers';
 import type { SpellcastingDeps } from '../../services/mcp/spellcastingService';
 import type { GameState } from '../../types';
+import { applyCondition } from '../../services/conditionEngine';
 
 vi.mock('../../utils/random', () => ({
   cryptoRoll: vi.fn(() => 5),
@@ -22,15 +23,15 @@ vi.mock('../../utils/dice', () => ({
   parseDiceFormula: vi.fn(() => ({ count: 3, sides: 10, bonus: 0 })),
 }));
 
-vi.mock('../diceEngine', () => ({
+vi.mock('../../services/diceEngine', () => ({
   rollDice: vi.fn(() => 17),
 }));
 
-vi.mock('../spellcastingEngine', () => ({
+vi.mock('../../services/spellcastingEngine', () => ({
   breakConcentration: vi.fn(),
 }));
 
-vi.mock('../conditionEngine', () => ({
+vi.mock('../../services/conditionEngine', () => ({
   applyCondition: vi.fn(),
 }));
 
@@ -150,6 +151,59 @@ describe('RESOURCE_HANDLERS', () => {
       const ctx = makeContext();
       const result = await RESOURCE_HANDLERS['arcane-recovery'](ctx, 'test-char');
       expect(result.success).toBe(false);
+    });
+  });
+
+  describe('ki', () => {
+    it('routes "Flurry of Blows" to the flurry-of-blows branch', async () => {
+      const ctx = makeContext();
+      const result = await RESOURCE_HANDLERS['ki'](ctx, 'test-char', 'Flurry of Blows');
+      expect(result.success).toBe(true);
+      expect(result.data?.flurryOfBlows).toBe(true);
+    });
+
+    it('routes "patient-defense" and applies a stable dodging condition', async () => {
+      const ctx = makeContext();
+      const result = await RESOURCE_HANDLERS['ki'](ctx, 'test-char', 'patient-defense');
+      expect(result.success).toBe(true);
+      expect(result.data?.patientDefense).toBe(true);
+      expect(vi.mocked(applyCondition)).toHaveBeenCalledTimes(1);
+      const cond = vi.mocked(applyCondition).mock.calls[0][1];
+      expect(cond.id).toBe('dodging');
+      expect(cond.duration).toBe(1);
+    });
+
+    it('routes "step_of_the_wind" to the step-of-the-wind branch', async () => {
+      const ctx = makeContext();
+      const result = await RESOURCE_HANDLERS['ki'](ctx, 'test-char', 'step_of_the_wind');
+      expect(result.success).toBe(true);
+      expect(result.data?.stepOfTheWind).toBe(true);
+    });
+
+    it('routes "Step of the Wind" (spaced label) to the step-of-the-wind branch', async () => {
+      const ctx = makeContext();
+      const result = await RESOURCE_HANDLERS['ki'](ctx, 'test-char', 'Step of the Wind');
+      expect(result.success).toBe(true);
+      expect(result.data?.stepOfTheWind).toBe(true);
+    });
+
+    it('routes an enemy name to Stunning Strike and stuns on a failed save', async () => {
+      const ctx = makeContext({
+        combat: {
+          isActive: true,
+          round: 1,
+          turnIndex: 0,
+          initiative: [{ id: 'goblin-1', name: 'Goblin', initiative: 10, type: 'enemy', isDead: false, hasActedThisTurn: false }],
+          enemies: [{ id: 'goblin-1', name: 'goblin-1', ac: 12, hp: { current: 7, max: 7 }, stats: { str: 10, dex: 12, con: 10, int: 6, wis: 8, cha: 6 }, attacks: [], isDead: false, conditions: [] }],
+        },
+      });
+      const result = await RESOURCE_HANDLERS['ki'](ctx, 'test-char', 'goblin-1');
+      expect(result.success).toBe(true);
+      expect(result.data?.stunned).toBe(true);
+      expect(vi.mocked(applyCondition)).toHaveBeenCalledTimes(1);
+      const cond = vi.mocked(applyCondition).mock.calls[0][1];
+      expect(cond.id.startsWith('stunning-strike-')).toBe(true);
+      expect(cond.duration).toBe(1);
     });
   });
 });

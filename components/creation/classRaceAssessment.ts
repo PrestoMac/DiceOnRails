@@ -39,7 +39,7 @@ const RACE_ASSESSMENTS: AssessmentMap = {
   },
   human: {
     status: 'ok',
-    reason: 'Standard (+1 all stats) and Variant Human (+1 to 2 stats, skill proficiency, feat at L1) are fully supported.',
+    reason: 'Standard (+1 all stats) fully supported. Variant Human grants the feat at L1 via the ASI/feat slot; the +1 to two chosen stats and bonus skill are not yet auto-applied (no wizard UI) — allocate them via your level-1 ASI/feat slot and skill points.',
   },
   halfling: {
     status: 'ok',

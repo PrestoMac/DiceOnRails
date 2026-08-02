@@ -215,6 +215,7 @@ describe('applyEffects — onAttackRoll', () => {
       weaponName: 'dagger',
       targetId: 'goblin-1',
       isRanged: false,
+      attackBonus: 0,
     };
     const result = applyEffects(char, 'onAttackRoll', ctx);
     expect(result.roll).not.toBe(1);

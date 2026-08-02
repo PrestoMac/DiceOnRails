@@ -161,6 +161,44 @@ describe('buildCharacterFromWizard', () => {
       expect(character?.hp.max).toBe(12);
       expect(character?.hp.current).toBe(12);
     });
+
+    it('applies the wood-elf subrace ASI with REPLACE semantics: +2 DEX +1 WIS (not +1 INT)', () => {
+      const { character } = buildCharacterFromWizard(
+        baseWizard({ selectedRace: RACES_BY_ID['elf'], selectedSubraceId: 'wood-elf' }),
+        { isNewCampaign: true }
+      );
+      // Elf base {dex:2,int:1} is REPLACED by wood-elf's {dex:2,wis:1} — the base
+      // ASI (which already includes the subrace bonus) is NOT summed on top.
+      // Old buggy behavior yielded int 13 and wis 11 (double-counted).
+      expect(character?.stats).toEqual({ str: 15, dex: 16, con: 13, int: 12, wis: 11, cha: 8 });
+      expect(character?.subraceId).toBe('wood-elf');
+      // Wood Elf subrace speedBonus is propagated to the built character (was silently dropped).
+      expect(character?.speedBonus).toBe(5);
+    });
+
+    it('applies the high-elf subrace ASI with REPLACE semantics (no double-counted INT)', () => {
+      const { character } = buildCharacterFromWizard(
+        baseWizard({ selectedRace: RACES_BY_ID['elf'], selectedSubraceId: 'high-elf' }),
+        { isNewCampaign: true }
+      );
+      // Elf base {dex:2,int:1} replaced by high-elf {dex:2,int:1} — same totals, but
+      // only one package is applied (base int 12 -> 13, not 14).
+      expect(character?.stats).toEqual({ str: 15, dex: 16, con: 13, int: 13, wis: 10, cha: 8 });
+    });
+
+    it('applies hill-dwarf Dwarven Toughness (+1 HP/level) and +2 CON / +1 WIS at creation', () => {
+      const { character } = buildCharacterFromWizard(
+        baseWizard({ selectedRace: RACES_BY_ID['dwarf'], selectedSubraceId: 'hill-dwarf' }),
+        { isNewCampaign: true }
+      );
+      // Dwarf base {con:2,wis:1} replaced by hill-dwarf {con:2,wis:1} (identical ASI here).
+      expect(character?.stats.con).toBe(15);
+      expect(character?.stats.wis).toBe(11);
+      // HP = fighter base 10 + conMod(2) + Dwarven Toughness (+1/level × 1) = 13.
+      // Without the subrace effect the HP would be 12.
+      expect(character?.hp.max).toBe(13);
+      expect(character?.hp.current).toBe(13);
+    });
   });
 
   describe('ASI/feat slot indexing', () => {
@@ -344,6 +382,24 @@ describe('buildCharacterFromWizard', () => {
       );
       expect(character?.draconicAncestry).toBeUndefined();
       expect(character?.draconicDamageType).toBeUndefined();
+    });
+
+    it('grants Draconic Bloodline sorcerers +level HP and sorcerousOrigin at creation', () => {
+      const { character } = buildCharacterFromWizard(
+        baseWizard({
+          selectedClass: CLASSES_BY_ID['sorcerer'],
+          selectedSubclassId: 'draconic-bloodline',
+          draconicAncestry: 'red',
+          selectedCantrips: ['fire-bolt'],
+          selectedSpells: ['burning-hands'],
+        }),
+        { isNewCampaign: true }
+      );
+      expect(character?.sorcerousOrigin).toBe('draconic-bloodline');
+      // Human sorcerer L1: con 13 -> 14 (mod +2). Sorcerer hpBase 6 -> 6 + 2 = 8,
+      // plus Draconic Bloodline +level (1) = 9. Without the subclass bonus it'd be 8.
+      expect(character?.hp.max).toBe(9);
+      expect(character?.hp.current).toBe(9);
     });
   });
 

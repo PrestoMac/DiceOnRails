@@ -721,12 +721,20 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
       const totalRequested = selections.reduce((sum, s) => sum + s.level * s.count, 0);
       if (totalRequested > maxLevels) return fail(`Cannot recover ${totalRequested} levels of spell slots. Maximum is ${maxLevels} (half your druid level, rounded up).`);
 
-      const recovered: Array<{ level: number; count: number }> = [];
+      // Validate ALL selections BEFORE mutating anything — an invalid later selection
+      // must not leave earlier slots partially recovered.
       for (const sel of selections) {
-        if (sel.level < 1 || sel.level > 5) return fail(`Natural Recovery cannot target level ${sel.level} slots. Only levels 1-5 are eligible.`);
         if (sel.count < 1) continue;
+        if (sel.level < 1 || sel.level > 5) return fail(`Natural Recovery cannot target level ${sel.level} slots. Only levels 1-5 are eligible.`);
         const slot = char.resources?.find(r => r.id === `spell-slot-${sel.level}`);
         if (!slot) return fail(`No level ${sel.level} spell slot resource found on ${char.name}.`);
+      }
+
+      const recovered: Array<{ level: number; count: number }> = [];
+      for (const sel of selections) {
+        if (sel.count < 1) continue;
+        const slot = char.resources?.find(r => r.id === `spell-slot-${sel.level}`);
+        if (!slot) continue;
         const actual = Math.min(sel.count, slot.max - slot.current);
         if (actual > 0) {
           slot.current += actual;

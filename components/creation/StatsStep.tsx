@@ -79,7 +79,7 @@ const StatsStep: React.FC<StepProps> = ({ wizardState, updateWizard, onNext }) =
     updateWizard({ rolledStatValues: totals, rollHistory: rolls, statsGenMode: 'roll' });
   };
 
-  const asiMap = getEffectiveAsiMap(selectedRace, halfElfChoice1, halfElfChoice2);
+  const asiMap = getEffectiveAsiMap(selectedRace, wizardState.selectedSubraceId, halfElfChoice1, halfElfChoice2);
   const racialConBonus = asiMap['con'] || 0;
   const totalCon = localStats.con + racialConBonus;
   const conMod = getMod(totalCon);

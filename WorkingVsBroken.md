@@ -33,7 +33,7 @@ Verification pass against `effectDispatcher.ts`, `classEngine.ts`, `characterCre
 3. **Rogue Slippery Mind is partially hardcoded, not narrative** — `classEngine.ts:153-155` adds a proficiency bonus to rogues at L15+, but it is keyed to `stat === 'dex'`. Slippery Mind grants **WIS** save proficiency. So the feature is implemented for the wrong stat (a bug), not absent.
 
 ### Bugs/gaps not previously documented
-4. **Wood Elf +5ft speed is broken (the table overstates it).** `SubraceDefinition.speedBonus: 5` (`data/races.ts:70`) is never copied to `Character.speedBonus` during `buildCharacterFromWizard`. `calculateSpeed` (`classEngine.ts:182`) reads `character.speedBonus || 0`, which is always 0 for Wood Elves → they stay at 25 ft instead of 30 ft. Fix is a one-line propagation in `characterCreationService.ts`.
+4. ~~Wood Elf +5ft speed is broken~~ **FIXED** — `buildCharacterFromWizard` now propagates `subrace.speedBonus` to `Character.speedBonus` (Wood Elves get 30 ft), and `getDarkvisionRange` honors a subrace `darkvision` override (Drow 120 ft).
 5. **The `armor-proficiency` reducer is a no-op** (`effectDispatcher.ts:481-486`) — the reduce body returns early without mutating anything. Consequences: **Mountain Dwarf's Dwarven Armor Training** (`data/races.ts:93`, light+medium) grants nothing, and the **Lightly/Moderately/Heavily Armored feats** (`data/feats.ts:253-284`) grant nothing. `canEquipArmor` (`classEngine.ts:48-53`) reads only `classDef.armorProfs` + the hardcoded Life-Cleric heavy-armor case.
 6. **Destroy Undead is message-only** — the table lists "Destroy Undead CR tiers via `channel-divinity`". The handler (`resourceHandlers.ts:132`) computes `crLimit` but only returns a narration string; no undead enemy is actually destroyed in state. Turn Undead (WIS save + turned condition) works; Destroy Undead does not.
 7. **`Durable` death-save bonus is dead code** — `getDeathSaveBonus()` (`featsService.ts:196`) is defined and re-exported but never called by any path (both death-save rolls bypass it). Durable grants no mechanical benefit. Already noted as a caveat in AGENTS.md; not in this file.
@@ -138,12 +138,12 @@ Verification pass against `effectDispatcher.ts`, `classEngine.ts`, `characterCre
 
 | Race | Rating | Subraces / Traits Implemented | SRD Fidelity |
 |------|--------|-------------------------------|--------------|
-| **Human** | **Working** | Standard (+1 all stats), Variant Human (+1 to two stats, 1 skill prof, 1 feat at L1) | ~90% |
-| **Elf** | **Working** | High Elf (+1 INT, cantrip), Wood Elf (+1 WIS, +5ft speed), Drow (+1 CHA, 120ft darkvision), Keen Senses (Perception prof via `skill-proficiency`), Fey Ancestry charm save advantage. Subrace cantrips/weapon-training are narrative but harmless. | ~85% |
-| **Dwarf** | **Working** | Hill Dwarf (+1 WIS, +1 HP/level via `hp-per-level`), Mountain Dwarf (+2 STR), Dwarven Resilience poison resistance + save advantage, Stonecunning (History prof), Combat Training | ~85% |
-| **Halfling** | **Working** | Lightfoot (+1 CHA), Stout (+1 CON, poison resistance + save advantage), **Lucky rerolls nat-1s on attacks, checks, AND saves** (reroll-ones on 3 hooks), Brave advantage vs frightened, Nimbleness | ~90% |
+| **Human** | **Working** | Standard (+1 all stats), Variant Human (feat via L1 ASI/feat slot; the +1 to two chosen stats + bonus skill are not auto-applied — no wizard UI) | ~85% |
+| **Elf** | **Working** | High Elf (+2 DEX +1 INT, cantrip), Wood Elf (+2 DEX +1 WIS, +5ft speed), Drow (+2 DEX +1 CHA, 120ft darkvision), Keen Senses (Perception prof via `skill-proficiency`), Fey Ancestry charm save advantage. Subrace cantrips/weapon-training are narrative but harmless. | ~90% |
+| **Dwarf** | **Working** | Hill Dwarf (+2 CON +1 WIS, +1 HP/level via `hp-per-level`), Mountain Dwarf (+2 CON +2 STR), Dwarven Resilience poison resistance + save advantage, Stonecunning (History prof), Combat Training | ~90% |
+| **Halfling** | **Working** | Lightfoot (+2 DEX +1 CHA), Stout (+2 DEX +1 CON, poison resistance + save advantage), **Lucky rerolls nat-1s on attacks, checks, AND saves** (reroll-ones on 3 hooks), Brave advantage vs frightened, Nimbleness | ~90% |
 | **Dragonborn** | **Working** | Breath Weapon resource (2d6→5d6 scaling, DEX save DC, per-short-rest), Draconic Ancestry element selection, Damage Resistance matching element | ~85% |
-| **Gnome** | **Working** | Rock Gnome (+1 CON), Forest Gnome (+1 DEX), **Gnome Cunning: adv on INT/WIS/CHA saves vs ALL spell-originated magic** (spellContext `isMagical`) | ~85% |
+| **Gnome** | **Working** | Rock Gnome (+2 INT +1 CON), Forest Gnome (+2 INT +1 DEX), **Gnome Cunning: adv on INT/WIS/CHA saves vs ALL spell-originated magic** (spellContext `isMagical`) | ~90% |
 | **Half-Elf** | **Working** | Flexible ASIs (`flexible-2`), Skill Versatility (+2 skill profs via `skill-proficiency`), Fey Ancestry charm save advantage | ~90% |
 | **Half-Orc** | **Working** | Relentless Endurance (resource → drop to 1 HP), Savage Attacks (+1 extra crit die via `crit-bonus-dice`), Darkvision | ~90% |
 | **Tiefling** | **Working** | Hellish Resistance (fire resistance), Infernal Legacy (Hellish Rebuke resource at L3, Darkness at L5 — Thaumaturgy is narrative), Darkvision | ~85% |

@@ -113,7 +113,7 @@ function createTransformationState(
     originalForm: {
       stats: { ...character.stats },
       hp: { ...character.hp },
-      ac: calculateAc(character),
+      ac: calculateAc(character, character.inventory?.find(i => i.equipped && (i.type === 'armor' || i.type === 'shield')) ?? null),
       attacks: []
     },
     transformedInto: beastForm.name,

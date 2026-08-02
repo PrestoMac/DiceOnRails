@@ -269,6 +269,48 @@ describe('combatTools', () => {
       expect(result.data?.isCritical).toBe(false);
     });
 
+    it('Archery fighting style does NOT crit on a natural 18', async () => {
+      // Archery grants +2 to the attack roll total, NOT to the natural d20 — a
+      // natural 18 must stay a normal hit (previously 18+2=20 was mis-scored as a crit).
+      server.joinParty(makeCharacter({
+        level: 1,
+        fightingStyle: 'archery',
+        inventory: [{
+          name: 'Longbow', quantity: 1, type: 'weapon',
+          stats: { damage: '1d8', damageType: 'piercing', properties: ['ranged', 'ammunition'] },
+          equipped: true,
+        }],
+      }));
+      await server.add_enemy('Goblin');
+      await server.start_combat();
+      mockRoll(18);
+      const result = await server.player_attack('Valerius', 'Longbow', 'Goblin');
+      expect(result.success).toBe(true);
+      expect(result.data?.roll).toBe(18);
+      expect(result.data?.isCritical).toBe(false);
+      expect(result.data?.isHit).toBe(true);
+      expect(result.message).not.toContain('CRITICAL');
+    });
+
+    it('Champion Improved Critical (19-20) with Archery does NOT crit on a natural 18', async () => {
+      // The +2 Archery bonus must not push a natural 18 into the Champion 19-20 range.
+      server.joinParty(makeCharacter({
+        level: 3,
+        subclassId: 'champion',
+        fightingStyle: 'archery',
+        inventory: [{
+          name: 'Longbow', quantity: 1, type: 'weapon',
+          stats: { damage: '1d8', damageType: 'piercing', properties: ['ranged', 'ammunition'] },
+          equipped: true,
+        }],
+      }));
+      await server.add_enemy('Goblin');
+      await server.start_combat();
+      mockRoll(18);
+      const result = await server.player_attack('Valerius', 'Longbow', 'Goblin');
+      expect(result.data?.isCritical).toBe(false);
+    });
+
     it('applies sharpshooter and sneak attack feat flags', async () => {
       mockRoll(20);
       server.joinParty(makeCharacter({

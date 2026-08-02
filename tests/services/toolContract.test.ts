@@ -11,6 +11,8 @@ const EXPECTED_TOOL_NAMES = [
   'cast_ritual', 'spell_effect', 'player_attack', 'narrate_turn',
   // VTT grid tools (Phase 1 — battle map)
   'move_token', 'init_battle_map',
+  // Druid class feature tool
+  'natural_recovery',
 ];
 
 describe('Tool Contract', () => {

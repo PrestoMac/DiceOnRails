@@ -116,16 +116,42 @@ export const tools = [
         type: "function",
         function: {
             name: 'use_resource',
-            description: 'Use a limited class/race resource. ENGINE-BACKED: rage (barbarian: sets raging, +2/+3/+4 damage), ki (monk: returns DC and martial arts die for Flurry of Blows/Stunning Strike/Patient Defense), second-wind (fighter: heals 1d10+level), breath-weapon (dragonborn: returns DC and rolled damage), lay-on-hands-pool (paladin: heals amount HP with targetId), channel-divinity (cleric: Preserve Life or Turn Undead), sorcery-points (sorcerer: spend for metamagic), bardic-inspiration (bard: returns rolled BI die with targetId).',
+            description: 'Use a limited class/race resource. ENGINE-BACKED: rage (barbarian: sets raging, +2/+3/+4 damage), ki (monk: flurry-of-blows/patient-defense/step-of-the-wind sub-actions or Stunning Strike target — see targetId), second-wind (fighter: heals 1d10+level), breath-weapon (dragonborn: returns DC and rolled damage), lay-on-hands-pool (paladin: heals amount HP with targetId), channel-divinity (cleric: Preserve Life or Turn Undead), sorcery-points (sorcerer: spend for metamagic), bardic-inspiration (bard: returns rolled BI die with targetId).',
             parameters: {
                 type: 'object',
                 properties: {
-                    targetId: { type: 'string', description: 'Character using the resource' },
+                    targetId: { type: 'string', description: "For ki: 'flurry-of-blows', 'patient-defense', or 'step-of-the-wind' to pick the ki action, or the enemy name for Stunning Strike. For other resources: the target character/enemy id." },
                     characterId: { type: 'string', description: 'Alternative: character using the resource' },
                     resourceId: { type: 'string', description: 'Resource ID: rage, ki, second-wind, breath-weapon, lay-on-hands-pool, channel-divinity, sorcery-points, bardic-inspiration, action-surge, relentless-endurance' },
                     amount: { type: 'integer', description: 'Amount to spend (for lay-on-hands-pool: HP to heal. For sorcery-points: metamagic cost.)' }
                 },
                 required: ['resourceId']
+            }
+        }
+    },
+    {
+        type: "function",
+        function: {
+            name: 'natural_recovery',
+            description: 'Druid (Circle of the Land L2+) only. During a short rest, recover expended spell slots with a total combined level up to half your druid level (rounded up). Once per long rest. Only spell slot levels 1-5 are eligible.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    characterId: { type: 'string', description: 'The druid character using Natural Recovery' },
+                    selections: {
+                        type: 'array',
+                        description: 'Spell slots to recover',
+                        items: {
+                            type: 'object',
+                            properties: {
+                                level: { type: 'integer', description: 'Spell slot level (1-5)' },
+                                count: { type: 'integer', description: 'Number of slots at this level to recover' }
+                            },
+                            required: ['level', 'count']
+                        }
+                    }
+                },
+                required: ['characterId', 'selections']
             }
         }
     }

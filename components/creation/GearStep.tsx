@@ -96,7 +96,7 @@ const GearStep: React.FC<StepProps & { onBackToSpells: () => void; onBackToFeats
     updateWizard({ inventory: next });
   };
 
-  const dexBonus = getEffectiveAsiMap(selectedRace, wizardState.halfElfChoice1, wizardState.halfElfChoice2).dex || 0;
+  const dexBonus = getEffectiveAsiMap(selectedRace, wizardState.selectedSubraceId, wizardState.halfElfChoice1, wizardState.halfElfChoice2).dex || 0;
   const estimatedAC = calculateAC(inventory, stats.dex + dexBonus);
 
   return (

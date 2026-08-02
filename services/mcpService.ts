@@ -513,6 +513,8 @@ export class MockMCPServer {
 
         case 'use_resource':
           res = await this.spells.use_resource(String(args.characterId || args.targetId || ''), String(args.resourceId || ''), args.targetId as string, args.amount as number); break;
+        case 'natural_recovery':
+          res = await this.natural_recovery(String(args.characterId || ''), Array.isArray(args.selections) ? args.selections as Array<{ level: number; count: number }> : []); break;
         case 'summon_creature':
           res = await this.summon_creature(String(args.casterId || ''), String(args.creatureName || args.template || ''), Number(args.count ?? 1)); break;
         case 'teleport_creature':

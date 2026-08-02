@@ -297,6 +297,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       if (target) {
         const te = getConditionEffects(target);
         if (te.attacksAgainstHaveAdvantage) hasAdvantage = true;
+        if (te.attacksAgainstHaveDisadvantage) hasDisadvantage = true;
       }
       const secondRoll = cryptoRoll(20);
       const resolved = resolveAdvantage(roll, secondRoll, hasAdvantage, hasDisadvantage);
@@ -1140,9 +1141,11 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
         weaponName,
         targetId: enemy.id,
         isRanged,
+        attackBonus: 0,
       };
       const afterRoll = applyEffects(attacker, 'onAttackRoll', atkRollCtx);
       roll = afterRoll.roll;
+      atkBonus += afterRoll.attackBonus;
       const hasExpandedCrit = !!(afterRoll as unknown as Record<string, unknown>)._critRangeExpanded;
 
       const attackRoll = roll + atkBonus - getExhaustionPenalty(attacker);

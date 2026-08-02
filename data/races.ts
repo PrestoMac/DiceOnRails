@@ -6,9 +6,9 @@ export interface SubraceDefinition {
   id: string;
   name: string;
   description: string;
-  /** Additional ASI on top of the base race's ASI. */
+  /** Full racial ASI package (REPLACE semantics: when set, it replaces the base race's ASI entirely — the base race ASI already includes the subrace-specific bonus, so both are never summed). */
   asi?: Partial<Record<keyof Character['stats'], number>>;
-  /** Override the base race's darkvision (takes the max). */
+  /** Override the base race's darkvision (when set, this value wins). */
   darkvision?: number;
   /** Speed bonus on top of the base race's speed. */
   speedBonus?: number;
@@ -45,8 +45,8 @@ export const RACES_CATALOG: RaceDefinition[] = [
     icon: 'fa-user',
     flavor: 'Humans are the most adaptable race, with a diverse range of cultures and backgrounds.',
     subraces: [
-      { id: 'standard', name: 'Standard Human', description: 'Versatile and ambitious, with +1 to all ability scores.', asi: { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 } },
-      { id: 'variant', name: 'Variant Human', description: 'Slightly less broadly gifted, but gains a feat and a skill proficiency at L1.', asi: { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 }, traits: [{ id: 'variant-human-feat', name: 'Bonus Feat', description: 'You gain one feat of your choice at L1 (use your ASI/feat slot).', kind: 'passive' }, { id: 'variant-human-skill', name: 'Bonus Skill', description: 'You gain proficiency in one skill of your choice.', kind: 'passive', effect: { kind: 'skill-proficiency', payload: { skills: ['_choice_'] } } }] },
+      { id: 'standard', name: 'Standard Human', description: 'Versatile and ambitious, with +1 to all ability scores.', asi: { str: 1, dex: 1, con: 1, int: 1, wis: 1, cha: 1 } },
+      { id: 'variant', name: 'Variant Human', description: 'Slightly less broadly gifted than a standard human. The two +1 ability-score choices are not yet selectable in the wizard — use your level-1 ASI/feat slot to allocate them.', asi: { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 }, traits: [{ id: 'variant-human-feat', name: 'Bonus Feat', description: 'You gain one feat of your choice at level 1 (use your ASI/feat slot).', kind: 'passive' }, { id: 'variant-human-skill', name: 'Bonus Skill', description: 'You gain proficiency in one skill of your choice (choose it via your skill points at level 1; not auto-applied).', kind: 'passive' }] },
     ],
   },
   {
@@ -66,9 +66,9 @@ export const RACES_CATALOG: RaceDefinition[] = [
     icon: 'fa-leaf',
     flavor: 'Elves are graceful and long-lived, with a deep connection to nature and magic.',
     subraces: [
-      { id: 'high-elf', name: 'High Elf', description: 'High elves are graceful warriors and wizards, educated in magic and lore.', asi: { int: 1 }, traits: [{ id: 'elf-cantrip', name: 'Elf Cantrip', description: 'You know one cantrip of your choice from the wizard spell list.', kind: 'passive' }, { id: 'elf-weapon-training', name: 'Elf Weapon Training', description: 'You have proficiency with the longsword, shortsword, shortbow, and longbow.', kind: 'passive' }] },
-      { id: 'wood-elf', name: 'Wood Elf', description: 'Wood elves are stealthy recluses, at home in the deepest forests.', asi: { wis: 1 }, speedBonus: 5, traits: [{ id: 'elf-weapon-training', name: 'Elf Weapon Training', description: 'You have proficiency with the longsword, shortsword, shortbow, and longbow.', kind: 'passive' }, { id: 'mask-of-the-wild', name: 'Mask of the Wild', description: 'You can hide even when lightly obscured by foliage, rain, snow, or other natural phenomena.', kind: 'passive' }] },
-      { id: 'drow', name: 'Dark Elf (Drow)', description: 'Drow elves dwell in the Underdark, adapted to its perpetual twilight.', asi: { cha: 1 }, darkvision: 120, traits: [{ id: 'drow-magic', name: 'Drow Magic', description: 'You know the dancing lights cantrip. At L3, you can cast faerie fire once per day. At L5, you can cast darkness once per day.', kind: 'passive' }, { id: 'drow-weapon-training', name: 'Drow Weapon Training', description: 'You have proficiency with rapiers, shortswords, and hand crossbows.', kind: 'passive' }] },
+      { id: 'high-elf', name: 'High Elf', description: 'High elves are graceful warriors and wizards, educated in magic and lore.', asi: { dex: 2, int: 1 }, traits: [{ id: 'elf-cantrip', name: 'Elf Cantrip', description: 'You know one cantrip of your choice from the wizard spell list.', kind: 'passive' }, { id: 'elf-weapon-training', name: 'Elf Weapon Training', description: 'You have proficiency with the longsword, shortsword, shortbow, and longbow.', kind: 'passive' }] },
+      { id: 'wood-elf', name: 'Wood Elf', description: 'Wood elves are stealthy recluses, at home in the deepest forests.', asi: { dex: 2, wis: 1 }, speedBonus: 5, traits: [{ id: 'elf-weapon-training', name: 'Elf Weapon Training', description: 'You have proficiency with the longsword, shortsword, shortbow, and longbow.', kind: 'passive' }, { id: 'mask-of-the-wild', name: 'Mask of the Wild', description: 'You can hide even when lightly obscured by foliage, rain, snow, or other natural phenomena.', kind: 'passive' }] },
+      { id: 'drow', name: 'Dark Elf (Drow)', description: 'Drow elves dwell in the Underdark, adapted to its perpetual twilight.', asi: { dex: 2, cha: 1 }, darkvision: 120, traits: [{ id: 'drow-magic', name: 'Drow Magic', description: 'You know the dancing lights cantrip. At L3, you can cast faerie fire once per day. At L5, you can cast darkness once per day.', kind: 'passive' }, { id: 'drow-weapon-training', name: 'Drow Weapon Training', description: 'You have proficiency with rapiers, shortswords, and hand crossbows.', kind: 'passive' }] },
     ],
   },
   {
@@ -89,8 +89,8 @@ export const RACES_CATALOG: RaceDefinition[] = [
     icon: 'fa-mountain',
     flavor: 'Dwarves are stout and resilient, born of mountain stone and steel.',
     subraces: [
-      { id: 'hill-dwarf', name: 'Hill Dwarf', description: 'Hill dwarfs are wise and tough, with deep roots in mountain communities.', asi: { wis: 1 }, traits: [{ id: 'dwarven-toughness', name: 'Dwarven Toughness', description: 'Your hit point maximum increases by 1, and it increases by 1 every time you gain a level.', kind: 'passive', effect: { kind: 'hp-per-level', payload: { amount: 1 } } }] },
-      { id: 'mountain-dwarf', name: 'Mountain Dwarf', description: 'Mountain dwarfs are strong and hardy, trained in heavy armor from youth.', asi: { str: 2 }, traits: [{ id: 'dwarven-armor-training', name: 'Dwarven Armor Training', description: 'You have proficiency with light and medium armor.', kind: 'passive' }] },
+      { id: 'hill-dwarf', name: 'Hill Dwarf', description: 'Hill dwarfs are wise and tough, with deep roots in mountain communities.', asi: { con: 2, wis: 1 }, traits: [{ id: 'dwarven-toughness', name: 'Dwarven Toughness', description: 'Your hit point maximum increases by 1, and it increases by 1 every time you gain a level.', kind: 'passive', effect: { kind: 'hp-per-level', payload: { amount: 1 } } }] },
+      { id: 'mountain-dwarf', name: 'Mountain Dwarf', description: 'Mountain dwarfs are strong and hardy, trained in heavy armor from youth.', asi: { con: 2, str: 2 }, traits: [{ id: 'dwarven-armor-training', name: 'Dwarven Armor Training', description: 'You have proficiency with light and medium armor.', kind: 'passive' }] },
     ],
   },
   {
@@ -109,8 +109,8 @@ export const RACES_CATALOG: RaceDefinition[] = [
     icon: 'fa-shoe-prints',
     flavor: 'Halflings are nimble and lucky, finding comfort in the smallest places.',
     subraces: [
-      { id: 'lightfoot', name: 'Lightfoot', description: 'Lightfoot halflings are stealthy and charming, able to hide behind larger creatures.', asi: { cha: 1 }, traits: [{ id: 'naturally-stealthy', name: 'Naturally Stealthy', description: 'You can attempt to hide even when obscured only by a creature larger than you.', kind: 'passive' }] },
-      { id: 'stout', name: 'Stout', description: 'Stout halflings are hardier than average, with dwarven resilience in their bloodline.', asi: { con: 1 }, traits: [{ id: 'stout-resilience', name: 'Stout Resilience', description: 'You have advantage on saving throws against poison, and resistance against poison damage.', kind: 'passive', effect: { kind: 'advantage-on-save', payload: { against: 'poison' } } }, { id: 'stout-resistance', name: 'Stout Resistance', description: 'You have resistance to poison damage.', kind: 'passive', effect: { kind: 'damage-resistance', payload: { type: 'poison' } } }] },
+      { id: 'lightfoot', name: 'Lightfoot', description: 'Lightfoot halflings are stealthy and charming, able to hide behind larger creatures.', asi: { dex: 2, cha: 1 }, traits: [{ id: 'naturally-stealthy', name: 'Naturally Stealthy', description: 'You can attempt to hide even when obscured only by a creature larger than you.', kind: 'passive' }] },
+      { id: 'stout', name: 'Stout', description: 'Stout halflings are hardier than average, with dwarven resilience in their bloodline.', asi: { dex: 2, con: 1 }, traits: [{ id: 'stout-resilience', name: 'Stout Resilience', description: 'You have advantage on saving throws against poison, and resistance against poison damage.', kind: 'passive', effect: { kind: 'advantage-on-save', payload: { against: 'poison' } } }, { id: 'stout-resistance', name: 'Stout Resistance', description: 'You have resistance to poison damage.', kind: 'passive', effect: { kind: 'damage-resistance', payload: { type: 'poison' } } }] },
     ],
   },
   {
@@ -145,8 +145,8 @@ export const RACES_CATALOG: RaceDefinition[] = [
     icon: 'fa-hat-wizard',
     flavor: 'Gnomes are tinkerers and inventors, bursting with curiosity and magical energy.',
     subraces: [
-      { id: 'rock-gnome', name: 'Rock Gnome', description: 'Rock gnomes are inventive and sturdy, known for their tinkering and artificing.', asi: { con: 1 }, traits: [{ id: 'artificers-lore', name: 'Artificer\'s Lore', description: 'Whenever you make an Intelligence (History) check related to magic items, alchemical objects, or technological devices, you can add twice your proficiency bonus.', kind: 'passive' }, { id: 'tinker', name: 'Tinker', description: 'You can spend 1 hour and 10 gp worth of materials to construct a tiny clockwork device.', kind: 'passive' }] },
-      { id: 'forest-gnome', name: 'Forest Gnome', description: 'Forest gnomes are secretive and quick, at home in the deepest woodland.', asi: { dex: 1 }, traits: [{ id: 'natural-illusionist', name: 'Natural Illusionist', description: 'You know the minor illusion cantrip. Intelligence is your spellcasting ability for it.', kind: 'passive' }, { id: 'speak-with-small-beasts', name: 'Speak with Small Beasts', description: 'You can communicate simple ideas with Small or smaller beasts.', kind: 'passive' }] },
+      { id: 'rock-gnome', name: 'Rock Gnome', description: 'Rock gnomes are inventive and sturdy, known for their tinkering and artificing.', asi: { int: 2, con: 1 }, traits: [{ id: 'artificers-lore', name: 'Artificer\'s Lore', description: 'Whenever you make an Intelligence (History) check related to magic items, alchemical objects, or technological devices, you can add twice your proficiency bonus.', kind: 'passive' }, { id: 'tinker', name: 'Tinker', description: 'You can spend 1 hour and 10 gp worth of materials to construct a tiny clockwork device.', kind: 'passive' }] },
+      { id: 'forest-gnome', name: 'Forest Gnome', description: 'Forest gnomes are secretive and quick, at home in the deepest woodland.', asi: { int: 2, dex: 1 }, traits: [{ id: 'natural-illusionist', name: 'Natural Illusionist', description: 'You know the minor illusion cantrip. Intelligence is your spellcasting ability for it.', kind: 'passive' }, { id: 'speak-with-small-beasts', name: 'Speak with Small Beasts', description: 'You can communicate simple ideas with Small or smaller beasts.', kind: 'passive' }] },
     ],
   },
   {

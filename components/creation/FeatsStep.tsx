@@ -17,7 +17,7 @@ const FeatsStep: React.FC<StepProps & { onGoToSpells: () => void; onGoToGear: ()
 }) => {
   const { selectedClass, selectedRace, stats, inventory, allocatedSkills, level, asiFeatSlots } = wizardState;
   const stepCls = "space-y-6 animate-in fade-in duration-500";
-  const asiMap = getEffectiveAsiMap(selectedRace, wizardState.halfElfChoice1, wizardState.halfElfChoice2);
+  const asiMap = getEffectiveAsiMap(selectedRace, wizardState.selectedSubraceId, wizardState.halfElfChoice1, wizardState.halfElfChoice2);
 
   const [featSearch, setFeatSearch] = useState('');
   const [featCategory, setFeatCategory] = useState<string>('all');

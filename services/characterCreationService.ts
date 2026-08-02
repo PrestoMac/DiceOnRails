@@ -2,7 +2,7 @@ import { Character, StartingLocation, InventoryItem, FeatSelection } from '../ty
 import { WizardState } from '../components/creation/types';
 import { calculateXPToNextLevel } from './progressionService';
 import { ASI_LEVELS, FALLBACK_STARTING_LOCATION } from '../constants';
-import { getMod, getRaceDef, recalculateResourcePools } from './classEngine';
+import { getMod, getRaceDef, recalculateResourcePools, calculateMaxHp } from './classEngine';
 import { DRAGON_ANCESTRIES } from '../components/creation/constants';
 import { computeSkillBudget } from '../components/creation/skillPoints';
 import { RACES_BY_ID } from '../utils/races';
@@ -27,17 +27,17 @@ export function buildCharacterFromWizard(
   if (loc && onSetStartingLocation) onSetStartingLocation(loc);
 
   const fs = { ...stats };
-  if (typeof selectedRace.asi === 'object') Object.entries(selectedRace.asi).forEach(([s, v]) => { (fs as Record<string, number>)[s] += v as number; });
-
-  // Apply subrace ASI bonuses on top of the base race ASI
+  // Subrace REPLACE semantics: when a subrace is selected, its `asi` IS the full
+  // racial ASI package — the base race ASI is ignored. The base ASIs already
+  // include the subrace-specific +1 (e.g. Elf base {dex:2,int:1} includes High
+  // Elf's +1 INT), so summing both double-counts. Half-Elf ('flexible-2') has no
+  // subraces, so it always falls through to the flexible branch below.
   const subrace = selectedSubraceId ? selectedRace.subraces?.find(sr => sr.id === selectedSubraceId) : undefined;
-  if (subrace?.asi) {
-    for (const [s, v] of Object.entries(subrace.asi)) {
-      (fs as Record<string, number>)[s] = ((fs as Record<string, number>)[s] || 0) + (v as number);
-    }
-  }
+  const effectiveAsi = subrace?.asi ?? selectedRace.asi;
 
-  if (typeof selectedRace.asi === 'string') {
+  if (typeof effectiveAsi === 'object') {
+    Object.entries(effectiveAsi).forEach(([s, v]) => { (fs as Record<string, number>)[s] += v as number; });
+  } else if (typeof effectiveAsi === 'string') {
     const halfElfStats = { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 2 };
     if (halfElfChoice1) (halfElfStats as Record<string, number>)[halfElfChoice1] += 1;
     if (halfElfChoice2) (halfElfStats as Record<string, number>)[halfElfChoice2] += 1;
@@ -74,8 +74,6 @@ export function buildCharacterFromWizard(
     }
   });
 
-  const conMod = getMod(fs.con);
-
   const racialTraits: string[] = [];
   const raceDef = getRaceDef(selectedRace.id);
   if (raceDef) for (const t of raceDef.traits) { racialTraits.push(t.id); }
@@ -87,10 +85,10 @@ export function buildCharacterFromWizard(
 
   const builtChar: Character = {
     id: 'player-' + Date.now(), name, race: selectedRace.id, class: selectedClass.id, level,
-    hp: {
-      current: selectedClass.hpBase + conMod + (selectedClass.hpPerLevel + conMod) * (level - 1),
-      max: selectedClass.hpBase + conMod + (selectedClass.hpPerLevel + conMod) * (level - 1),
-    },
+    // hp is placeholder here — computed through the engine right after construction
+    // (see below) so subrace/feat effects (Hill Dwarf Dwarven Toughness +1/level,
+    // Draconic Bloodline +level, Tough feat) apply at creation.
+    hp: { current: 0, max: 0 },
     stats: fs, inventory,
     currency: (() => {
       let gp = Math.floor(goldPool);
@@ -103,6 +101,7 @@ export function buildCharacterFromWizard(
     unusedSkillPoints: remainingSkillPoints || 0,
     feats: collectedFeats, featSelections, featChoices, pendingFeatChoice: false,
     resources, racialTraits,
+    speedBonus: subrace?.speedBonus ?? 0,
     conditionsImmunities: (() => {
       if (selectedRace.id === 'elf' || selectedRace.id === 'half-elf') return ['sleep'];
       return undefined;
@@ -146,6 +145,8 @@ export function buildCharacterFromWizard(
         : [...selectedCantrips]
     ),
     subclassId: selectedSubclassId || undefined,
+    // calculateMaxHp keys the Draconic Bloodline +1 HP/level bonus off sorcerousOrigin.
+    sorcerousOrigin: (selectedClass.id === 'sorcerer' && selectedSubclassId === 'draconic-bloodline') ? 'draconic-bloodline' : undefined,
     subraceId: selectedSubraceId || undefined,
     fightingStyle: fightingStyleChoice || undefined,
     backstory: backstory || undefined,
@@ -176,6 +177,13 @@ export function buildCharacterFromWizard(
       return raceDef.languages.filter(l => l !== 'one-of-choice');
     })(),
   };
+
+  // Compute HP through the engine so race/subrace/feat effects (Hill Dwarf's
+  // Dwarven Toughness +1/level, Draconic Bloodline +level, Tough feat) apply at
+  // creation. For characters with no HP-affecting effects this equals the former
+  // inline formula exactly.
+  const maxHp = calculateMaxHp(builtChar);
+  builtChar.hp = { current: maxHp, max: maxHp };
 
   // Grant domain spells at character creation
   if (selectedSubclassId) {

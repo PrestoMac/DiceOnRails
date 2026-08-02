@@ -199,7 +199,7 @@ export function getConditionEffects(target: Target): {
     advantageOnAttacks: ids.has('frightened') ? false : (ids.has('paralyzed') || ids.has('stunned') || ids.has('unconscious')),
     speedModifier: (ids.has('restrained') || ids.has('unconscious')) ? 0 : 1,
     acModifier: 0,
-    attacksAgainstHaveDisadvantage: false,
+    attacksAgainstHaveDisadvantage: ids.has('dodging'),
     d20Modifier: -exhaustionLevel,
     speedPenaltyFt: -(exhaustionLevel * 5),
   };

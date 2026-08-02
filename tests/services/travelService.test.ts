@@ -542,3 +542,110 @@ describe('travelService — short_rest', () => {
     expect(String(result.data?.narration)).toContain(narration);
   });
 });
+
+describe('travelService — natural_recovery', () => {
+  let state: GameState;
+  let service: TravelService;
+
+  function makeDruid(overrides: Partial<Character> = {}): Character {
+    return {
+      id: 'druid-1',
+      name: 'Willow',
+      class: 'druid',
+      race: 'half-elf',
+      level: 4,
+      hp: { current: 30, max: 30 },
+      stats: { str: 8, dex: 14, con: 12, int: 12, wis: 16, cha: 10 },
+      inventory: [],
+      currency: { gp: 10, sp: 0, cp: 0 },
+      location: 'Test Grove',
+      experience: 0,
+      experienceToNextLevel: 2700,
+      unusedStatPoints: 0,
+      maxHpBonus: 0,
+      hitDice: { current: 4, max: 4 },
+      conditions: [],
+      resources: [
+        { id: 'spell-slot-1', name: 'Level 1 Spell Slot', current: 4, max: 4, resetOn: 'long', source: 'class', sourceId: 'druid' },
+        { id: 'spell-slot-2', name: 'Level 2 Spell Slot', current: 0, max: 3, resetOn: 'long', source: 'class', sourceId: 'druid' },
+      ],
+      ...overrides,
+    };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(cryptoRoll).mockReset();
+    state = makeGameState({ gameTime: 0, lastLongRestTime: -960 });
+    service = createTravelService(state, {
+      getTarget: (id) => state.party.find(c => c.id === id),
+      adjust_currency: vi.fn(async () => ({ success: true, message: '', data: {} })),
+      update_inventory: vi.fn(async () => ({ success: true, message: '', data: {} })),
+      log_lore: vi.fn(async () => ({ success: true, message: '', data: {} })),
+      upsert_quest: vi.fn(async () => ({ success: true, message: '', data: {} })),
+    });
+  });
+
+  it('restores an expended spell slot and consumes the charge (happy path)', async () => {
+    const druid = makeDruid();
+    state.party.push(druid);
+    const result = await service.natural_recovery('druid-1', [{ level: 2, count: 1 }]);
+    expect(result.success).toBe(true);
+    expect(result.message).toContain('Natural Recovery');
+    const slot2 = druid.resources?.find(r => r.id === 'spell-slot-2');
+    expect(slot2?.current).toBe(1);
+    const nrPool = druid.resources?.find(r => r.id === 'natural-recovery');
+    expect(nrPool).toBeDefined();
+    expect(nrPool?.current).toBe(0);
+  });
+
+  it('rejects non-druid characters', async () => {
+    state.party.push(makeChar());
+    const result = await service.natural_recovery('hero-1', [{ level: 1, count: 1 }]);
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('Only Druids');
+  });
+
+  it('rejects when natural recovery already used (pool current 0)', async () => {
+    const druid = makeDruid({ resources: [
+      { id: 'spell-slot-1', name: 'Level 1 Spell Slot', current: 4, max: 4, resetOn: 'long', source: 'class', sourceId: 'druid' },
+      { id: 'spell-slot-2', name: 'Level 2 Spell Slot', current: 0, max: 3, resetOn: 'long', source: 'class', sourceId: 'druid' },
+      { id: 'natural-recovery', name: 'Natural Recovery', current: 0, max: 1, resetOn: 'long', source: 'class', sourceId: 'druid' },
+    ] });
+    state.party.push(druid);
+    const result = await service.natural_recovery('druid-1', [{ level: 2, count: 1 }]);
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('already used');
+  });
+
+  it('fails on mixed valid+invalid selections WITHOUT mutating state', async () => {
+    // Level-16 druid: maxLevels = 8, so the total (2 + 6) passes the level budget,
+    // letting the per-selection level-range validation reject the level-6 slot.
+    const druid = makeDruid({ level: 16, resources: [
+      { id: 'spell-slot-1', name: 'Level 1 Spell Slot', current: 4, max: 4, resetOn: 'long', source: 'class', sourceId: 'druid' },
+      { id: 'spell-slot-2', name: 'Level 2 Spell Slot', current: 0, max: 3, resetOn: 'long', source: 'class', sourceId: 'druid' },
+    ] });
+    state.party.push(druid);
+    const result = await service.natural_recovery('druid-1', [{ level: 2, count: 1 }, { level: 6, count: 1 }]);
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('level 6');
+    const slot2 = druid.resources?.find(r => r.id === 'spell-slot-2');
+    expect(slot2?.current).toBe(0);
+    const nrPool = druid.resources?.find(r => r.id === 'natural-recovery');
+    expect(nrPool?.current).toBe(1);
+  });
+
+  it('fails on a missing slot resource WITHOUT mutating state', async () => {
+    // Level-6 druid: maxLevels = 3, so the total (3) passes the level budget and the
+    // missing-slot validation rejects it (no spell-slot-3 resource exists).
+    const druid = makeDruid({ level: 6, resources: [
+      { id: 'spell-slot-2', name: 'Level 2 Spell Slot', current: 0, max: 3, resetOn: 'long', source: 'class', sourceId: 'druid' },
+    ] });
+    state.party.push(druid);
+    const result = await service.natural_recovery('druid-1', [{ level: 3, count: 1 }]);
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('level 3');
+    const nrPool = druid.resources?.find(r => r.id === 'natural-recovery');
+    expect(nrPool?.current).toBe(1);
+  });
+});

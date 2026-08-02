@@ -187,9 +187,13 @@ export function calculateSpeed(character: Character): number {
   return Math.max(0, speed);
 }
 
-/** Returns the darkvision range in feet for the character's race, or 0 if none. */
+/** Returns the darkvision range in feet for the character's race, or 0 if none. A subrace darkvision override wins when set. */
 export function getDarkvisionRange(character: Character): number {
-  return getRaceDef(character.race)?.darkvision ?? 0;
+  const race = getRaceDef(character.race);
+  if (!race) return 0;
+  const subrace = character.subraceId ? race.subraces?.find(sr => sr.id === character.subraceId) : undefined;
+  if (subrace?.darkvision != null) return subrace.darkvision;
+  return race.darkvision ?? 0;
 }
 
 /** Finds a character's resource pool by its string ID (e.g. 'spell-slot-1', 'ki'). */
