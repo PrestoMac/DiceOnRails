@@ -124,7 +124,8 @@ export type EffectKind =
   | 'diamond-soul'
   | 'aura-of-protection'
   | 'evasion'
-  | 'two-weapon-fighting';
+  | 'two-weapon-fighting'
+  | 'frenzy-exhaustion';
 
 /** A feature granted by a character class at a specific level. */
 export interface ClassFeature {
