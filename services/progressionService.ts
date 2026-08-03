@@ -1,6 +1,7 @@
 import { Character, LevelUpSummary } from '../types';
 import { XP_TABLE, STAT_POINTS_PER_LEVEL, MAX_STAT_VALUE, ASI_LEVELS } from '../constants';
 import { calculateMaxHp as classEngineCalculateMaxHp, getClassDef, getSubclassDef, recalculateResourcePools } from './classEngine';
+import { getInvocationCount } from '../data/invocations';
 
 /** Returns the XP required to reach a given character level from the XP table. */
 export function getXpForLevel(level: number): number {
@@ -89,6 +90,20 @@ export function awardExperience(
     }
     if (updated.class === 'wizard') {
       updated.pendingWizardSpells = (updated.pendingWizardSpells ?? 0) + (levelsGained * 2);
+    }
+
+    // Warlock Eldritch Invocations: grant pending picks when crossing the
+    // invocation-count thresholds (L2/L5/L7/L9/L12/L15/L18). The delta between
+    // getInvocationCount(newLevel) and the invocations already chosen drives
+    // the pending count. The LevelUpModal surfaces an "Invocations" tab when
+    // this is > 0.
+    if (updated.class === 'warlock' && newLevel >= 2) {
+      const targetCount = getInvocationCount(newLevel);
+      const currentCount = (updated.invocations ?? []).length;
+      const pendingDelta = Math.max(0, targetCount - currentCount);
+      if (pendingDelta > 0) {
+        updated.pendingInvocations = (updated.pendingInvocations ?? 0) + pendingDelta;
+      }
     }
 
     const oldMaxHp = character.hp.max;

@@ -6,6 +6,8 @@ import { FeatDefinition, FEATS_CATALOG } from '../utils/feats';
 import { filterAvailableFeats, validateFeatPrereqs } from '../services/featsService';
 import { getClassDef, getSubclassDef, getSpellSaveDc, getSpellAttackBonus, getMod } from '../services/classEngine';
 import { SPELLS_BY_ID } from '../utils/spells';
+import { INVOCATIONS_CATALOG, getInvocationCount } from '../data/invocations';
+import { FIGHTING_STYLE_OPTIONS } from '../data/classes';
 import FeatDetailModal from './FeatDetailModal';
 import TabButton from './shared/TabButton';
 import StatRow from './wizard/shared/StatRow';
@@ -41,17 +43,26 @@ interface LevelUpModalProps {
     skillChoices?: string[];
   }) => void | Promise<void>;
   onAcknowledgeSubclass?: () => void | Promise<void>;
+  onConfirmInvocations?: (invocationIds: string[]) => Promise<boolean>;
+  onConfirmFightingStyleTwo?: (style: string) => Promise<boolean>;
 }
 
-type Tab = 'hp' | 'stats' | 'skills' | 'choice' | 'asi' | 'feat' | 'subclass' | 'resources' | 'spells';
+type Tab = 'hp' | 'stats' | 'skills' | 'choice' | 'asi' | 'feat' | 'subclass' | 'resources' | 'spells' | 'invocations' | 'fighting-style-two';
 
-/** Level-up modal with tabs for HP roll, stat allocation, skill points, ASI/feat selection, resources, and spells. */
-const LevelUpModal: React.FC<LevelUpModalProps> = ({ character, selectedAllocations, remainingPoints, previewHp, error, onAllocate, onConfirm, onCancel, onConfirmAsi, onConfirmFeat, onAcknowledgeSubclass }) => {
+/** Level-up modal with tabs for HP roll, stat allocation, skill points, ASI/feat selection, resources, spells, and Warlock invocations. */
+const LevelUpModal: React.FC<LevelUpModalProps> = ({ character, selectedAllocations, remainingPoints, previewHp, error, onAllocate, onConfirm, onCancel, onConfirmAsi, onConfirmFeat, onAcknowledgeSubclass, onConfirmInvocations, onConfirmFightingStyleTwo }) => {
   const isAsi = character.pendingFeatChoice && ASI_LEVELS.includes(character.level);
   const hasSubclassFeature = character.pendingSubclassFeature && character.subclassId;
   const subclassDef = character.subclassId ? getSubclassDef(character.class, character.subclassId) : undefined;
   const newSubclassFeatures = hasSubclassFeature && subclassDef ? subclassDef.features.filter(f => f.level === character.level && !(character.unlockedSubclassFeatures || []).includes(f.level)) : [];
-  const defaultTab: Tab = hasSubclassFeature ? 'subclass' : (isAsi ? 'choice' : 'hp');
+  // Warlock invocation picker visibility: Warlock L2+ with pending choices.
+  const hasPendingInvocations = character.class === 'warlock' && (character.pendingInvocations ?? 0) > 0;
+  // Champion Fighter L10 "Additional Fighting Style": subclass feature gate.
+  const championL10Feature = subclassDef?.features.find(
+    f => f.level === character.level && f.id === 'additional-fighting-style'
+  );
+  const hasPendingFightingStyleTwo = !!(championL10Feature && !character.fightingStyleTwo);
+  const defaultTab: Tab = hasSubclassFeature ? 'subclass' : (hasPendingInvocations ? 'invocations' : (hasPendingFightingStyleTwo ? 'fighting-style-two' : (isAsi ? 'choice' : 'hp')));
   const [activeTab, setActiveTab] = useState<Tab>(defaultTab);
   const [localSkills, setLocalSkills] = useState<Record<string,number>>({});
   const [subclassAcknowledged, setSubclassAcknowledged] = useState(false);
@@ -75,6 +86,8 @@ const LevelUpModal: React.FC<LevelUpModalProps> = ({ character, selectedAllocati
   );
   const [asiBonusesForFeat, setAsiBonusesForFeat] = useState<Partial<Record<keyof Character['stats'], number>>>({});
   const [skilledChoices, setSkilledChoices] = useState<string[]>([]);
+  const [pendingInvocationPicks, setPendingInvocationPicks] = useState<string[]>([]);
+  const [pendingFightingStyleTwo, setPendingFightingStyleTwo] = useState<string>('');
 
   const handleRollHp = () => {
     if (rolling) return;
@@ -122,6 +135,8 @@ const LevelUpModal: React.FC<LevelUpModalProps> = ({ character, selectedAllocati
     { key: 'choice', icon: 'fa-star', label: 'ASI / Feat', show: isAsi },
     { key: 'asi', icon: 'fa-arrow-up', label: 'ASI', show: isAsi && choiceType === 'asi' },
     { key: 'feat', icon: 'fa-trophy', label: 'Feat', show: isAsi && choiceType === 'feat' },
+    { key: 'invocations', icon: 'fa-eye', label: 'Invocations', show: hasPendingInvocations },
+    { key: 'fighting-style-two', icon: 'fa-shield-halved', label: 'Style II', show: hasPendingFightingStyleTwo },
     { key: 'resources', icon: 'fa-bolt', label: 'Resources', show: (character.resources || []).length > 0 },
     { key: 'spells', icon: 'fa-book', label: 'Spells', show: !!classDef?.spellcasting },
   ];
@@ -248,6 +263,11 @@ const LevelUpModal: React.FC<LevelUpModalProps> = ({ character, selectedAllocati
       ))
     : (remainingPoints === 0 && remainingSkillPoints === 0 && hpRoll !== null);
 
+  // Side-tab gating: pending picks must be resolved before the user can confirm the level-up.
+  const invocationsPendingUnresolved = hasPendingInvocations && pendingInvocationPicks.length !== (character.pendingInvocations ?? 0);
+  const fightingStyleTwoUnresolved = hasPendingFightingStyleTwo && !pendingFightingStyleTwo;
+  const sidePicksBlock = invocationsPendingUnresolved || fightingStyleTwoUnresolved;
+
   return (
     <div className="fixed inset-0 bg-stone-950/90 z-50 flex flex-col items-center justify-center p-4 text-stone-200">
       <div className="absolute inset-0 opacity-10 pointer-events-none" style={{backgroundImage:'url("https://www.transparenttextures.com/patterns/black-paper.png")'}}></div>
@@ -345,6 +365,77 @@ const LevelUpModal: React.FC<LevelUpModalProps> = ({ character, selectedAllocati
               </div>
             ))}
             {(character.resources || []).filter(r => r.max > 0).length === 0 && <p className="text-xs text-stone-500 text-center py-6 italic">No resource pools available.</p>}
+          </div>}
+          {activeTab==='invocations' && <div className="space-y-3 py-2 animate-in fade-in duration-350">
+            <div className="bg-amber-950/20 border border-amber-700 rounded-xl p-4 text-center">
+              <div className="text-3xl mb-1"><i className="fas fa-eye text-amber-500"></i></div>
+              <h3 className="font-bold text-amber-500">Eldritch Invocations</h3>
+              <p className="text-[10px] text-stone-400 mt-1">
+                Pick {character.pendingInvocations} new invocation{character.pendingInvocations === 1 ? '' : 's'} from the list below.
+                Your current invocation budget is {getInvocationCount(character.level)} at L{character.level}.
+              </p>
+            </div>
+            <div className="max-h-72 overflow-y-auto pr-1 custom-scrollbar space-y-2">
+              {INVOCATIONS_CATALOG.filter(inv => inv.minLevel <= character.level && !(character.invocations ?? []).includes(inv.id)).map(inv => {
+                const isSelected = pendingInvocationPicks.includes(inv.id);
+                const disablePick = !isSelected && pendingInvocationPicks.length >= (character.pendingInvocations ?? 0);
+                return (
+                  <button key={inv.id} onClick={() => {
+                    if (isSelected) setPendingInvocationPicks(p => p.filter(x => x !== inv.id));
+                    else if (!disablePick) setPendingInvocationPicks(p => [...p, inv.id]);
+                  }}
+                    className={`w-full text-left p-3 rounded-lg border transition-colors ${isSelected ? 'bg-amber-900/40 border-amber-700/50 text-amber-200' : 'bg-stone-950/40 border-stone-800 hover:bg-stone-900 disabled:opacity-40'}`}
+                    disabled={!isSelected && disablePick}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1">
+                        <p className="text-xs font-bold text-stone-200">{inv.name}{inv.prerequisite ? <span className="text-[9px] text-stone-500 ml-1">· {inv.prerequisite}</span> : null}</p>
+                        <p className="text-[10px] text-stone-400 mt-0.5">{inv.description}</p>
+                      </div>
+                      {isSelected && <i className="fas fa-check text-amber-400 text-xs"></i>}
+                    </div>
+                  </button>
+                );
+              })}
+              {INVOCATIONS_CATALOG.filter(inv => inv.minLevel <= character.level && !(character.invocations ?? []).includes(inv.id)).length === 0 && (
+                <p className="text-center text-stone-500 text-xs py-4 italic">No new invocations available at this level.</p>
+              )}
+            </div>
+            <button
+              onClick={async () => {
+                if (!onConfirmInvocations) return;
+                const ok = await onConfirmInvocations(pendingInvocationPicks);
+                if (ok) setPendingInvocationPicks([]);
+              }}
+              disabled={pendingInvocationPicks.length !== (character.pendingInvocations ?? 0)}
+              className="w-full py-2 bg-amber-700 hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg font-bold text-white transition-all uppercase tracking-wider text-xs">
+              Learn {pendingInvocationPicks.length > 0 ? `(${pendingInvocationPicks.length}/${character.pendingInvocations ?? 0})` : ''}
+            </button>
+          </div>}
+          {activeTab==='fighting-style-two' && <div className="space-y-3 py-2 animate-in fade-in duration-350">
+            <div className="bg-amber-950/20 border border-amber-700 rounded-xl p-4 text-center">
+              <div className="text-3xl mb-1"><i className="fas fa-shield-halved text-amber-500"></i></div>
+              <h3 className="font-bold text-amber-500">Additional Fighting Style</h3>
+              <p className="text-[10px] text-stone-400 mt-1">Champion L10 — pick a second fighting style (cannot duplicate your first).</p>
+            </div>
+            <div className="grid grid-cols-1 gap-2">
+              {FIGHTING_STYLE_OPTIONS.filter(fs => fs.id !== 'protection' && fs.id !== character.fightingStyle).map(fs => (
+                <button key={fs.id} onClick={() => setPendingFightingStyleTwo(fs.id)}
+                  className={`p-3 rounded-lg border text-left transition-colors ${pendingFightingStyleTwo === fs.id ? 'bg-amber-900/40 border-amber-700/50 text-amber-200' : 'bg-stone-950/40 border-stone-800 hover:bg-stone-900'}`}>
+                  <p className="text-xs font-bold text-stone-200">{fs.label}</p>
+                  <p className="text-[10px] text-stone-400 mt-0.5">{fs.description}</p>
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={async () => {
+                if (!onConfirmFightingStyleTwo || !pendingFightingStyleTwo) return;
+                const ok = await onConfirmFightingStyleTwo(pendingFightingStyleTwo);
+                if (ok) setPendingFightingStyleTwo('');
+              }}
+              disabled={!pendingFightingStyleTwo}
+              className="w-full py-2 bg-amber-700 hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg font-bold text-white transition-all uppercase tracking-wider text-xs">
+              Confirm Style
+            </button>
           </div>}
           {activeTab==='spells' && <div className="space-y-3 py-2 animate-in fade-in duration-350">
             {character.pendingSpellSwap && classDef?.spellcasting?.prepMode === 'known' && (
@@ -461,7 +552,7 @@ const LevelUpModal: React.FC<LevelUpModalProps> = ({ character, selectedAllocati
                 {choiceType === 'asi' ? 'Confirm ASI' : choiceType === 'feat' ? `Take ${selectedFeat?.shortName || 'Feat'}` : 'Choose First'}
               </button>
             ) : (
-              <button onClick={() => { if (remainingPoints>0||remainingSkillPoints>0) { alert("Please allocate all available attribute and skill points."); return; } if (hpRoll===null) { alert("Please roll for HP or take average before continuing."); return; } onConfirm(localSkills, hpDeviation); }} disabled={remainingPoints>0||remainingSkillPoints>0||hpRoll===null} className="flex-1 py-3 bg-amber-700 hover:bg-amber-600 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg font-bold text-white transition-all uppercase tracking-wider text-xs shadow-lg shadow-amber-950/40">Confirm Level Up</button>
+              <button onClick={() => { if (remainingPoints>0||remainingSkillPoints>0) { alert("Please allocate all available attribute and skill points."); return; } if (hpRoll===null) { alert("Please roll for HP or take average before continuing."); return; } if (sidePicksBlock) { alert("Please resolve your pending invocation or fighting-style picks first."); return; } onConfirm(localSkills, hpDeviation); }} disabled={remainingPoints>0||remainingSkillPoints>0||hpRoll===null||sidePicksBlock} className="flex-1 py-3 bg-amber-700 hover:bg-amber-600 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg font-bold text-white transition-all uppercase tracking-wider text-xs shadow-lg shadow-amber-950/40">Confirm Level Up</button>
             )}
           </div>
         </div>

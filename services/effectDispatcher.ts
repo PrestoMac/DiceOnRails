@@ -181,8 +181,28 @@ const HOOK_REGISTRY: Record<HookName, ReducerEntry[]> = {
       reduce: (ctx, payload, character) => {
         const acCtx = ctx as unknown as AcContext;
         const style = (payload.style as string) || character.fightingStyle;
-        if (style === 'defense' && acCtx.equippedArmor && acCtx.equippedArmor.type !== 'none') {
-          acCtx.baseAc += 1;
+        // The reducer is invoked once per `fighting-style` effect payload in the
+        // catalogs (Fighter L1, Champion L10 additional-fighting-style, etc.).
+        // For Defense, we want the bonus applied exactly once per distinct slot
+        // — both `character.fightingStyle` and `character.fightingStyleTwo`
+        // contribute independently when both are 'defense'. Track which slots
+        // have already been applied via the context so re-entry is idempotent.
+        const marker = acCtx as unknown as Record<string, unknown>;
+        if (!marker._fightingStyleDefenseApplied) {
+          marker._fightingStyleDefenseApplied = { primary: false, secondary: false };
+        }
+        const applied = marker._fightingStyleDefenseApplied as { primary: boolean; secondary: boolean };
+        if (acCtx.equippedArmor && acCtx.equippedArmor.type !== 'none') {
+          // Apply primary once.
+          if (style === 'defense' && character.fightingStyle === 'defense' && !applied.primary) {
+            acCtx.baseAc += 1;
+            applied.primary = true;
+          }
+          // Apply secondary once (Champion L10 Additional Fighting Style).
+          if (character.fightingStyleTwo === 'defense' && !applied.secondary) {
+            acCtx.baseAc += 1;
+            applied.secondary = true;
+          }
         }
         return ctx;
       },
@@ -497,8 +517,18 @@ const HOOK_REGISTRY: Record<HookName, ReducerEntry[]> = {
     },
     {
       kind: 'armor-proficiency',
-      reduce: (ctx, _payload, character) => {
-        if (!character.inventory) return ctx;
+      reduce: (ctx, payload, character) => {
+        const prof = (payload.prof as string) || '';
+        const valid: ('light' | 'medium' | 'heavy' | 'shield')[] = ['light', 'medium', 'heavy', 'shield'];
+        const typed = valid.find(v => v === prof.toLowerCase());
+        if (typed) {
+          if (!character.armorProfs) character.armorProfs = [];
+          if (!character.armorProfs.includes(typed)) character.armorProfs.push(typed);
+          // Moderately Armored also grants shield proficiency per SRD.
+          if (typed === 'medium' && !character.armorProfs.includes('shield')) {
+            character.armorProfs.push('shield');
+          }
+        }
         return ctx;
       },
     },

@@ -290,6 +290,13 @@ export interface Character {
   draconicDamageType?: DamageType;
   subraceId?: string;
   invocations?: string[];
+  /** Count of pending Eldritch Invocation picks granted on Warlock level-up.
+   *  Set when leveling past the L2/L5/L7/L9/L12/L15/L18 invocation-count thresholds.
+   *  Decremented as the player picks invocations via the LevelUpModal. */
+  pendingInvocations?: number;
+  /** Additional armor proficiencies granted by feats (Lightly/Moderately/Bulwark Training).
+   *  Empty/undefined means the character has only class-granted armor proficiencies. */
+  armorProfs?: ('light' | 'medium' | 'heavy' | 'shield')[];
   halfElfStatChoices?: ('str'|'dex'|'con'|'int'|'wis'|'cha')[];
   backstory?: string;
   /** Background & persona — SRD 5.1 narrative fields (no mechanical effects).
@@ -303,6 +310,11 @@ export interface Character {
   appearance?: string;
   bonusSkillProficiencies?: number;
   fightingStyle?: string;
+  /** Champion Fighter L10 "Additional Fighting Style". Set by the level-up flow
+   *  when the Champion subclass feature `additional-fighting-style` is unlocked.
+   *  The Defense fighting-style reducer only consults `fightingStyle` (the primary),
+   *  so the secondary style must be applied via a separate reducer instance. */
+  fightingStyleTwo?: string;
   divineDomain?: string;
   sorcerousOrigin?: string;
   warlockPatron?: string;
@@ -327,6 +339,10 @@ export interface Character {
   /** Full spell preparation mode (available after a long rest or on fresh character setup). */
   longRestPrepAvailable?: boolean;
   raging?: boolean;
+  /** Barbarian Reckless Attack state — set true when the barbarian declares a
+   *  reckless attack on their turn. Cleared at the start of their next turn.
+   *  While true, attacks against this character have advantage. */
+  recklessAttacking?: boolean;
 
   tempHp?: number;
   conditionsImmunities?: string[];

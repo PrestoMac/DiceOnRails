@@ -55,7 +55,8 @@ const MobileLayout: React.FC = () => {
     showLevelUpModal, levelUpCharacter, selectedAllocations, remainingPoints,
     previewHp, allocationError, handleOpenLevelUp, handleCloseLevelUp,
     handleAllocateStat, handleConfirmAllocation, handleConfirmAsiChoice,
-    handleConfirmFeatChoice, handleAcknowledgeSubclass
+    handleConfirmFeatChoice, handleAcknowledgeSubclass,
+    handleConfirmInvocations, handleConfirmFightingStyleTwo
   } = useProgressionContext();
   const { settings, setSettingsOpen, handleTriggerDiceRoll, setCompendiumOpen } = useUIContext();
   const { userId, handleLogout } = useAuthContext();
@@ -243,7 +244,7 @@ const MobileLayout: React.FC = () => {
         <img src={myAtmosphereUrl} alt="Atmosphere Fullscreen" className="w-full max-h-[70vh] object-contain rounded-lg border border-stone-800"/>
         <p className="mt-4 text-stone-500 italic fantasy-font text-center">{gameState.worldDescription}</p>
       </div>}
-      {showLevelUpModal&&levelUpCharacter&&<LevelUpModal character={levelUpCharacter} selectedAllocations={selectedAllocations} remainingPoints={remainingPoints} previewHp={previewHp} error={allocationError} onAllocate={handleAllocateStat} onConfirm={handleConfirmAllocation} onCancel={handleCloseLevelUp} onConfirmAsi={handleConfirmAsiChoice} onConfirmFeat={handleConfirmFeatChoice} onAcknowledgeSubclass={handleAcknowledgeSubclass}/>}
+      {showLevelUpModal&&levelUpCharacter&&<LevelUpModal character={levelUpCharacter} selectedAllocations={selectedAllocations} remainingPoints={remainingPoints} previewHp={previewHp} error={allocationError} onAllocate={handleAllocateStat} onConfirm={handleConfirmAllocation} onCancel={handleCloseLevelUp} onConfirmAsi={handleConfirmAsiChoice} onConfirmFeat={handleConfirmFeatChoice} onAcknowledgeSubclass={handleAcknowledgeSubclass} onConfirmInvocations={handleConfirmInvocations} onConfirmFightingStyleTwo={handleConfirmFightingStyleTwo}/>}
     </div>
   );
 };

@@ -87,8 +87,10 @@ CLASS FEATURES:
 - Wild Shape (Druid L2): use polymorph_creature to transform into beast forms (Wolf, Panther, Brown Bear, Dire Wolf, Giant Eagle, Giant Crocodile, Tyrannosaurus Rex). Engine auto-consumes charges, enforces CR limits, and manages beast stat overlays.
 - Natural Recovery (Druid Circle of Land L2): Once per long rest during a short rest, recover expended spell slots with a total combined level up to half your druid level (rounded up). Call the natural_recovery tool with characterId and selections: [{ "level": 2, "count": 1 }] (levels 1-5 only).
 - Eldritch Invocations (Warlock L2): Agonizing Blast (add CHA mod to Eldritch Blast damage), Armor of Shadows (mage armor at will), Fiendish Vigor (false life at will), and others are **ENGINE APPLIED** based on the warlock's chosen invocations.
+- Thirsting Blade (Warlock L5+ with Pact of the Blade): functions identically to Extra Attack — when taking the Attack action with the pact weapon, call player_attack TWICE. Only applies to pact-weapon attacks.
 - Fighting Styles: **ENGINE APPLIED**. Archery (+2 attack), Defense (+1 AC in armor), Dueling (+2 damage), GWF (rerolls 1s/2s), and TWF (offhand mod) are mechanically applied.
 - Extra Attack (Fighter L5, Barbarian L5, Monk L5, Paladin L5, Ranger L5): when the character has the Extra Attack class feature and takes the Attack action, call player_attack TWICE (a second attack at the same target or a new one). The engine does NOT auto-repeat the attack — you must issue both player_attack calls.
+- Reckless Attack (Barbarian L2): pass \`reckless: true\` on player_attack with a melee STR attack to gain advantage on the attack. The engine then grants advantage on attacks against the barbarian until their next turn (mechanically enforced).
 - Monk: Martial Arts uses unarmed strikes (1d4 + DEX, scaling). Monks are NOT spellcasters — NEVER call cast_spell for monk abilities. Use player_attack with weaponName="Unarmed Strike".
 
 RACE TRAITS:
@@ -100,6 +102,7 @@ RACE TRAITS:
 - Fey Ancestry (Elf/Half-Elf): **ENGINE APPLIED**. Advantage vs charmed saves, immune to magical sleep.
 - Gnome Cunning (Gnome): **ENGINE APPLIED**. Advantage on INT/WIS/CHA saves vs magic (auto-applied to all spell-originated saves).
 - Halfling Brave: **ENGINE APPLIED**. Advantage on saves vs frightened.
+- Skill Versatility (Half-Elf): **ENGINE APPLIED at character creation**. Grants 2 additional skill proficiency points during character creation (the player picks them in the Skills step). Not a runtime effect.
 - Damage Resistances: **ENGINE APPLIED**. Dwarf poison, Tiefling fire, Dragonborn draconic element, and Barbarian rage resistances are automatically calculated on damage taken.
 - Breath Weapon (Dragonborn): 'use_resource' with resourceId="breath-weapon" returns the save DC and rolled damage.
 - Hellish Rebuke (Tiefling, once per long rest): use_resource(resourceId="hellish-rebuke", targetId="enemy-name").

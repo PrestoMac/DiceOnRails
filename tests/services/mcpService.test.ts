@@ -2369,4 +2369,74 @@ const roundTripped = deepClone(char.conditions);
       expect(char?.experience).toBe(0);
     });
   });
+
+  describe('choose_invocations (Warlock level-up)', () => {
+    it('adds the chosen invocation and decrements pendingInvocations', async () => {
+      const char = makeCharacter({
+        class: 'warlock', level: 5,
+        stats: { str: 8, dex: 14, con: 12, int: 10, wis: 10, cha: 16 },
+        invocations: ['agonizing-blast'],
+        pendingInvocations: 1,
+      });
+      const server = new MockMCPServer();
+      server.joinParty(char);
+      const result = await server.choose_invocations('hero-1', ['armor-of-shadows']);
+      expect(result.success).toBe(true);
+      expect(char.invocations).toContain('armor-of-shadows');
+      expect(char.pendingInvocations).toBe(0);
+      // At-will spell injection
+      expect(char.knownSpells).toContain('mage-armor');
+    });
+
+    it('rejects choice exceeding pending count', async () => {
+      const char = makeCharacter({
+        class: 'warlock', level: 5,
+        stats: { str: 8, dex: 14, con: 12, int: 10, wis: 10, cha: 16 },
+        invocations: [], pendingInvocations: 1,
+      });
+      const server = new MockMCPServer();
+      server.joinParty(char);
+      const result = await server.choose_invocations('hero-1', ['agonizing-blast', 'armor-of-shadows']);
+      expect(result.success).toBe(false);
+      expect(result.message).toMatch(/pending/i);
+    });
+
+    it('rejects when character is not a warlock', async () => {
+      const char = makeCharacter({
+        class: 'fighter', level: 5,
+        stats: { str: 16, dex: 14, con: 14, int: 10, wis: 10, cha: 10 },
+        pendingInvocations: 1,
+      });
+      const server = new MockMCPServer();
+      server.joinParty(char);
+      const result = await server.choose_invocations('hero-1', ['agonizing-blast']);
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects unknown invocation id', async () => {
+      const char = makeCharacter({
+        class: 'warlock', level: 5,
+        stats: { str: 8, dex: 14, con: 12, int: 10, wis: 10, cha: 16 },
+        invocations: [], pendingInvocations: 1,
+      });
+      const server = new MockMCPServer();
+      server.joinParty(char);
+      const result = await server.choose_invocations('hero-1', ['totally-fake-invocation']);
+      expect(result.success).toBe(false);
+      expect(result.message).toMatch(/unknown invocation/i);
+    });
+
+    it('rejects duplicate invocation', async () => {
+      const char = makeCharacter({
+        class: 'warlock', level: 5,
+        stats: { str: 8, dex: 14, con: 12, int: 10, wis: 10, cha: 16 },
+        invocations: ['agonizing-blast'], pendingInvocations: 1,
+      });
+      const server = new MockMCPServer();
+      server.joinParty(char);
+      const result = await server.choose_invocations('hero-1', ['agonizing-blast']);
+      expect(result.success).toBe(false);
+      expect(result.message).toMatch(/already knows/i);
+    });
+  });
 });

@@ -44,11 +44,12 @@ export function calculateMaxHp(character: Character): number {
   return Math.max(1, result.hp);
 }
 
-/** Checks whether a character can equip a given armor type based on class proficiencies and domain features. */
+/** Checks whether a character can equip a given armor type based on class proficiencies, feat-granted proficiencies, and domain features. */
 export function canEquipArmor(character: Character, armorType: 'light' | 'medium' | 'heavy' | 'shield'): boolean {
   const classDef = getClassDef(character.class);
   if (!classDef) return armorType === 'light';
   if (classDef.armorProfs.includes(armorType)) return true;
+  if ((character.armorProfs || []).includes(armorType)) return true;
   return classDef.id === 'cleric' && character.divineDomain === 'life-domain' && armorType === 'heavy';
 }
 

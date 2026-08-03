@@ -6,6 +6,7 @@ import {
   AttackRollContext,
   SaveRollContext,
   SkillCheckContext,
+  AcContext,
 } from '../../services/effectDispatcher';
 import { getClassDef, getRaceDef, getSubclassDef, getProficiencyBonus } from '../../services/classEngine';
 import { getFeatById } from '../../utils/feats';
@@ -440,5 +441,160 @@ describe('applyEffects — onSaveRoll (Diamond Soul)', () => {
     };
     const result = applyEffects(char, 'onSaveRoll', ctx);
     expect(result.extraModifier).toBe(0);
+  });
+});
+
+describe('applyEffects — onCharacterCreated (armor-proficiency)', () => {
+  it('adds the granted armor proficiency to character.armorProfs', () => {
+    vi.mocked(getRaceDef).mockReturnValue(undefined);
+    vi.mocked(getClassDef).mockReturnValue(undefined);
+    vi.mocked(getSubclassDef).mockReturnValue(undefined);
+    vi.mocked(getFeatById).mockReturnValue({
+      id: 'heavily-armored', name: 'Bulwark Training', category: 'armor',
+      shortName: 'Bulwark', icon: '', description: '', mechanicalEffect: '',
+      effectType: 'flag',
+      effect: { kind: 'armor-proficiency', payload: { prof: 'heavy' } },
+    });
+
+    const char = makeChar({ feats: ['heavily-armored'], armorProfs: [] });
+    const ctx = { _hook: 'onCharacterCreated' as const, character: char };
+    applyEffects(char, 'onCharacterCreated', ctx);
+    expect(char.armorProfs).toContain('heavy');
+  });
+
+  it('also grants shield proficiency for Moderately Armored', () => {
+    vi.mocked(getRaceDef).mockReturnValue(undefined);
+    vi.mocked(getClassDef).mockReturnValue(undefined);
+    vi.mocked(getSubclassDef).mockReturnValue(undefined);
+    vi.mocked(getFeatById).mockReturnValue({
+      id: 'moderately-armored', name: 'Moderately Armored', category: 'armor',
+      shortName: 'Med. Armor', icon: '', description: '', mechanicalEffect: '',
+      effectType: 'flag',
+      effect: { kind: 'armor-proficiency', payload: { prof: 'medium' } },
+    });
+
+    const char = makeChar({ feats: ['moderately-armored'], armorProfs: ['light'] });
+    const ctx = { _hook: 'onCharacterCreated' as const, character: char };
+    applyEffects(char, 'onCharacterCreated', ctx);
+    expect(char.armorProfs).toContain('medium');
+    expect(char.armorProfs).toContain('shield');
+  });
+
+  it('does not duplicate an existing proficiency', () => {
+    vi.mocked(getRaceDef).mockReturnValue(undefined);
+    vi.mocked(getClassDef).mockReturnValue(undefined);
+    vi.mocked(getSubclassDef).mockReturnValue(undefined);
+    vi.mocked(getFeatById).mockReturnValue({
+      id: 'lightly-armored', name: 'Lightly Armored', category: 'armor',
+      shortName: 'Light Armor', icon: '', description: '', mechanicalEffect: '',
+      effectType: 'flag',
+      effect: { kind: 'armor-proficiency', payload: { prof: 'light' } },
+    });
+
+    const char = makeChar({ feats: ['lightly-armored'], armorProfs: ['light'] });
+    const ctx = { _hook: 'onCharacterCreated' as const, character: char };
+    applyEffects(char, 'onCharacterCreated', ctx);
+    expect((char.armorProfs || []).filter(p => p === 'light')).toHaveLength(1);
+  });
+});
+
+describe('applyEffects — computeAc (Defense + fightingStyleTwo)', () => {
+  it('Champion L10 with Defense primary + Defense secondary grants +2 AC (idempotent across two fighting-style payloads)', () => {
+    vi.mocked(getRaceDef).mockReturnValue(undefined);
+    vi.mocked(getClassDef).mockReturnValue({
+      id: 'fighter', name: 'Fighter', hitDie: 10, hpBase: 10, hpPerLevel: 6,
+      primaryStat: 'str', savingThrowProfs: ['str', 'con'],
+      armorProfs: ['light', 'medium', 'heavy', 'shield'],
+      weaponProfs: { simple: true, martial: true },
+      skillChoices: { count: 2, from: ['athletics'] },
+      startingEquipment: [], recommendedStats: { str: 16, dex: 13, con: 14, int: 10, wis: 12, cha: 10 },
+      statPriority: ['str', 'con', 'cha', 'dex', 'wis', 'int'],
+      features: [
+        { id: 'fighting-style', name: 'Fighting Style', description: '', level: 1, kind: 'subclass',
+          choice: { label: '', options: [] },
+          effect: { kind: 'fighting-style' } },
+      ],
+      subclasses: [{
+        id: 'champion', parentClass: 'fighter', name: 'Champion', description: '',
+        features: [
+          { id: 'additional-fighting-style', name: 'Additional Fighting Style', description: '', level: 10, kind: 'subclass',
+            choice: { label: '', options: [] },
+            effect: { kind: 'fighting-style' } },
+        ],
+      }],
+      subclassLevel: 3, icon: '', description: '', flavor: '',
+    });
+    vi.mocked(getSubclassDef).mockReturnValue({
+      id: 'champion', parentClass: 'fighter', name: 'Champion', description: '',
+      features: [
+        { id: 'additional-fighting-style', name: 'Additional Fighting Style', description: '', level: 10, kind: 'subclass',
+          choice: { label: '', options: [] },
+          effect: { kind: 'fighting-style' } },
+      ],
+    });
+
+    const char = makeChar({
+      class: 'fighter', subclassId: 'champion', level: 10,
+      fightingStyle: 'defense', fightingStyleTwo: 'defense',
+    });
+    const ctx: AcContext = {
+      _hook: 'computeAc',
+      baseAc: 16,
+      character: char,
+      equippedArmor: { name: 'Chain Mail', type: 'heavy' },
+      equippedWeaponCount: 1,
+    };
+    const result = applyEffects(char, 'computeAc', ctx);
+    // Two Defense styles stack → +2 AC.
+    expect(result.baseAc).toBe(18);
+  });
+
+  it('Champion L10 with one Defense style only grants +1 AC (no double-counting)', () => {
+    vi.mocked(getRaceDef).mockReturnValue(undefined);
+    vi.mocked(getClassDef).mockReturnValue({
+      id: 'fighter', name: 'Fighter', hitDie: 10, hpBase: 10, hpPerLevel: 6,
+      primaryStat: 'str', savingThrowProfs: ['str', 'con'],
+      armorProfs: ['light', 'medium', 'heavy', 'shield'],
+      weaponProfs: { simple: true, martial: true },
+      skillChoices: { count: 2, from: ['athletics'] },
+      startingEquipment: [], recommendedStats: { str: 16, dex: 13, con: 14, int: 10, wis: 12, cha: 10 },
+      statPriority: ['str', 'con', 'cha', 'dex', 'wis', 'int'],
+      features: [
+        { id: 'fighting-style', name: 'Fighting Style', description: '', level: 1, kind: 'subclass',
+          choice: { label: '', options: [] },
+          effect: { kind: 'fighting-style' } },
+      ],
+      subclasses: [{
+        id: 'champion', parentClass: 'fighter', name: 'Champion', description: '',
+        features: [
+          { id: 'additional-fighting-style', name: 'Additional Fighting Style', description: '', level: 10, kind: 'subclass',
+            choice: { label: '', options: [] },
+            effect: { kind: 'fighting-style' } },
+        ],
+      }],
+      subclassLevel: 3, icon: '', description: '', flavor: '',
+    });
+    vi.mocked(getSubclassDef).mockReturnValue({
+      id: 'champion', parentClass: 'fighter', name: 'Champion', description: '',
+      features: [
+        { id: 'additional-fighting-style', name: 'Additional Fighting Style', description: '', level: 10, kind: 'subclass',
+          choice: { label: '', options: [] },
+          effect: { kind: 'fighting-style' } },
+      ],
+    });
+
+    const char = makeChar({
+      class: 'fighter', subclassId: 'champion', level: 10,
+      fightingStyle: 'defense', fightingStyleTwo: 'archery',
+    });
+    const ctx: AcContext = {
+      _hook: 'computeAc',
+      baseAc: 16,
+      character: char,
+      equippedArmor: { name: 'Chain Mail', type: 'heavy' },
+      equippedWeaponCount: 1,
+    };
+    const result = applyEffects(char, 'computeAc', ctx);
+    expect(result.baseAc).toBe(17); // +1 for primary Defense only
   });
 });

@@ -196,6 +196,48 @@ export const useProgression = (
     }
   }, [levelUpCharacterId, syncState, currentCampaignId]);
 
+  /** Warlock Eldritch Invocation level-up picker. Calls the engine's
+   *  choose_invocations, which atomically adds the chosen invocations,
+   *  injects any at-will spells granted, and decrements pendingInvocations. */
+  const handleConfirmInvocations = useCallback(async (invocationIds: string[]): Promise<boolean> => {
+    if (!levelUpCharacterId) return false;
+    try {
+      const result = await mcpServer.choose_invocations(levelUpCharacterId, invocationIds);
+      if (!result.success) {
+        setAllocationError(result.message);
+        return false;
+      }
+      syncState();
+      if (currentCampaignId) {
+        await storageService.syncCampaignState(currentCampaignId, mcpServer.getFullState());
+      }
+      return true;
+    } catch (err) {
+      setAllocationError(err instanceof Error ? err.message : String(err));
+      return false;
+    }
+  }, [levelUpCharacterId, syncState, currentCampaignId]);
+
+  /** Champion Fighter L10 "Additional Fighting Style" picker. Writes the
+   *  chosen style to character.fightingStyleTwo. Persists via the standard
+   *  sync pattern. */
+  const handleConfirmFightingStyleTwo = useCallback(async (style: string): Promise<boolean> => {
+    if (!levelUpCharacterId) return false;
+    try {
+      const char = mcpServer.getFullState().party.find(c => c.id === levelUpCharacterId);
+      if (!char) return false;
+      char.fightingStyleTwo = style;
+      syncState();
+      if (currentCampaignId) {
+        await storageService.syncCampaignState(currentCampaignId, mcpServer.getFullState());
+      }
+      return true;
+    } catch (err) {
+      setAllocationError(err instanceof Error ? err.message : String(err));
+      return false;
+    }
+  }, [levelUpCharacterId, syncState, currentCampaignId]);
+
   const previewHp = (() => {
     if (!levelUpCharacter) return 0;
     const result = applyStatAllocation(levelUpCharacter, selectedAllocations, selectedSkillAllocations, 0);
@@ -221,5 +263,7 @@ export const useProgression = (
     handleConfirmFeatChoice,
     handleAcknowledgeSubclass,
     handleConfirmSpellSwap,
+    handleConfirmInvocations,
+    handleConfirmFightingStyleTwo,
   };
 };

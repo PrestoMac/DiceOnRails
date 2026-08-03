@@ -615,6 +615,34 @@ describe('rollDeathSave', () => {
     expect(result.successes).toBe(1);
     expect(ch.deathSaves).toBeDefined();
   });
+
+  it('Durable feat adds +1 bonus to total (rescues a roll of 9 into success)', () => {
+    vi.mocked(cryptoRoll).mockReturnValue(9); // raw 9, +1 Durable = 10 = success
+    const ch = makeCharacter({
+      hp: { current: 0, max: 12 },
+      deathSaves: { successes: 0, failures: 0, isStable: false },
+      feats: ['durable'],
+    });
+    const cs = makeCombatState();
+    const result = rollDeathSave(ch, cs);
+    expect(result.successes).toBe(1);
+    expect(result.rollSuccess).toBe(true);
+    expect(result.total).toBe(10);
+    expect(result.message).toContain('Durable');
+  });
+
+  it('Durable feat does not turn a nat 1 into a success (nat 1 still crit-fails)', () => {
+    vi.mocked(cryptoRoll).mockReturnValue(1);
+    const ch = makeCharacter({
+      hp: { current: 0, max: 12 },
+      deathSaves: { successes: 0, failures: 0, isStable: false },
+      feats: ['durable'],
+    });
+    const cs = makeCombatState();
+    const result = rollDeathSave(ch, cs);
+    expect(result.rollSuccess).toBe(false);
+    expect(result.failures).toBe(1);
+  });
 });
 
 

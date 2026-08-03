@@ -66,6 +66,7 @@ export const tools = [
                     isSneakAttack: { type: 'boolean', description: 'Set true for Rogue Sneak Attack.' },
                     sharpshooter: { type: 'boolean', description: 'Use Sharpshooter feat: -5 to hit, +10 damage.' },
                     greatWeaponMaster: { type: 'boolean', description: 'Use Great Weapon Master feat: -5 to hit, +10 damage.' },
+                    reckless: { type: 'boolean', description: 'Barbarian Reckless Attack: gain advantage on this melee STR attack in exchange for attackers gaining advantage against you until your next turn. Only valid for Barbarians with the reckless-attack feature.' },
                     divineSmite: { type: 'object', description: 'Optional. Paladin Divine Smite: expend a spell slot to deal 2d8 + 1d8/level radiant damage (max 5d8, doubled on crit, +1d8 vs fiends/undead). Engine consumes slot automatically.', properties: { slotLevel: { type: 'integer', description: 'Spell slot level to expend (1-5)' } }, required: ['slotLevel'] }
                 },
                 required: ['attackerId', 'weaponName']

@@ -37,7 +37,7 @@ export interface CombatService {
   checkCombatEndConditions(): { ended: boolean; reason?: string; victory?: boolean };
   resolveAllPendingEnemyTurns(): Promise<{ messages: string[]; combatEnded: boolean; victory?: boolean; attackResults: Record<string, unknown>[] }>;
   syncInitiativeConditions(): void;
-  player_attack(attackerId: string, weaponName: string, targetId: string, isOffHand?: boolean, isSneakAttack?: boolean, sharpshooter?: boolean, greatWeaponMaster?: boolean, divineSmite?: { slotLevel: number }): Promise<MCPResponse>;
+  player_attack(attackerId: string, weaponName: string, targetId: string, isOffHand?: boolean, isSneakAttack?: boolean, sharpshooter?: boolean, greatWeaponMaster?: boolean, reckless?: boolean, divineSmite?: { slotLevel: number }): Promise<MCPResponse>;
   resolveAdvantage(attacker?: Character | Enemy, target?: Character | Enemy, roll?: number): { roll: number; hasAdvantage: boolean; hasDisadvantage: boolean };
   initializeDeathSaves(character: Character): void;
 }
@@ -286,17 +286,21 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
   return {
     initializeDeathSaves,
 
-    resolveAdvantage(attacker, target, roll = 10) {
+    resolveAdvantage(attacker, target, roll = 10, forcedAdvantage = false) {
       let hasAdvantage = false, hasDisadvantage = false;
       if (attacker) {
         const ae = getConditionEffects(attacker);
         if (ae.advantageOnAttacks) hasAdvantage = true;
         if (ae.disadvantageOnAttacks) hasDisadvantage = true;
+        if (forcedAdvantage) hasAdvantage = true;
       }
       if (target) {
         const te = getConditionEffects(target);
         if (te.attacksAgainstHaveAdvantage) hasAdvantage = true;
         if (te.attacksAgainstHaveDisadvantage) hasDisadvantage = true;
+        // Barbarian Reckless Attack: while the barbarian is in reckless stance,
+        // attacks against them have advantage.
+        if ((target as Character).recklessAttacking) hasAdvantage = true;
       }
       const secondRoll = cryptoRoll(20);
       const resolved = resolveAdvantage(roll, secondRoll, hasAdvantage, hasDisadvantage);
@@ -657,6 +661,12 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
         this.syncInitiativeConditions();
         combat.turnIndex = 0;
 
+        // New round — clear all per-turn player flags. Reckless Attack only
+        // applies during the barbarian's own turn; a new round ends that stance.
+        for (const player of state.party) {
+          player.recklessAttacking = false;
+        }
+
         const endCheck = this.checkCombatEndConditions();
         if (endCheck.ended) {
           combat.isActive = false;
@@ -696,6 +706,9 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
         if (player) {
           player.reactionAvailable = true;
           player.reactionUsedThisTurn = false;
+          // Reckless Attack only applies during the barbarian's own turn — clear it
+          // when their next turn starts so attackers no longer have advantage.
+          player.recklessAttacking = false;
         }
       }
 
@@ -1102,7 +1115,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       return { messages, combatEnded, victory, attackResults };
     },
 
-    async player_attack(attackerId, weaponName, targetId, isOffHand, isSneakAttack, sharpshooter, greatWeaponMaster, divineSmite) {
+    async player_attack(attackerId, weaponName, targetId, isOffHand, isSneakAttack, sharpshooter, greatWeaponMaster, reckless, divineSmite) {
       const attacker = deps.getTarget(attackerId);
       if (!attacker) return fail(`Attacker "${attackerId}" not found.`, ErrorCodes.NOT_FOUND);
 
@@ -1128,7 +1141,15 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       if (sharpshooter || greatWeaponMaster) atkBonus -= 5;
 
       let roll = cryptoRoll(20);
-      const advResult = this.resolveAdvantage(attacker, enemy, roll);
+      // Barbarian Reckless Attack: when declared on a melee STR attack, grant advantage
+      // and flag the barbarian as "attackers have advantage" until their next turn.
+      const hasReckless = !!reckless && !isRanged && getEffects(attacker, 'reckless-attack').length > 0;
+      let forcedAdvantage = false;
+      if (hasReckless) {
+        forcedAdvantage = true;
+        attacker.recklessAttacking = true;
+      }
+      const advResult = this.resolveAdvantage(attacker, enemy, roll, forcedAdvantage);
       roll = advResult.roll;
 
       const atkRollCtx: AttackRollContext = {

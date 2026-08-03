@@ -9,6 +9,13 @@
 > - **Spellcasting & Subclasses**: Life Cleric `disciple-of-life` bonus healing (`2 + spellLevel` per target via `healing-bonus`), Sorcerer `metamagic-option` populates `metamagicOptions` at creation AND on level-up, Warlock `agonizing-blast` (+CHA damage per Eldritch Blast beam), Warlock `INVOCATIONS_CATALOG` with at-will spell grants.
 > - **Wild Shape & Transformations**: Druid `BEAST_FORMS_CATALOG` with Wolf, Panther, Brown Bear, Dire Wolf, Giant Eagle, Giant Crocodile (CR 5, swim), and Tyrannosaurus Rex (CR 8) stat overlays. CR-limited by druid level (`floor(level/3)`).
 > - **Subraces & Variant Human**: Subraces for Elves, Dwarves, Halflings, Gnomes, and Variant Human.
+> - **Feat & class effect wiring (this session)**:
+>   - **`armor-proficiency` reducer body implemented** — Lightly/Moderately/Bulwark Training feats now actually grant their proficiencies (`Character.armorProfs` is populated via the `onCharacterCreated` reducer; Moderately Armored also grants shield per SRD). `canEquipArmor` consults both class and feat proficiencies.
+>   - **Durable feat wired** — `getDeathSaveBonus` is now called from `diceEngine.rollDeathSave`, adding +1 to the death-save total (rescues rolls of 9 into success; nat 1/20 still use the natural die per SRD).
+>   - **Barbarian Reckless Attack implemented** — new `reckless` parameter on `player_attack`; when true and the attacker has the `reckless-attack` effect, the attack gains advantage and the barbarian is flagged `recklessAttacking`, which grants advantage to incoming attacks until the start of their next turn (cleared at turn-start and on new-round).
+>   - **Champion L10 Additional Fighting Style wired** — new `Character.fightingStyleTwo` field, LevelUpModal "Style II" tab (visible when the Champion subclass feature is unlocked), engine reducer stacks Defense with the primary style (idempotent — no double-counting).
+>   - **Warlock Eldritch Invocations level-up** — `awardExperience` now grants `pendingInvocations` when crossing the L2/L5/L7/L9/L12/L15/L18 invocation-count thresholds; new LevelUpModal "Invocations" tab surfaces the picker; `mcpServer.choose_invocations` engine method adds the chosen invocations and injects at-will-spell `knownSpells` entries. Thirsting Blade added to the LLM prompt.
+>   - **Half-Elf Skill Versatility documented in the prompt** — the engine grants +2 to `unusedSkillPoints` at character creation (player picks the 2 skills); the prompt now mentions this so the LLM doesn't try to apply it at runtime.
 > **Scope**: All 9 races and 12 classes defined in the codebase, compared against the 5e SRD.
 
 ---
@@ -29,7 +36,7 @@ Verification pass against `effectDispatcher.ts`, `classEngine.ts`, `characterCre
 
 ### Corrections to the table above
 1. **Tiefling Thaumaturgy is NOT narrative** — the table says "Thaumaturgy is narrative", but `characterCreationService.ts:131,136` hardcode-grants it at creation (added to `knownSpells` for casters, a cantrip for non-casters). It's engine-applied, just via a race-ID special case rather than an effect payload on the `infernal-legacy` trait.
-2. **Warlock invocations are wired at creation** — `ClassStep.tsx` has a real picker (L2+) with `getInvocationCount()` budget enforcement, and `invocationChoices` is propagated to `Character.invocations` (`characterCreationService.ts:172`). Agonizing Blast is engine-applied in `spellcastingEngine.ts:327`. **Gap remains:** `level_up` in `progressionService.ts` has no invocation handling — a warlock who levels past L2 in play never gains new invocation slots (creation-only today).
+2. **Warlock invocations are wired at creation AND on level-up** — `ClassStep.tsx` has a real picker (L2+) with `getInvocationCount()` budget enforcement, and `invocationChoices` is propagated to `Character.invocations` (`characterCreationService.ts:172`). Agonizing Blast is engine-applied in `spellcastingEngine.ts:327`. `awardExperience` grants `pendingInvocations` when crossing the L2/L5/L7/L9/L12/L15/L18 thresholds; the LevelUpModal "Invocations" tab surfaces the picker; `mcpServer.choose_invocations` adds the chosen invocations and injects at-will-spell `knownSpells` entries.
 3. **Rogue Slippery Mind is partially hardcoded, not narrative** — `classEngine.ts:153-155` adds a proficiency bonus to rogues at L15+, but it is keyed to `stat === 'dex'`. Slippery Mind grants **WIS** save proficiency. So the feature is implemented for the wrong stat (a bug), not absent.
 
 ### Bugs/gaps not previously documented
@@ -51,8 +58,8 @@ Verification pass against `effectDispatcher.ts`, `classEngine.ts`, `characterCre
 ## CLASSES
 
 ### Barbarian — **Partial**
-**Engine-wired:** Rage resource pool (damage bonus + B/P/S resistance via `damage-resistance` with `condition: 'raging'`, resets on long rest), Unarmored Defense (`10 + DEX + CON` via `ac-formula`), Danger Sense (DEX save advantage via `advantage-on-save`), Brutal Critical (extra crit damage dice via `crit-bonus-dice`), Fast Movement (`speed-bonus` with heavy-armor condition), Extra Attack (LLM issues two `player_attack` calls per the prompt).
-**Narrative-only:** **Reckless Attack** (`effect: {kind:'reckless-attack'}` is declared in `data/classes.ts` but there is **no reducer** for it anywhere in `effectDispatcher.ts` — advantage on melee attacks is not mechanically applied), Feral Instinct, Relentless Rage, Persistent Rage, Indomitable Might, Primal Champion, and the entire **Path of the Berserker** subclass (Frenzy, Mindless Rage, Intimidating Presence, Retaliation).
+**Engine-wired:** Rage resource pool (damage bonus + B/P/S resistance via `damage-resistance` with `condition: 'raging'`, resets on long rest), Unarmored Defense (`10 + DEX + CON` via `ac-formula`), Danger Sense (DEX save advantage via `advantage-on-save`), Brutal Critical (extra crit damage dice via `crit-bonus-dice`), Fast Movement (`speed-bonus` with heavy-armor condition), **Reckless Attack** (new `reckless` parameter on `player_attack`; when declared on a melee STR attack, grants advantage on the attack and sets `recklessAttacking`, which gives attackers advantage against the barbarian until their next turn — mechanically enforced), Extra Attack (LLM issues two `player_attack` calls per the prompt).
+**Narrative-only:** Feral Instinct, Relentless Rage, Persistent Rage, Indomitable Might, Primal Champion, and the entire **Path of the Berserker** subclass (Frenzy, Mindless Rage, Intimidating Presence, Retaliation).
 **SRD Fidelity:** ~60% (base class good; subclass = 0%).
 
 ---
@@ -79,7 +86,7 @@ Verification pass against `effectDispatcher.ts`, `classEngine.ts`, `characterCre
 ---
 
 ### Fighter — **Working** (best-supported class)
-**Engine-wired:** Second Wind (1d10 + level via `second-wind` resource handler), Action Surge (extra action via `action-surge` resource handler), **Champion Criticals** (19-20 at L3, 18-20 at L15 — Superior Critical now correctly crits on natural 18 via `crit-range` reducer, NOT a hardcoded `roll >= 19`), all five selectable Fighting Styles (Archery +2 ranged atk, Defense +1 AC in armor, Dueling +2 1H melee dmg, Great Weapon Fighting rerolls 1s/2s, Two-Weapon Fighting adds ability mod to offhand), Indomitable (save reroll via `indomitable` resource handler), Extra Attack (LLM issues 2-4 `player_attack` calls per the prompt).
+**Engine-wired:** Second Wind (1d10 + level via `second-wind` resource handler), Action Surge (extra action via `action-surge` resource handler), **Champion Criticals** (19-20 at L3, 18-20 at L15 — Superior Critical now correctly crits on natural 18 via `crit-range` reducer, NOT a hardcoded `roll >= 19`), all five selectable Fighting Styles (Archery +2 ranged atk, Defense +1 AC in armor, Dueling +2 1H melee dmg, Great Weapon Fighting rerolls 1s/2s, Two-Weapon Fighting adds ability mod to offhand), **Champion L10 Additional Fighting Style** (writes to `Character.fightingStyleTwo`; LevelUpModal "Style II" tab; Defense stacks with the primary style idempotently), Indomitable (save reroll via `indomitable` resource handler), Extra Attack (LLM issues 2-4 `player_attack` calls per the prompt).
 **Narrative-only:** Remarkable Athlete, Survivor. (Battle Master is not in the catalog — only Champion.)
 **SRD Fidelity:** ~80%.
 
@@ -121,7 +128,7 @@ Verification pass against `effectDispatcher.ts`, `classEngine.ts`, `characterCre
 ---
 
 ### Warlock — **Partial**
-**Engine-wired:** **Pact Magic** (short-rest slot recovery, max castable slot level, via `pactMagic` resource), **Agonizing Blast** (adds CHA mod to each Eldritch Blast beam damage in `spellcastingEngine`), at-will spell invocations (Armor of Shadows → mage armor, Fiendish Vigor → false life, etc. granted at creation via `INVOCATIONS_CATALOG`).
+**Engine-wired:** **Pact Magic** (short-rest slot recovery, max castable slot level, via `pactMagic` resource), **Agonizing Blast** (adds CHA mod to each Eldritch Blast beam damage in `spellcastingEngine`), at-will spell invocations (Armor of Shadows → mage armor, Fiendish Vigor → false life, etc. granted at creation via `INVOCATIONS_CATALOG` AND via the level-up `choose_invocations` engine method), **Thirsting Blade** (LLM prompt instructs two `player_attack` calls with the pact weapon — same as martial Extra Attack), **Eldritch Invocation level-up** (`awardExperience` grants `pendingInvocations` at L2/L5/L7/L9/L12/L15/L18; LevelUpModal "Invocations" tab surfaces the picker; `choose_invocations` adds them and injects at-will spells).
 **Narrative-only / known gaps:** **Mystic Arcanum (6th-9th) is NOT implemented** — only the pact-slot pool exists (explicitly documented in AGENTS.md). Pact Boons (Blade/Tome/Chain), Fiendish Resilience, and the **Fiend** patron features are catalog-only. (Hurl Through Hell, Dark One's Own Luck, etc. not present.)
 **SRD Fidelity:** ~60%.
 
@@ -155,7 +162,7 @@ Verification pass against `effectDispatcher.ts`, `classEngine.ts`, `characterCre
 - **Classes overall SRD fidelity**: ~70% across all 12 classes **base-class core**; **subclass fidelity is ~5%** — every class (except Fighter/Champion, Rogue, Wizard, and the 1-2 subclass effects noted above) has subclass features that are catalog/prompt-only with zero engine reducers.
 - **Races overall SRD fidelity**: ~87% across all 9 races + subraces. Races are near-complete — all ASIs, resistances, save advantages, resources (breath weapon, relentless endurance, hellish rebuke), and CR-limited transformations are engine-wired.
 - **Rating summary**: **Working** — Fighter, Rogue, Wizard (classes); all 9 races. **Partial** — Barbarian, Bard, Cleric, Druid, Monk, Paladin, Ranger, Sorcerer, Warlock (base identity wired, subclasses narrative).
-- **Most important known gaps** (documented in AGENTS.md): Warlock Mystic Arcanum (6-9) not implemented; Warlock Pact Boons narrative; Reckless Attack has a declared effect kind but no reducer; essentially all subclass feature trees beyond Champion crits, Life Disciple bonus, Draconic Resilience, and a handful of effects are narrative-only.
+- **Most important known gaps** (documented in AGENTS.md): Warlock Mystic Arcanum (6-9) not implemented; Warlock Pact Boons narrative; the remaining narrative-only feats — `charge-damage` (Charger — needs Dash-action tracking), `grapple-advantage` (Grappler — needs grappled condition), `ignore-ranged-penalty` (Crossbow Expert — needs melee-range disadvantage model), `elemental-adept` (needs chosen-damage-type tracking), `magic-initiate`/`ritual-caster`/`spell-sniper` (need spell-system extension), `passive-skill-bonus` (Observant — needs passive-check system), `reaction-ac-bonus` (Defensive Duelist — needs reaction-AC tracking), `extra-skill-profs` (Skilled — inlined via the level-up modal); essentially all subclass feature trees beyond Champion crits, Champion L10 second fighting style, Life Disciple bonus, Draconic Resilience, and a handful of effects are narrative-only.
 - **Verified by** full unit test suite (92 test files, 2,054 tests passing).
 
 ---

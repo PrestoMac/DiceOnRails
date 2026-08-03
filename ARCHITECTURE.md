@@ -524,7 +524,7 @@ The math layer behind `mcp/combatService.ts`. `addEnemyToCombat` auto-fills stat
 | `onSaveRoll` | `SaveRollContext` | `combatService.make_save` | `reroll-ones` (Halfling Lucky — the d20 is rolled before effects so the reducer sees a natural 1), `advantage-on-save` (spell-context-gated: Gnome Cunning via `isMagical`+`stats`, Fey Ancestry via `isCharm`), `save-proficiency`, `diamond-soul`; `aura-of-protection` is applied cross-character in `make_save` (scans party for conscious Paladins L6+, adds highest CHA mod min +1) |
 | `onSkillCheck` | `SkillCheckContext` | `travelService.check_skill` | `reroll-ones`, `skill-expertise`, `jack-of-all-trades` (+½ prof on non-proficient), `reliable-talent` (floor proficient rolls at 10) |
 | `onConditionApplied` | `ConditionAppliedContext` | `conditionEngine.applyCondition` | `condition-immunity` |
-| `onCharacterCreated` | `CharacterCreatedContext` | `characterCreationService.buildCharacterFromWizard` | `skill-proficiency`, `armor-proficiency`, `language`, `metamagic-option` (populates `character.metamagicOptions`) |
+| `onCharacterCreated` | `CharacterCreatedContext` | `characterCreationService.buildCharacterFromWizard` | `skill-proficiency`, `armor-proficiency` (adds to `Character.armorProfs` — Lightly/Moderately/Bulwark Training feats grant light/medium/heavy + shield for Moderately Armored), `language`, `metamagic-option` (populates `character.metamagicOptions`) |
 | `onLongRest` | `RestContext` | `travelService.long_rest` | _(extension point)_ |
 | `onShortRest` | `RestContext` | `travelService.short_rest` | _(extension point)_ |
 | `onLevelUp` | `LevelUpContext` | `progressionService.level_up` | `metamagic-option` (re-applies metamagic on level-up so L3+ sorcerers get options through progression) |
@@ -784,7 +784,7 @@ Differences:
 | `SetupWizard` | First-run installer; writes `.env` via dev-server middleware or pastes SQL into Supabase. |
 | `SettingsModal` | Toggles for voice, atmosphere, portraits, debug mode, TTS sliders, account actions, debug-log export. |
 | `DiceRollModal` | Big animated dice popup for skill checks / attacks. |
-| `LevelUpModal` | Allocates stat points, picks ASI vs. Feat, picks subclass features. |
+| `LevelUpModal` | Allocates stat points, picks ASI vs. Feat, picks subclass features, picks Warlock Eldritch Invocations (when `pendingInvocations > 0`), picks Champion L10 Additional Fighting Style (when the subclass feature is unlocked). |
 | `ArcaneRecoveryModal` | Wizard-only modal for choosing which spell slots to recover via Arcane Recovery (once per long rest). Opens from InputArea. |
 | `NaturalRecoveryModal` | Circle of the Land Druid-only modal for choosing which spell slots to recover via Natural Recovery (once per long rest). Clone of `ArcaneRecoveryModal`. Opens from InputArea. |
 | `SpellbookModal` | Caster spell management with class archetype badges (`Prepared (Spellbook)`, `Prepared (Full List)`, `Known Spontaneous`), dynamic rule banners, and tooltip guidance. Prepared casters (including Wizards) use a consolidated 1-section master list layout with 1-click toggle buttons (`[ ✓ Prepared ]` / `[ + Prepare ]`), with prepared spells sorted to the top. Known casters use a 2-column Swap Tracker Grid ("Leveled Swap" and "Cantrip Swap") to swap spells per level-up (Tasha's rule) or long rest (2024 cantrip rule). Opens from CharacterSheet "Manage" button + InputArea Quick Action. Locked in combat. |
@@ -861,7 +861,7 @@ types/
 - `RollData.type` is one of `'attack' | 'skill' | 'damage' | 'cast_spell' | 'save' | 'death_save'`.
 - `MCPResponse = { success: boolean; data: Record<string, unknown>; message?: string }` — every tool returns this shape.
 
-The `Character` interface has ~50 optional fields covering every subclass choice (divine domain, sorcerous origin, warlock patron, arcane tradition, fighting style, draconic ancestry, sneak attack dice, …) plus race-level choices (`subraceId`) and Warlock options (`invocations`, `pactBoon`). The `stateService.ensureCharacterFields` function (in `mcp/stateService.ts:46`) hydrates sane defaults whenever a character enters the engine.
+The `Character` interface has ~50 optional fields covering every subclass choice (divine domain, sorcerous origin, warlock patron, arcane tradition, fighting style (and second fighting style via `fightingStyleTwo` for Champion L10+), draconic ancestry, sneak attack dice, …) plus race-level choices (`subraceId`), Warlock options (`invocations`, `pendingInvocations`), armor proficiencies granted by feats (`armorProfs`), and the Barbarian's per-turn reckless stance (`recklessAttacking`). The `stateService.ensureCharacterFields` function (in `mcp/stateService.ts:46`) hydrates sane defaults whenever a character enters the engine.
 
 ---
 

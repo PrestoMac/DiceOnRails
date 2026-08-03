@@ -5,6 +5,7 @@ import { getMod, getProficiencyBonus } from './classEngine';
 import { parseDiceFormula } from '../utils/dice';
 import { getExhaustionPenalty } from './conditionEngine';
 import { ensureDeathSaves, updateCombatantDeathStatus } from './characterUtils';
+import { getDeathSaveBonus } from './featsService';
 
 type StatKey = 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
 
@@ -236,7 +237,11 @@ export function rollDeathSave(ch: Character, cs?: CombatState): {
     return { message: `${ch.name} is stable.`, roll: 0, total: 0, successes: s.successes, failures: s.failures, isStable: true, revived: false, died: false, rollSuccess: false };
   }
   const rawRoll = cryptoRoll(20);
-  const total = rawRoll - getExhaustionPenalty(ch);
+  // Durable / Resilient-CON feats grant a flat bonus to death saves via getDeathSaveBonus.
+  // The bonus is added to the total (not the natural die) so a nat 20 still revives and a
+  // nat 1 still crit-fails by SRD. The rollSuccess check uses the modified total.
+  const deathBonus = getDeathSaveBonus(ch);
+  const total = rawRoll - getExhaustionPenalty(ch) + deathBonus;
   if (rawRoll === 20) {
     ch.hp.current = 1;
     ch.deathSaves = { successes: 0, failures: 0, isStable: false };
@@ -246,7 +251,8 @@ export function rollDeathSave(ch: Character, cs?: CombatState): {
   if (total >= 10) {
     s.successes++;
     if (s.successes >= 3) s.isStable = true;
-    return { message: `${ch.name} rolls DEATH SAVE: **${rawRoll}** — ${s.successes >= 3 ? '3 successes! Stabilized.' : `Success (${s.successes}/3)`}`, roll: rawRoll, total, successes: s.successes, failures: s.failures, isStable: s.isStable, revived: false, died: false, rollSuccess: true };
+    const bonusText = deathBonus > 0 ? ` (+${deathBonus} Durable)` : '';
+    return { message: `${ch.name} rolls DEATH SAVE: **${rawRoll}**${bonusText} — ${s.successes >= 3 ? '3 successes! Stabilized.' : `Success (${s.successes}/3)`}`, roll: rawRoll, total, successes: s.successes, failures: s.failures, isStable: s.isStable, revived: false, died: false, rollSuccess: true };
   }
   s.failures++;
   const dead = s.failures >= 3;

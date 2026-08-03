@@ -568,6 +568,58 @@ describe('combatTools', () => {
       expect(Number.isNaN(damageCard?.total ?? NaN)).toBe(false);
       expect(damageCard?.success).toBe(true);
     });
+
+    it('Barbarian Reckless Attack grants advantage and sets recklessAttacking flag', async () => {
+      server.joinParty(makeBarbarian());
+      await server.add_enemy('Goblin');
+      await server.start_combat();
+      // Two rolls AFTER start_combat: first is the d20 (15), second is the advantage second-roll (18).
+      mockRollSequence(15, 18);
+      const result = await server.player_attack('Grishnak', 'Greataxe', 'Goblin', false, false, false, false, true);
+      expect(result.success).toBe(true);
+      const barbarian = server.getFullState().party[0];
+      expect(barbarian.recklessAttacking).toBe(true);
+      // The advantage result picked the higher of the two (18)
+      const d = result.data as Record<string, unknown>;
+      expect(d.roll).toBe(18);
+    });
+
+    it('Reckless attack has no effect when the attacker lacks the reckless-attack effect (feat only)', async () => {
+      server.joinParty(makeCharacter());
+      await server.add_enemy('Goblin');
+      await server.start_combat();
+      mockRollSequence(15, 18);
+      const result = await server.player_attack('Valerius', 'Longsword', 'Goblin', false, false, false, false, true);
+      expect(result.success).toBe(true);
+      const fighter = server.getFullState().party[0];
+      expect(fighter.recklessAttacking).toBeFalsy();
+      // No advantage was applied — roll stays at 15 (the original)
+      const d = result.data as Record<string, unknown>;
+      expect(d.roll).toBe(15);
+    });
+
+    it('Reckless attack does not trigger on ranged attacks', async () => {
+      server.joinParty(makeBarbarian({ inventory: [{ name: 'Longbow', quantity: 1, type: 'weapon', equipped: true, stats: { properties: ['ranged'] } }] }));
+      await server.add_enemy('Goblin');
+      await server.start_combat();
+      mockRollSequence(15, 18);
+      const result = await server.player_attack('Grishnak', 'Longbow', 'Goblin', false, false, false, false, true);
+      expect(result.success).toBe(true);
+      const barbarian = server.getFullState().party[0];
+      expect(barbarian.recklessAttacking).toBeFalsy();
+    });
+
+    it('recklessAttacking flag is cleared at the start of the barbarian\'s next turn', async () => {
+      server.joinParty(makeBarbarian());
+      await server.add_enemy('Goblin');
+      await server.start_combat();
+      mockRollSequence(15, 18);
+      await server.player_attack('Grishnak', 'Greataxe', 'Goblin', false, false, false, false, true);
+      expect(server.getFullState().party[0].recklessAttacking).toBe(true);
+      // Goblin's turn auto-resolves, then back to Grishnak.
+      await server.next_turn();
+      expect(server.getFullState().party[0].recklessAttacking).toBe(false);
+    });
   });
 
   describe('inflict_damage', () => {

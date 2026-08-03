@@ -198,6 +198,72 @@ export class MockMCPServer {
   public async swap_known_spell(characterId: string, oldSpellId: string, newSpellId: string): Promise<MCPResponse> { return this.spells.swap_known_spell(characterId, oldSpellId, newSpellId); }
   public async use_resource(characterId: string, resourceId: string, targetId?: string, amount?: number): Promise<MCPResponse> { return this.spells.use_resource(characterId, resourceId, targetId, amount); }
 
+  /** Warlock Eldritch Invocation picker (level-up). Adds the chosen invocations
+   *  to the character, decrements pendingInvocations, and injects any at-will
+   *  spells granted by the chosen invocations into knownSpells. */
+  public async choose_invocations(characterId: string, invocationIds: string[]): Promise<MCPResponse> {
+    const target = this.party.getTarget(characterId);
+    if (!target) {
+      return { success: false, data: {}, message: `Character "${characterId}" not found.` };
+    }
+    if (target.class !== 'warlock') {
+      return { success: false, data: {}, message: `${target.name} is not a Warlock and cannot choose Eldritch Invocations.` };
+    }
+    const pending = target.pendingInvocations ?? 0;
+    if (pending <= 0) {
+      return { success: false, data: {}, message: `${target.name} has no pending Eldritch Invocation choices.` }
+    }
+    if (invocationIds.length > pending) {
+      return { success: false, data: {}, message: `Cannot choose ${invocationIds.length} invocations; only ${pending} pending.` };
+    }
+    // Lazy-import to avoid circular deps at module load.
+    const { INVOCATIONS_BY_ID, getInvocationCount } = await import('../data/invocations');
+    const targetCount = getInvocationCount(target.level);
+    const currentCount = (target.invocations ?? []).length;
+    const chosenSet = new Set(invocationIds);
+    // Reject duplicates and unknown ids.
+    for (const id of invocationIds) {
+      const def = INVOCATIONS_BY_ID[id];
+      if (!def) {
+        return { success: false, data: {}, message: `Unknown invocation: ${id}` };
+      }
+      if ((target.invocations ?? []).includes(id)) {
+        return { success: false, data: {}, message: `${target.name} already knows ${def.name}.` };
+      }
+      if (def.minLevel > target.level) {
+        return { success: false, data: {}, message: `${def.name} requires level ${def.minLevel}.` };
+      }
+    }
+    if (currentCount + invocationIds.length > targetCount) {
+      return { success: false, data: {}, message: `Choice exceeds invocation budget (${targetCount} at L${target.level}).` };
+    }
+
+    target.invocations = [...(target.invocations ?? []), ...invocationIds];
+    target.pendingInvocations = Math.max(0, pending - invocationIds.length);
+
+    // Inject at-will spells into knownSpells (mirrors characterCreationService).
+    const grantedSpells: string[] = [];
+    for (const id of chosenSet) {
+      const def = INVOCATIONS_BY_ID[id];
+      if (def?.effect === 'at-will-spell') {
+        for (const sid of def.grantsSpells ?? []) {
+          if (!(target.knownSpells ?? []).includes(sid)) {
+            grantedSpells.push(sid);
+          }
+        }
+      }
+    }
+    if (grantedSpells.length) {
+      target.knownSpells = [...(target.knownSpells ?? []), ...grantedSpells];
+    }
+
+    return {
+      success: true,
+      data: { invocations: target.invocations, pendingInvocations: target.pendingInvocations, grantedSpells },
+      message: `${target.name} learned: ${invocationIds.map(id => INVOCATIONS_BY_ID[id]?.name ?? id).join(', ')}.`
+    };
+  }
+
   // ---------------------------------------------------------------------------
   // VTT Battle Map — public surface for UI-driven operations
   // ---------------------------------------------------------------------------

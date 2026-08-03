@@ -38,7 +38,8 @@ const DesktopLayout: React.FC = () => {
     showLevelUpModal, levelUpCharacter, selectedAllocations, remainingPoints,
     previewHp, allocationError, handleOpenLevelUp, handleCloseLevelUp,
     handleAllocateStat, handleConfirmAllocation, handleConfirmAsiChoice,
-    handleConfirmFeatChoice, handleAcknowledgeSubclass
+    handleConfirmFeatChoice, handleAcknowledgeSubclass,
+    handleConfirmInvocations, handleConfirmFightingStyleTwo
   } = useProgressionContext();
   const { settings, setSettingsOpen, handleTriggerDiceRoll, setCompendiumOpen } = useUIContext();
   const { userId, handleLogout } = useAuthContext();
@@ -294,7 +295,7 @@ const DesktopLayout: React.FC = () => {
       <div className="w-full max-w-6xl aspect-square md:aspect-video rounded-xl overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.8)] border border-stone-800" onClick={e => e.stopPropagation()}><img src={myAtmosphereUrl} alt="Atmosphere Fullscreen" className="w-full h-full object-cover" /></div>
       <p className="mt-8 text-stone-500 italic fantasy-font text-xl text-center max-w-2xl px-4">{gameState.worldDescription}</p>
     </div>}
-    {showLevelUpModal && levelUpCharacter && <LevelUpModal character={levelUpCharacter} selectedAllocations={selectedAllocations} remainingPoints={remainingPoints} previewHp={previewHp} error={allocationError} onAllocate={handleAllocateStat} onConfirm={handleConfirmAllocation} onCancel={handleCloseLevelUp} onConfirmAsi={handleConfirmAsiChoice} onConfirmFeat={handleConfirmFeatChoice} onAcknowledgeSubclass={handleAcknowledgeSubclass} />}
+    {showLevelUpModal && levelUpCharacter && <LevelUpModal character={levelUpCharacter} selectedAllocations={selectedAllocations} remainingPoints={remainingPoints} previewHp={previewHp} error={allocationError} onAllocate={handleAllocateStat} onConfirm={handleConfirmAllocation} onCancel={handleCloseLevelUp} onConfirmAsi={handleConfirmAsiChoice} onConfirmFeat={handleConfirmFeatChoice} onAcknowledgeSubclass={handleAcknowledgeSubclass} onConfirmInvocations={handleConfirmInvocations} onConfirmFightingStyleTwo={handleConfirmFightingStyleTwo} />}
   </>);
 };
 

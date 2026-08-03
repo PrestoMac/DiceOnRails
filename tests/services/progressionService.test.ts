@@ -192,6 +192,27 @@ describe('progressionService', () => {
       expect(result.leveledUp).toBe(true);
       expect(result.character.pendingSpellSwap).toBeFalsy();
     });
+
+    it('grants pendingInvocations on Warlock level-up across thresholds', () => {
+      // Warlock L1 → L2: getInvocationCount(2) = 2, started with 0 → delta = 2
+      const char = makeCharacter({
+        class: 'warlock', level: 1,
+        stats: { str: 8, dex: 14, con: 12, int: 10, wis: 10, cha: 16 },
+        invocations: [],
+      });
+      const result = awardExperience(char, 300);
+      expect(result.leveledUp).toBe(true);
+      expect(result.character.level).toBe(2);
+      // At L2, getInvocationCount returns 2. The character starts with 0 invocations.
+      expect(result.character.pendingInvocations).toBe(2);
+    });
+
+    it('does NOT grant pendingInvocations for non-warlocks', () => {
+      const char = makeCharacter({ class: 'fighter', level: 1 });
+      const result = awardExperience(char, 100000);
+      expect(result.leveledUp).toBe(true);
+      expect(result.character.pendingInvocations).toBeFalsy();
+    });
   });
 
   describe('applyStatAllocation', () => {
