@@ -164,7 +164,7 @@ export class MockMCPServer {
   public getCurrentTurnInfo(): { name: string; type: 'player' | 'enemy'; id: string } | null { return this.combat.getCurrentTurnInfo(); }
   public updateInitiativeDeathStatus(id: string, isDead: boolean): void { this.combat.updateInitiativeDeathStatus(id, isDead); }
   public checkCombatEndConditions(): { ended: boolean; reason?: string; victory?: boolean } { return this.combat.checkCombatEndConditions(); }
-  public async player_attack(attackerId: string, weaponName: string, targetId: string, isOffHand?: boolean, isSneakAttack?: boolean, sharpshooter?: boolean, greatWeaponMaster?: boolean, divineSmite?: { slotLevel: number }): Promise<MCPResponse> { return this.combat.player_attack(attackerId, weaponName, targetId, isOffHand, isSneakAttack, sharpshooter, greatWeaponMaster, divineSmite); }
+  public async player_attack(attackerId: string, weaponName: string, targetId: string, isOffHand?: boolean, isSneakAttack?: boolean, sharpshooter?: boolean, greatWeaponMaster?: boolean, reckless?: boolean, divineSmite?: { slotLevel: number }): Promise<MCPResponse> { return this.combat.player_attack(attackerId, weaponName, targetId, isOffHand, isSneakAttack, sharpshooter, greatWeaponMaster, reckless, divineSmite); }
   public async resolveEnemyTurn(): Promise<MCPResponse> { return this.combat.resolveEnemyTurn(); }
   public async resolveAllPendingEnemyTurns(): Promise<{ messages: string[]; combatEnded: boolean; victory?: boolean; attackResults: Record<string, unknown>[] }> { return this.combat.resolveAllPendingEnemyTurns(); }
   public syncInitiativeConditions(): void { this.combat.syncInitiativeConditions(); }
@@ -502,7 +502,7 @@ export class MockMCPServer {
         case 'end_combat':
           res = await this.combat.end_combat(); break;
         case 'player_attack':
-          res = await this.combat.player_attack(String(args.attackerId || ''), String(args.weaponName || ''), String(args.targetId || args.target_name || args.target || ''), args.isOffHand as boolean | undefined, args.isSneakAttack as boolean | undefined, args.sharpshooter as boolean | undefined, args.greatWeaponMaster as boolean | undefined, args.divineSmite as { slotLevel: number } | undefined); break;
+          res = await this.combat.player_attack(String(args.attackerId || ''), String(args.weaponName || ''), String(args.targetId || args.target_name || args.target || ''), args.isOffHand as boolean | undefined, args.isSneakAttack as boolean | undefined, args.sharpshooter as boolean | undefined, args.greatWeaponMaster as boolean | undefined, args.reckless as boolean | undefined, args.divineSmite as { slotLevel: number } | undefined); break;
         case 'move_to': {
           res = await this.travel.move_to(String(args.location_name || 'Unknown'), String(args.description || ''), args.targetId as string | undefined, args.skillCheck as unknown as { skill_name?: string; difficulty?: number; onSuccess?: unknown }, args.significance as LocationSignificance | undefined);
           res = await this.maybeFinalizeTurn(args, res, options?.deferFinalize);

@@ -620,6 +620,63 @@ describe('combatTools', () => {
       await server.next_turn();
       expect(server.getFullState().party[0].recklessAttacking).toBe(false);
     });
+
+    // --- LLM dispatch path (executeToolCall) regression tests ---
+    // These verify the actual agent-loop code path: named args, NOT positional forwarding.
+    // Pre-fix: mcpService.executeToolCall dropped args.reckless and misrouted args.divineSmite.
+
+    it('executeToolCall player_attack with reckless:true fires Reckless Attack via LLM dispatch path', async () => {
+      server.joinParty(makeBarbarian());
+      await server.add_enemy('Goblin');
+      await server.start_combat();
+      // Two d20 rolls: initial (15) and advantage second-roll (18).
+      mockRollSequence(15, 18);
+      const result = await server.executeToolCall('player_attack', {
+        attackerId: 'Grishnak',
+        weaponName: 'Greataxe',
+        targetId: 'Goblin',
+        reckless: true,
+      });
+      expect(result.success).toBe(true);
+      const barbarian = server.getFullState().party[0];
+      expect(barbarian.recklessAttacking).toBe(true);
+      const d = result.data as Record<string, unknown>;
+      expect(d.roll).toBe(18); // advantage picked the higher
+    });
+
+    it('executeToolCall player_attack with divineSmite consumes the spell slot via LLM dispatch path', async () => {
+      const paladin = makeCharacter({
+        id: 'pal-1',
+        name: 'Roland',
+        class: 'paladin',
+        level: 5,
+        stats: { str: 16, dex: 10, con: 14, int: 10, wis: 12, cha: 14 },
+        resources: [
+          { id: 'spell-slot-1', name: 'Level 1 Spell Slot', current: 4, max: 4, resetOn: 'long', source: 'class', sourceId: 'paladin' },
+          { id: 'spell-slot-2', name: 'Level 2 Spell Slot', current: 2, max: 2, resetOn: 'long', source: 'class', sourceId: 'paladin' },
+        ],
+      });
+      server.joinParty(paladin);
+      await server.add_enemy('Goblin');
+      await server.start_combat();
+      // Rolls: attack d20 (15), resolveAdvantage always rolls a 2nd d20 (10, unused),
+      // weapon damage 1d6 (4), then 3 smite d8s (5, 6, 7).
+      mockRollSequence(15, 10, 4, 5, 6, 7);
+      const slotBefore = server.getFullState().party[0].resources?.find(r => r.id === 'spell-slot-1')?.current;
+      expect(slotBefore).toBe(4);
+      const result = await server.executeToolCall('player_attack', {
+        attackerId: 'Roland',
+        weaponName: 'Longsword',
+        targetId: 'Goblin',
+        divineSmite: { slotLevel: 1 },
+      });
+      expect(result.success).toBe(true);
+      const slotAfter = server.getFullState().party[0].resources?.find(r => r.id === 'spell-slot-1')?.current;
+      expect(slotAfter).toBe(slotBefore - 1);
+      // Smite added 3d8 (5+6+7=18) on top of weapon damage (4 + STR 3 = 7) → total 25.
+      const d = result.data as Record<string, unknown>;
+      expect(d.damage).toBe(25);
+    });
   });
 
   describe('inflict_damage', () => {
