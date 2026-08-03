@@ -122,7 +122,7 @@ export const RESOURCE_HANDLERS: Record<string, ResourceHandler> = {
       const profBonus = getProficiencyBonus(char);
       const dc = 8 + profBonus + wisMod;
       const saveResult = await ctx.deps.make_save(enemy.id, 'wis', dc);
-      const saved = saveResult.data && typeof saveResult.data === 'object' ? (saveResult.data as Record<string, unknown>).success === false : true;
+      const saved = saveResult.data && typeof saveResult.data === 'object' ? (saveResult.data as Record<string, unknown>).success === true : true;
       if (saved) {
         return { success: true, data: { turned: false, dc }, message: `${enemy.name} made the WIS save (DC ${dc}) and resisted Turn Undead.` };
       }
@@ -144,11 +144,14 @@ export const RESOURCE_HANDLERS: Record<string, ResourceHandler> = {
     const chaMod = getMod(char.stats.cha);
     const damage = rollDice(3, 10);
     const saveDC = char.level >= 5 ? (8 + getProficiencyBonus(char) + chaMod) : undefined;
+    let saved = false;
     if (saveDC && enemy) {
-      await ctx.deps.make_save(enemy.id, 'dex', saveDC);
+      const saveResult = await ctx.deps.make_save(enemy.id, 'dex', saveDC);
+      saved = saveResult.data && typeof saveResult.data === 'object' ? (saveResult.data as Record<string, unknown>).success === true : false;
     }
-    const result = await ctx.deps.inflict_damage(damage, actualTarget.id, 'fire', { skipTargetDerivedReductions: true });
-    return { success: true, data: { damage, saveDC }, message: `Hellish Rebuke deals ${damage} fire damage to ${actualTarget.name}.${result.message ? ' ' + result.message : ''}` };
+    const finalDamage = saved ? Math.floor(damage / 2) : damage;
+    const result = await ctx.deps.inflict_damage(finalDamage, actualTarget.id, 'fire', { skipTargetDerivedReductions: true });
+    return { success: true, data: { damage: finalDamage, saveDC, saved }, message: `Hellish Rebuke deals ${finalDamage} fire damage to ${actualTarget.name}${saved ? ' (halved by successful DEX save)' : ''}.${result.message ? ' ' + result.message : ''}` };
   },
 
   'wild-shape': async (ctx, characterId, _targetId) => {

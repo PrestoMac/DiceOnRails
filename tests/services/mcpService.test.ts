@@ -2439,4 +2439,119 @@ const roundTripped = deepClone(char.conditions);
       expect(result.message).toMatch(/already knows/i);
     });
   });
+
+  describe('use_resource hellish-rebuke save-for-half (regression)', () => {
+    it('halves damage when the DEX save succeeds (L5+ caster)', async () => {
+      // 3d10 damage = 6+6+6 = 18. Save d20 = 20 (success vs DC 13). Halved = 9.
+      vi.mocked(cryptoRoll).mockImplementation((sides = 20) => sides === 10 ? 6 : 20);
+      const char = makeCharacter({
+        id: 'tiefling-1', name: 'Zara', class: 'warlock', race: 'tiefling', level: 5,
+        stats: { str: 8, dex: 14, con: 12, int: 10, wis: 10, cha: 16 },
+        resources: [{ id: 'hellish-rebuke', name: 'Hellish Rebuke', current: 1, max: 1, resetOn: 'long', source: 'class', sourceId: 'warlock' }],
+      });
+      const server = new MockMCPServer();
+      server.joinParty(char);
+      await server.add_enemy('Goblin');
+      await server.start_combat();
+      const enemyId = server.getFullState().combat?.enemies[0]?.id;
+      const result = await server.use_resource('tiefling-1', 'hellish-rebuke', enemyId);
+      expect(result.success).toBe(true);
+      const data = result.data as { damage: number; saved: boolean; saveDC: number };
+      expect(data.saveDC).toBeGreaterThanOrEqual(13);
+      expect(data.saved).toBe(true);
+      expect(data.damage).toBe(9); // floor(18 / 2)
+      expect(result.message).toMatch(/halved/i);
+    });
+
+    it('applies full damage when the DEX save fails', async () => {
+      // 3d10 = 6+6+6 = 18. Save d20 = 1 (failure). Full = 18.
+      vi.mocked(cryptoRoll).mockImplementation((sides = 20) => sides === 10 ? 6 : 1);
+      const char = makeCharacter({
+        id: 'tiefling-1', name: 'Zara', class: 'warlock', race: 'tiefling', level: 5,
+        stats: { str: 8, dex: 14, con: 12, int: 10, wis: 10, cha: 16 },
+        resources: [{ id: 'hellish-rebuke', name: 'Hellish Rebuke', current: 1, max: 1, resetOn: 'long', source: 'class', sourceId: 'warlock' }],
+      });
+      const server = new MockMCPServer();
+      server.joinParty(char);
+      await server.add_enemy('Goblin');
+      await server.start_combat();
+      const enemyId = server.getFullState().combat?.enemies[0]?.id;
+      const result = await server.use_resource('tiefling-1', 'hellish-rebuke', enemyId);
+      expect(result.success).toBe(true);
+      const data = result.data as { damage: number; saved: boolean };
+      expect(data.saved).toBe(false);
+      expect(data.damage).toBe(18);
+    });
+
+    it('applies full damage at L1 with no save DC (no save rolled)', async () => {
+      // L1 caster → no saveDC. Damage 3d10 = 6+6+6 = 18, full.
+      vi.mocked(cryptoRoll).mockImplementation((sides = 20) => sides === 10 ? 6 : 1);
+      const char = makeCharacter({
+        id: 'tiefling-1', name: 'Zara', class: 'warlock', race: 'tiefling', level: 1,
+        stats: { str: 8, dex: 14, con: 12, int: 10, wis: 10, cha: 14 },
+        resources: [{ id: 'hellish-rebuke', name: 'Hellish Rebuke', current: 1, max: 1, resetOn: 'long', source: 'class', sourceId: 'warlock' }],
+      });
+      const server = new MockMCPServer();
+      server.joinParty(char);
+      await server.add_enemy('Goblin');
+      await server.start_combat();
+      const enemyId = server.getFullState().combat?.enemies[0]?.id;
+      const result = await server.use_resource('tiefling-1', 'hellish-rebuke', enemyId);
+      expect(result.success).toBe(true);
+      const data = result.data as { damage: number; saveDC?: number; saved: boolean };
+      expect(data.saveDC).toBeUndefined();
+      expect(data.saved).toBe(false);
+      expect(data.damage).toBe(18);
+    });
+  });
+
+  describe('use_resource channel-divinity Turn Undead save (regression)', () => {
+    it('turns undead when the WIS save FAILS', async () => {
+      // Save d20 = 1 → total 1 vs DC 12 → failure → undead IS turned.
+      vi.mocked(cryptoRoll).mockReturnValue(1);
+      const char = makeCharacter({
+        id: 'cleric-1', name: 'Aria', class: 'cleric', race: 'human', level: 3,
+        stats: { str: 13, dex: 10, con: 14, int: 10, wis: 16, cha: 12 },
+        resources: [{ id: 'channel-divinity', name: 'Channel Divinity', current: 1, max: 1, resetOn: 'short', source: 'class', sourceId: 'cleric' }],
+      });
+      const server = new MockMCPServer();
+      server.joinParty(char);
+      await server.add_enemy('Skeleton');
+      // Mark the enemy as undead so Turn Undead applies.
+      const enemy = server.getFullState().combat?.enemies[0];
+      expect(enemy).toBeDefined();
+      // Enemies default to no type; force type via direct state mutation.
+      const state = server.getFullState();
+      if (state.combat) state.combat.enemies[0].type = 'undead';
+      await server.start_combat();
+      const enemyId = server.getFullState().combat?.enemies[0]?.id;
+      const result = await server.use_resource('cleric-1', 'channel-divinity', enemyId);
+      expect(result.success).toBe(true);
+      const data = result.data as { turned: boolean; dc: number };
+      expect(data.turned).toBe(true);
+      expect(result.message).toMatch(/failed the WIS save/i);
+    });
+
+    it('resists (not turned) when the WIS save SUCCEEDS', async () => {
+      // Save d20 = 20 → total 20 vs DC 12 → success → undead NOT turned.
+      vi.mocked(cryptoRoll).mockReturnValue(20);
+      const char = makeCharacter({
+        id: 'cleric-1', name: 'Aria', class: 'cleric', race: 'human', level: 3,
+        stats: { str: 13, dex: 10, con: 14, int: 10, wis: 16, cha: 12 },
+        resources: [{ id: 'channel-divinity', name: 'Channel Divinity', current: 1, max: 1, resetOn: 'short', source: 'class', sourceId: 'cleric' }],
+      });
+      const server = new MockMCPServer();
+      server.joinParty(char);
+      await server.add_enemy('Skeleton');
+      await server.start_combat();
+      const state = server.getFullState();
+      if (state.combat) state.combat.enemies[0].type = 'undead';
+      const enemyId = server.getFullState().combat?.enemies[0]?.id;
+      const result = await server.use_resource('cleric-1', 'channel-divinity', enemyId);
+      expect(result.success).toBe(true);
+      const data = result.data as { turned: boolean };
+      expect(data.turned).toBe(false);
+      expect(result.message).toMatch(/made the WIS save/i);
+    });
+  });
 });
