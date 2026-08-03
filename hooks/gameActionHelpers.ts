@@ -4,6 +4,7 @@ import { getAllFeats } from '../services/featsService';
 import { getClassDef, getSubclassDef, getMod, getProficiencyBonus } from '../services/classEngine';
 import { SPELLS_BY_ID } from '../utils/spells';
 import { getAlignmentName, getBackgroundName } from '../utils/backgrounds';
+import { INVOCATIONS_BY_ID } from '../data/invocations';
 
 /**
  * Returns a shallow copy of a character with the private `notes`/`gmNotes` fields
@@ -59,6 +60,22 @@ export function buildCharacterEnrichment(mc: Character): string {
     }
     const allF = getAllFeats(mc);
     if (allF.length > 0) parts.push(`ACTIVE FEATS [${allF.map(f => `${f.name}: ${f.mechanicalEffect}`).join(' | ')}]`);
+    // Fighting Style
+    if (mc.fightingStyle) {
+        const styleName = mc.fightingStyle.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        parts.push(`FIGHTING STYLE [${styleName}]`);
+    }
+    // Eldritch Invocations
+    const invocations = mc.invocations || [];
+    if (invocations.length > 0) {
+        const invNames = invocations.map(id => INVOCATIONS_BY_ID[id]?.name ?? id);
+        parts.push(`ELDRITCH INVOCATIONS [${invNames.join(' | ')}]`);
+    }
+    // Subrace Traits
+    if (mc.subraceId) {
+        const subraceName = mc.subraceId.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        parts.push(`SUBRACE [${subraceName}]`);
+    }
     // PERSONA block — surfaces the SRD 5.1 background/alignment/trait fields as a
     // single first-class labeled block instead of dense JSON ids/arrays. Gated on
     // at least one non-empty field so existing characters with no persona add zero

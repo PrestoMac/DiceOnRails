@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Character } from '../types';
+import { CLASSES_BY_ID } from '../utils/classes';
 
 interface NaturalRecoveryModalProps {
   character: Character;
@@ -80,7 +81,7 @@ const NaturalRecoveryModal: React.FC<NaturalRecoveryModalProps> = ({ character, 
           <div>
             <h2 className="text-lg font-bold text-amber-500 fantasy-font tracking-wide">Natural Recovery</h2>
             <p className="text-xs text-stone-400 mt-0.5">
-              {character.name} &middot; Level {character.level} Druid
+              {character.name} &middot; Level {character.level} {CLASSES_BY_ID[character.class]?.name || character.class}
             </p>
           </div>
           <button onClick={handleClose} className="p-1.5 hover:bg-stone-800 rounded-lg text-stone-500 hover:text-stone-300 transition-colors">

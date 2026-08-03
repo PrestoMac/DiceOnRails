@@ -160,7 +160,7 @@ export const RACES_CATALOG: RaceDefinition[] = [
     darkvision: 60,
     traits: [
       { id: 'fey-ancestry', name: 'Fey Ancestry', description: 'You have advantage on saving throws against being charmed, and magic can\'t put you to sleep.', kind: 'passive', effect: { kind: 'advantage-on-save', payload: { against: 'charmed' } } },
-      { id: 'skill-versatility', name: 'Skill Versatility', description: 'You gain proficiency in two skills of your choice.', kind: 'passive', effect: { kind: 'skill-proficiency', payload: { skills: ['_choice_', '_choice_'] } } },
+      { id: 'skill-versatility', name: 'Skill Versatility', description: 'You gain proficiency in two skills of your choice.', kind: 'passive' },
     ],
     languages: ['common', 'elvish', 'one-of-choice'],
     icon: 'fa-user-graduate',

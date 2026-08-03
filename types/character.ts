@@ -264,6 +264,7 @@ export interface Character {
   maxHpBonus: number;
   hitDice: { current: number; max: number };
   skills?: Record<string, number>;
+  expertiseSkills?: string[];
   unusedSkillPoints?: number;
   deathSaves?: DeathSaveStatus;
   feats?: string[];
@@ -300,7 +301,7 @@ export interface Character {
   bonds?: string[];
   flaws?: string[];
   appearance?: string;
-  bonusSkillProficiencies?: string[];
+  bonusSkillProficiencies?: number;
   fightingStyle?: string;
   divineDomain?: string;
   sorcerousOrigin?: string;

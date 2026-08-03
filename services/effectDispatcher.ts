@@ -397,6 +397,22 @@ const HOOK_REGISTRY: Record<HookName, ReducerEntry[]> = {
         return ctx;
       },
     },
+    {
+      kind: 'shield-bonus-to-save',
+      reduce: (ctx, payload, character) => {
+        const saveCtx = ctx as unknown as SaveRollContext;
+        const saveStat = (payload.saveStat as string) || '';
+        const bonus = (payload.bonus as number) || 0;
+        if (!saveStat || saveCtx.stat.toLowerCase() !== saveStat.toLowerCase()) return ctx;
+        const hasShield = (character.inventory || []).some(
+          item => item.type === 'shield' && item.equipped
+        );
+        if (hasShield) {
+          saveCtx.extraModifier += bonus;
+        }
+        return ctx;
+      },
+    },
   ],
   onSkillCheck: [
     {
@@ -413,8 +429,7 @@ const HOOK_REGISTRY: Record<HookName, ReducerEntry[]> = {
       kind: 'skill-expertise',
       reduce: (ctx, _payload, character) => {
         const skillCtx = ctx as unknown as SkillCheckContext;
-        const rank = character.skills?.[skillCtx.skillName] || 0;
-        if (rank > 1) {
+        if (character.expertiseSkills?.includes(skillCtx.skillName)) {
           skillCtx.skillBonus += getProficiencyBonus(character);
         }
         return ctx;

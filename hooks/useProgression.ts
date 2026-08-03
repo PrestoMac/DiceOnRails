@@ -111,6 +111,23 @@ export const useProgression = (
       customSkillAllocations ?? selectedSkillAllocations,
       customHpDeviation ?? 0
     );
+
+    // Auto-assign fighting style if the new level grants one and the character
+    // doesn't already have a fighting style. Default to 'defense' (always
+    // applicable). The player can change it later via the character sheet.
+    // This handles class features (Fighter L1, Paladin L2, Ranger L2) which
+    // are NOT subclass features, so they won't be caught by handleAcknowledgeSubclass.
+    if (result.errors.length === 0 && !result.character.fightingStyle) {
+      const classDef = getClassDef(result.character.class);
+      const fsFeature = classDef?.features.find(
+        (f: { level: number; effect?: { kind?: string }; choice?: unknown }) =>
+          f.level <= result.character.level && f.effect?.kind === 'fighting-style' && f.choice
+      );
+      if (fsFeature) {
+        result.character.fightingStyle = 'defense';
+      }
+    }
+
     if (await applyResultToParty(levelUpCharacterId, result)) return;
     handleCloseLevelUp();
   }, [levelUpCharacterId, levelUpCharacter, selectedAllocations, selectedSkillAllocations, applyResultToParty, handleCloseLevelUp]);
@@ -132,23 +149,10 @@ export const useProgression = (
       const newLevels = subclassDef
         ? subclassDef.features.filter((f: { level: number }) => f.level === char.level).map((f: { level: number }) => f.level)
         : [];
-      // Auto-assign fighting style if a class feature with a fighting-style choice
-      // is unlocked at this level and the character doesn't already have one.
-      // Default to 'defense' (always applicable). The player can change it later.
-      const classDef = getClassDef(char.class);
-      const fsFeature = classDef?.features.find(
-        (f: { level: number; effect?: { kind?: string }; choice?: unknown }) =>
-          f.level === char.level && f.effect?.kind === 'fighting-style' && f.choice
-      );
-      const fightingStyleUpdate: Partial<Character> = {};
-      if (fsFeature && !char.fightingStyle) {
-        fightingStyleUpdate.fightingStyle = 'defense';
-      }
       mcpServer.getFullState().party[idx] = {
         ...char,
         pendingSubclassFeature: false,
         unlockedSubclassFeatures: Array.from(new Set([...existing, ...newLevels])),
-        ...fightingStyleUpdate,
       };
     }
     syncState();

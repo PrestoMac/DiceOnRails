@@ -127,6 +127,37 @@ export function buildExplorationSuggestions(state: GameState, characterId?: stri
         }
     }
 
+    // Subclass & resource-aware suggestions (gated by remaining capacity).
+    if (suggestions.length < MAX_SUGGESTIONS) {
+        if (character.class === 'monk' && character.level >= 2) {
+            const ki = (character.resources || []).find(r => r.id === 'ki');
+            if (ki && ki.current > 0) {
+                suggestions.push('Use Flurry of Blows for extra strikes');
+                if (suggestions.length < MAX_SUGGESTIONS) suggestions.push('Spend Ki on Patient Defense');
+                if (suggestions.length < MAX_SUGGESTIONS) suggestions.push('Use Stunning Strike on the enemy');
+            }
+        }
+        if (character.class === 'druid' && character.subclassId === 'circle-of-the-land') {
+            const nr = (character.resources || []).find(r => r.id === 'natural-recovery');
+            if (!nr || nr.current > 0) {
+                suggestions.push('Use Natural Recovery to regain spell slots');
+            }
+        }
+        if (character.class === 'warlock' && (character.invocations || []).includes('agonizing-blast')) {
+            suggestions.push('Blast the enemy with Eldritch Blast + Agonizing Blast');
+        }
+        if (character.class === 'fighter' && character.level >= 2) {
+            const as = (character.resources || []).find(r => r.id === 'action-surge');
+            if (!as || as.current > 0) {
+                suggestions.push('Use Action Surge for an extra action');
+            }
+        }
+        if (character.class === 'rogue' && character.level >= 2) {
+            const cu = (character.resources || []).find(r => r.id === 'cunning-action');
+            if (cu) suggestions.push('Use Cunning Action to Dash, Disengage, or Hide');
+        }
+    }
+
     if (suggestions.length < MAX_SUGGESTIONS) {
         const activeQuest = (state.quests || []).find(q => q.status === 'active');
         if (activeQuest) suggestions.push(`Pursue: ${activeQuest.title}`);

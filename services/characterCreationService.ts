@@ -74,6 +74,16 @@ export function buildCharacterFromWizard(
     }
   });
 
+  // Populate expertise skills for Bards (L3+) and Rogues (L1+).
+  // Skills with rank >= 2 in the allocation map are treated as expertise choices.
+  const expertiseSkills: string[] = [];
+  const isExpertiseClass = (selectedClass.id === 'bard' && level >= 3) || (selectedClass.id === 'rogue' && level >= 1);
+  if (isExpertiseClass) {
+    for (const [skillName, rank] of Object.entries(updatedSkills)) {
+      if (rank >= 2) expertiseSkills.push(skillName);
+    }
+  }
+
   const racialTraits: string[] = [];
   const raceDef = getRaceDef(selectedRace.id);
   if (raceDef) for (const t of raceDef.traits) { racialTraits.push(t.id); }
@@ -98,7 +108,10 @@ export function buildCharacterFromWizard(
     })(),
     location: loc?.name || '', experience: 0, experienceToNextLevel: calculateXPToNextLevel(level),
     unusedStatPoints: Math.max(0, (level - 1) * 2 - bonusAllocated), maxHpBonus: 0, hitDice: { current: level, max: level },
-    unusedSkillPoints: remainingSkillPoints || 0,
+    unusedSkillPoints: (remainingSkillPoints || 0) + (() => {
+      const raceDef = getRaceDef(selectedRace.id);
+      return (raceDef && raceDef.traits.some(t => t.id === 'skill-versatility')) ? 2 : 0;
+    })(),
     feats: collectedFeats, featSelections, featChoices, pendingFeatChoice: false,
     resources, racialTraits,
     speedBonus: subrace?.speedBonus ?? 0,
@@ -170,6 +183,7 @@ export function buildCharacterFromWizard(
       return (DRAGON_ANCESTRIES.find(d => d.id === a)?.damageType as string) || undefined;
     })(),
     unlockedSubclassFeatures: [],
+    expertiseSkills: expertiseSkills.length ? expertiseSkills : undefined,
     invocations: (invocationChoices?.length) ? invocationChoices : undefined,
     languages: (() => {
       const raceDef = getRaceDef(selectedRace.id);

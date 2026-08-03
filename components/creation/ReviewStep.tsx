@@ -1,7 +1,8 @@
 import React from 'react';
 import { WizardState } from './types';
 import { SKILLS_LIST, ASI_LEVELS } from '../../constants';
-import { getMod } from '../../services/classEngine';
+import { Character } from '../../types';
+import { calculateMaxHp, getRaceDef, getMod } from '../../services/classEngine';
 import { FEATS_CATALOG } from '../../utils/feats';
 import { STAT_LABELS } from './constants';
 import { getEffectiveAsiMap } from './asiUtils';
@@ -24,7 +25,7 @@ interface ReviewStepProps {
 const ReviewStep: React.FC<ReviewStepProps> = ({
   wizardState, finalizeError, isNewCampaign, campaignStartingLocation, needsSpellsStep, onFinalize, onGoToStart,
 }) => {
-  const { name, selectedRace, selectedClass, stats, level, allocatedSkills, goldPool, inventory, asiFeatSlots, selectedSubclassId, selectedCantrips, selectedSpells, alignment, background, personalityTraits, ideals, bonds, flaws, backstory } = wizardState;
+  const { name, selectedRace, selectedClass, stats, level, allocatedSkills, goldPool, inventory, asiFeatSlots, selectedSubclassId, selectedCantrips, selectedSpells, alignment, background, personalityTraits, ideals, bonds, flaws, backstory, fightingStyleChoice, invocationChoices, selectedSubraceId } = wizardState;
   const asiMap = getEffectiveAsiMap(selectedRace, wizardState.selectedSubraceId, wizardState.halfElfChoice1, wizardState.halfElfChoice2);
   const stepCls = "space-y-6 animate-in fade-in duration-500";
 
@@ -39,11 +40,42 @@ const ReviewStep: React.FC<ReviewStepProps> = ({
             <p className="text-amber-700 italic">Level {level} {selectedRace.name} {selectedClass.name}</p>
           </div>
           {(() => {
-            const conBonus = asiMap.con || 0;
+            // Build a minimal character for accurate HP calculation (includes subrace/feat bonuses)
+            const resolvedStats = { ...stats };
+            for (const [s, v] of Object.entries(asiMap)) resolvedStats[s as keyof typeof stats] += v;
+            for (const [s, v] of Object.entries(wizardState.bonusStatAllocations || {})) {
+              if (v > 0) resolvedStats[s as keyof typeof stats] += v;
+            }
+            for (const slot of asiFeatSlots) {
+              if (slot.type === 'asi' && slot.statAllocations) {
+                for (const [s, v] of Object.entries(slot.statAllocations)) {
+                  if (v > 0) resolvedStats[s as keyof typeof stats] += v;
+                }
+              }
+            }
+            const raceDef = getRaceDef(selectedRace.id);
+            const racialTraits: string[] = [];
+            if (raceDef) for (const t of raceDef.traits) racialTraits.push(t.id);
+            const subraceDef = selectedSubraceId ? selectedRace.subraces?.find(sr => sr.id === selectedSubraceId) : undefined;
+            if (subraceDef?.traits) for (const t of subraceDef.traits) racialTraits.push(t.id);
+            const collectedFeats: string[] = [];
+            for (const slot of asiFeatSlots) {
+              if (slot.type === 'feat' && slot.featId) collectedFeats.push(slot.featId);
+            }
+            const tempChar: Character = {
+              id: 'temp', name, race: selectedRace.id, class: selectedClass.id, level,
+              stats: resolvedStats, inventory: [], racialTraits, feats: collectedFeats,
+              sorcerousOrigin: (selectedClass.id === 'sorcerer' && selectedSubclassId === 'draconic-bloodline') ? 'draconic-bloodline' : undefined,
+              maxHpBonus: 0, hp: { current: 0, max: 0 },
+              currency: { gp: 0, sp: 0, cp: 0 }, location: '',
+              experience: 0, experienceToNextLevel: 0, unusedStatPoints: 0,
+              hitDice: { current: level, max: level },
+            };
+            const maxHp = calculateMaxHp(tempChar);
             return (
               <div className="text-right">
                 <p className="text-stone-500 uppercase text-[10px] font-bold tracking-widest">Vitality</p>
-                <p className="text-2xl font-bold text-green-700">{selectedClass.hpBase + getMod(stats.con + conBonus) + (selectedClass.hpPerLevel + getMod(stats.con + conBonus)) * (level - 1)} HP</p>
+                <p className="text-2xl font-bold text-green-700">{maxHp} HP</p>
               </div>
             );
           })()}
@@ -115,6 +147,24 @@ const ReviewStep: React.FC<ReviewStepProps> = ({
             </div>
           ) : null;
         })()}
+        {fightingStyleChoice && (
+          <div>
+            <p className="text-stone-500 uppercase text-[10px] font-bold tracking-widest mb-1">Fighting Style</p>
+            <p className="text-amber-400 font-bold">{fightingStyleChoice.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</p>
+          </div>
+        )}
+        {invocationChoices?.length > 0 && (
+          <div>
+            <p className="text-stone-500 uppercase text-[10px] font-bold tracking-widest mb-1">Invocations</p>
+            <p className="text-[10px] text-stone-300">{invocationChoices.join(', ')}</p>
+          </div>
+        )}
+        {selectedSubraceId && (
+          <div>
+            <p className="text-stone-500 uppercase text-[10px] font-bold tracking-widest mb-1">Subrace</p>
+            <p className="text-amber-400 font-bold">{selectedSubraceId.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</p>
+          </div>
+        )}
         {asiFeatSlots.length > 0 && (
           <div>
             <p className="text-stone-500 uppercase text-[10px] font-bold tracking-widest mb-2">Feats and Ability Improvements</p>

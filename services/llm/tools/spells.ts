@@ -22,7 +22,7 @@ export const tools = [
                         required: ['option']
                     }
                 },
-                required: ['casterId', 'spellId', 'slotLevels']
+                required: ['casterId', 'spellId', 'slotLevel']
             }
         }
     },

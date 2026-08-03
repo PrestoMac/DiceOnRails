@@ -7,7 +7,6 @@ import { getConditionEffects, isIncapacitated, isUnconscious, removeCondition, t
 import {
   getAlertInitiativeBonus,
   getResilientSaveBonus,
-  getShieldMasterSaveBonus,
 } from '../featsService';
 import { rollDice, rollDeathSave } from '../diceEngine';
 import { parseDiceFormula } from '../../utils/dice';
@@ -871,8 +870,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
         const statVal = (partyTarget.stats as Record<string, number>)[mappedStat] || 10;
         const mod = getMod(statVal);
         const resilientBonus = getResilientSaveBonus(partyTarget, mappedStat as 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha');
-        const shieldMasterBonus = getShieldMasterSaveBonus(partyTarget, mappedStat as 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha');
-        let totalMod = mod + resilientBonus + shieldMasterBonus;
+        let totalMod = mod + resilientBonus;
 
         const initialRoll = cryptoRoll(20);
         const saveCtx: SaveRollContext = {
@@ -935,7 +933,6 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
 
         const bonusParts: string[] = [];
         if (resilientBonus > 0) bonusParts.push(`Resilient +${resilientBonus}`);
-        if (shieldMasterBonus > 0) bonusParts.push(`Shield Master +${shieldMasterBonus}`);
         if (auraBonus > 0) bonusParts.push(`Aura of Protection${auraSource ? ' (' + auraSource + ')' : ''} +${auraBonus}`);
 
         return {
@@ -944,7 +941,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
             character: partyTarget.name,
             stat: mappedStat.toUpperCase(),
             roll, modifier: totalMod, total, dc, success, nat20, nat1,
-            resilientBonus, shieldMasterBonus
+            resilientBonus
           },
           message: `${partyTarget.name} ${mappedStat.toUpperCase()} save: ${success ? 'SUCCESS' : 'FAILURE'}` +
             ` (Rolled ${roll} + ${totalMod}${bonusParts.length ? ' [' + bonusParts.join(', ') + ']' : ''} = ${total} vs DC ${dc})${advantageNote}${nat20 ? ' [Natural 20!]' : ''}${nat1 ? ' [Natural 1!]' : ''}`

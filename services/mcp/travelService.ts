@@ -7,7 +7,7 @@ import { getMod, getClassDef, recoverResources as classEngineRecoverResources } 
 import { computeXp, awardXpToParty, formatXpAwardLine } from '../xpEngine';
 import { getConditionEffects, applyCondition, tickConditionsByTime, tickConditionsByRounds, hasCondition, getExhaustionPenalty, executeConditionOnRemove } from '../conditionEngine';
 import { getTimePeriod, AMBIENT_LINES } from '../../utils/timeUtils';
-import { applyEffects, SkillCheckContext, RestContext } from '../effectDispatcher';
+import { applyEffects, getEffects, SkillCheckContext, RestContext } from '../effectDispatcher';
 import { SPELLS_BY_ID } from '../../utils/spells';
 import { breakConcentration as engineBreakConcentration, checkConcentrationExpiry } from '../spellcastingEngine';
 import { ensureGameStateFields } from './stateService';
@@ -491,7 +491,7 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
 
           if (char.raging && !state.combat?.isActive && safeTimePassed > 0) {
             char.raging = false;
-            if (char.subclassId === 'berserker') {
+            if (getEffects(char, 'frenzy-exhaustion').length > 0) {
               applyCondition(char, { id: 'exhaustion-1', source: 'frenzy', duration: -1, durationUnit: 'permanent' });
               logs.push(`${char.name} gains exhaustion level 1 from Frenzy.`);
             }
@@ -574,7 +574,7 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
       for (const char of state.party) {
         if (char.raging) {
           char.raging = false;
-          if (char.subclassId === 'berserker') {
+          if (getEffects(char, 'frenzy-exhaustion').length > 0) {
             applyCondition(char, { id: 'exhaustion-1', source: 'frenzy', duration: -1, durationUnit: 'permanent' });
             messages.push(`${char.name} gains exhaustion level 1 from Frenzy.`);
           }

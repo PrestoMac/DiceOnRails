@@ -190,6 +190,11 @@ export const RESOURCE_HANDLERS: Record<string, ResourceHandler> = {
     return { success: true, data: { detectType: ['celestial', 'fiend', 'undead'], range: 60 }, message: `${char.name} uses Divine Sense for 1 minute. Detects celestial, fiend, or undead within 60 ft that are not behind total cover.` };
   },
 
+  /**
+   * Info-only handler. Actual slot recovery for Arcane Recovery happens via
+   * the dedicated arcane_recovery tool / ArcaneRecoveryModal → travelService.arcane_recovery().
+   * This handler is called by use_resource for informational purposes only.
+   */
   'arcane-recovery': async (ctx, characterId) => {
     const char = ctx.deps.getTarget(characterId);
     if (!char) return fail('Character not found.');
@@ -206,6 +211,11 @@ export const RESOURCE_HANDLERS: Record<string, ResourceHandler> = {
     return { success: true, data: { revived: true }, message: `${char.name} endures! Drops to 1 HP instead of 0 HP. Once per long rest.` };
   },
 
+  /**
+   * Info-only handler. Actual slot recovery for Natural Recovery happens via
+   * the dedicated natural_recovery tool / NaturalRecoveryModal → travelService.natural_recovery().
+   * This handler is called by use_resource for informational purposes only.
+   */
   'natural-recovery': async (ctx, characterId) => {
     const char = ctx.deps.getTarget(characterId);
     if (!char) return fail('Character not found.');

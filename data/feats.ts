@@ -146,8 +146,7 @@ export const FEATS_CATALOG: FeatDefinition[] = [
     icon: 'fa-hand-fist',
     description: 'Choose one ability score. You gain the following benefits: the chosen ability score increases by 1, to a maximum of 20. You gain proficiency in saving throws using the chosen ability.',
     mechanicalEffect: 'Add proficiency bonus to one chosen save. The +1 ASI is applied separately by the level-up modal.',
-    effectType: 'modifier',
-    effect: { kind: 'save-proficiency' }
+    effectType: 'modifier'
   },
   {
     id: 'alert',

@@ -89,6 +89,7 @@ CLASS FEATURES:
 - Eldritch Invocations (Warlock L2): Agonizing Blast (add CHA mod to Eldritch Blast damage), Armor of Shadows (mage armor at will), Fiendish Vigor (false life at will), and others are **ENGINE APPLIED** based on the warlock's chosen invocations.
 - Fighting Styles: **ENGINE APPLIED**. Archery (+2 attack), Defense (+1 AC in armor), Dueling (+2 damage), GWF (rerolls 1s/2s), and TWF (offhand mod) are mechanically applied.
 - Extra Attack (Fighter L5, Barbarian L5, Monk L5, Paladin L5, Ranger L5): when the character has the Extra Attack class feature and takes the Attack action, call player_attack TWICE (a second attack at the same target or a new one). The engine does NOT auto-repeat the attack — you must issue both player_attack calls.
+- Monk: Martial Arts uses unarmed strikes (1d4 + DEX, scaling). Monks are NOT spellcasters — NEVER call cast_spell for monk abilities. Use player_attack with weaponName="Unarmed Strike".
 
 RACE TRAITS:
 - Darkvision: Don't narrate "you can't see in this dark room" if the character has darkvision.
@@ -105,6 +106,15 @@ RACE TRAITS:
 - Channel Divinity: Turn Undead (Cleric): use_resource(resourceId="channel-divinity", targetId="undead-name").
 - Bardic Inspiration (Bard): use_resource(resourceId="bardic-inspiration", targetId="ally-name").
 - Tiefling Infernal Legacy: Tieflings know thaumaturgy cantrip from racial traits. Hellish rebuke and darkness are handled via use_resource(resourceId="hellish-rebuke") as once-per-long-rest abilities.
+
+SUBRACE TRAITS:
+- Hill Dwarf: Dwarven Toughness — +1 HP per level (already in max HP).
+- Mountain Dwarf: proficient with all martial weapons and light/medium armor.
+- Stout Halfling: resistance to poison damage, advantage on poison saves.
+- High Elf: knows one wizard cantrip (INT-based).
+- Wood Elf: speed 35 ft, Mask of the Wild (hide in natural phenomena).
+- Forest Gnome: knows minor illusion cantrip.
+- Rock Gnome: tinker's tools proficiency.
 
 DIVINE SMITE (Paladin L2+): On a melee hit, you can expend a spell slot to deal extra radiant damage. Set the 'divineSmite' parameter on player_attack with {slotLevel: N} (1-5). The engine adds 2d8 + 1d8 per slot level radiant damage (max 5d8) plus an extra 1d8 vs. fiends/undead. Do NOT call inflict_damage or narrate the damage separately — it is embedded in the attack result.
 

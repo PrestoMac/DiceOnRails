@@ -134,7 +134,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
         name: 'Path of the Berserker',
         description: 'A warrior who unleashes a furious frenzy in battle.',
         features: [
-          { id: 'frenzy', name: 'Frenzy', description: 'While raging, you can make a single melee weapon attack as a bonus action on each of your turns. When your rage ends, you suffer one level of exhaustion.', level: 3, kind: 'passive' },
+          { id: 'frenzy', name: 'Frenzy', description: 'While raging, you can make a single melee weapon attack as a bonus action on each of your turns. When your rage ends, you suffer one level of exhaustion.', level: 3, kind: 'passive', effect: { kind: 'frenzy-exhaustion' } },
           { id: 'mindless-rage', name: 'Mindless Rage', description: 'You can\'t be charmed or frightened while raging.', level: 6, kind: 'passive' },
           { id: 'intimidating-presence', name: 'Intimidating Presence', description: 'Use a bonus action to frighten a creature within 30 ft (WIS save DC 8 + prof + CHA mod).', level: 10, kind: 'passive' },
           { id: 'retaliation', name: 'Retaliation', description: 'When you take damage from a creature within 5 ft, use your reaction to make a melee attack against that creature.', level: 14, kind: 'reaction' },
@@ -194,10 +194,10 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
       { id: 'bardic-inspiration', name: 'Bardic Inspiration', description: 'Bonus action: grant a creature a d6 inspiration die (d8 at L5, d10 at L10, d12 at L15) to add to one ability check, attack roll, or save. Uses equal to CHA mod per long rest.', level: 1, kind: 'resource', grantsResource: 'bardic-inspiration' },
       { id: 'jack-of-all-trades', name: 'Jack of All Trades', description: 'Add half your proficiency bonus (round down) to any ability check you make that doesn\'t already include your proficiency bonus.', level: 2, kind: 'passive', effect: { kind: 'jack-of-all-trades' } },
       { id: 'song-of-rest', name: 'Song of Rest', description: 'You and friendly creatures who hear your song regain 1d6 extra HP on a short rest.', level: 2, kind: 'passive' },
-      { id: 'expertise-1', name: 'Expertise', description: 'Choose two skill proficiencies. Your proficiency bonus is doubled for those skills.', level: 3, kind: 'passive' },
+      { id: 'expertise-1', name: 'Expertise', description: 'Choose two skill proficiencies. Your proficiency bonus is doubled for those skills.', level: 3, kind: 'passive', effect: { kind: 'skill-expertise' } },
       { id: 'font-of-inspiration', name: 'Font of Inspiration', description: 'You regain all uses of Bardic Inspiration on a short rest.', level: 5, kind: 'passive' },
       { id: 'countercharm', name: 'Countercharm', description: 'You can use an action to grant allies within 30 ft advantage on saves against being charmed or frightened.', level: 6, kind: 'passive' },
-      { id: 'expertise-2', name: 'Expertise (2 more)', description: 'Choose two more skills for expertise.', level: 10, kind: 'passive' },
+      { id: 'expertise-2', name: 'Expertise (2 more)', description: 'Choose two more skills for expertise.', level: 10, kind: 'passive', effect: { kind: 'skill-expertise' } },
       { id: 'superior-inspiration', name: 'Superior Inspiration', description: 'When you roll initiative and have no Bardic Inspiration uses remaining, you regain one use.', level: 20, kind: 'passive' },
     ],
     subclasses: [
@@ -587,7 +587,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     recommendedStats: { str: 8, dex: 15, con: 12, int: 13, wis: 10, cha: 14 },
     statPriority: ['dex', 'cha', 'int', 'con', 'wis', 'str'],
     features: [
-      { id: 'expertise-rogue-1', name: 'Expertise', description: 'Choose two skills to gain expertise (double proficiency bonus).', level: 1, kind: 'passive' },
+      { id: 'expertise-rogue-1', name: 'Expertise', description: 'Choose two skills to gain expertise (double proficiency bonus).', level: 1, kind: 'passive', effect: { kind: 'skill-expertise' } },
       { id: 'sneak-attack', name: 'Sneak Attack', description: 'Once per turn, deal 1d6 extra damage (scales at L3, L5, L7, L9, L11, L13, L15, L17, L19) with a finesse/ranged weapon if you have advantage or an ally is within 5 ft.', level: 1, kind: 'passive', effect: { kind: 'sneak-attack', payload: { extraDiceAtLevel: { 1: 1, 3: 2, 5: 3, 7: 4, 9: 5, 11: 6, 13: 7, 15: 8, 17: 9, 19: 10 } } } },
       { id: 'thieves-cant', name: 'Thieves\' Cant', description: 'You know the secret language of thieves.', level: 1, kind: 'passive' },
       { id: 'cunning-action', name: 'Cunning Action', description: 'Use a bonus action to Dash, Disengage, or Hide.', level: 2, kind: 'passive' },
