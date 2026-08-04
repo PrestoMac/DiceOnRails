@@ -9,6 +9,7 @@ import ConfirmDialog from '../primitives/ConfirmDialog';
 import ChatColumn from '../chat/ChatColumn';
 import Composer from '../chat/Composer';
 import TypingStrip from '../chat/TypingStrip';
+import { buildReplayData } from '../chat/replay';
 import TopBar from './TopBar';
 import CombatBanner from './CombatBanner';
 import MapOverlay from './MapOverlay';
@@ -55,6 +56,37 @@ const GameScreen: React.FC = () => {
   const hasBattleMap = !!gameState.battleMap;
   const activeQuests = gameState.quests.filter((q) => q.status === 'active').length;
   const typingCharacterIds = new Set(vm.typingUsers.map((u) => u.characterId));
+
+  /* ---------------- Dice roll modal auto-trigger ----------------
+   * Lives HERE (not in ChatColumn) because GameScreen renders once while
+   * ChatColumn is dual-mounted (desktop + mobile CSS toggles). Watching
+   * messages here ensures each roll fires exactly one popup, not two. */
+  const diceSeenIds = useRef<Set<string>>(new Set());
+  const diceMounted = useRef(false);
+
+  useEffect(() => {
+    const currentIds = new Set(messages.map((m) => m.id));
+    if (!diceMounted.current) {
+      diceSeenIds.current = currentIds;
+      diceMounted.current = true;
+      return;
+    }
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    let delay = 0;
+    for (const msg of messages) {
+      if (diceSeenIds.current.has(msg.id)) continue;
+      const rolls = msg.rollData ? (Array.isArray(msg.rollData) ? msg.rollData : [msg.rollData]) : [];
+      for (const roll of rolls) {
+        const t = setTimeout(() => void ui.handleTriggerDiceRoll(buildReplayData(roll)), delay);
+        timers.push(t);
+        delay += 4000;
+      }
+    }
+    diceSeenIds.current = currentIds;
+    return () => {
+      timers.forEach(clearTimeout);
+    };
+  }, [messages, ui.handleTriggerDiceRoll]);
 
   // Collapse the lightbox whenever the scene image changes.
   useEffect(() => {

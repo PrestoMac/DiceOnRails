@@ -119,8 +119,6 @@ const ChatColumn: React.FC<ChatColumnProps> = ({
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [showExport, setShowExport] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
-  const prevMessageIds = useRef<Set<string>>(new Set());
-  const mounted = useRef(false);
   const { toast } = useToastV2();
 
   const lastUserMessageId = useMemo(
@@ -157,33 +155,6 @@ const ChatColumn: React.FC<ChatColumnProps> = ({
 
   /* Stop any in-flight narration audio on unmount. */
   useEffect(() => () => stopSpeaking(), []);
-
-  /* Dice roll modal auto-trigger for newly-arrived messages carrying rollData.
-   * Runs on every client (local + remote via realtime). Skips initial-load
-   * messages (mounted ref). 4s stagger prevents modal overlap. */
-  useEffect(() => {
-    const currentIds = new Set(messages.map((m) => m.id));
-    if (!mounted.current) {
-      prevMessageIds.current = currentIds;
-      mounted.current = true;
-      return;
-    }
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    let delay = 0;
-    for (const msg of messages) {
-      if (prevMessageIds.current.has(msg.id)) continue;
-      const rolls = msg.rollData ? (Array.isArray(msg.rollData) ? msg.rollData : [msg.rollData]) : [];
-      for (const roll of rolls) {
-        const t = setTimeout(() => onTriggerDiceRoll(buildReplayData(roll)), delay);
-        timers.push(t);
-        delay += 4000;
-      }
-    }
-    prevMessageIds.current = currentIds;
-    return () => {
-      timers.forEach(clearTimeout);
-    };
-  }, [messages, onTriggerDiceRoll]);
 
   /* Export popover outside-click close. */
   useEffect(() => {
@@ -425,7 +396,7 @@ const ChatColumn: React.FC<ChatColumnProps> = ({
 
         {chatItems.map((item) => {
           if (item.kind === 'tools') {
-            return <SystemLogGroup key={item.id} messages={item.messages} />;
+            return <SystemLogGroup key={item.id} messages={item.messages} onRollClick={(roll) => void onTriggerDiceRoll(buildReplayData(roll))} />;
           }
           const msg = item.message;
           const showAvatar =
