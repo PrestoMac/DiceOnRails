@@ -57,6 +57,11 @@ const NaturalRecoveryModal: React.FC<NaturalRecoveryModalProps> = ({ character, 
       .map(([level, count]) => ({ level: Number(level), count }));
     if (selections.length > 0) {
       onRecover(selections);
+      setAllocations(() => {
+        const init: Record<number, number> = {};
+        for (const level of Object.keys(initialSlots)) init[Number(level)] = 0;
+        return init;
+      });
       onClose();
     }
   };

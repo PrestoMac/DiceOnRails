@@ -4,6 +4,7 @@ import { mcpServer } from '../services/mcpService';
 import { applyStatAllocation } from '../services/progressionService';
 import { applyAsiChoice, applyFeatChoice } from '../services/featsService';
 import { getSubclassDef, getClassDef } from '../services/classEngine';
+import { applyEffects, LevelUpContext } from '../services/effectDispatcher';
 import { storageService } from '../services/storageService';
 
 /** Options passed when confirming a feat choice during level-up, including optional ASI bonuses and skill selections. */
@@ -128,6 +129,13 @@ export const useProgression = (
       }
     }
 
+    // Dispatch onLevelUp effects (metamagic, armor proficiency from feats,
+    // etc.) so they survive the modal stat-allocation path.
+    if (result.errors.length === 0) {
+      const levelUpCtx: LevelUpContext = { _hook: 'onLevelUp', character: result.character, newLevel: result.character.level };
+      applyEffects(result.character, 'onLevelUp', levelUpCtx);
+    }
+
     if (await applyResultToParty(levelUpCharacterId, result)) return;
     handleCloseLevelUp();
   }, [levelUpCharacterId, levelUpCharacter, selectedAllocations, selectedSkillAllocations, applyResultToParty, handleCloseLevelUp]);
@@ -135,6 +143,10 @@ export const useProgression = (
   const handleConfirmAsiChoice = useCallback(async () => {
     if (!levelUpCharacterId || !levelUpCharacter) return;
     const result = applyAsiChoice(levelUpCharacter, selectedAllocations, levelUpCharacter.level);
+    if (result.errors.length === 0) {
+      const levelUpCtx: LevelUpContext = { _hook: 'onLevelUp', character: result.character, newLevel: levelUpCharacter.level };
+      applyEffects(result.character, 'onLevelUp', levelUpCtx);
+    }
     if (await applyResultToParty(levelUpCharacterId, result)) return;
     handleCloseLevelUp();
   }, [levelUpCharacterId, levelUpCharacter, selectedAllocations, applyResultToParty, handleCloseLevelUp]);

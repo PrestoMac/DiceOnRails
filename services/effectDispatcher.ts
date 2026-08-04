@@ -256,9 +256,23 @@ const HOOK_REGISTRY: Record<HookName, ReducerEntry[]> = {
       kind: 'fighting-style',
       reduce: (ctx, payload, character) => {
         const atkCtx = ctx as unknown as AttackRollContext;
-        const style = (payload.style as string) || character.fightingStyle;
-        if (style === 'archery' && atkCtx.isRanged) {
+        if (!atkCtx.isRanged) return ctx;
+        // The reducer is invoked once per `fighting-style` effect payload (Fighter L1,
+        // Champion L10 additional-fighting-style). Use markers so each slot applies at
+        // most once — prevents the Champion's two payloads from double-applying the
+        // primary style (+4 attack), and lets `fightingStyleTwo` contribute independently.
+        const marker = atkCtx as unknown as Record<string, unknown>;
+        if (!marker._fightingStyleArcheryApplied) {
+          marker._fightingStyleArcheryApplied = { primary: false, secondary: false };
+        }
+        const applied = marker._fightingStyleArcheryApplied as { primary: boolean; secondary: boolean };
+        if (character.fightingStyle === 'archery' && !applied.primary) {
           atkCtx.attackBonus += 2;
+          applied.primary = true;
+        }
+        if (character.fightingStyleTwo === 'archery' && !applied.secondary) {
+          atkCtx.attackBonus += 2;
+          applied.secondary = true;
         }
         return ctx;
       },
@@ -305,9 +319,21 @@ const HOOK_REGISTRY: Record<HookName, ReducerEntry[]> = {
       kind: 'fighting-style',
       reduce: (ctx, payload, character) => {
         const dmgCtx = ctx as unknown as AttackDamageContext;
-        const style = (payload.style as string) || character.fightingStyle;
-        if (style === 'dueling' && !dmgCtx.isRanged) {
+        if (dmgCtx.isRanged) return ctx;
+        // Marker-based idempotency (see Archery reducer above) — prevents Champion L10
+        // double-apply and honors `fightingStyleTwo`.
+        const marker = dmgCtx as unknown as Record<string, unknown>;
+        if (!marker._fightingStyleDuelingApplied) {
+          marker._fightingStyleDuelingApplied = { primary: false, secondary: false };
+        }
+        const applied = marker._fightingStyleDuelingApplied as { primary: boolean; secondary: boolean };
+        if (character.fightingStyle === 'dueling' && !applied.primary) {
           dmgCtx.damage += 2;
+          applied.primary = true;
+        }
+        if (character.fightingStyleTwo === 'dueling' && !applied.secondary) {
+          dmgCtx.damage += 2;
+          applied.secondary = true;
         }
         return ctx;
       },
@@ -498,6 +524,45 @@ const HOOK_REGISTRY: Record<HookName, ReducerEntry[]> = {
       reduce: (ctx, payload, character) => {
         const opts = (payload.options as string[]) || [];
         if (opts.length) character.metamagicOptions = opts;
+        return ctx;
+      },
+    },
+    {
+      kind: 'armor-proficiency',
+      reduce: (ctx, payload, character) => {
+        const prof = (payload.prof as string) || '';
+        const valid: ('light' | 'medium' | 'heavy' | 'shield')[] = ['light', 'medium', 'heavy', 'shield'];
+        const typed = valid.find(v => v === prof.toLowerCase());
+        if (typed) {
+          if (!character.armorProfs) character.armorProfs = [];
+          if (!character.armorProfs.includes(typed)) character.armorProfs.push(typed);
+          if (typed === 'medium' && !character.armorProfs.includes('shield')) {
+            character.armorProfs.push('shield');
+          }
+        }
+        return ctx;
+      },
+    },
+    {
+      kind: 'skill-proficiency',
+      reduce: (ctx, payload, character) => {
+        const vals = (payload.skills as string[]) || [];
+        if (!character.skills) character.skills = {};
+        for (const skill of vals) {
+          if (character.skills[skill] === undefined) character.skills[skill] = 1;
+          else character.skills[skill] = (character.skills[skill] || 0) + 1;
+        }
+        return ctx;
+      },
+    },
+    {
+      kind: 'language',
+      reduce: (ctx, payload, character) => {
+        const langs = (payload.languages as string[]) || [];
+        if (!character.languages) character.languages = [];
+        for (const lang of langs) {
+          if (!character.languages.includes(lang)) character.languages.push(lang);
+        }
         return ctx;
       },
     },

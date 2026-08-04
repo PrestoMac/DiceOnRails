@@ -147,7 +147,11 @@ export function resolveEnemySingleAttack(enemy: Enemy, atkIdx: number, target: C
   let roll = cryptoRoll(20); let adv = false; let dis = false;
   const ae = getConditionEffects(enemy);
   if (ae.advantageOnAttacks) adv = true; if (ae.disadvantageOnAttacks) dis = true;
-  if (getConditionEffects(target).attacksAgainstHaveAdvantage) adv = true;
+  const te = getConditionEffects(target);
+  if (te.attacksAgainstHaveAdvantage) adv = true;
+  if (te.attacksAgainstHaveDisadvantage) dis = true;
+  // Barbarian Reckless Attack: attacks against a reckless barbarian have advantage.
+  if ((target as Character).recklessAttacking) adv = true;
   if (adv && dis) { adv = false; dis = false; }
   if (adv || dis) { const s = cryptoRoll(20); roll = adv ? Math.max(roll, s) : Math.min(roll, s); }
   const aRoll = roll + atk.toHit - getExhaustionPenalty(enemy); const crit = roll === 20; const fumble = roll === 1;

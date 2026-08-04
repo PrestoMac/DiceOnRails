@@ -660,7 +660,7 @@ describe('combatTools', () => {
       await server.add_enemy('Goblin');
       await server.start_combat();
       // Rolls: attack d20 (15), resolveAdvantage always rolls a 2nd d20 (10, unused),
-      // weapon damage 1d6 (4), then 3 smite d8s (5, 6, 7).
+      // weapon damage 1d6 (4), then 2 smite d8s (5, 6).
       mockRollSequence(15, 10, 4, 5, 6, 7);
       const slotBefore = server.getFullState().party[0].resources?.find(r => r.id === 'spell-slot-1')?.current;
       expect(slotBefore).toBe(4);
@@ -673,9 +673,9 @@ describe('combatTools', () => {
       expect(result.success).toBe(true);
       const slotAfter = server.getFullState().party[0].resources?.find(r => r.id === 'spell-slot-1')?.current;
       expect(slotAfter).toBe(slotBefore - 1);
-      // Smite added 3d8 (5+6+7=18) on top of weapon damage (4 + STR 3 = 7) → total 25.
+      // Smite added 2d8 (5+6=11) on top of weapon damage (4 + STR 3 = 7) → total 18.
       const d = result.data as Record<string, unknown>;
-      expect(d.damage).toBe(25);
+      expect(d.damage).toBe(18);
     });
   });
 

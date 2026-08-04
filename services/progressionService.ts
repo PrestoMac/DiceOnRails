@@ -94,16 +94,17 @@ export function awardExperience(
 
     // Warlock Eldritch Invocations: grant pending picks when crossing the
     // invocation-count thresholds (L2/L5/L7/L9/L12/L15/L18). The delta between
-    // getInvocationCount(newLevel) and the invocations already chosen drives
-    // the pending count. The LevelUpModal surfaces an "Invocations" tab when
-    // this is > 0.
+    // getInvocationCount(newLevel) and the invocations already chosen (plus any
+    // already-granted-but-unspent pending picks) drives the new pending count.
+    // Subtracting existing pending prevents re-inflation on every subsequent
+    // level-up when prior picks were deferred. The LevelUpModal surfaces an
+    // "Invocations" tab when this is > 0.
     if (updated.class === 'warlock' && newLevel >= 2) {
       const targetCount = getInvocationCount(newLevel);
       const currentCount = (updated.invocations ?? []).length;
-      const pendingDelta = Math.max(0, targetCount - currentCount);
-      if (pendingDelta > 0) {
-        updated.pendingInvocations = (updated.pendingInvocations ?? 0) + pendingDelta;
-      }
+      const existingPending = updated.pendingInvocations ?? 0;
+      const pendingDelta = Math.max(0, targetCount - currentCount - existingPending);
+      updated.pendingInvocations = existingPending + pendingDelta;
     }
 
     const oldMaxHp = character.hp.max;
@@ -175,11 +176,18 @@ export function applyStatAllocation(
     }
   }
 
+  // Sync expertiseSkills: any skill at rank >= 2 qualifies for expertise.
+  const expertiseSet = new Set(character.expertiseSkills ?? []);
+  for (const [skill, rank] of Object.entries(newSkills)) {
+    if (typeof rank === 'number' && rank >= 2) expertiseSet.add(skill);
+  }
+
   const oldHp = character.hp.max;
   const updated: Character = {
     ...character,
     stats: newStats,
     skills: newSkills,
+    expertiseSkills: Array.from(expertiseSet),
     unusedStatPoints: character.unusedStatPoints - totalAllocated,
     unusedSkillPoints: currentUnusedSkillPoints - totalSkillsAllocated,
     maxHpBonus: character.maxHpBonus + hpDeviation,

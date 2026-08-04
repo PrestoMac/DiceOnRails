@@ -5,6 +5,7 @@ import { parseDiceFormula } from '../utils/dice';
 import { cryptoRoll } from '../utils/random';
 import { SPELLS_BY_ID, parseDuration } from '../utils/spells';
 import { getConditionEffects, getExhaustionPenalty, executeConditionOnRemove } from './conditionEngine';
+import { getAtWillInvocationSpells } from '../data/invocations';
 
 export function getMaxPactSlotLevel(character: Character): number {
   if (character.class !== 'warlock') return 0;
@@ -134,7 +135,10 @@ export function canLearnSpell(character: Character, spellId: string): { ok: bool
   }
   if (classDef.spellcasting.prepMode === 'known') {
     const cap = getSpellsKnown(character, character.level);
-    const currentKnown = (character.knownSpells ?? []).filter(sid => (SPELLS_BY_ID[sid]?.level ?? 1) !== 0).length;
+    // At-will invocation spells (mage armor, false life, …) are additions to the
+    // known list and must NOT count against the spells-known cap.
+    const atWill = getAtWillInvocationSpells(character.invocations);
+    const currentKnown = (character.knownSpells ?? []).filter(sid => (SPELLS_BY_ID[sid]?.level ?? 1) !== 0 && !atWill.includes(sid)).length;
     if (currentKnown >= cap) {
       return { ok: false, reason: `You already know ${cap} spells (max for L${character.level} ${classDef.name}).` };
     }
@@ -247,7 +251,11 @@ export function castSpell(
     if (slotLevel < spell.level) {
       return { success: false, reason: `${spell.name} requires at least a level ${spell.level} slot.` };
     }
-    if (!hasSpellSlot(character, slotLevel as 1|2|3|4|5|6|7|8|9)) {
+    // At-will invocation spells (Armor of Shadows, Fiendish Vigor, …) are cast
+    // without expending a spell slot.
+    const atWill = getAtWillInvocationSpells(character.invocations);
+    const isAtWillInvocation = atWill.includes(spell.id);
+    if (!isAtWillInvocation && !hasSpellSlot(character, slotLevel as 1|2|3|4|5|6|7|8|9)) {
       return { success: false, reason: `No level ${slotLevel} spell slot remaining.` };
     }
     const known = character.knownSpells ?? [];
@@ -258,7 +266,9 @@ export function castSpell(
     if (classDef.spellcasting.prepMode === 'prepared' && !prepared.includes(spell.id)) {
       return { success: false, reason: `${spell.name} is not prepared.` };
     }
-    consumeSpellSlot(character, slotLevel as 1|2|3|4|5|6|7|8|9);
+    if (!isAtWillInvocation) {
+      consumeSpellSlot(character, slotLevel as 1|2|3|4|5|6|7|8|9);
+    }
   }
 
 
@@ -324,12 +334,10 @@ export function castSpell(
         beamDamage = finalDiceDamage + flatBonus + abilityMod;
 
         // Agonizing Blast invocation: add CHA mod to Eldritch Blast damage per beam
+        let agonizingMod = 0;
         if (spell.id === 'eldritch-blast' && character.invocations?.includes('agonizing-blast')) {
-          const agonizingMod = getAbilityMod(character, classDef.spellcasting.ability);
+          agonizingMod = getAbilityMod(character, classDef.spellcasting.ability);
           beamDamage += agonizingMod;
-          if (result.damageRollDetails) {
-            result.damageRollDetails += ` + ${agonizingMod} [Agonizing Blast]`;
-          }
         }
 
         const baseFormula = `${count}d${sides}`;
@@ -337,7 +345,8 @@ export function castSpell(
         const critMult = isCrit ? ' * 2' : '';
         const flatStr = flatBonus ? ` + ${flatBonus}` : '';
         const abilityStr = abilityMod ? ` + ${abilityMod} [mod]` : '';
-        const detail = `${baseFormula} [${rollsStr}]${critMult}${flatStr}${abilityStr}`;
+        const agonizingStr = agonizingMod ? ` + ${agonizingMod} [Agonizing Blast]` : '';
+        const detail = `${baseFormula} [${rollsStr}]${critMult}${flatStr}${abilityStr}${agonizingStr}`;
         if (result.damageRollDetails) {
           result.damageRollDetails += `, ${detail}`;
         } else {

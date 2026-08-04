@@ -221,6 +221,9 @@ export class MockMCPServer {
     const targetCount = getInvocationCount(target.level);
     const currentCount = (target.invocations ?? []).length;
     const chosenSet = new Set(invocationIds);
+    if (chosenSet.size !== invocationIds.length) {
+      return { success: false, data: {}, message: 'Duplicate invocation selections are not allowed.' };
+    }
     // Reject duplicates and unknown ids.
     for (const id of invocationIds) {
       const def = INVOCATIONS_BY_ID[id];

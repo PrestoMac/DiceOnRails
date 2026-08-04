@@ -9,6 +9,7 @@ import { parseDiceFormula } from '../../utils/dice';
 import { applyCondition, removeCondition, getConditionEffects, getExhaustionPenalty } from '../conditionEngine';
 import { RESOURCE_HANDLERS } from '../resourceHandlers';
 import { getEffects } from '../effectDispatcher';
+import { getAtWillInvocationSpells } from '../../data/invocations';
 
 /** Dependencies required by the SpellcastingService. */
 export interface SpellcastingDeps {
@@ -815,6 +816,11 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
       } else if (action === 'forget') {
         const idx = char.knownSpells.indexOf(spell.id);
         if (idx === -1) return fail(`${spell.name} is not known by ${char.name}.`);
+        // At-will invocation spells are tied to their invocation and cannot be
+        // forgotten via the spellbook (remove the invocation instead).
+        if (getAtWillInvocationSpells(char.invocations).includes(spell.id)) {
+          return fail(`${spell.name} is granted by an Eldritch Invocation and cannot be forgotten.`);
+        }
         char.knownSpells.splice(idx, 1);
         return { success: true, data: {}, message: `${spell.name} removed.` };
       }
@@ -834,6 +840,10 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
       if (!oldSpell || !newSpell) return fail('Unknown spell.');
       const oldIdx = char.knownSpells.indexOf(oldSpell.id);
       if (oldIdx === -1) return fail(`${oldSpell.name} is not known by ${char.name}.`);
+      // At-will invocation spells cannot be swapped away (would orphan the invocation).
+      if (getAtWillInvocationSpells(char.invocations).includes(oldSpell.id)) {
+        return fail(`${oldSpell.name} is granted by an Eldritch Invocation and cannot be swapped.`);
+      }
       // Like-for-like: both cantrips or both leveled (checked before flag validation).
       const oldIsCantrip = oldSpell.level === 0;
       const newIsCantrip = newSpell.level === 0;
@@ -880,8 +890,15 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
     async use_resource(characterId, resourceId, targetId, amount) {
       const char = deps.getTarget(characterId);
       if (!char) return fail('Character not found.');
-      const ok = classEngineSpendResource(char, resourceId, amount ?? 1);
-      if (!ok) return fail(`Insufficient ${resourceId} remaining.`);
+
+      // Info-only resources: the handler returns capacity/hint info without
+      // spending the charge. The actual consumption happens through the
+      // dedicated modal/tool paths (arcane_recovery / natural_recovery).
+      const INFO_ONLY_RESOURCES = new Set(['arcane-recovery', 'natural-recovery']);
+      if (!INFO_ONLY_RESOURCES.has(resourceId)) {
+        const ok = classEngineSpendResource(char, resourceId, amount ?? 1);
+        if (!ok) return fail(`Insufficient ${resourceId} remaining.`);
+      }
 
       const handler = RESOURCE_HANDLERS[resourceId];
       if (handler) {

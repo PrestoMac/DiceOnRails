@@ -6,6 +6,7 @@ import {
 } from '../utils/feats';
 import { getMod } from '../utils/dice';
 import { calculateMaxHp, getProficiencyBonus as ceProficiencyBonus } from './classEngine';
+import { applyEffects, LevelUpContext } from './effectDispatcher';
 import { ASI_LEVELS } from '../constants';
 export { ASI_LEVELS };
 
@@ -300,6 +301,11 @@ export function applyFeatChoice(
       statAllocations: options?.asiBonuses
     }
   ];
+
+  // Dispatch onLevelUp effects granted by the feat (armor proficiency, skill
+  // proficiency, language, etc.) so they apply immediately at level-up time.
+  const levelUpCtx: LevelUpContext = { _hook: 'onLevelUp', character: updated, newLevel: level };
+  applyEffects(updated, 'onLevelUp', levelUpCtx);
 
   return { character: recalcHp(char, updated), errors: [] };
 }

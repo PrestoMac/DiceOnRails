@@ -38,7 +38,7 @@ export interface CombatService {
   resolveAllPendingEnemyTurns(): Promise<{ messages: string[]; combatEnded: boolean; victory?: boolean; attackResults: Record<string, unknown>[] }>;
   syncInitiativeConditions(): void;
   player_attack(attackerId: string, weaponName: string, targetId: string, isOffHand?: boolean, isSneakAttack?: boolean, sharpshooter?: boolean, greatWeaponMaster?: boolean, reckless?: boolean, divineSmite?: { slotLevel: number }): Promise<MCPResponse>;
-  resolveAdvantage(attacker?: Character | Enemy, target?: Character | Enemy, roll?: number): { roll: number; hasAdvantage: boolean; hasDisadvantage: boolean };
+  resolveAdvantage(attacker?: Character | Enemy, target?: Character | Enemy, roll?: number, forcedAdvantage?: boolean): { roll: number; hasAdvantage: boolean; hasDisadvantage: boolean };
   initializeDeathSaves(character: Character): void;
 }
 
@@ -805,6 +805,9 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
         if (ae.disadvantageOnAttacks) hasDisadvantage = true;
         const te = getConditionEffects(target);
         if (te.attacksAgainstHaveAdvantage) hasAdvantage = true;
+        if (te.attacksAgainstHaveDisadvantage) hasDisadvantage = true;
+        // Barbarian Reckless Attack: attacks against a reckless barbarian have advantage.
+        if ((target as Character).recklessAttacking) hasAdvantage = true;
       }
       const secondRoll = cryptoRoll(20);
       const resolved = resolveAdvantage(atkRoll, secondRoll, hasAdvantage, hasDisadvantage);
@@ -1215,7 +1218,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       const dieSides = parsed.sides;
       const flatMod = parsed.bonus;
 
-      const hasGWF = (getEffects(attacker, 'gwf-reroll').length > 0 || attacker.fightingStyle === 'great-weapon-fighting') && !isOffHand;
+      const hasGWF = (getEffects(attacker, 'gwf-reroll').length > 0 || attacker.fightingStyle === 'great-weapon-fighting' || attacker.fightingStyleTwo === 'great-weapon-fighting') && !isOffHand;
       const damageResults: number[] = [];
       for (let i = 0; i < diceCount; i++) {
         let v = cryptoRoll(dieSides);
@@ -1228,7 +1231,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       if (isUnarmed && !isMonk) {
         damageTotal += abilityMod;
       } else if (isOffHand) {
-        if (getEffects(attacker, 'offhand-modifier').length > 0 || attacker.fightingStyle === 'two-weapon-fighting') damageTotal += abilityMod;
+        if (getEffects(attacker, 'offhand-modifier').length > 0 || attacker.fightingStyle === 'two-weapon-fighting' || attacker.fightingStyleTwo === 'two-weapon-fighting') damageTotal += abilityMod;
       } else {
         damageTotal += abilityMod;
       }
@@ -1272,20 +1275,26 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
         }
       }
 
-      if (divineSmite && divineSmite.slotLevel && !isOffHand) {
-        const smiteLevel = Math.min(divineSmite.slotLevel, 5);
-        const smiteDice = 2 + smiteLevel;
-        const isFiendOrUndead = enemy.type === 'fiend' || enemy.type === 'undead';
-        const extraSmiteDie = isFiendOrUndead ? 1 : 0;
-        for (let i = 0; i < smiteDice + extraSmiteDie; i++) {
-          damageTotal += cryptoRoll(8);
-        }
-        damageTotal = Math.round(damageTotal);
-        // Consume the spell slot
-        const slotId = `spell-slot-${divineSmite.slotLevel}`;
+      if (divineSmite && divineSmite.slotLevel && !isRanged && !isOffHand) {
+        // Divine Smite: Paladin L2 feature — expend a spell slot for extra radiant damage.
+        // Gate on paladin class; require an available slot BEFORE rolling any smite dice
+        // (previously dice were added unconditionally, granting free smites with 0 slots).
+        // Base dice: 2d8 at L1, +1d8 per slot level above 1, capped at 5d8 total (per SRD).
+        // +1d8 vs fiend/undead is a separate bonus on top of the cap. Doubled on crit.
+        const hasDivineSmite = attacker.class === 'paladin' && attacker.level >= 2;
+        const smiteSlotLevel = Math.min(Math.max(Math.floor(divineSmite.slotLevel), 1), 9);
+        const slotId = `spell-slot-${smiteSlotLevel}`;
         const slot = (attacker.resources || []).find(r => r.id === slotId);
-        if (slot && slot.current > 0) {
+        if (hasDivineSmite && slot && slot.current > 0) {
           slot.current -= 1;
+          const baseSmiteDice = Math.min(1 + smiteSlotLevel, 6);
+          const isFiendOrUndead = enemy.type === 'fiend' || enemy.type === 'undead';
+          const extraSmiteDie = isFiendOrUndead ? 1 : 0;
+          const smiteDice = isCrit ? 2 * baseSmiteDice : baseSmiteDice;
+          for (let i = 0; i < smiteDice + extraSmiteDie; i++) {
+            damageTotal += cryptoRoll(8);
+          }
+          damageTotal = Math.round(damageTotal);
         }
       }
 

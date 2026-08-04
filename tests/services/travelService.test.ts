@@ -553,6 +553,7 @@ describe('travelService — natural_recovery', () => {
       name: 'Willow',
       class: 'druid',
       race: 'half-elf',
+      subclassId: 'circle-of-the-land',
       level: 4,
       hp: { current: 30, max: 30 },
       stats: { str: 8, dex: 14, con: 12, int: 12, wis: 16, cha: 10 },

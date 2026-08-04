@@ -5,7 +5,7 @@ import { SKILLS_LIST } from '../../constants';
 import { isDebugMode } from '../../utils/debug';
 import { getMod, getClassDef, recoverResources as classEngineRecoverResources } from '../classEngine';
 import { computeXp, awardXpToParty, formatXpAwardLine } from '../xpEngine';
-import { getConditionEffects, applyCondition, tickConditionsByTime, tickConditionsByRounds, hasCondition, getExhaustionPenalty, executeConditionOnRemove } from '../conditionEngine';
+import { getConditionEffects, applyCondition, tickConditionsByTime, tickConditionsByRounds, hasCondition, getExhaustionPenalty, parseExhaustionLevel, executeConditionOnRemove } from '../conditionEngine';
 import { getTimePeriod, AMBIENT_LINES } from '../../utils/timeUtils';
 import { applyEffects, getEffects, SkillCheckContext, RestContext } from '../effectDispatcher';
 import { SPELLS_BY_ID } from '../../utils/spells';
@@ -492,8 +492,10 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
           if (char.raging && !state.combat?.isActive && safeTimePassed > 0) {
             char.raging = false;
             if (getEffects(char, 'frenzy-exhaustion').length > 0) {
-              applyCondition(char, { id: 'exhaustion-1', source: 'frenzy', duration: -1, durationUnit: 'permanent' });
-              logs.push(`${char.name} gains exhaustion level 1 from Frenzy.`);
+              const currentLevel = parseExhaustionLevel(char);
+              const newLevel = Math.min(currentLevel + 1, 10);
+              applyCondition(char, { id: `exhaustion-${newLevel}`, source: 'frenzy', duration: -1, durationUnit: 'permanent' });
+              logs.push(`${char.name} gains exhaustion level ${newLevel} from Frenzy.`);
             }
           }
 
@@ -575,8 +577,10 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
         if (char.raging) {
           char.raging = false;
           if (getEffects(char, 'frenzy-exhaustion').length > 0) {
-            applyCondition(char, { id: 'exhaustion-1', source: 'frenzy', duration: -1, durationUnit: 'permanent' });
-            messages.push(`${char.name} gains exhaustion level 1 from Frenzy.`);
+            const currentLevel = parseExhaustionLevel(char);
+            const newLevel = Math.min(currentLevel + 1, 10);
+            applyCondition(char, { id: `exhaustion-${newLevel}`, source: 'frenzy', duration: -1, durationUnit: 'permanent' });
+            messages.push(`${char.name} gains exhaustion level ${newLevel} from Frenzy.`);
           }
         }
       }
@@ -682,6 +686,9 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
       if (arPool.current <= 0) return fail('Arcane Recovery already used today. Finish a long rest to regain it.');
 
       const maxLevels = Math.ceil(char.level / 2);
+      for (const sel of selections) {
+        if (sel.count < 0) return fail('Selection count cannot be negative.');
+      }
       const totalRequested = selections.reduce((sum, s) => sum + s.level * s.count, 0);
       if (totalRequested > maxLevels) return fail(`Cannot recover ${totalRequested} levels of spell slots. Maximum is ${maxLevels} (half your wizard level, rounded up).`);
 
@@ -708,6 +715,8 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
       const char = state.party.find(c => c.id === characterId);
       if (!char) return fail('Character not found.');
       if (char.class !== 'druid') return fail('Only Druids can use Natural Recovery.');
+      if (char.subclassId !== 'circle-of-the-land') return fail('Natural Recovery is a Circle of the Land feature.');
+      if (char.level < 2) return fail('Natural Recovery requires Druid level 2.');
 
       let nrPool = char.resources?.find(r => r.id === 'natural-recovery');
       if (!nrPool) {
@@ -718,6 +727,9 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
       if (nrPool.current <= 0) return fail('Natural Recovery already used. Finish a long rest to regain it.');
 
       const maxLevels = Math.ceil(char.level / 2);
+      for (const sel of selections) {
+        if (sel.count < 0) return fail('Selection count cannot be negative.');
+      }
       const totalRequested = selections.reduce((sum, s) => sum + s.level * s.count, 0);
       if (totalRequested > maxLevels) return fail(`Cannot recover ${totalRequested} levels of spell slots. Maximum is ${maxLevels} (half your druid level, rounded up).`);
 

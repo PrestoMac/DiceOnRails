@@ -36,3 +36,20 @@ export function getInvocationCount(level: number): number {
   if (level >= 5) return 3;
   return 2;
 }
+
+/** Returns the spell ids granted as at-will casts by the character's owned invocations.
+ *  These spells do not consume a spell slot when cast and do not count against the
+ *  spells-known cap. */
+export function getAtWillInvocationSpells(invocations: string[] | undefined): string[] {
+  if (!invocations || invocations.length === 0) return [];
+  const spells: string[] = [];
+  for (const id of invocations) {
+    const inv = INVOCATIONS_BY_ID[id];
+    if (inv?.effect === 'at-will-spell') {
+      for (const s of inv.grantsSpells ?? []) {
+        if (!spells.includes(s)) spells.push(s);
+      }
+    }
+  }
+  return spells;
+}

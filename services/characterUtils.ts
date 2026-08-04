@@ -1,4 +1,5 @@
 import { Character, CombatState } from '../types';
+import { getInvocationCount } from '../data/invocations';
 
 export function ensureDeathSaves(c: Character): void {
   if (!c.deathSaves) c.deathSaves = { successes: 0, failures: 0, isStable: false };
@@ -42,8 +43,25 @@ export function ensureCharacterFields(char: Character): void {
   char.fightingStyle ??= '';
   char.fightingStyleTwo ??= '';
   char.expertiseSkills ??= [];
+  // Migrate old saves: sync expertiseSkills from skill ranks >= 2.
+  if (char.skills) {
+    const expertiseSet = new Set(char.expertiseSkills);
+    for (const [skill, rank] of Object.entries(char.skills)) {
+      if (typeof rank === 'number' && rank >= 2) expertiseSet.add(skill);
+    }
+    char.expertiseSkills = Array.from(expertiseSet);
+  }
   char.invocations ??= [];
   char.pendingInvocations ??= 0;
+  // Self-heal: clamp pendingInvocations to the valid delta for warlocks so an
+  // inflated value from an older save (pre-fix delta math) can't hard-lock the
+  // LevelUpModal's exact-match requirement.
+  if (char.class === 'warlock' && char.level >= 2) {
+    const maxPending = Math.max(0, getInvocationCount(char.level) - (char.invocations ?? []).length);
+    if (char.pendingInvocations > maxPending) char.pendingInvocations = maxPending;
+  } else if (char.class !== 'warlock') {
+    char.pendingInvocations = 0;
+  }
   char.armorProfs ??= [];
   char.subraceId ??= '';
   char.notes ??= '';

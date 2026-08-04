@@ -65,6 +65,7 @@ const ReviewStep: React.FC<ReviewStepProps> = ({
             const tempChar: Character = {
               id: 'temp', name, race: selectedRace.id, class: selectedClass.id, level,
               stats: resolvedStats, inventory: [], racialTraits, feats: collectedFeats,
+              subraceId: selectedSubraceId || undefined,
               sorcerousOrigin: (selectedClass.id === 'sorcerer' && selectedSubclassId === 'draconic-bloodline') ? 'draconic-bloodline' : undefined,
               maxHpBonus: 0, hp: { current: 0, max: 0 },
               currency: { gp: 0, sp: 0, cp: 0 }, location: '',

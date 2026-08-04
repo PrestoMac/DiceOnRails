@@ -2098,6 +2098,7 @@ const roundTripped = deepClone(char.conditions);
     function makeDruid(overrides: Partial<Character> = {}): Character {
       return {
         id: 'druid-1', name: 'Willow', class: 'druid', race: 'half-elf', level: 4,
+        subclassId: 'circle-of-the-land',
         hp: { current: 30, max: 30 },
         stats: { str: 8, dex: 14, con: 12, int: 12, wis: 16, cha: 10 },
         inventory: [],
