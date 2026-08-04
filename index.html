@@ -6,9 +6,71 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DiceOnRails</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    /* Emberlight V2 design tokens (read by the Tailwind CDN at runtime). */
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            obsidian: {
+              950: '#0A0908', 900: '#12100E', 850: '#17140F', 800: '#1E1A15',
+              750: '#27211A', 700: '#332A20', 600: '#473B2C', 500: '#5E5040',
+            },
+            ember: {
+              100: '#FFEFD8', 200: '#FFDFB4', 300: '#FFD9A0', 400: '#F5B04C',
+              500: '#EE9B2E', 600: '#D9821F', 700: '#B26415', 800: '#85500F',
+              900: '#5C3A0E', 950: '#3A250C',
+            },
+            arcane: {
+              200: '#D8CCFC', 300: '#C4B5FD', 400: '#A08CF8', 500: '#8B7CF6',
+              600: '#7460E8', 700: '#5C47D4', 800: '#4533A6', 900: '#2F2275', 950: '#211754',
+            },
+            verdant: {
+              300: '#8ADCB2', 400: '#4FC08A', 500: '#3FA66A', 600: '#2E8A56',
+              700: '#236B44', 800: '#1A5234', 900: '#143C27', 950: '#0D2A1B',
+            },
+            blood: {
+              300: '#F08A8A', 400: '#E06060', 500: '#D64545', 600: '#B23333',
+              700: '#8F2929', 800: '#702121', 900: '#521B1B', 950: '#3A1212',
+            },
+            frost: { 300: '#B4D8EE', 400: '#8CC3E3', 500: '#5FA8D3', 600: '#3F87B3', 700: '#2F668A', 900: '#1B3B50' },
+            parchment: { DEFAULT: '#EDE6D6', dim: '#B9B0A0', mute: '#8A8172', faint: '#6B6355' },
+          },
+          fontFamily: {
+            display: ['Cinzel', 'serif'],
+            body: ['Inter', 'sans-serif'],
+            narration: ['"Crimson Pro"', 'serif'],
+          },
+          animation: {
+            'fade-in': 'v2fade .2s ease-out',
+            'slide-up': 'v2slideup .25s ease-out',
+            'zoom-in': 'v2zoom .18s ease-out',
+            'ember-glow': 'emberglow 2.4s ease-in-out infinite',
+            'ember-drift': 'emberdrift 9s linear infinite',
+            'spin-slow': 'spin 14s linear infinite',
+          },
+          keyframes: {
+            v2fade: { from: { opacity: '0' }, to: { opacity: '1' } },
+            v2slideup: { from: { opacity: '0', transform: 'translateY(12px)' }, to: { opacity: '1', transform: 'translateY(0)' } },
+            v2zoom: { from: { opacity: '0', transform: 'scale(.96)' }, to: { opacity: '1', transform: 'scale(1)' } },
+            emberglow: {
+              '0%,100%': { boxShadow: '0 0 22px rgba(238,155,46,0.38)' },
+              '50%': { boxShadow: '0 0 8px rgba(238,155,46,0.10)' },
+            },
+            emberdrift: {
+              '0%': { transform: 'translateY(0) translateX(0)', opacity: '0' },
+              '10%': { opacity: '0.9' },
+              '90%': { opacity: '0.5' },
+              '100%': { transform: 'translateY(-110vh) translateX(6vw)', opacity: '0' },
+            },
+          },
+        },
+      },
+    };
+  </script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;500;600&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;500;600&display=swap');
 
     body {
       margin: 0;
@@ -148,6 +210,34 @@
     .animate-dice-settle { animation: dice-settle 0.4s ease-out; }
     .animate-dice-glow-green { animation: dice-glow-green 0.6s ease-out; }
     .animate-dice-glow-red { animation: dice-glow-red 0.6s ease-out; }
+
+    /* ── Emberlight V2 textures ─────────────────────────────────────────── */
+    .bg-grain {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+      opacity: 0.04;
+      pointer-events: none;
+    }
+    .bg-ember-aura {
+      background:
+        radial-gradient(900px 500px at 50% -10%, rgba(238, 155, 46, 0.12), transparent 60%),
+        radial-gradient(700px 400px at 85% 110%, rgba(139, 124, 246, 0.07), transparent 60%),
+        radial-gradient(600px 400px at 10% 105%, rgba(217, 130, 31, 0.08), transparent 60%);
+    }
+    .bg-dotgrid {
+      background-image: radial-gradient(rgba(237, 230, 214, 0.06) 1px, transparent 1px);
+      background-size: 34px 34px;
+    }
+    .v2-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+    .v2-scrollbar::-webkit-scrollbar-thumb { background: #332A20; border-radius: 3px; }
+    .v2-scrollbar::-webkit-scrollbar-thumb:hover { background: #473B2C; }
+    .v2-noscroll { scrollbar-width: none; }
+    .v2-noscroll::-webkit-scrollbar { display: none; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .animate-fade-in, .animate-slide-up, .animate-zoom-in,
+      .animate-ember-glow, .animate-ember-drift, .animate-spin-slow,
+      .animate-dice-roll, .animate-dice-settle { animation: none !important; }
+    }
 
 
     .markdown-content>*:first-child {

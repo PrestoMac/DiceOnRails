@@ -16,7 +16,7 @@ DiceOnRails pairs a **large language model** (for narration, roleplay, and inten
 - **Voice narration** — In-browser text-to-speech reads the GM's prose aloud.
 - **Solo or multiplayer** — Play alone (anonymous/local) or invite friends to a shared cloud campaign with realtime sync.
 - **Interactive Virtual Tabletop (VTT)** — Live 5e tactical grid map featuring drag-and-drop tokens, Chebyshev distance calculations, and LLM spatial awareness.
-- **Cross-platform UI** — Responsive layouts for desktop and mobile, voice input, multiplayer pending-batch chat with typing indicators, dice popups, and a searchable / exportable chat log.
+- **Cross-platform UI** — The "Emberlight" interface (obsidian + ember-gold design system): one responsive shell for desktop and mobile, voice input, multiplayer pending-batch chat with typing indicators, dice popups, and a searchable / exportable chat log.
 - **Cloud saves & campaigns** — Powered by Supabase (Postgres + Realtime + Auth).
 - **Works with any OpenAI-compatible provider** — Default is OpenRouter; bring your own API key.
 
@@ -104,13 +104,16 @@ Create a campaign → choose **Quick Start** (a pre-made hero) or **Custom** cre
 
 ### The Adventure Screen
 
+The Emberlight UI is a single responsive shell: a collapsible, drag-resizable dock on desktop becomes a bottom-tab navigator on mobile.
+
 | Area | What it does |
 |---|---|
 | **Chat Log (center)** | The GM's narration, your actions, system logs. Filterable, searchable, and exportable. |
-| **Character Sheet (left)** | Your hero's HP, AC, stats, skills, inventory, spellbook, conditions, feats, and resources. Edit anything inline; click spells, items, and conditions for detail popups. Casters get a "Manage" button next to Spellcasting to prepare/unprepare spells (prepared casters) or swap a known spell on level-up (known casters, Tasha's rule) — locked during combat. |
+| **Hero panel (dock/tabs)** | Your hero's HP, AC, stats, skills, inventory, spellbook, conditions, feats, and resources. Edit anything inline; click spells, items, and conditions for detail popups. Casters get a "Manage" button next to Spellcasting to prepare/unprepare spells (prepared casters) or swap a known spell on level-up (known casters, Tasha's rule) — locked during combat. |
+| **Party panel** (multiplayer) | The roster: every hero's portrait, HP, AC, and live conditions. Click a hero to inspect their sheet; a "writing…" hint shows who is typing. |
 | **Journal tab** | Active quests + categorized lore (NPCs, Locations, History, Items) the GM has logged. |
 | **Compendium (📖)** | In-app reference browser: glossary, all conditions + exhaustion levels, rules tables, the full spell catalog, and SRD items. Read-only, pulls from the same data the engine uses. |
-| **Combat Tracker** | Slides in during fights — shows initiative order, current turn, HP bars, conditions. |
+| **Combat Banner** | Slides in during fights — shows initiative order, current turn, HP bars, conditions. |
 | **Atmosphere image** | Generated scene art behind the chat, tracking the LOCAL player's location. Click to expand fullscreen. In multiplayer, each player sees the atmosphere for their own character's location, so a traveling companion's move won't flip your background. |
 | **Pending-batch chat** (multiplayer) | Each player types into the chat to add a pending message; any player presses **"Take the Turn"** to flush the batch through one GM response. Only shown when 2+ party members are present. |
 | **Quick Actions** | One-tap buttons for your prepared spells, equipped weapons, class resources, skills, saves, and potions. |

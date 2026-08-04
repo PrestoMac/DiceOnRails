@@ -55,6 +55,11 @@ export function useOnboarding() {
     setTourActive(true);
   }, []);
 
+  /** Stops the active tour WITHOUT persisting the seen flag (it may auto-launch again next session). */
+  const stopTour = useCallback(() => {
+    setTourActive(false);
+  }, []);
+
   return {
     tourSeen,
     welcomeSeen,
@@ -65,6 +70,7 @@ export function useOnboarding() {
     shouldShowWelcomeChips: !welcomeSeen,
     launchTour,
     dismissTour,
+    stopTour,
     markWelcomeSeen,
     resetOnboarding,
   };

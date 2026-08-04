@@ -63,21 +63,31 @@ DiceOnRails/
 ├── index.html                # Vite HTML shell (Tailwind CDN, fonts, animations)
 ├── constants.ts              # Re-exports + SYSTEM_INSTRUCTION + INITIAL_CHARACTER
 ├── components/               # All React UI components
-│   ├── compendium/           # Compendium modal tabs (Glossary, Conditions, Rules, Spells, Items)
-│   ├── creation/             # Character creation wizard (12+ steps)
-│   ├── dice/                 # DiceEngine component
-│   ├── layouts/              # DesktopLayout, MobileLayout
-│   ├── levelup/              # Level-up modal panels
-│   ├── modals/               # Extracted detail modals (Spell, Item, Condition)
-│   ├── onboarding/           # OnboardingTour, WelcomeChips
-│   ├── shared/               # Reusable atoms (HpBar, BaseModal, Toggle, …)
-│   ├── sheet/                # CharacterSheet subpanels (SpellPanel)
-│   ├── ui/                   # Generic Tooltip primitive (portal + mobile long-press)
-│   ├── wizard/               # Generic StepWizard framework + shared ASI/skill UI
-│   └── *.tsx                 # Top-level screens & modals (incl. CompendiumModal, QuickStartFlow, StartModeScreen)
+│   ├── v2/                   # Emberlight V2 UI — the LIVE interface (see §12). App.tsx renders this tree.
+│   │   ├── primitives/       # Design-system atoms (Button, Modal, Sheet, Toast, Tabs, Chip, Card, …)
+│   │   ├── pregame/          # Landing, Auth, Setup, Hall (dashboard), Path, QuickStart screens
+│   │   ├── forge/            # Character-creation wizard (ForgeScreen + 11 steps)
+│   │   ├── chat/             # ChatColumn, Composer, bubbles, roll cards, suggestion/batch/typing strips
+│   │   ├── game/             # GameScreen shell, TopBar, CombatBanner, MapOverlay, DiceOverlay, TourOverlay
+│   │   │   ├── panels/       # Dock panels: CharacterPanel, JournalPanel, PartyPanel
+│   │   │   └── sheets/       # Big modals: Settings, Compendium, LevelUp, Spellbook, Recovery, Background, Details
+│   │   └── AppShellV2.tsx    # Stage router (replaces legacy AppContent)
+│   ├── compendium/           # [LEGACY — dead code] Compendium modal tabs
+│   ├── creation/             # [LEGACY — dead code] Character creation wizard (12+ steps)
+│   ├── dice/                 # DiceEngine component (shared — used by V2 DiceOverlay)
+│   ├── layouts/              # [LEGACY — dead code] DesktopLayout, MobileLayout
+│   ├── levelup/              # [LEGACY — dead code] Level-up modal panels
+│   ├── modals/               # [LEGACY — dead code] Extracted detail modals (Spell, Item, Condition)
+│   ├── onboarding/           # [LEGACY — dead code] OnboardingTour, WelcomeChips
+│   ├── shared/               # Reusable atoms (HpBar, BaseModal, Toggle, …) — mostly legacy; BattleMapPanel is LIVE (wrapped by V2 MapOverlay)
+│   ├── sheet/                # [LEGACY — dead code] CharacterSheet subpanels (SpellPanel)
+│   ├── ui/                   # [LEGACY — dead code] Generic Tooltip primitive
+│   ├── wizard/               # Generic StepWizard framework + shared ASI/skill UI (still imported by some live data flows)
+│   └── *.tsx                 # [LEGACY — dead code] Top-level screens & modals
 ├── contexts/                 # 6 React Context providers
 ├── data/                     # Static SRD catalogs + reference data (classes, races, spells, conditionInfo, glossary, referenceConstants, …)
 ├── hooks/                    # 10 custom hooks backing the contexts
+│   └── v2/                   # V2-only hooks: useGameViewModel (game-screen brain), useNativeDialogInterception
 ├── public/                   # Static assets (splash-bg.png)
 ├── scripts/                  # Node tooling (preflight, installer, benchmarks)
 ├── services/                 # All business logic
@@ -109,11 +119,11 @@ DiceOnRails/
 
 `index.html` → `/index.tsx` → `App.tsx` (default export).
 
-`App.tsx:45-69` — the root `App` component decides what to render:
+`App.tsx` — the root `App` component decides what to render:
 
-1. If `import.meta.env.VITE_SETUP_MODE === 'true'` → render `<SetupWizard />` (first-run installer that writes `.env`). The flag is injected by `vite.config.ts` based on whether `.env` contains `VITE_SUPABASE_URL`.
+1. If `import.meta.env.VITE_SETUP_MODE === 'true'` → render `<SetupScreen />` (V2 first-run installer that writes `.env`, wrapped in `ToastProviderV2`). The flag is injected by `vite.config.ts` based on whether `.env` contains `VITE_SUPABASE_URL`.
 2. `initAudio()` on mount (primes `speechSynthesis` voices).
-3. Show `<SplashScreen />` once per page load (purely decorative).
+3. Show `<LandingScreen />` (V2 splash) once per browser session (gated by a `sessionStorage` flag).
 4. Wrap the rest in the provider stack:
 
 ```
@@ -123,29 +133,29 @@ AuthProvider
     └─ ProgressionProvider
       └─ CampaignProvider
         └─ ActionsProvider
-          └─ <AppContent />
+          └─ <AppShellV2 />        ← V2 stage router (was <AppContent /> pre-redesign)
 ```
 
 The order matters: each provider consumes the contexts above it.
 
 ### Stage machine
 
-`AppStage` enum (`types/common.ts:10`) drives the entire UX:
+`AppStage` enum (`types/common.ts:10`) drives the entire UX. `AppShellV2` (`components/v2/AppShellV2.tsx`) is the router — it wraps everything in `ToastProviderV2`, installs `useNativeDialogInterception` (routes `window.alert` → V2 toast), and renders per stage:
 
-| Stage | Rendered by `AppContent.getContent()` | When |
+| Stage | Rendered by `AppShellV2.getContent()` | When |
 |---|---|---|
-| `AUTH` | `<AuthScreen />` | No user id and not anonymous |
-| `DASHBOARD` | `<CampaignDashboard />` | User signed in, not yet in a campaign |
-| `START_MODE` | `<StartModeScreen />` | New/joined campaign, choosing Quick Start vs. Custom |
-| `QUICK_START` | `<QuickStartFlow />` | Quick Start path — host: pick preset → starting grounds; joiner (`isNewCampaign={false}`): pick preset only (campaign starting ground is fixed by host) |
-| `CREATION` | `<WizardShell />` | Custom path — full character creation wizard |
-| `PLAY` | `<DesktopLayout />` or `<MobileLayout />` (wrapped in `<ErrorBoundary>`) | Active game |
+| `AUTH` | `<AuthScreen />` (V2) | No user id and not anonymous |
+| `DASHBOARD` | `<HallScreen />` (V2) | User signed in, not yet in a campaign |
+| `START_MODE` | `<PathScreen />` (V2) | New/joined campaign, choosing Quick Start vs. Custom |
+| `QUICK_START` | `<QuickStartScreen />` (V2) | Quick Start path — host: pick preset → starting grounds; joiner (`isNewCampaign={false}`): pick preset only (campaign starting ground is fixed by host) |
+| `CREATION` | `<ForgeScreen />` (V2) | Custom path — full character creation wizard |
+| `PLAY` | `<GameScreen />` (V2, wrapped in `<ErrorBoundary>`, keyed by `currentCampaignId`) | Active game |
 
-Layout choice (`isMobile`) comes from `UIContext` which listens to `window.innerWidth < 768`.
+The V2 `GameScreen` is a single responsive shell replacing the legacy `DesktopLayout`/`MobileLayout` pair (dock + bottom-nav patterns switch on the `md` breakpoint).
 
-Overlays rendered on top regardless of stage: `<SettingsModal>`, `<CampaignModal>`, `<DiceRollModal>`, `<QueueNotification>`, `<CompendiumModal>` (reference browser), `<OnboardingTour>` (PLAY stage only), plus `<Analytics />` and `<SpeedInsights />`.
+Overlays rendered on top regardless of stage: `<SettingsSheet>`, `<CreateCampaignModal>` (inline in AppShellV2), `<CompendiumSheet>`, `<DiceOverlay>`, `<TourOverlay>` (PLAY stage only; `onDismiss(dontShowAgain)` maps to `onboarding.dismissTour()` / `onboarding.stopTour()`), a sign-out `ConfirmDialog`, plus `<Analytics />` and `<SpeedInsights />`. A `dor:replay-tour` window event (dispatched by SettingsSheet) resets onboarding.
 
-A `useEffect` in `AppContent` does a one-time "warmup" POST to the LLM (a `ping` with `max_tokens: 1`) when entering the PLAY stage — this primes the provider's cache for faster first-turn response.
+A `useEffect` in `AppShellV2` does a one-time "warmup" POST to the LLM (a `ping` with `max_tokens: 1`) when entering the PLAY stage — this primes the provider's cache for faster first-turn response.
 
 ---
 
@@ -755,9 +765,37 @@ components/wizard/
 
 ## 12. Components & UI Layouts
 
-### Layouts
+> **Emberlight V2 redesign (branch `ui-update`).** The live UI is the `components/v2/` tree; `App.tsx` renders `<AppShellV2 />`. All pre-V2 components (`components/layouts/`, `components/creation/`, `components/*.tsx` top-level screens/modals, etc.) remain in the repo as **un-imported dead code** — their tests still run and pass. Reverting the redesign = reverting `App.tsx` + `index.html`. Only two pre-existing files were modified: `index.html` (design tokens, fonts, textures) and `App.tsx` (cutover). Everything else is additive.
 
-`DesktopLayout.tsx` and `MobileLayout.tsx` are the two Play-stage shells. Both:
+### V2 design system ("Emberlight")
+
+- **Palette** (Tailwind CDN inline `tailwind.config` in `index.html`): `obsidian` (warm near-black surfaces), `ember` (gold, primary), `arcane` (violet, AI/magic), `verdant`/`blood`/`frost` (semantics), `parchment` (text ladder). **No `stone-*`/`amber-*` classes, no emojis** — Font Awesome 6.4 icons only.
+- **Fonts**: Cinzel (`font-display`, headers/labels), Inter (`font-body`), Crimson Pro (`font-narration`, chat prose).
+- **Textures/keyframes** (index.html): `bg-grain`, `bg-ember-aura`, `bg-dotgrid`, `v2-scrollbar`, ember-drift particles, reduced-motion override.
+- **Z-ladder** (`components/v2/primitives/layers.ts`): `Z.base/content/dock/nav/menu/sheet/modal/toast/dice/tour` — never ad-hoc z-index utilities.
+- **Primitives** (`components/v2/primitives/`): `cx`, `Button`, `IconButton`, `Screen`, `Modal`, `Sheet`, `ConfirmDialog`, `Toast` (`ToastProviderV2` + `useToastV2`), `Chip`, `Card` (+`SectionHeader`), `Avatar`, `HpBar`, `Tooltip`, `Tabs`, `Field` (`TextField`/`TextArea`), `Toggle`, `ProgressRail`, `EmptyState`, `StatBadge`.
+- **Native-dialog replacement**: `window.alert` is intercepted → toast (`hooks/v2/useNativeDialogInterception`, installed in AppShellV2). `window.confirm` is NOT intercepted — V2 call sites use `<ConfirmDialog>` explicitly (logout, leave-game, clear-map, delete-campaign).
+
+### V2 structure
+
+- **`AppShellV2.tsx`** — stage router (see §3). Owns global overlays: `SettingsSheet`, `CompendiumSheet`, inline `CreateCampaignModal`, `DiceOverlay`, `TourOverlay`, sign-out `ConfirmDialog`.
+- **`pregame/`** — `LandingScreen` (session-gated splash), `AuthScreen`, `SetupScreen` (first-run installer), `HallScreen` (campaign dashboard: resume/rename/delete/create/join + sign-out), `CampaignCard`, `JoinCampaignModal`, `PathScreen` (Quick Start vs Custom), `QuickStartScreen`, `shared/StartingGroundsPicker`.
+- **`forge/`** — character creation wizard: `ForgeScreen` (shell + `ForgePreview` live character sheet), `forgeTypes`/`forgeUtils`/`forgeWidgets`, 11 steps (Identity, Origin, Path, Abilities, Skills, Feats, Spells, Gear, Story, Review, Grounds). Reuses the same data catalogs and `buildCharacterFromWizard` pipeline as legacy.
+- **`chat/`** — `ChatColumn` (message stream + search/filter + export + suggestion strip + batch bar), `MessageBubble`, `SystemLogGroup`, `RollCardV2`, `WelcomePanel`, `SuggestionStrip`, `BatchBar` ("Take the Turn"), `TypingStrip`, `EnemyTurnBar`, `QuickActionsSheet`, `Composer` (auto-growing input, speech-to-text, quick actions; owns `data-tour="chat-input"`).
+- **`game/`** — `GameScreen` (responsive shell), `TopBar` (chrome: back, location/time, activity bell, share, compendium/settings/logout, `leading` slot for dock toggle), `CombatBanner` (initiative, `data-tour="combat-tracker"`), `MapOverlay` (slide-over wrapping the legacy `BattleMapPanel` — the one legacy component still live), `DiceOverlay` (animated dice, uses shared `dice/DiceEngine`), `TourOverlay` (coachmarks over `data-tour` anchors), `panels/` (`CharacterPanel`, `JournalPanel`, `PartyPanel` — multiplayer roster replacing the legacy per-character tab bar), `sheets/` (`SettingsSheet`, `CompendiumSheet`, `LevelUpSheet`, `SpellbookSheet`, `RecoverySheet` arcane+natural, `BackgroundSheet`, `DetailModals`).
+- **`hooks/v2/useGameViewModel.ts`** — the deduplicated brain of `GameScreen`: centralizes every derivation/handler the legacy layouts copy-pasted (`myCharacter`, `charToShow`, `portraitMap`, per-character suggestions, presence/typing, battle-map handlers, `signOut` bypassing the legacy hook's native confirm, etc.). Pure consumer of the 6 contexts — no engine state.
+
+### V2 game shell (GameScreen)
+
+- **Desktop (`md+`)**: collapsible + drag-resizable dock (280–520px) with Hero/Journal/Party tabs (`data-tour="character-sheet"`/`"journal"`), main column = TopBar → CombatBanner → chat (atmosphere backdrop behind, `ChatColumn` → `TypingStrip` → `Composer`). Party tab only in multiplayer.
+- **Mobile**: same main column + bottom nav (Adventure/Hero/Journal/Party); adventure tab adds a slim HP strip above the Composer (HpStatusBar parity).
+- **Atmosphere**: dimmed full-bleed image behind the chat tracking the LOCAL player's location (same rule as legacy); fullscreen lightbox with location label + world description.
+- **Battle map**: `MapOverlay` right slide-over; open-inits a 20×15 auto-placed map when none exists; clear-map is ConfirmDialog-gated (view model's `clearMap`).
+- **Sheets owned by GameScreen**: `LevelUpSheet` (progression context), `RecoverySheet` (arcane/natural), `SpellbookSheet` (Composer quick action). `CharacterPanel` internally owns `BackgroundSheet` + its own `SpellbookSheet` + detail modals.
+
+### Legacy layouts (dead code — kept for reference)
+
+`DesktopLayout.tsx` and `MobileLayout.tsx` are the two pre-V2 Play-stage shells. Both:
 
 - Pull state from all 6 contexts.
 - Render `<ChatLog>`, `<InputArea>`, `<CharacterSheet>`, `<Journal>`, `<LevelUpModal>`, `<CombatTracker>`, `<ActivityBell>`, `<AtmosphereOverlay>`.
@@ -769,7 +807,7 @@ Differences:
 - **Desktop** — three-column resizable sidebar (Character/Journal tabs), top header with location/time/share/Activity Bell, combat tracker as a floating bar, "Take the Turn" button in the chat (multiplayer only), typing indicator strip above InputArea.
 - **Mobile** — bottom nav (`Adventure` / `Hero` / `Journal` / `Settings`), `<AtmosphereOverlay>` blended behind the chat (same dimmed full-bleed `z-0` pattern as desktop, content lifted to `z-10`) with a clickable location pill in the header to expand the scene fullscreen, typing indicator strip above InputArea, persistent HP/AC status bar.
 
-### Top-level screens & modals
+### Top-level screens & modals (legacy — dead code)
 
 | Component | Purpose |
 |---|---|
