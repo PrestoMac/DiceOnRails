@@ -334,6 +334,35 @@ export function recalculateResourcePools(character: Character): ResourcePool[] {
       }
     }
 
+    // Subclass spellcasting (e.g. Eldritch Knight, Arcane Trickster)
+    const subclassDef = character.subclassId ? getSubclassDef(character.class, character.subclassId) : undefined;
+    if (subclassDef?.spellcasting && subclassDef.spellcasting.spellSlots) {
+      const subSlots = subclassDef.spellcasting.spellSlots[Math.min(level - 1, subclassDef.spellcasting.spellSlots.length - 1)];
+      if (subSlots) {
+        for (let i = 0; i < subSlots.length; i++) {
+          if (subSlots[i] > 0) {
+            const slotId = `spell-slot-${i + 1}`;
+            const existing = resources.find(r => r.id === slotId);
+            if (existing) {
+              // Merge with existing class spell slots (shouldn't normally happen)
+              existing.current = Math.max(existing.current, subSlots[i]);
+              existing.max = Math.max(existing.max, subSlots[i]);
+            } else {
+              resources.push({
+                id: slotId,
+                name: `Level ${i + 1} Spell Slot`,
+                current: subSlots[i],
+                max: subSlots[i],
+                resetOn: 'long',
+                source: 'subclass',
+                sourceId: subclassDef.id
+              });
+            }
+          }
+        }
+      }
+    }
+
     // Warlock Pact Magic: a single pool of slots that all share the same level and
     // recharge on a short rest. findSpellSlot()/getMaxPactSlotLevel() key on
     // 'pactMagic', so creating this resource is what makes the warlock castable.
@@ -351,6 +380,38 @@ export function recalculateResourcePools(character: Character): ResourcePool[] {
           source: 'class',
           sourceId: 'warlock',
         });
+      }
+    }
+  }
+
+  // Subclass features with kind: 'resource' (e.g. Battle Master superiority-dice, Wild Magic tides-of-chaos)
+  const subclassDef = character.subclassId ? getSubclassDef(character.class, character.subclassId) : undefined;
+  if (subclassDef) {
+    for (const feat of subclassDef.features) {
+      if (feat.level <= level && feat.kind === 'resource' && feat.grantsResource) {
+        let max = 1;
+        let resetOn: 'short' | 'long' = 'long';
+
+        if (feat.grantsResource === 'superiority-dice') {
+          max = Math.min(4 + level, 8); // Battle Master: 4 at L3, scales to 8
+          resetOn = 'short';
+        } else if (feat.grantsResource === 'tides-of-chaos') {
+          max = 1;
+          resetOn = 'long';
+        }
+
+        // Don't duplicate if already added by class features
+        if (!resources.find(r => r.id === feat.grantsResource)) {
+          resources.push({
+            id: feat.grantsResource,
+            name: feat.name,
+            current: max,
+            max: max,
+            resetOn,
+            source: 'subclass',
+            sourceId: subclassDef.id
+          });
+        }
       }
     }
   }

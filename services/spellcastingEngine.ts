@@ -1,5 +1,5 @@
 import { Character, ResourcePool, SaveStat } from '../types';
-import { getClassDef, getMod, getProficiencyBonus, getSpellSaveDc, getSpellAttackBonus } from './classEngine';
+import { getClassDef, getSubclassDef, getMod, getProficiencyBonus, getSpellSaveDc, getSpellAttackBonus } from './classEngine';
 import { rollDice } from './diceEngine';
 import { parseDiceFormula } from '../utils/dice';
 import { cryptoRoll } from '../utils/random';
@@ -70,7 +70,15 @@ export function consumeSpellSlot(character: Character, level: 1|2|3|4|5|6|7|8|9)
 /** Returns the number of cantrips a character of the given class and level can know. */
 export function getCantripsKnown(character: Character, level: number): number {
   const classDef = getClassDef(character.class);
-  if (!classDef?.spellcasting) return 0;
+  if (!classDef?.spellcasting) {
+    // Check subclass spellcasting (Eldritch Knight, Arcane Trickster)
+    const subclassDef = character.subclassId ? getSubclassDef(character.class, character.subclassId) : undefined;
+    if (subclassDef?.spellcasting?.cantripsKnown) {
+      const arr = subclassDef.spellcasting.cantripsKnown;
+      return arr[Math.min(level - 1, arr.length - 1)] || 0;
+    }
+    return 0;
+  }
   const arr = classDef.spellcasting.cantripsKnown;
   return arr[Math.min(level - 1, arr.length - 1)] || 0;
 }
@@ -78,7 +86,15 @@ export function getCantripsKnown(character: Character, level: number): number {
 /** Returns the number of spells a known-style caster can know at the given level. */
 export function getSpellsKnown(character: Character, level: number): number {
   const classDef = getClassDef(character.class);
-  if (!classDef?.spellcasting || !classDef.spellcasting.spellsKnown) return 0;
+  if (!classDef?.spellcasting || !classDef.spellcasting.spellsKnown) {
+    // Check subclass spellcasting (Eldritch Knight, Arcane Trickster)
+    const subclassDef = character.subclassId ? getSubclassDef(character.class, character.subclassId) : undefined;
+    if (subclassDef?.spellcasting?.spellsKnown) {
+      const arr = subclassDef.spellcasting.spellsKnown;
+      return arr[Math.min(level - 1, arr.length - 1)] || 0;
+    }
+    return 0;
+  }
   const arr = classDef.spellcasting.spellsKnown;
   return arr[Math.min(level - 1, arr.length - 1)] || 0;
 }
@@ -86,14 +102,35 @@ export function getSpellsKnown(character: Character, level: number): number {
 /** Returns the maximum number of spells a prepared-style caster can prepare at the given level. */
 export function getMaxPrepared(character: Character, level: number): number {
   const classDef = getClassDef(character.class);
-  if (!classDef?.spellcasting || classDef.spellcasting.prepMode !== 'prepared') return 0;
+  if (!classDef?.spellcasting || classDef.spellcasting.prepMode !== 'prepared') {
+    // Check subclass spellcasting (Eldritch Knight uses prepared mode)
+    const subclassDef = character.subclassId ? getSubclassDef(character.class, character.subclassId) : undefined;
+    if (subclassDef?.spellcasting && subclassDef.spellcasting.prepMode === 'known') {
+      // Subclass casters use known mode
+      return getSpellsKnown(character, level);
+    }
+    return 0;
+  }
   return Math.max(1, level + getAbilityMod(character, classDef.spellcasting.ability));
 }
 
 /** Returns the highest spell slot level a character can cast based on their class and level. */
 export function getMaxCastableSlotLevel(character: Character): number {
   const classDef = getClassDef(character.class);
-  if (!classDef?.spellcasting) return 0;
+  if (!classDef?.spellcasting) {
+    // Check subclass spellcasting (Eldritch Knight, Arcane Trickster)
+    const subclassDef = character.subclassId ? getSubclassDef(character.class, character.subclassId) : undefined;
+    if (subclassDef?.spellcasting && subclassDef.spellcasting.spellSlots) {
+      const level = character.level;
+      const slotsRow = subclassDef.spellcasting.spellSlots[Math.min(level - 1, subclassDef.spellcasting.spellSlots.length - 1)];
+      if (slotsRow) {
+        for (let i = slotsRow.length - 1; i >= 0; i--) {
+          if (slotsRow[i] > 0) return i + 1;
+        }
+      }
+    }
+    return 0;
+  }
   const level = character.level;
   if (character.class === 'warlock') {
     return getMaxPactSlotLevel(character);
@@ -117,7 +154,13 @@ export function canLearnSpell(character: Character, spellId: string): { ok: bool
   const spell = SPELLS_BY_ID[spellId.toLowerCase()];
   if (!spell) return { ok: false, reason: 'Unknown spell.' };
   const classDef = getClassDef(character.class);
-  if (!classDef?.spellcasting) return { ok: false, reason: `${classDef?.name || 'This class'} cannot cast spells.` };
+
+  // Check for subclass spellcasting (Eldritch Knight, Arcane Trickster)
+  const subclassDef = character.subclassId ? getSubclassDef(character.class, character.subclassId) : undefined;
+  const hasSubclassSpellcasting = subclassDef?.spellcasting && subclassDef.spellcasting.spellSlots;
+  const effectiveSpellcasting = classDef?.spellcasting || (hasSubclassSpellcasting ? subclassDef.spellcasting : undefined);
+
+  if (!effectiveSpellcasting) return { ok: false, reason: `${classDef?.name || 'This class'} cannot cast spells.` };
   if (!spell.classes.includes(character.class)) {
     return { ok: false, reason: `${classDef.name} cannot learn ${spell.name}.` };
   }
@@ -133,7 +176,7 @@ export function canLearnSpell(character: Character, spellId: string): { ok: bool
   if (spell.level > maxSlot) {
     return { ok: false, reason: `${spell.name} is a level ${spell.level} spell, but you can only cast up to level ${maxSlot} spells.` };
   }
-  if (classDef.spellcasting.prepMode === 'known') {
+  if (effectiveSpellcasting.prepMode === 'known') {
     const cap = getSpellsKnown(character, character.level);
     // At-will invocation spells (mage armor, false life, …) are additions to the
     // known list and must NOT count against the spells-known cap.
@@ -165,7 +208,15 @@ export function learnSpell(character: Character, spellId: string): boolean {
 /** Prepares a spell for a prepared-style caster, respecting the preparation cap, and returns success with optional reason. */
 export function prepareSpell(character: Character, spellId: string): { ok: boolean; reason?: string } {
   const classDef = getClassDef(character.class);
-  if (!classDef?.spellcasting || classDef.spellcasting.prepMode !== 'prepared') {
+  const subclassDef = character.subclassId ? getSubclassDef(character.class, character.subclassId) : undefined;
+  const effectiveSpellcasting = classDef?.spellcasting || (subclassDef?.spellcasting);
+
+  if (!effectiveSpellcasting || effectiveSpellcasting.prepMode !== 'prepared') {
+    // Subclass casters use known mode
+    if (subclassDef?.spellcasting && subclassDef.spellcasting.prepMode === 'known') {
+      // Known casters don't prepare spells
+      return { ok: false, reason: `${classDef?.name || 'This class'} does not prepare spells.` };
+    }
     return { ok: false, reason: `${classDef?.name || 'This class'} does not prepare spells.` };
   }
   const spell = SPELLS_BY_ID[spellId.toLowerCase()];
