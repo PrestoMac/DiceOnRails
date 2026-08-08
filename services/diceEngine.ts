@@ -16,11 +16,18 @@ export function rollDice(count: number, sides: number): number {
   return total;
 }
 
-/** Rolls dice with advantage if the flag is set, returning the higher of two separate rolls. */
+/**
+ * Rolls a set of dice twice and returns the higher total when advantage is set,
+ * or a single roll when it is not.
+ *
+ * Note: this only implements the "keep high" (advantage) case. For true
+ * disadvantage, or for cancelling advantage and disadvantage against each
+ * other, use `resolveAdvantage` in `utils/combatUtils` instead.
+ */
 export function rollDiceWithAdvantage(
   count: number,
   sides: number,
-  advantage: boolean
+  advantage: boolean = false
 ): number {
   const first = rollDice(count, sides);
   if (!advantage) return first;
