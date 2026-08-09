@@ -105,11 +105,19 @@ const Composer: React.FC<ComposerProps> = ({
     // Mount-only subscription: latest callbacks are read via refs above.
   }, []);
 
-  /* Auto-grow the textarea up to ~7 lines. */
+  /* Auto-grow the textarea up to ~7 lines — but only for real input.
+   * Empty textarea stays at its native single-row height so a long placeholder
+   * can't inflate the composer on small screens. */
   useEffect(() => {
     const ta = textareaRef.current;
     if (!ta) return;
     ta.style.height = 'auto';
+    if (!input.trim()) {
+      const row = ta.clientHeight || 0;
+      ta.style.height = `${row}px`;
+      ta.style.overflowY = 'hidden';
+      return;
+    }
     const next = Math.min(ta.scrollHeight, MAX_TEXTAREA_PX);
     ta.style.height = `${next}px`;
     ta.style.overflowY = ta.scrollHeight > MAX_TEXTAREA_PX ? 'auto' : 'hidden';
@@ -159,7 +167,7 @@ const Composer: React.FC<ComposerProps> = ({
     ? 'The enemy is acting...'
     : isLoading
       ? 'The GM is narrating...'
-      : placeholder ?? 'What do you do, adventurer? (Enter to send — Shift+Enter for a new line)';
+      : placeholder ?? 'What do you do, adventurer?';
 
   const mic = useMemo(
     () => (
@@ -211,9 +219,10 @@ const Composer: React.FC<ComposerProps> = ({
               onChange={handleChange}
               onKeyDown={handleKeyDown}
               placeholder={resolvedPlaceholder}
+              title="Enter to send — Shift+Enter for a new line"
               disabled={effectivelyLocked}
               className={cx(
-                'w-full bg-obsidian-900 border rounded-xl px-4 py-3 font-narration text-lg text-parchment placeholder:text-parchment-faint focus:outline-none transition-colors resize-none v2-scrollbar disabled:opacity-60',
+                'w-full bg-obsidian-900 border rounded-xl px-4 py-2 md:py-3 font-narration text-base md:text-lg text-parchment placeholder:text-parchment-faint focus:outline-none transition-colors resize-none v2-scrollbar disabled:opacity-60',
                 isEnemyTurn
                   ? 'border-blood-700/50 focus:border-blood-500'
                   : 'border-white/10 focus:border-ember-500/60',

@@ -69,9 +69,9 @@ const TopBar: React.FC<TopBarProps> = ({
 
       <div className="flex items-center gap-2 min-w-0 flex-1">
         {locationLabel && (
-          <span className="inline-flex items-center gap-1.5 max-w-[40%] sm:max-w-[260px] px-2.5 py-1 rounded-full bg-obsidian-800/80 border border-white/[0.08]">
+          <span className="inline-flex items-center gap-1.5 min-w-0 max-w-full sm:max-w-[260px] px-2.5 py-1 rounded-full bg-obsidian-800/80 border border-white/[0.08]">
             <i className="fas fa-location-dot text-ember-400 text-[10px] shrink-0" aria-hidden="true" />
-            <span className="font-display text-[10px] font-semibold uppercase tracking-[0.16em] text-parchment truncate">
+            <span className="min-w-0 font-display text-[10px] font-semibold uppercase tracking-[0.16em] text-parchment truncate">
               {locationLabel}
             </span>
           </span>
@@ -126,7 +126,7 @@ const TopBar: React.FC<TopBarProps> = ({
         <IconButton icon="fa-book-open" tip="Compendium" onClick={onOpenCompendium} />
         <IconButton icon="fa-gear" tip="Settings" onClick={onOpenSettings} />
         {showLogout && <IconButton icon="fa-right-from-bracket" tip="Log out" variant="danger" onClick={onLogout} />}
-        <span className="w-2 h-2 ml-1 rounded-full bg-verdant-500 animate-pulse" title="Synced" aria-label="Synced" />
+        <span className="hidden sm:block w-2 h-2 ml-1 rounded-full bg-verdant-500 animate-pulse" title="Synced" aria-label="Synced" />
       </div>
     </header>
   );
