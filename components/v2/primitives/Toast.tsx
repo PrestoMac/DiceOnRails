@@ -23,9 +23,6 @@ export function useToastV2(): ToastContextValue {
   return ctx;
 }
 
-/** Context revealed for the native-dialog interception hook (mounted by AppShellV2). */
-export const ToastContextForInterception = ToastContext;
-
 const KIND_STYLE: Record<ToastKind, { ring: string; icon: string; iconColor: string }> = {
   info: { ring: 'border-frost-500/40', icon: 'fa-circle-info', iconColor: 'text-frost-400' },
   success: { ring: 'border-verdant-500/40', icon: 'fa-circle-check', iconColor: 'text-verdant-400' },

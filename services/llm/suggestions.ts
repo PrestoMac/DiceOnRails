@@ -232,58 +232,6 @@ function parseSuggestionArray(content: string): string[] {
     return normalizeSuggestions(parsed);
 }
 
-/**
- * Minimal-prompt LLM call that requests 2-3 next-action suggestions as a JSON
- * array. Mirrors generateNarrationSimple (temperature 0.9, content-only — no
- * reasoning_content fallback). Returns [] on any failure or non-array response;
- * never throws. Per-item sanitized + clamped to 80 chars.
- */
-export const generateSuggestions = async (
-    history: Message[],
-    context: string,
-    frozenMessages?: { role: 'user' | 'system'; content: string }[],
-    providerConfig?: { provider: LLMProvider; apiKey: string; apiBase?: string },
-    sessionId?: string,
-): Promise<string[]> => {
-    const { apiKey: finalApiKey, model, apiUrl, apiHeaders } = resolveLLMConfig(providerConfig, sessionId);
-    if (!finalApiKey) {
-        if (isDebugMode) console.error('[Suggestions] generateSuggestions: No API key');
-        return [];
-    }
-    const messages = mapHistoryToMessages(history);
-    const systemMessage = {
-        role: 'system' as const,
-        content:
-            'You suggest the next 2-3 actions a player could take in a fantasy RPG, given the latest narration and game state. Respond with ONLY a JSON array of 2-3 short strings, each in the FIRST PERSON from the player perspective, max 60 characters, no numbering, no markdown, no extra commentary. Respond in English. Example: ["Ask the tavernkeeper about rumors","Inspect the odd statue"]',
-    };
-    const contextMessage = { role: 'user' as const, content: `[Dungeon State Context: ${context}]` };
-    const payloadBase: Record<string, unknown> = {
-        model,
-        messages: [systemMessage, ...(frozenMessages || []), ...messages, contextMessage],
-        temperature: 0.9,
-    };
-    if (sessionId) payloadBase.session_id = sessionId;
-    if (isDebugMode) console.log('[Suggestions] generateSuggestions request', { model, messageCount: (payloadBase.messages as unknown[]).length });
-    const fetchController = new AbortController();
-    const fetchTimer = setTimeout(() => fetchController.abort(new Error('generateSuggestions timed out after 30s')), 30_000);
-    try {
-        const response = await fetch(apiUrl, { method: 'POST', headers: apiHeaders, body: JSON.stringify(payloadBase), signal: fetchController.signal });
-        if (!response.ok) {
-            const errMsg = `LLM request failed: ${response.status}`;
-            throw new Error(errMsg);
-        }
-        const data = parseLlmResponse(await response.json());
-        const msg = data.choices[0].message;
-        const c = (typeof msg.content === 'string' && msg.content.trim()) ? msg.content : '';
-        return parseSuggestionArray(c);
-    } catch (error) {
-        if (isDebugMode) console.error('[Suggestions] generateSuggestions failed:', error instanceof Error ? error.message : String(error));
-        return [];
-    } finally {
-        clearTimeout(fetchTimer);
-    }
-};
-
 /** Budget for the opt-in extra suggestions LLM call before falling through to the deterministic/generic tiers. */
 const SUGGESTION_LLM_TIMEOUT_MS = 20_000;
 /** Races a promise against a timeout; resolves to undefined if the budget is exceeded (mirrors withNarrationRetryTimeout). */
@@ -293,57 +241,13 @@ function withSuggestionsTimeout<T>(p: Promise<T>): Promise<T | undefined> {
     return Promise.race([p.then(v => v, () => undefined), timeout]).finally(() => { if (timer) clearTimeout(timer); });
 }
 
-/**
- * Resolves the final suggestion set for a turn via a 4-tier fallback chain so the
- * tray is never blank when the feature is enabled:
- *   Tier 0 — inline suggestions captured by the agent loop (preferred).
- *   Tier 1 — opt-in extra LLM call (only when enableSuggestions is on). Placed
- *            above the deterministic tier for higher-fidelity chips; cost is
- *            gated entirely by the setting.
- *   Tier 2 — deterministic generator (combat -> buildCombatSuggestions, else
- *            buildExplorationSuggestions). Zero LLM cost.
- *   Tier 3 — generic always-show fallback.
- * When enableSuggestions is false this is byte-identical to the previous
- * `result.suggestions || []` (Tier 0 only; no call, no fallback tiers).
- */
-export async function resolveSuggestions(
-    state: GameState,
-    history: Message[],
-    context: string,
-    frozen: { role: 'user' | 'system'; content: string }[] | undefined,
-    turnSuggestions: string[] | undefined,
-    enableSuggestions: boolean,
-    sessionId: string | undefined,
-): Promise<string[]> {
-    // Tier 0: agent-loop inline suggestions (always available, zero cost).
-    const t0 = normalizeSuggestions(turnSuggestions);
-    // Feature off -> behave like the old `result.suggestions || []`: Tier 0 only.
-    if (!enableSuggestions) return t0;
-    if (t0.length > 0) return t0;
-
-    // Tier 1: opt-in extra LLM call (higher fidelity, gated by the setting).
-    const llm = await withSuggestionsTimeout(generateSuggestions(history, context, frozen, undefined, sessionId));
-    const t1 = normalizeSuggestions(llm);
-    if (t1.length > 0) return t1;
-
-    // Tier 2: deterministic generator (combat vs exploration).
-    const det = state.combat?.isActive ? buildCombatSuggestions(state) : buildExplorationSuggestions(state);
-    const t2 = normalizeSuggestions(det);
-    if (t2.length > 0) return t2;
-
-    // Tier 3: generic always-show fallback.
-    return [...GENERIC_SUGGESTIONS];
-}
-
 // ============================================================================
 // Per-character suggestions (multiplayer + migrated solo)
 // ============================================================================
 // These functions replace the legacy single-suggestion-list model with a
 // `Record<characterId, string[]>`. Each party member gets class-aware chips
 // scoped to their own state. Solo play stores a single entry under the lone
-// character's id, so there is one unified code path. The legacy
-// `resolveSuggestions` / `lastSuggestions` field are kept for back-compat with
-// old callers and old saves.
+// character's id, so there is one unified code path.
 // ============================================================================
 
 /**

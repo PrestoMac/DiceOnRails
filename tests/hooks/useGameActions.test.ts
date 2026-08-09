@@ -42,11 +42,9 @@ vi.mock('../../services/mcpService', () => ({
 }));
 
 const mockGenerateNarration = vi.fn();
-const mockGenerateNarrationStream = vi.fn();
 const mockRunAgentLoop = vi.fn();
 vi.mock('../../services/llm', () => ({
   generateNarration: (...args: unknown[]) => mockGenerateNarration(...args),
-  generateNarrationStream: (...args: unknown[]) => mockGenerateNarrationStream(...args),
   runAgentLoop: (...args: unknown[]) => mockRunAgentLoop(...args),
   estimateTokens: vi.fn(() => 10),
   compressRawToCheckpoint: vi.fn().mockResolvedValue(''),
@@ -147,10 +145,6 @@ describe('useGameActions', () => {
     mcpServerMock.getCharacterProgression.mockReturnValue('Level 1');
     mcpServerMock.getResource.mockReturnValue({ location: 'Tavern', description: 'A dark tavern' });
     mockGenerateNarration.mockResolvedValue({ text: 'The adventure continues...' });
-    mockGenerateNarrationStream.mockReturnValue({
-      promise: Promise.resolve('The adventure continues...'),
-      cancel: vi.fn()
-    });
     mockRunAgentLoop.mockResolvedValue({ toolMessages: [], iterationCount: 0, promptTokens: 0, completionTokens: 0, cachedTokens: 0 });
   });
 
@@ -272,10 +266,6 @@ describe('useGameActions', () => {
 
   it('handleSendMessage creates user message and calls generateNarration', async () => {
     mockGenerateNarration.mockResolvedValue({ text: 'The hero attacks!' });
-    mockGenerateNarrationStream.mockReturnValue({
-      promise: Promise.resolve('The hero attacks!'),
-      cancel: vi.fn()
-    });
 
     const { result } = render();
     const msgPromise = act(async () => {

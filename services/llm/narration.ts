@@ -1,10 +1,8 @@
 import { Message, LLMProvider, MCPResponse, RollData } from '../../types';
 import { SYSTEM_INSTRUCTION, PROGRESSION_SYSTEM_PROMPT } from '../../constants';
-import { getThinkingDisabledBody } from '../../utils/envHelper';
 import { isDebugMode } from '../../utils/debug';
 import { safeParseJson, parseLlmResponse } from '../../utils/safeJson';
 import { sanitizeNarration } from '../../utils/textSanitize';
-import { streamChatCompletion } from '../streamingClient';
 import { resolveLLMConfig, mapHistoryToMessages } from './llmApiClient';
 
 function skillRollData(d: Record<string, unknown>, dc: number, label?: string, extra?: Partial<RollData>): RollData {
@@ -278,67 +276,4 @@ export function buildDeterministicNarration(toolMessages: Message[]): string {
         }
     }
     return "";
-}
-
-/** Callbacks for streaming narration events. */
-export interface NarrationStreamCallbacks {
-  onDelta: (chunk: string, fullSoFar: string) => void;
-  onDone: (fullText: string, usage: { prompt: number; completion: number; cached: number }) => void;
-  onError: (err: Error) => void;
-}
-
-/** Result of starting a streaming narration, including a promise and a cancel function. */
-export interface NarrationStreamResult {
-  promise: Promise<string>;
-  cancel: () => void;
-}
-
-/**
- * Creates a streaming narration that delivers delta chunks via callbacks and returns a cancel handle.
- * @param history - The conversation history messages.
- * @param context - A string describing the current game state context.
- * @param frozenMessages - Optional frozen/pinned messages to include.
- * @param callbacks - Callback object for delta, done, and error events.
- * @param providerConfig - Optional LLM provider configuration override.
- * @returns A NarrationStreamResult with a promise and cancel function.
- */
-export function generateNarrationStream(history: Message[], context: string, frozenMessages: { role: 'user' | 'system'; content: string }[] | undefined, callbacks: NarrationStreamCallbacks, providerConfig?: { provider: LLMProvider; apiKey: string; apiBase?: string }): NarrationStreamResult {
-    const { apiKey: finalApiKey, model, apiUrl, apiHeaders } = resolveLLMConfig(providerConfig);
-    if (isDebugMode) console.log('[NarrationStream] generateNarrationStream starting', { model, apiUrl, historyLen: history.length, contextLen: context.length, hasApiKey: !!finalApiKey });
-    const narrationInstruction = `Respond in ENGLISH only. Focus solely on narrating the story based on the provided context and actions. Do NOT include [System:tool_name] patterns in your narration — they are not real commands.`;
-    const systemMessage = { role: "system" as const, content: `${SYSTEM_INSTRUCTION}\n\n${PROGRESSION_SYSTEM_PROMPT}\n\n=== NARRATION MODE ===\n${narrationInstruction}` };
-    const contextMessage = { role: "user" as const, content: `[Dungeon State Context: ${context}]` };
-    const messages = [systemMessage, ...(frozenMessages || []), ...mapHistoryToMessages(history), contextMessage];
-    const body: Record<string, unknown> = { model, messages, temperature: 0.7, stream: true, stream_options: { include_usage: true }, ...(getThinkingDisabledBody() || {}) };
-    if (isDebugMode) console.log('[NarrationStream] Request body', { model, messageCount: messages.length, hasStream: body.stream, hasUsage: !!body.stream_options });
-    const controller = new AbortController();
-    let fullText = '';
-    let usage = { prompt: 0, completion: 0, cached: 0 };
-    let chunkCount = 0;
-    const streamStart = Date.now();
-    const promise = (async () => {
-        try {
-            for await (const chunk of streamChatCompletion(apiUrl, body, apiHeaders, { signal: controller.signal })) {
-                chunkCount++;
-                if (chunk.type === 'content') { fullText += chunk.delta; try { callbacks.onDelta(chunk.delta, fullText); } catch { /* callback may throw */ } }
-                else if (chunk.type === 'usage') { usage = { prompt: chunk.prompt, completion: chunk.completion, cached: chunk.cached }; if (isDebugMode) console.log('[NarrationStream] Usage update', usage); }
-                else if (chunk.type === 'error') { if (isDebugMode) console.error('[NarrationStream] Error in stream', chunk.error); callbacks.onError(chunk.error); throw chunk.error; }
-            }
-            if (isDebugMode) console.log(`[NarrationStream] Stream complete in ${Date.now() - streamStart}ms, ${chunkCount} chunks, ${fullText.length} chars`, usage);
-            fullText = sanitizeNarration(fullText);
-            if (!fullText) { fullText = "The adventure continues..."; }
-            callbacks.onDone(fullText, usage);
-            return fullText;
-        } catch (e) {
-            if (controller.signal.aborted) {
-                if (isDebugMode) console.log(`[NarrationStream] Aborted after ${Date.now() - streamStart}ms, ${chunkCount} chunks, ${fullText.length} chars`);
-                return sanitizeNarration(fullText);
-            }
-            const err = e instanceof Error ? e : new Error(String(e));
-            if (isDebugMode) console.error('[NarrationStream] Failed', { elapsed: Date.now() - streamStart, error: err });
-            callbacks.onError(err);
-            return sanitizeNarration(fullText) || "The Narrator is silenced by an unknown force.";
-        }
-    })();
-    return { promise, cancel: () => { if (isDebugMode) console.log('[NarrationStream] Cancelled by caller'); controller.abort(); } };
 }

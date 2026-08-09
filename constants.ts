@@ -1,4 +1,3 @@
-import { Character } from './types';
 /** Skill definitions, XP progression thresholds, per-level stat-point allocation, max stat value, ASI milestone levels, and a fallback starting location. */
 export { SKILLS_LIST, XP_TABLE, STAT_POINTS_PER_LEVEL, MAX_STAT_VALUE, ASI_LEVELS, FALLBACK_STARTING_LOCATION } from './data/constants';
 /** Describes a single skill with its name, key ability, and optional description. */
@@ -63,42 +62,3 @@ LEVELING: Leveling is fast and frequent. When a character levels up, the level_u
 
 LONG REST (SRD 5e): call long_rest when the player rests/sleeps/camps. It restores all HP, recovers half total Hit Dice (min 1), and requires ≥1 HP. The engine enforces the 24h cooldown mechanically. Time advances automatically when narration is provided.
 ` as const;
-
-function deepFreeze<T>(obj: T): T {
-  if (obj && typeof obj === 'object') {
-    Object.freeze(obj);
-    for (const value of Object.values(obj)) deepFreeze(value);
-  }
-  return obj;
-}
-
-/** A frozen default Character instance used as the starting hero (Valerius, a level-1 human paladin) for quick-start games. */
-export const INITIAL_CHARACTER: Character = deepFreeze({
-  id: 'player-1',
-  name: 'Valerius',
-  class: 'paladin',
-  race: 'human',
-  level: 1,
-  hp: { current: 12, max: 12 },
-  stats: { str: 16, dex: 10, con: 14, int: 8, wis: 12, cha: 14 },
-  inventory: [
-    { name: 'Longsword', quantity: 1 },
-    { name: 'Shield', quantity: 1 },
-    { name: 'Chain Mail', quantity: 1 },
-    { name: 'Healer\'s Kit', quantity: 10 }
-  ],
-  currency: { gp: 15, sp: 5, cp: 0 },
-  location: '',
-  experience: 0,
-  experienceToNextLevel: 300,
-  unusedStatPoints: 0,
-  maxHpBonus: 0,
-  hitDice: { current: 1, max: 1 },
-  skills: { religion: 1, persuasion: 1 },
-  unusedSkillPoints: 2,
-  resources: [],
-  knownSpells: [],
-  preparedSpells: [],
-  racialTraits: [],
-  unlockedSubclassFeatures: [],
-});

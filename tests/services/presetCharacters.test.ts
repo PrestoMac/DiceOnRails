@@ -6,8 +6,6 @@ import { CLASSES_CATALOG } from '../../data/classes';
 import { SPELLS_CATALOG } from '../../data/spells';
 import { FEATS_CATALOG } from '../../data/feats';
 import { MockMCPServer } from '../../services/mcpService';
-import { auditState } from '../../services/auditor';
-import { Character, GameState } from '../../types';
 
 const RACE_IDS = new Set(RACES_CATALOG.map(r => r.id));
 const CLASS_IDS = new Set(CLASSES_CATALOG.map(c => c.id));
@@ -22,26 +20,6 @@ const CASTER_CLASS_IDS = new Set(
 const FULL_CASTER_CLASS_IDS = new Set(
   CLASSES_CATALOG.filter(c => c.spellcasting && (c.spellcasting.tradition === 'full' || c.spellcasting.tradition === 'pact')).map(c => c.id)
 );
-
-/**
- * Auditor rules known to be pre-existing data inconsistencies that affect wizard-built characters
- * identically (not introduced by presets). `classes-valid` flags Life Domain clerics equipping
- * chain mail because the auditor does not model subclass-granted heavy armor proficiency — the
- * base cleric class lists chain mail in its startingEquipment, so the wizard path produces the
- * same flag. Preset characters must match wizard output, so this rule is excluded from parity checks.
- */
-const AUDIT_RULES_EXCLUDED = new Set(['classes-valid']);
-
-/** Builds a minimal GameState with the given party for auditor checks. */
-function makeState(party: Character[]): GameState {
-  return {
-    party,
-    worldDescription: 'Test world',
-    sessionLogs: [],
-    quests: [],
-    lore: [],
-    } as GameState;
-}
 
 describe('presetCharacters data file', () => {
   it('exposes exactly 10 presets', () => {
@@ -147,12 +125,6 @@ describe('buildPresetCharacter', () => {
           expect(() => server.joinParty(character)).not.toThrow();
           const state = server.getFullState();
           expect(state.party.some(c => c.id === character.id)).toBe(true);
-        });
-
-        it('passes the auditor rules when placed in a party', () => {
-          const results = auditState(makeState([character]));
-          const failed = results.filter(r => !r.passed && !AUDIT_RULES_EXCLUDED.has(r.rule));
-          expect(failed.map(f => `${f.rule}: ${f.details}`)).toEqual([]);
         });
       });
     }

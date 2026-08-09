@@ -199,15 +199,12 @@ export function prepareContext(ctx: ContextState, am: Message[], contextString?:
 /**
  * Syncs finished state by attaching context metadata, deep-cloning the game state, and persisting it.
  * @param ctx - The current context state.
- * @param mts - (Unused) messages parameter.
  * @param ms - The MCP server instance.
  * @param sg - State setter function (e.g. React setState).
- * @param cci - (Unused) campaign ID parameter.
- * @param cn - (Unused) campaign name parameter.
  * @param extras - Optional additional GameState fields to merge.
  * @returns The finalized game state object.
  */
-export function syncFinishedState(ctx: ContextState, mts: Message[], ms: typeof mcpServer, sg: (s: GameState) => void, cci: string | undefined, cn: string | undefined, extras?: Partial<GameState>) {
+export function syncFinishedState(ctx: ContextState, ms: typeof mcpServer, sg: (s: GameState) => void, extras?: Partial<GameState>) {
     const ctxMeta: Record<string, unknown> = {};
     if (ctx.episodeCheckpoints.length > 0) ctxMeta.episodeCheckpoints = ctx.episodeCheckpoints;
     ctxMeta.frozenRawHistory = ctx.frozenRawHistory;

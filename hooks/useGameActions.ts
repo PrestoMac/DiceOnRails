@@ -87,7 +87,7 @@ function insertToolCallMessages(
 }
 
 import React, { useCallback, useRef, useEffect } from 'react';
-import { GameState, Message, MessageRole, AppSettings, Character, AppStage } from '../types';
+import { GameState, Message, MessageRole, AppSettings, Character, AppStage, MCPResponse } from '../types';
 import { mcpServer } from '../services/mcpService';
 import { runAgentLoop, generateNarration, generateNarrationSimple, buildDeterministicNarration, generatePortrait } from '../services/llm';
 import { storageService } from '../services/storageService';
@@ -175,13 +175,10 @@ export const useGameActions = (
         }
     }, [gameState]);
 
-    // Synchronously rebuilds ctxRef from the current gameState. Order-independent:
-    // safe to call before or after loadGameData resolves, because it does not rely
-    // on the useEffect above re-firing (refs aren't in dep arrays). Used on campaign
-    // switch to prevent LLM context (frozenRawHistory, episodeCheckpoints, etc.)
-    // from bleeding between campaigns.
-    const resetContextState = () => {
-        const gs = gameState as unknown as { ctx?: { episodeCheckpoints?: unknown[]; frozenRawHistory?: string; frozenRawTokens?: number; frozenMessageCount?: number; turnCounter?: number; generation?: number } };
+    // Rebuilds ctxRef from a state object's persistent ctx fields. `bumpGeneration`
+    // increments the rewind generation so remote clients discard stale context.
+    const rebuildCtxFrom = (state: unknown, opts: { bumpGeneration?: boolean } = {}) => {
+        const gs = state as { ctx?: { episodeCheckpoints?: unknown[]; frozenRawHistory?: string; frozenRawTokens?: number; frozenMessageCount?: number; turnCounter?: number; generation?: number } };
         ctxRef.current = {
             episodeCheckpoints: (gs.ctx?.episodeCheckpoints as string[]) ?? [],
             frozenRawHistory: gs.ctx?.frozenRawHistory ?? '',
@@ -190,8 +187,17 @@ export const useGameActions = (
             turnCounter: gs.ctx?.turnCounter ?? 0,
             isCompressing: false,
             compressPromise: null,
-            generation: (gs.ctx?.generation ?? 0),
+            generation: (gs.ctx?.generation ?? 0) + (opts.bumpGeneration ? 1 : 0),
         };
+    };
+
+    // Synchronously rebuilds ctxRef from the current gameState. Order-independent:
+    // safe to call before or after loadGameData resolves, because it does not rely
+    // on the useEffect above re-firing (refs aren't in dep arrays). Used on campaign
+    // switch to prevent LLM context (frozenRawHistory, episodeCheckpoints, etc.)
+    // from bleeding between campaigns.
+    const resetContextState = () => {
+        rebuildCtxFrom(gameState);
         ctxLoadedRef.current = true;
         if (isDebugMode) console.log('[Context Reset] re-hydrated on campaign switch', { checkpoints: ctxRef.current.episodeCheckpoints.length, raw: ctxRef.current.frozenRawTokens });
     };
@@ -199,20 +205,13 @@ export const useGameActions = (
     const autoSpeak = (text: string) => { if (settings.autoSpeak) { const c = cleanSpeak(text); if (c) speakText(c, settings); } };
 
     const syncFinished = (msgs: Message[], extras?: Partial<GameState>) => {
-        const finalState = syncStateHelper(ctxRef.current, msgs, mcpServer, setGameState, currentCampaignId, campaignName, extras);
+        const finalState = syncStateHelper(ctxRef.current, mcpServer, setGameState, extras);
         if (currentCampaignId) {
             storageService.syncCampaignState(currentCampaignId, finalState, msgs).catch(e => console.warn('[Sync] failed:', e));
         }
     };
 
     const runPipeline_ = () => runPipeline(ctxRef.current, FREEZE_INTERVAL, messagesRef.current, ACTIVE_MSG_WINDOW, sessionId);
-
-    const resolveNarration = async (
-        _userText: string, _toolMessages: Message[], inlineNarration: string | undefined,
-        _streamingId: string, _isBatch: boolean
-    ): Promise<{ narrationText: string; usedStream: boolean }> => {
-        return { narrationText: inlineNarration ?? 'The adventure continues...', usedStream: false };
-    };
 
     const handleSendMessage = async (text: string, isRetry = false) => {
         if (isDebugMode) console.log('[DEBUG handleSendMessage] entered', { text, isRetry });
@@ -240,9 +239,7 @@ export const useGameActions = (
                 mcpServer.setLastSuggestionsByCharacter(updated);
             }
             syncState();
-            if (isSyncableCampaign(currentCampaignId)) {
-                storageService.syncCampaignState(currentCampaignId, mcpServer.getFullState(), withPending).catch(e => console.warn('[Sync] pending msg failed:', e));
-            } else if (currentCampaignId === ANONYMOUS_CAMPAIGN_ID) {
+            if (currentCampaignId) {
                 storageService.syncCampaignState(currentCampaignId, mcpServer.getFullState(), withPending).catch(e => console.warn('[Sync] pending msg failed:', e));
             }
             return;
@@ -271,7 +268,6 @@ export const useGameActions = (
         }
 
         const turnStart = Date.now();
-        let firstDeltaAt: number | null = null;
 
         try {
             const currentState = mcpServer.getFullState();
@@ -322,10 +318,7 @@ export const useGameActions = (
             const placeholderMsg: Message = { id: streamingId, role: MessageRole.MODEL, text: '', timestamp: Date.now() };
             setMessages(prev => [...prev, ...insertToolCallMessages(prev, toolMessages, 'model-synth'), placeholderMsg]);
 
-            const { narrationText, usedStream } = await resolveNarration(text, toolMessages, inlineNarration, streamingId, false);
-            if (firstDeltaAt === null && usedStream) firstDeltaAt = Date.now();
-
-            let finalNarration = narrationText;
+            let finalNarration = inlineNarration ?? 'The adventure continues...';
             if (!inlineNarration) {
                 console.warn('[Narration] No inline narration from agent loop. Retrying with generateNarration...', { toolCount: toolMessages.length, inlineNarration });
                 try {
@@ -400,8 +393,7 @@ export const useGameActions = (
 
             if (isDebugMode) {
                 const total = Date.now() - turnStart;
-                const ttft = firstDeltaAt !== null ? firstDeltaAt - turnStart : -1;
-                console.log(`[Turn] total=${total}ms ttft=${ttft}ms stream=${usedStream} inline=${!!inlineNarration} tools=${toolMessages.length}`);
+                console.log(`[Turn] total=${total}ms inline=${!!inlineNarration} tools=${toolMessages.length}`);
             }
         } catch (err) {
             if (isDebugMode) console.error("[DEBUG handleSendMessage] Critical failure:", err);
@@ -491,11 +483,9 @@ export const useGameActions = (
         const promotedMessages = currentMessages.map(m => promotedIds.has(m.id) ? { ...m, pending: false } : m);
         setMessages(promotedMessages);
         messagesRef.current = promotedMessages;
-        if (isSyncableCampaign(currentCampaignId)) storageService.syncCampaignState(currentCampaignId, lockedState, promotedMessages).catch(e => console.warn('[Sync] failed:', e));
-        else if (currentCampaignId === ANONYMOUS_CAMPAIGN_ID) storageService.syncCampaignState(currentCampaignId, lockedState, promotedMessages).catch(e => console.warn('[Sync] failed:', e));
+        if (currentCampaignId) storageService.syncCampaignState(currentCampaignId, lockedState, promotedMessages).catch(e => console.warn('[Sync] failed:', e));
 
         const turnStart = Date.now();
-        let firstDeltaAt: number | null = null;
 
         try {
             // Rewind point captures the PRE-promotion state so a subsequent
@@ -529,10 +519,7 @@ export const useGameActions = (
             const placeholderMsg: Message = { id: streamingId, role: MessageRole.MODEL, text: '', timestamp: Date.now() };
             setMessages(prev => [...prev, ...insertToolCallMessages(prev, result.toolMessages, 'model-synth'), placeholderMsg]);
 
-            const { narrationText, usedStream } = await resolveNarration(batchText, result.toolMessages, result.inlineNarration, streamingId, true);
-            if (firstDeltaAt === null && usedStream) firstDeltaAt = Date.now();
-
-            let finalNarration = narrationText;
+            let finalNarration = result.inlineNarration ?? 'The adventure continues...';
             if (!result.inlineNarration) {
                 console.warn('[Narration] No inline narration from batch agent loop. Retrying with generateNarration...', { toolCount: result.toolMessages.length, inlineNarration: result.inlineNarration });
                 try {
@@ -592,8 +579,7 @@ export const useGameActions = (
 
             if (isDebugMode) {
                 const total = Date.now() - turnStart;
-                const ttft = firstDeltaAt !== null ? firstDeltaAt - turnStart : -1;
-                console.log(`[Batch] total=${total}ms ttft=${ttft}ms tools=${result.toolMessages.length}`);
+                console.log(`[Batch] total=${total}ms tools=${result.toolMessages.length}`);
             }
         } catch (err) {
             if (isDebugMode) console.error("Batch failure:", err);
@@ -632,9 +618,7 @@ export const useGameActions = (
         const updated = messagesRef.current.filter(m => m.id !== messageId);
         setMessages(updated);
         messagesRef.current = updated;
-        if (isSyncableCampaign(currentCampaignId)) {
-            storageService.syncCampaignState(currentCampaignId, mcpServer.getFullState(), updated).catch(e => console.warn('[Sync] failed:', e));
-        } else if (currentCampaignId === ANONYMOUS_CAMPAIGN_ID) {
+        if (currentCampaignId) {
             storageService.syncCampaignState(currentCampaignId, mcpServer.getFullState(), updated).catch(e => console.warn('[Sync] failed:', e));
         }
     };
@@ -759,17 +743,7 @@ export const useGameActions = (
                 processingRef.current = false; setIsLoading(false);
 
                 if (emergencySnap) mcpServer.restoreSnapshot(emergencySnap);
-                const gs = mcpServer.getFullState() as unknown as { ctx?: { episodeCheckpoints?: unknown[]; frozenRawHistory?: string; frozenRawTokens?: number; frozenMessageCount?: number; turnCounter?: number } };
-                ctxRef.current = {
-                    episodeCheckpoints: gs.ctx?.episodeCheckpoints ?? [],
-                    frozenRawHistory: gs.ctx?.frozenRawHistory ?? '',
-                    frozenRawTokens: gs.ctx?.frozenRawTokens ?? 0,
-                    frozenMessageCount: gs.ctx?.frozenMessageCount ?? 0,
-                    turnCounter: gs.ctx?.turnCounter ?? 0,
-                    isCompressing: false,
-                    compressPromise: null,
-                    generation: (gs.ctx?.generation ?? 0) + 1,
-                };
+                rebuildCtxFrom(mcpServer.getFullState(), { bumpGeneration: true });
 
                 if (isSyncableCampaign(currentCampaignId)) {
                     const cleanState = { ...mcpServer.getFullState(), isProcessing: false, processingUser: undefined };
@@ -794,17 +768,7 @@ export const useGameActions = (
             processingRef.current = false; setIsLoading(false);
 
             if (emergencySnap) mcpServer.restoreSnapshot(emergencySnap);
-            const gs = mcpServer.getFullState() as unknown as { ctx?: { episodeCheckpoints?: unknown[]; frozenRawHistory?: string; frozenRawTokens?: number; frozenMessageCount?: number; turnCounter?: number } };
-            ctxRef.current = {
-                episodeCheckpoints: gs.ctx?.episodeCheckpoints ?? [],
-                frozenRawHistory: gs.ctx?.frozenRawHistory ?? '',
-                frozenRawTokens: gs.ctx?.frozenRawTokens ?? 0,
-                frozenMessageCount: gs.ctx?.frozenMessageCount ?? 0,
-                turnCounter: gs.ctx?.turnCounter ?? 0,
-                isCompressing: false,
-                compressPromise: null,
-                generation: (gs.ctx?.generation ?? 0) + 1,
-            };
+            rebuildCtxFrom(mcpServer.getFullState(), { bumpGeneration: true });
 
             if (isSyncableCampaign(currentCampaignId)) {
                 const cleanState = { ...mcpServer.getFullState(), isProcessing: false, processingUser: undefined };
@@ -826,8 +790,7 @@ export const useGameActions = (
         // (never pending).
         const lastSnapshotMsg = snapshot.messages[snapshot.messages.length - 1];
         const isBatch = lastSnapshotMsg?.pending === true;
-        const userMessage = isBatch ? lastSnapshotMsg : lastSnapshotMsg;
-        const originalText = userMessage?.text || '';
+        const originalText = lastSnapshotMsg?.text || '';
         processingRef.current = false; setIsLoading(false);
 
         mcpServer.restoreSnapshot(snapshot.gameState);
@@ -841,17 +804,7 @@ export const useGameActions = (
         setMessages(restoredMessages); setGameState(mcpServer.getFullState());
         messagesRef.current = restoredMessages;
 
-        const gs = restoredState as unknown as { ctx?: { episodeCheckpoints?: unknown[]; frozenRawHistory?: string; frozenRawTokens?: number; frozenMessageCount?: number; turnCounter?: number } };
-        ctxRef.current = {
-            episodeCheckpoints: gs.ctx?.episodeCheckpoints ?? [],
-            frozenRawHistory: gs.ctx?.frozenRawHistory ?? '',
-            frozenRawTokens: gs.ctx?.frozenRawTokens ?? 0,
-            frozenMessageCount: gs.ctx?.frozenMessageCount ?? 0,
-            turnCounter: gs.ctx?.turnCounter ?? 0,
-            isCompressing: false,
-            compressPromise: null,
-            generation: (gs.ctx?.generation ?? 0) + 1,
-        };
+        rebuildCtxFrom(restoredState, { bumpGeneration: true });
 
         if (isSyncableCampaign(currentCampaignId)) {
             const cleanState = { ...mcpServer.getFullState(), isProcessing: false, processingUser: undefined };
@@ -886,40 +839,36 @@ export const useGameActions = (
         }
     }, [restoreToBeforeLastTurn]);
 
-    const handleArcaneRecovery = async (characterId: string, selections: Array<{ level: number; count: number }>): Promise<boolean> => {
-      if (!characterId || selections.length === 0) return false;
+    /** Shared skeleton for UI-direct engine calls (bypass the LLM agent loop):
+     *  run → syncState → persist → return success. Recovery calls additionally
+     *  drop the `[System:...]` log line the engine appended to the message list. */
+    const runEngineCall = async (label: string, run: () => Promise<MCPResponse>, filterSystemMsg = false): Promise<boolean> => {
       try {
-        const result = await mcpServer.arcane_recovery(characterId, selections);
+        const result = await run();
         if (result.success) {
           syncState();
-          const cleanedMsgs = messagesRef.current.filter(m => m.text !== `[System] ${result.message}`);
-          storageService.syncCampaignState(currentCampaignId, mcpServer.getFullState(), cleanedMsgs).catch((e: unknown) => console.warn('[Sync] failed:', e));
+          const msgs = filterSystemMsg
+            ? messagesRef.current.filter(m => m.text !== `[System] ${result.message}`)
+            : messagesRef.current;
+          storageService.syncCampaignState(currentCampaignId, mcpServer.getFullState(), msgs).catch((e: unknown) => console.warn('[Sync] failed:', e));
           return true;
         }
-        console.warn('[Arcane Recovery] failed:', result.message);
+        console.warn(`[${label}] failed:`, result.message);
         return false;
       } catch (err) {
-        console.error('[Arcane Recovery] error:', err instanceof Error ? err.message : String(err));
+        console.error(`[${label}] error:`, err instanceof Error ? err.message : String(err));
         return false;
       }
     };
 
+    const handleArcaneRecovery = async (characterId: string, selections: Array<{ level: number; count: number }>): Promise<boolean> => {
+      if (!characterId || selections.length === 0) return false;
+      return runEngineCall('Arcane Recovery', () => mcpServer.arcane_recovery(characterId, selections), true);
+    };
+
     const handleNaturalRecovery = async (characterId: string, selections: Array<{ level: number; count: number }>): Promise<boolean> => {
       if (!characterId || selections.length === 0) return false;
-      try {
-        const result = await mcpServer.natural_recovery(characterId, selections);
-        if (result.success) {
-          syncState();
-          const cleanedMsgs = messagesRef.current.filter(m => m.text !== `[System] ${result.message}`);
-          storageService.syncCampaignState(currentCampaignId, mcpServer.getFullState(), cleanedMsgs).catch((e: unknown) => console.warn('[Sync] failed:', e));
-          return true;
-        }
-        console.warn('[Natural Recovery] failed:', result.message);
-        return false;
-      } catch (err) {
-        console.error('[Natural Recovery] error:', err instanceof Error ? err.message : String(err));
-        return false;
-      }
+      return runEngineCall('Natural Recovery', () => mcpServer.natural_recovery(characterId, selections), true);
     };
 
     /** UI-direct spellbook management (bypasses the LLM agent loop). Mirrors
@@ -930,20 +879,7 @@ export const useGameActions = (
       spellId: string
     ): Promise<boolean> => {
       if (!characterId || (action !== 'finish_prep' && !spellId)) return false;
-
-      try {
-        const result = await mcpServer.manage_spellbook(characterId, action, spellId);
-        if (result.success) {
-          syncState();
-          storageService.syncCampaignState(currentCampaignId, mcpServer.getFullState(), messagesRef.current).catch((e: unknown) => console.warn('[Sync] failed:', e));
-          return true;
-        }
-        console.warn('[Manage Spellbook] failed:', result.message);
-        return false;
-      } catch (err) {
-        console.error('[Manage Spellbook] error:', err instanceof Error ? err.message : String(err));
-        return false;
-      }
+      return runEngineCall('Manage Spellbook', () => mcpServer.manage_spellbook(characterId, action, spellId));
     };
 
     /** UI-direct known-spell / cantrip swap (bypasses the LLM agent loop).
@@ -955,19 +891,7 @@ export const useGameActions = (
       newSpellId: string
     ): Promise<boolean> => {
       if (!characterId || !oldSpellId || !newSpellId) return false;
-      try {
-        const result = await mcpServer.swap_known_spell(characterId, oldSpellId, newSpellId);
-        if (result.success) {
-          syncState();
-          storageService.syncCampaignState(currentCampaignId, mcpServer.getFullState(), messagesRef.current).catch((e: unknown) => console.warn('[Sync] failed:', e));
-          return true;
-        }
-        console.warn('[Swap Spell] failed:', result.message);
-        return false;
-      } catch (err) {
-        console.error('[Swap Spell] error:', err instanceof Error ? err.message : String(err));
-        return false;
-      }
+      return runEngineCall('Swap Spell', () => mcpServer.swap_known_spell(characterId, oldSpellId, newSpellId));
     };
 
     return { handleSendMessage, handleProcessBatch, handleRemovePendingMessage, handleCharacterCreated, handleUndo, handleRewind, resetContextState, handleArcaneRecovery, handleNaturalRecovery, handleManageSpellbook, handleSwapKnownSpell };

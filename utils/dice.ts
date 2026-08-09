@@ -18,25 +18,3 @@ export function getMod(score: number): number {
   const s = typeof score === 'number' && !Number.isNaN(score) ? score : 10;
   return Math.floor((s - 10) / 2);
 }
-
-export interface ParsedDamageRoll {
-  count: number;
-  sides: number;
-  flatBonus: number;
-}
-
-export function parseDamageDice(diceStr: string): ParsedDamageRoll | null {
-  const m = diceStr.match(/(\d+)d(\d+)([+-]\d+)?/);
-  if (!m) return null;
-  return {
-    count: parseInt(m[1], 10),
-    sides: parseInt(m[2], 10),
-    flatBonus: parseInt(m[3] || '0', 10),
-  };
-}
-
-export function rollDamage(parsed: ParsedDamageRoll, dieRoller: (sides: number) => number): number {
-  let total = 0;
-  for (let i = 0; i < parsed.count; i++) total += dieRoller(parsed.sides);
-  return total + parsed.flatBonus;
-}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import Tooltip from '../ui/Tooltip';
+import Tooltip from '../v2/primitives/Tooltip';
 import { rollTraitFromTable } from '../../utils/backgrounds';
 
 /** A single persona trait field (personality / ideals / bonds / flaws) with a

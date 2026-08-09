@@ -1,11 +1,9 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { makeCharacter } from '../../helpers/characters';
 import { makeGameState } from '../../helpers/state';
 import {
     normalizeSuggestions,
     buildExplorationSuggestions,
-    generateSuggestions,
-    resolveSuggestions,
     GENERIC_SUGGESTIONS,
 } from '../../../services/llm/suggestions';
 import { buildCombatSuggestions } from '../../../services/mcp/combatService';
@@ -31,21 +29,6 @@ vi.mock('../../../services/supabaseClient', () => ({
         })),
     },
 }));
-
-const { getEnv } = await import('../../../utils/envHelper');
-
-const mockFetch = vi.fn();
-
-function makeSuggestionsResponse(content: string) {
-    return {
-        ok: true,
-        status: 200,
-        json: () => Promise.resolve({
-            choices: [{ message: { content, role: 'assistant' } }],
-            usage: { prompt_tokens: 10, completion_tokens: 5 },
-        }),
-    } as unknown as Response;
-}
 
 describe('normalizeSuggestions', () => {
     it('filters non-strings and empties', () => {
@@ -122,97 +105,6 @@ describe('buildExplorationSuggestions', () => {
             ],
         });
         expect(buildExplorationSuggestions(s).length).toBeLessThanOrEqual(3);
-    });
-});
-
-describe('generateSuggestions', () => {
-    beforeEach(() => {
-        mockFetch.mockReset();
-        getEnv.mockReset();
-        getEnv.mockImplementation((key: string) => {
-            if (key === 'VITE_LLM_API_KEY') return 'test-api-key';
-            if (key === 'VITE_LLM_MODEL') return 'deepseek/deepseek-v4-flash';
-            return undefined;
-        });
-        vi.stubGlobal('fetch', mockFetch);
-    });
-    afterEach(() => { vi.unstubAllGlobals(); });
-
-    it('parses a JSON array from content', async () => {
-        mockFetch.mockResolvedValueOnce(makeSuggestionsResponse('["Ask the guard","Open the chest","Leave the room"]'));
-        const out = await generateSuggestions([], 'ctx', undefined, undefined, 'sid');
-        expect(out).toEqual(['Ask the guard', 'Open the chest', 'Leave the room']);
-    });
-    it('returns [] and skips fetch when no API key', async () => {
-        getEnv.mockImplementation(() => undefined);
-        const out = await generateSuggestions([], 'ctx');
-        expect(out).toEqual([]);
-        expect(mockFetch).not.toHaveBeenCalled();
-    });
-    it('returns [] on a non-ok response', async () => {
-        mockFetch.mockResolvedValueOnce({ ok: false, status: 500, json: () => Promise.resolve({}) } as unknown as Response);
-        const out = await generateSuggestions([], 'ctx', undefined, undefined, 'sid');
-        expect(out).toEqual([]);
-    });
-    it('falls back to quoted-string extraction for non-JSON content', async () => {
-        mockFetch.mockResolvedValueOnce(makeSuggestionsResponse('Sure! ["Look around","Search the chest"]'));
-        const out = await generateSuggestions([], 'ctx', undefined, undefined, 'sid');
-        expect(out).toEqual(['Look around', 'Search the chest']);
-    });
-    it('clamps and caps the results', async () => {
-        const long = 'y'.repeat(120);
-        mockFetch.mockResolvedValueOnce(makeSuggestionsResponse(JSON.stringify([long, 'a', 'b', 'c', 'd'])));
-        const out = await generateSuggestions([], 'ctx', undefined, undefined, 'sid');
-        expect(out).toHaveLength(3);
-        expect(out[0]).toHaveLength(80);
-    });
-});
-
-describe('resolveSuggestions (tier chain)', () => {
-    beforeEach(() => {
-        mockFetch.mockReset();
-        getEnv.mockReset();
-        getEnv.mockImplementation((key: string) => {
-            if (key === 'VITE_LLM_API_KEY') return 'test-api-key';
-            if (key === 'VITE_LLM_MODEL') return 'deepseek/deepseek-v4-flash';
-            return undefined;
-        });
-        vi.stubGlobal('fetch', mockFetch);
-    });
-    afterEach(() => { vi.unstubAllGlobals(); });
-
-    it('Tier 0 wins and makes no LLM call', async () => {
-        const out = await resolveSuggestions(makeGameState(), [], 'ctx', undefined, ['Attack'], true, 'sid');
-        expect(out).toEqual(['Attack']);
-        expect(mockFetch).not.toHaveBeenCalled();
-    });
-    it('disabled + empty Tier 0 -> [] and no LLM call (byte-identical)', async () => {
-        const out = await resolveSuggestions(makeGameState(), [], 'ctx', undefined, [], false, 'sid');
-        expect(out).toEqual([]);
-        expect(mockFetch).not.toHaveBeenCalled();
-    });
-    it('disabled + non-empty Tier 0 -> returns Tier 0', async () => {
-        const out = await resolveSuggestions(makeGameState(), [], 'ctx', undefined, ['Look'], false, 'sid');
-        expect(out).toEqual(['Look']);
-        expect(mockFetch).not.toHaveBeenCalled();
-    });
-    it('enabled + empty Tier 0 -> Tier 1 LLM call wins', async () => {
-        mockFetch.mockResolvedValueOnce(makeSuggestionsResponse('["Flee","Hide"]'));
-        const out = await resolveSuggestions(makeGameState(), [], 'ctx', undefined, [], true, 'sid');
-        expect(out).toEqual(['Flee', 'Hide']);
-        expect(mockFetch).toHaveBeenCalledTimes(1);
-    });
-    it('enabled + LLM returns nothing -> falls to Tier 2 deterministic', async () => {
-        mockFetch.mockResolvedValueOnce(makeSuggestionsResponse(''));
-        const s = makeGameState({ party: [makeCharacter({ hp: { current: 2, max: 20 } })] });
-        const out = await resolveSuggestions(s, [], 'ctx', undefined, [], true, 'sid');
-        expect(out).toContain('Take a short rest to recover');
-    });
-    it('enabled + LLM call unavailable (no key) -> falls to Tier 2 deterministic', async () => {
-        getEnv.mockImplementation(() => undefined);
-        const s = makeGameState({ quests: [{ id: 'q', title: 'Slay Dragon', description: '', status: 'active' }] });
-        const out = await resolveSuggestions(s, [], 'ctx', undefined, [], true, 'sid');
-        expect(out).toContain('Pursue: Slay Dragon');
     });
 });
 
