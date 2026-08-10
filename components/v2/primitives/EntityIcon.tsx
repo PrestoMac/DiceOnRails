@@ -40,7 +40,7 @@ export const EntityIcon: React.FC<EntityIconProps> = ({
         src={iconUrl}
         alt={alt}
         className={cx(
-          'rounded-full object-cover',
+          'rounded-full object-contain',
           sizeClass,
           className,
         )}

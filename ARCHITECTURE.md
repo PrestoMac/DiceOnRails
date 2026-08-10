@@ -40,7 +40,7 @@ For a friendly introduction, see **[README.md](./README.md)** first.
 | Backend / DB | Supabase (Postgres + Realtime + Auth) |
 | AI transport | OpenAI-compatible Chat Completions API over `fetch` + SSE streaming |
 | AI provider | OpenRouter by default; any OpenAI-compatible endpoint works |
-| Image gen | ImageRouter (`stabilityai/sdxl-turbo` default) |
+| Image gen | ImageRouter (`stabilityai/sdxl-turbo` default); bundled medallion WebP icons for implemented classes/races |
 | Markdown | `react-markdown` |
 | Tests | Vitest 4 + `@testing-library/react` + `jsdom` |
 | Lint | ESLint 8 + `@typescript-eslint` |
@@ -49,6 +49,8 @@ For a friendly introduction, see **[README.md](./README.md)** first.
 | Analytics | `@vercel/analytics` + `@vercel/speed-insights` |
 
 The Emberlight V2 game shell also supports native keyboard panel navigation: `1` Hero, `2` Journal, `3` Party in multiplayer, and `4` Adventure on mobile. Shortcuts are ignored while focus is inside an editable control.
+
+Entity artwork uses `EntityIcon` (`components/v2/primitives/EntityIcon.tsx`), which prefers an `iconUrl` bundled under `public/icons/` and falls back to the existing Font Awesome class. The class/race medallions are circularly masked during extraction so neighboring artwork from the source sheet cannot bleed into an icon.
 
 `moduleResolution: bundler`, `target: ES2022`, JSX via `react-jsx`. Path alias `@/*` → repo root.
 

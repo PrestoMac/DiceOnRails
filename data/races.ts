@@ -44,6 +44,8 @@ export const RACES_CATALOG: RaceDefinition[] = [
     size: 'medium',
     traits: [],
     languages: ['common', 'one-of-choice'],
+    icon: 'fa-user',
+    iconUrl: '/icons/races/human.webp',
 
     flavor: 'Humans are the most adaptable race, with a diverse range of cultures and backgrounds.',
     subraces: [
@@ -65,6 +67,8 @@ export const RACES_CATALOG: RaceDefinition[] = [
       { id: 'trance', name: 'Trance', description: 'Elves don\'t need to sleep. Instead, they meditate deeply, remaining semiconscious, for 4 hours a day.', kind: 'passive', icon: 'fa-moon' },
     ],
     languages: ['common', 'elvish'],
+    icon: 'fa-leaf',
+    iconUrl: '/icons/races/elf.webp',
 
     flavor: 'Elves are graceful and long-lived, with a deep connection to nature and magic.',
     subraces: [
@@ -91,6 +95,8 @@ export const RACES_CATALOG: RaceDefinition[] = [
 
     ],
     languages: ['common', 'dwarvish'],
+    icon: 'fa-mountain',
+    iconUrl: '/icons/races/dwarf.webp',
 
     flavor: 'Dwarves are stout and resilient, born of mountain stone and steel.',
     subraces: [
@@ -116,6 +122,8 @@ export const RACES_CATALOG: RaceDefinition[] = [
 
     ],
     languages: ['common', 'halfling'],
+    icon: 'fa-person-walking',
+    iconUrl: '/icons/races/halfling.webp',
 
     flavor: 'Halflings are nimble and lucky, finding comfort in the smallest places.',
     subraces: [
@@ -138,6 +146,8 @@ export const RACES_CATALOG: RaceDefinition[] = [
       { id: 'damage-resistance-dragonborn', name: 'Damage Resistance', description: 'You have resistance to the damage type associated with your draconic ancestry.', kind: 'passive', effect: { kind: 'damage-resistance', payload: { type: 'from-draconic-ancestry' } } },
     ],
     languages: ['common', 'draconic'],
+    icon: 'fa-dragon',
+    iconUrl: '/icons/races/dragonborn.webp',
 
     flavor: 'Dragonborn are proud, draconic humanoids with ancient lineage and elemental breath weapons.',
   },
@@ -154,6 +164,8 @@ export const RACES_CATALOG: RaceDefinition[] = [
 
     ],
     languages: ['common', 'gnomish'],
+    icon: 'fa-gear',
+    iconUrl: '/icons/races/gnome.webp',
 
     flavor: 'Gnomes are tinkerers and inventors, bursting with curiosity and magical energy.',
     subraces: [
@@ -178,6 +190,7 @@ export const RACES_CATALOG: RaceDefinition[] = [
       { id: 'skill-versatility', name: 'Skill Versatility', description: 'You gain proficiency in two skills of your choice.', kind: 'passive' },
     ],
     languages: ['common', 'elvish', 'one-of-choice'],
+    icon: 'fa-users',
 
     flavor: 'Half-elves blend the grace of their elven heritage with the ambition of their human blood.',
   },
@@ -194,6 +207,8 @@ export const RACES_CATALOG: RaceDefinition[] = [
       { id: 'savage-attacks', name: 'Savage Attacks', description: 'On a melee weapon crit, roll one additional damage die and add it to the total.', kind: 'passive', effect: { kind: 'crit-bonus-dice', payload: { count: 1 } } },
     ],
     languages: ['common', 'orc'],
+    icon: 'fa-user',
+    iconUrl: '/icons/races/half-orc.webp',
 
     flavor: 'Half-orcs are fierce warriors, combining orcish strength with human adaptability.',
   },
@@ -210,6 +225,8 @@ export const RACES_CATALOG: RaceDefinition[] = [
       { id: 'infernal-legacy', name: 'Infernal Legacy', description: 'You know the thaumaturgy cantrip. At L3, you can cast hellish rebuke once per long rest as a L2 spell (DEX save, 3d10 fire). At L5, you can cast darkness once per long rest. Charisma is your spellcasting ability for these.', kind: 'resource', grantsResource: 'hellish-rebuke' },
     ],
     languages: ['common', 'infernal'],
+    icon: 'fa-fire',
+    iconUrl: '/icons/races/tiefling.webp',
 
     flavor: 'Tieflings bear the mark of infernal ancestry, wielding fire and shadow.',
   },
