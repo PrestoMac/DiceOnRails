@@ -1,4 +1,6 @@
 import React from 'react';
+import type { LucideIcon } from 'lucide-react';
+import { Bell, BookOpen, Copy, LogOut, Settings2, Share2 } from 'lucide-react';
 import { formatGameTime } from '../../../utils/timeUtils';
 import { cx } from '../primitives/cx';
 import { Z } from '../primitives/layers';
@@ -22,6 +24,30 @@ interface TopBarProps {
   /** Optional slot rendered immediately after the back button (e.g. dock toggle). */
   leading?: React.ReactNode;
 }
+
+interface ActionIconProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  icon: LucideIcon;
+  label: string;
+  tone?: 'default' | 'danger';
+}
+
+const ActionIcon: React.FC<ActionIconProps> = ({ icon: Icon, label, tone = 'default', className, ...props }) => (
+  <button
+    type="button"
+    aria-label={label}
+    title={label}
+    className={cx(
+      'inline-flex h-9 w-9 items-center justify-center rounded-lg transition-colors duration-150 cursor-pointer',
+      tone === 'danger'
+        ? 'text-blood-400 hover:bg-blood-500/10 hover:text-blood-300'
+        : 'text-parchment-mute hover:bg-white/[0.06] hover:text-parchment',
+      className,
+    )}
+    {...props}
+  >
+    <Icon size={15} strokeWidth={1.8} aria-hidden="true" />
+  </button>
+);
 
 /** Slim 56px chrome bar: back nav, location/game-time context, activity bell, share + panel shortcuts. */
 const TopBar: React.FC<TopBarProps> = ({
@@ -107,7 +133,7 @@ const TopBar: React.FC<TopBarProps> = ({
             }
           >
             <span className="relative inline-flex">
-              <IconButton icon="fa-bell" tip="Recent party activity" aria-label="Recent party activity" />
+              <ActionIcon icon={Bell} label="Recent party activity" />
               <span className="pointer-events-none absolute -top-0.5 -right-0.5 h-4 min-w-4 px-0.5 rounded-full bg-ember-500 border-2 border-obsidian-950 flex items-center justify-center">
                 <span className="text-[8px] font-bold text-obsidian-950 leading-none">{recentActivity.length}</span>
               </span>
@@ -117,15 +143,15 @@ const TopBar: React.FC<TopBarProps> = ({
 
         {shareId && (
           <span className="hidden sm:inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-full bg-obsidian-800/80 border border-white/[0.08]">
-            <i className="fas fa-share-nodes text-arcane-400 text-[10px]" aria-hidden="true" />
+            <Share2 size={13} strokeWidth={1.8} className="text-arcane-400" aria-hidden="true" />
             <span className="text-[10px] font-mono text-parchment-dim max-w-[72px] truncate">{shareId}</span>
-            <IconButton icon="fa-copy" tip="Copy share code" size="sm" onClick={copyShareId} />
+            <ActionIcon icon={Copy} label="Copy share code" onClick={copyShareId} className="h-7 w-7" />
           </span>
         )}
 
-        <IconButton icon="fa-book-open" tip="Compendium" onClick={onOpenCompendium} />
-        <IconButton icon="fa-gear" tip="Settings" onClick={onOpenSettings} />
-        {showLogout && <IconButton icon="fa-right-from-bracket" tip="Log out" variant="danger" onClick={onLogout} />}
+        <ActionIcon icon={BookOpen} label="Compendium" onClick={onOpenCompendium} />
+        <ActionIcon icon={Settings2} label="Settings" onClick={onOpenSettings} />
+        {showLogout && <ActionIcon icon={LogOut} label="Log out" tone="danger" onClick={onLogout} />}
         <span className="hidden sm:block w-2 h-2 ml-1 rounded-full bg-verdant-500 animate-pulse" title="Synced" aria-label="Synced" />
       </div>
     </header>

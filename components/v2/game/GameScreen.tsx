@@ -49,6 +49,32 @@ const GameScreen: React.FC = () => {
   const [spellbookOpen, setSpellbookOpen] = useState(false);
   const [confirming, setConfirming] = useState<ConfirmKind>(null);
 
+  // Keep panel switching fast without stealing keystrokes from the composer.
+  useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.matches('input, textarea, select, [contenteditable="true"]')) return;
+      const tabs: Record<string, DockTab | MobileTab> = {
+        '1': 'character',
+        '2': 'journal',
+        '3': 'party',
+        '4': 'adventure',
+      };
+      const tab = tabs[event.key];
+      if (!tab || (tab === 'party' && !vm.isMultiplayer)) return;
+      event.preventDefault();
+      if (tab === 'adventure') {
+        setMobileTab('adventure');
+        return;
+      }
+      setDockTab(tab as DockTab);
+      setMobileTab(tab as MobileTab);
+      setDockOpen(true);
+    };
+    window.addEventListener('keydown', handleShortcut);
+    return () => window.removeEventListener('keydown', handleShortcut);
+  }, [vm.isMultiplayer]);
+
   const dragState = useRef<{ startX: number; startWidth: number } | null>(null);
   const [dragging, setDragging] = useState(false);
 
@@ -228,6 +254,7 @@ const GameScreen: React.FC = () => {
       key={key}
       type="button"
       data-tour={tour}
+      title={`Open ${label} (${key === 'character' ? '1' : key === 'journal' ? '2' : '3'})`}
       onClick={() => setDockTab(key)}
       className={cx(
         'relative flex-1 py-3 font-display text-[11px] font-bold uppercase tracking-[0.18em] transition-colors cursor-pointer',
@@ -248,6 +275,7 @@ const GameScreen: React.FC = () => {
     <button
       key={key}
       type="button"
+      title={`Open ${label}${key === 'adventure' ? ' (4)' : key === 'character' ? ' (1)' : key === 'journal' ? ' (2)' : ' (3)'}`}
       onClick={() => setMobileTab(key)}
       className={cx(
         'relative flex flex-col items-center gap-1 p-2 transition-colors cursor-pointer',

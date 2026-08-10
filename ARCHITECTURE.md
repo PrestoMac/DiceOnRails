@@ -35,7 +35,7 @@ For a friendly introduction, see **[README.md](./README.md)** first.
 | Language | TypeScript 5.8 (strict mode, `noImplicitAny`, `strictNullChecks`) |
 | UI | React 19.2 |
 | Build tool | Vite 6.2 (`@vitejs/plugin-react`) |
-| Styling | Tailwind via CDN + custom CSS in `index.html`; Font Awesome 6; Google Fonts (Crimson Pro / Inter) |
+| Styling | Tailwind via CDN + custom CSS in `index.html`; Font Awesome 6 + Lucide React icons; Google Fonts (Crimson Pro / Inter) |
 | State | React Context + hooks (no Redux/Zustand) |
 | Backend / DB | Supabase (Postgres + Realtime + Auth) |
 | AI transport | OpenAI-compatible Chat Completions API over `fetch` + SSE streaming |
@@ -47,6 +47,8 @@ For a friendly introduction, see **[README.md](./README.md)** first.
 | Git hooks | Husky 9 |
 | Deploy | Vercel (SPA + serverless proxy) |
 | Analytics | `@vercel/analytics` + `@vercel/speed-insights` |
+
+The Emberlight V2 game shell also supports native keyboard panel navigation: `1` Hero, `2` Journal, `3` Party in multiplayer, and `4` Adventure on mobile. Shortcuts are ignored while focus is inside an editable control.
 
 `moduleResolution: bundler`, `target: ES2022`, JSX via `react-jsx`. Path alias `@/*` → repo root.
 
