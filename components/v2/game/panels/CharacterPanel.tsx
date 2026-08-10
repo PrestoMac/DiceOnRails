@@ -68,7 +68,7 @@ type PanelTab = 'stats' | 'gear' | 'magic' | 'story';
 const STATS: (keyof Character['stats'])[] = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
 
 const ITEM_TYPE_ICONS: Record<string, string> = {
-  weapon: 'fa-sword',
+  weapon: 'fa-khanda',
   armor: 'fa-shield-halved',
   shield: 'fa-shield',
   potion: 'fa-flask',

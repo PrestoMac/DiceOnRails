@@ -58,7 +58,7 @@ export const RACES_CATALOG: RaceDefinition[] = [
     size: 'medium',
     darkvision: 60,
     traits: [
-      { id: 'keen-senses', name: 'Keen Senses', description: 'You have proficiency in the Perception skill.', kind: 'passive', effect: { kind: 'skill-proficiency', payload: { skills: ['perception'] , icon: 'fa-eye'} }, icon: 'fa-eye' },
+      { id: 'keen-senses', name: 'Keen Senses', description: 'You have proficiency in the Perception skill.', kind: 'passive', effect: { kind: 'skill-proficiency', payload: { skills: ['perception'] } }, icon: 'fa-eye' },
       { id: 'fey-ancestry', name: 'Fey Ancestry', description: 'You have advantage on saving throws against being charmed, and magic can\'t put you to sleep.', kind: 'passive', effect: { kind: 'advantage-on-save', payload: { against: 'charmed' } }, icon: 'fa-leaf' },
       { id: 'trance', name: 'Trance', description: 'Elves don\'t need to sleep. Instead, they meditate deeply, remaining semiconscious, for 4 hours a day.', kind: 'passive', icon: 'fa-moon' },
     ],
@@ -80,10 +80,10 @@ export const RACES_CATALOG: RaceDefinition[] = [
     size: 'medium',
     darkvision: 60,
     traits: [
-      { id: 'dwarven-resilience', name: 'Dwarven Resilience', description: 'You have advantage on saving throws against poison, and you have resistance against poison damage.', kind: 'passive', effect: { kind: 'damage-resistance', payload: { type: 'poison' , icon: 'fa-shield-halved'} } },
+      { id: 'dwarven-resilience', name: 'Dwarven Resilience', description: 'You have advantage on saving throws against poison, and you have resistance against poison damage.', kind: 'passive', effect: { kind: 'damage-resistance', payload: { type: 'poison' } }, icon: 'fa-shield-halved' },
 
       { id: 'dwarven-resilience-saves', name: 'Dwarven Resilience (Poison Saves)', description: 'Advantage on saving throws against poison.', kind: 'passive', effect: { kind: 'advantage-on-save', payload: { against: 'poison' } } },
-      { id: 'stonecunning', name: 'Stonecunning', description: 'Whenever you make an Intelligence (History) check related to the origin of stonework, you are considered proficient in the History skill and add double your proficiency bonus.', kind: 'passive', effect: { kind: 'skill-proficiency', payload: { skills: ['history'] , icon: 'fa-mountain'} } },
+      { id: 'stonecunning', name: 'Stonecunning', description: 'Whenever you make an Intelligence (History) check related to the origin of stonework, you are considered proficient in the History skill and add double your proficiency bonus.', kind: 'passive', effect: { kind: 'skill-proficiency', payload: { skills: ['history'] } }, icon: 'fa-mountain' },
 
       { id: 'dwarven-combat-training', name: 'Dwarven Combat Training', description: 'You have proficiency with the battleaxe, handaxe, throwing hammer, and warhammer.', kind: 'passive' , icon: 'fa-sword'},
 
@@ -92,7 +92,7 @@ export const RACES_CATALOG: RaceDefinition[] = [
 
     flavor: 'Dwarves are stout and resilient, born of mountain stone and steel.',
     subraces: [
-      { id: 'hill-dwarf', name: 'Hill Dwarf', description: 'Hill dwarfs are wise and tough, with deep roots in mountain communities.', asi: { con: 2, wis: 1 }, traits: [{ id: 'dwarven-toughness', name: 'Dwarven Toughness', description: 'Your hit point maximum increases by 1, and it increases by 1 every time you gain a level.', kind: 'passive', effect: { kind: 'hp-per-level', payload: { amount: 1 , icon: 'fa-heart-pulse'} } }] },
+      { id: 'hill-dwarf', name: 'Hill Dwarf', description: 'Hill dwarfs are wise and tough, with deep roots in mountain communities.', asi: { con: 2, wis: 1 }, traits: [{ id: 'dwarven-toughness', name: 'Dwarven Toughness', description: 'Your hit point maximum increases by 1, and it increases by 1 every time you gain a level.', kind: 'passive', effect: { kind: 'hp-per-level', payload: { amount: 1 } }, icon: 'fa-heart-pulse' }] },
 
       { id: 'mountain-dwarf', name: 'Mountain Dwarf', description: 'Mountain dwarfs are strong and hardy, trained in heavy armor from youth.', asi: { con: 2, str: 2 }, traits: [{ id: 'dwarven-armor-training', name: 'Dwarven Armor Training', description: 'You have proficiency with light and medium armor.', kind: 'passive' , icon: 'fa-shirt'}] },
 
@@ -106,11 +106,11 @@ export const RACES_CATALOG: RaceDefinition[] = [
     speed: 25,
     size: 'small',
     traits: [
-      { id: 'lucky', name: 'Lucky', description: 'When you roll a 1 on an attack roll, ability check, or saving throw, you can reroll the die and must use the new roll.', kind: 'passive', effect: { kind: 'reroll-ones', payload: { scope: 'all' , icon: 'fa-dice'} } },
+      { id: 'lucky', name: 'Lucky', description: 'When you roll a 1 on an attack roll, ability check, or saving throw, you can reroll the die and must use the new roll.', kind: 'passive', effect: { kind: 'reroll-ones', payload: { scope: 'all' } }, icon: 'fa-dice' },
 
-      { id: 'brave', name: 'Brave', description: 'You have advantage on saving throws against being frightened.', kind: 'passive', effect: { kind: 'advantage-on-save', payload: { against: 'frightened' , icon: 'fa-shield-halved'} } },
+      { id: 'brave', name: 'Brave', description: 'You have advantage on saving throws against being frightened.', kind: 'passive', effect: { kind: 'advantage-on-save', payload: { against: 'frightened' } }, icon: 'fa-shield-halved' },
 
-      { id: 'halfling-nimbleness', name: 'Halfling Nimbleness', description: 'You can move through the space of any creature that is of a size larger than yours.', kind: 'passive' , icon: 'fa-person-skating'},
+      { id: 'halfling-nimbleness', name: 'Halfling Nimbleness', description: 'You can move through the space of any creature that is of a size larger than yours.', kind: 'passive' , icon: 'fa-person-walking'},
 
     ],
     languages: ['common', 'halfling'],
@@ -118,7 +118,7 @@ export const RACES_CATALOG: RaceDefinition[] = [
     flavor: 'Halflings are nimble and lucky, finding comfort in the smallest places.',
     subraces: [
       { id: 'lightfoot', name: 'Lightfoot', description: 'Lightfoot halflings are stealthy and charming, able to hide behind larger creatures.', asi: { dex: 2, cha: 1 }, traits: [{ id: 'naturally-stealthy', name: 'Naturally Stealthy', description: 'You can attempt to hide even when obscured only by a creature larger than you.', kind: 'passive' , icon: 'fa-user-secret'}] },
-      { id: 'stout', name: 'Stout', description: 'Stout halflings are hardier than average, with dwarven resilience in their bloodline.', asi: { dex: 2, con: 1 }, traits: [{ id: 'stout-resilience', name: 'Stout Resilience', description: 'You have advantage on saving throws against poison, and resistance against poison damage.', kind: 'passive', effect: { kind: 'advantage-on-save', payload: { against: 'poison' , icon: 'fa-shield-halved'} } }, { id: 'stout-resistance', name: 'Stout Resistance', description: 'You have resistance to poison damage.', kind: 'passive', effect: { kind: 'damage-resistance', payload: { type: 'poison' } } }] },
+      { id: 'stout', name: 'Stout', description: 'Stout halflings are hardier than average, with dwarven resilience in their bloodline.', asi: { dex: 2, con: 1 }, traits: [{ id: 'stout-resilience', name: 'Stout Resilience', description: 'You have advantage on saving throws against poison, and resistance against poison damage.', kind: 'passive', effect: { kind: 'advantage-on-save', payload: { against: 'poison' } }, icon: 'fa-shield-halved' }, { id: 'stout-resistance', name: 'Stout Resistance', description: 'You have resistance to poison damage.', kind: 'passive', effect: { kind: 'damage-resistance', payload: { type: 'poison' } } }] },
     ],
   },
   {
@@ -132,7 +132,7 @@ export const RACES_CATALOG: RaceDefinition[] = [
       { id: 'draconic-ancestry', name: 'Draconic Ancestry', description: 'You choose one dragon type (Black, Blue, Brass, Bronze, Copper, Gold, Green, Red, Silver, White). Your breath weapon and damage resistance use this type.', kind: 'passive' },
       { id: 'breath-weapon', name: 'Breath Weapon', description: 'Action: exhale destructive energy. Blue and Bronze breathe a 30-ft line; Brass, Copper, Gold, Green, Red, Silver, White breathe a 30-ft cone. Each creature in the area makes a DEX save (DC 8 + CON mod + prof). On fail, take 2d6 damage (3d6 at L6, 4d6 at L11, 5d6 at L16). 1 use per short rest.', kind: 'resource', grantsResource: 'breath-weapon',
 
-        effect: { kind: 'breath-weapon', payload: { saveDC: '8 + CON + prof', damage: '2d6', scaling: { 6: '3d6', 11: '4d6', 16: '5d6' , icon: 'fa-fire'} } } },
+        effect: { kind: 'breath-weapon', payload: { saveDC: '8 + CON + prof', damage: '2d6', scaling: { 6: '3d6', 11: '4d6', 16: '5d6' } } }, icon: 'fa-fire' },
       { id: 'damage-resistance-dragonborn', name: 'Damage Resistance', description: 'You have resistance to the damage type associated with your draconic ancestry.', kind: 'passive', effect: { kind: 'damage-resistance', payload: { type: 'from-draconic-ancestry' } } },
     ],
     languages: ['common', 'draconic'],
@@ -148,7 +148,7 @@ export const RACES_CATALOG: RaceDefinition[] = [
     size: 'small',
     darkvision: 60,
     traits: [
-      { id: 'gnome-cunning', name: 'Gnome Cunning', description: 'You have advantage on all Intelligence, Wisdom, and Charisma saving throws against magic.', kind: 'passive', effect: { kind: 'advantage-on-save', payload: { against: 'magic', stats: ['int', 'wis', 'cha'] , icon: 'fa-brain'} } },
+      { id: 'gnome-cunning', name: 'Gnome Cunning', description: 'You have advantage on all Intelligence, Wisdom, and Charisma saving throws against magic.', kind: 'passive', effect: { kind: 'advantage-on-save', payload: { against: 'magic', stats: ['int', 'wis', 'cha'] } }, icon: 'fa-brain' },
 
     ],
     languages: ['common', 'gnomish'],

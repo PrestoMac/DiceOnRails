@@ -58,7 +58,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     features: [
       { id: 'fighting-style', name: 'Fighting Style', description: 'You adopt a particular style of fighting as your specialty.', level: 1, kind: 'subclass',
 
-        choice: { label: 'Choose a Fighting Style', options: FIGHTING_STYLE_OPTIONS.filter(fs => fs.id !== 'protection') , icon: 'fa-sword'},
+        choice: { label: 'Choose a Fighting Style', options: FIGHTING_STYLE_OPTIONS.filter(fs => fs.id !== 'protection') },
         effect: { kind: 'fighting-style' }
       },
       { id: 'second-wind', name: 'Second Wind', description: 'Bonus action: regain 1d10 + fighter level HP, once per short rest.', level: 1, kind: 'resource', grantsResource: 'second-wind', icon: 'fa-heart-pulse' },
@@ -78,15 +78,15 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
 
         description: 'The archetypal Champion focuses on the development of raw physical power honed to deadly perfection.',
         features: [
-          { id: 'improved-critical', name: 'Improved Critical', description: 'Your weapon attacks score a critical hit on a roll of 19 or 20.', level: 3, kind: 'passive', effect: { kind: 'crit-range', payload: { min: 19 , icon: 'fa-crosshairs'} } },
+          { id: 'improved-critical', name: 'Improved Critical', description: 'Your weapon attacks score a critical hit on a roll of 19 or 20.', level: 3, kind: 'passive', effect: { kind: 'crit-range', payload: { min: 19 } } },
 
           { id: 'remarkable-athlete', name: 'Remarkable Athlete', description: 'Add half your proficiency bonus (round up) to any Strength, Dexterity, or Constitution check you make that doesn\'t already use your proficiency bonus.', level: 7, kind: 'passive' },
 
           { id: 'additional-fighting-style', name: 'Additional Fighting Style', description: 'Choose a second fighting style.', level: 10, kind: 'subclass',
-            choice: { label: 'Choose a second Fighting Style', options: FIGHTING_STYLE_OPTIONS.filter(fs => fs.id !== 'protection') , icon: 'fa-sword'},
+            choice: { label: 'Choose a second Fighting Style', options: FIGHTING_STYLE_OPTIONS.filter(fs => fs.id !== 'protection') },
             effect: { kind: 'fighting-style' }
           },
-          { id: 'superior-critical', name: 'Superior Critical', description: 'Your weapon attacks score a critical hit on a roll of 18-20.', level: 15, kind: 'passive', effect: { kind: 'crit-range', payload: { min: 18 , icon: 'fa-crosshairs'} } },
+          { id: 'superior-critical', name: 'Superior Critical', description: 'Your weapon attacks score a critical hit on a roll of 18-20.', level: 15, kind: 'passive', effect: { kind: 'crit-range', payload: { min: 18 } } },
 
           { id: 'survivor', name: 'Survivor', description: 'At the start of each of your turns, you regain hit points equal to 5 + your Constitution modifier if you have no more than half your hit points left.', level: 18, kind: 'passive' , icon: 'fa-heart-pulse'},
 
@@ -156,6 +156,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
       },
     ],
     subclassLevel: 3,
+    icon: 'fa-shield-halved',
 
     description: 'A master of martial combat, skilled with a variety of weapons and armor.',
     flavor: 'Fighters are the backbone of any adventuring party, trained in all styles of combat.',
@@ -247,6 +248,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
       },
     ],
     subclassLevel: 3,
+    icon: 'fa-hammer',
 
     description: 'A fierce warrior who can enter a battle fury, shrugging off damage while wreaking havoc.',
     flavor: 'Barbarians are the embodiment of primal fury, channeling raw emotion into devastating combat.',
@@ -338,6 +340,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
       },
     ],
     subclassLevel: 3,
+    icon: 'fa-guitar',
 
     description: 'An inspiring magician whose power echoes the music of creation.',
     flavor: 'Bards weave magic through music, poetry, and oration, inspiring allies and confounding foes.',
@@ -474,6 +477,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
       },
     ],
     subclassLevel: 1,
+    icon: 'fa-cross',
 
     description: 'A priestly champion who wields divine magic in service of a higher power.',
     flavor: 'Clerics are the mortal conduits of divine will, channeling the power of the gods.',
@@ -563,6 +567,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
       },
     ],
     subclassLevel: 2,
+    icon: 'fa-leaf',
 
     description: 'A priest of the Old Faith, wielding the powers of nature and animal transformation.',
     flavor: 'Druids draw power from the natural world, protecting it with primal magic.',
@@ -645,6 +650,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
       },
     ],
     subclassLevel: 3,
+    icon: 'fa-fist-raised',
 
     description: 'A master of martial arts, harnessing ki to perform extraordinary feats.',
     flavor: 'Monks blend martial discipline with spiritual energy, fighting with unarmed strikes and monk weapons.',
@@ -753,6 +759,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
       },
     ],
     subclassLevel: 3,
+    icon: 'fa-sun',
 
     description: 'A holy warrior bound by a sacred oath to fight for justice and righteousness.',
     flavor: 'Paladins stand at the intersection of martial prowess and divine conviction.',
@@ -849,6 +856,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
       },
     ],
     subclassLevel: 3,
+    icon: 'fa-crosshairs',
 
     description: 'A warrior who combines martial prowess with nature magic to track and hunt foes.',
     flavor: 'Rangers are masters of the wild, tracking enemies across any terrain.',
@@ -962,6 +970,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
       },
     ],
     subclassLevel: 3,
+    icon: 'fa-user-ninja',
 
     description: 'A scoundrel who uses stealth and guile to overcome obstacles and enemies.',
     flavor: 'Rogues rely on their wits, stealth, and precision to survive in a dangerous world.',
@@ -1051,6 +1060,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
       },
     ],
     subclassLevel: 1,
+    icon: 'fa-hat-wizard',
 
     description: 'A spellcaster who draws on inherent magic from a bloodline or other mystical source.',
     flavor: 'Sorcerers channel magic through their very being, bending reality with raw charisma.',
@@ -1136,6 +1146,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
       },
     ],
     subclassLevel: 1,
+    icon: 'fa-skull',
 
     description: 'A wielder of magic derived from a pact with an otherworldly patron.',
     flavor: 'Warlocks seek forbidden knowledge and power through bargains with supernatural entities.',
@@ -1301,6 +1312,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
       },
     ],
     subclassLevel: 2,
+    icon: 'fa-book-dead',
 
     description: 'A scholarly magic-user who casts spells through study and memorization.',
     flavor: 'Wizards are the quintessential spellcasters, wielding magic through years of arcane study.',

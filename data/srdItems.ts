@@ -32,7 +32,7 @@ export const SRD_ITEMS: Omit<InventoryItem, 'quantity'>[] = [
   {
     name: 'Shortsword',
     type: 'weapon',
-    icon: 'fa-sword',
+    icon: 'fa-khanda',
     rarity: 'common',
     description: 'A short, double-edged blade popular among rogues and dual-wielders.',
     weight: 2,
@@ -46,7 +46,7 @@ export const SRD_ITEMS: Omit<InventoryItem, 'quantity'>[] = [
   {
     name: 'Longsword',
     type: 'weapon',
-    icon: 'fa-sword',
+    icon: 'fa-khanda',
     rarity: 'common',
     description: 'A versatile two-handed sword favored by knights and warriors.',
     weight: 4,
@@ -60,7 +60,7 @@ export const SRD_ITEMS: Omit<InventoryItem, 'quantity'>[] = [
   {
     name: 'Greatsword',
     type: 'weapon',
-    icon: 'fa-sword',
+    icon: 'fa-khanda',
     rarity: 'common',
     description: 'A massive two-handed sword that deals devastating cuts.',
     weight: 6,
@@ -115,7 +115,7 @@ export const SRD_ITEMS: Omit<InventoryItem, 'quantity'>[] = [
   {
     name: 'Staff',
     type: 'weapon',
-    icon: 'fa-sword',
+    icon: 'fa-khanda',
     rarity: 'common',
     description: 'An arcane staff that doubles as a walking stick and a weapon.',
     weight: 4,
@@ -129,7 +129,7 @@ export const SRD_ITEMS: Omit<InventoryItem, 'quantity'>[] = [
   {
     name: 'Rock',
     type: 'weapon',
-    icon: 'fa-sword',
+    icon: 'fa-khanda',
     rarity: 'common',
     description: 'A simple stone picked up off the ground. Effective when thrown.',
     weight: 1,
@@ -143,7 +143,7 @@ export const SRD_ITEMS: Omit<InventoryItem, 'quantity'>[] = [
   {
     name: 'Shortbow',
     type: 'weapon',
-    icon: 'fa-bow-arrow',
+    icon: 'fa-crosshairs',
     rarity: 'common',
     description: 'A compact bow for hunting and ranged skirmishing.',
     weight: 2,
@@ -245,7 +245,7 @@ export const SRD_ITEMS: Omit<InventoryItem, 'quantity'>[] = [
   {
     name: 'Potion of Healing',
     type: 'potion',
-    icon: 'fa-flask-round-potion',
+    icon: 'fa-flask',
     rarity: 'common',
     description: 'A magical red fluid that seals wounds upon ingestion.',
     weight: 0.5,
@@ -257,7 +257,7 @@ export const SRD_ITEMS: Omit<InventoryItem, 'quantity'>[] = [
   {
     name: 'Potion of Greater Healing',
     type: 'potion',
-    icon: 'fa-flask-round-potion',
+    icon: 'fa-flask',
     rarity: 'uncommon',
     description: 'A stronger blend of healing herbs and magic fluid.',
     weight: 0.5,
@@ -269,7 +269,7 @@ export const SRD_ITEMS: Omit<InventoryItem, 'quantity'>[] = [
   {
     name: 'Potion of Superior Healing',
     type: 'potion',
-    icon: 'fa-flask-round-potion',
+    icon: 'fa-flask',
     rarity: 'rare',
     description: 'A rare, highly concentrated healing potion.',
     weight: 0.5,
@@ -423,7 +423,7 @@ export const SRD_ITEMS: Omit<InventoryItem, 'quantity'>[] = [
   {
     name: 'Greataxe',
     type: 'weapon',
-    icon: 'fa-axe',
+    icon: 'fa-khanda',
     rarity: 'common',
     description: 'A massive two-handed axe that delivers devastating blows.',
     weight: 7,
@@ -465,7 +465,7 @@ export const SRD_ITEMS: Omit<InventoryItem, 'quantity'>[] = [
   {
     name: 'Longbow',
     type: 'weapon',
-    icon: 'fa-bow-arrow',
+    icon: 'fa-crosshairs',
     rarity: 'common',
     description: 'A large bow made of yew or other woods.',
     weight: 2,
@@ -479,7 +479,7 @@ export const SRD_ITEMS: Omit<InventoryItem, 'quantity'>[] = [
   {
     name: 'Rapier',
     type: 'weapon',
-    icon: 'fa-sword',
+    icon: 'fa-khanda',
     rarity: 'common',
     description: 'A slender, pointy sword with a basket hilt.',
     weight: 2,
@@ -493,7 +493,7 @@ export const SRD_ITEMS: Omit<InventoryItem, 'quantity'>[] = [
   {
     name: 'Scimitar',
     type: 'weapon',
-    icon: 'fa-sword',
+    icon: 'fa-khanda',
     rarity: 'common',
     description: 'A curved, slashing sword with a light blade.',
     weight: 3,
@@ -507,7 +507,7 @@ export const SRD_ITEMS: Omit<InventoryItem, 'quantity'>[] = [
   {
     name: 'Battleaxe',
     type: 'weapon',
-    icon: 'fa-axe',
+    icon: 'fa-khanda',
     rarity: 'common',
     description: 'A versatile axe that can be wielded one- or two-handed.',
     weight: 4,
@@ -521,7 +521,7 @@ export const SRD_ITEMS: Omit<InventoryItem, 'quantity'>[] = [
   {
     name: 'Sickle',
     type: 'weapon',
-    icon: 'fa-sickle',
+    icon: 'fa-khanda',
     rarity: 'common',
     description: 'A curved farming tool used as a weapon.',
     weight: 2,
@@ -549,7 +549,7 @@ export const SRD_ITEMS: Omit<InventoryItem, 'quantity'>[] = [
   {
     name: 'Club',
     type: 'weapon',
-    icon: 'fa-baseball-bat',
+    icon: 'fa-hand-fist',
     rarity: 'common',
     description: 'A simple, heavy piece of wood used as a weapon.',
     weight: 2,
@@ -563,7 +563,7 @@ export const SRD_ITEMS: Omit<InventoryItem, 'quantity'>[] = [
   {
     name: 'Greatclub',
     type: 'weapon',
-    icon: 'fa-sword',
+    icon: 'fa-khanda',
     rarity: 'common',
     description: 'A large, heavy club wielded with two hands.',
     weight: 10,
@@ -577,7 +577,7 @@ export const SRD_ITEMS: Omit<InventoryItem, 'quantity'>[] = [
   {
     name: 'Halberd',
     type: 'weapon',
-    icon: 'fa-sword',
+    icon: 'fa-khanda',
     rarity: 'common',
     description: 'A two-handed pole weapon with an axe blade and a spike.',
     weight: 6,
@@ -591,7 +591,7 @@ export const SRD_ITEMS: Omit<InventoryItem, 'quantity'>[] = [
   {
     name: 'Glaive',
     type: 'weapon',
-    icon: 'fa-sword',
+    icon: 'fa-khanda',
     rarity: 'common',
     description: 'A polearm with a single-edged blade on the end.',
     weight: 6,
@@ -647,7 +647,7 @@ export const SRD_ITEMS: Omit<InventoryItem, 'quantity'>[] = [
   {
     name: 'War Pick',
     type: 'weapon',
-    icon: 'fa-sword',
+    icon: 'fa-khanda',
     rarity: 'common',
     description: 'A pick designed for punching through armor.',
     weight: 2,
@@ -661,7 +661,7 @@ export const SRD_ITEMS: Omit<InventoryItem, 'quantity'>[] = [
   {
     name: 'Flail',
     type: 'weapon',
-    icon: 'fa-mace',
+    icon: 'fa-hand-fist',
     rarity: 'common',
     description: 'A spiked ball on a chain attached to a handle.',
     weight: 2,
@@ -675,7 +675,7 @@ export const SRD_ITEMS: Omit<InventoryItem, 'quantity'>[] = [
   {
     name: 'Morningstar',
     type: 'weapon',
-    icon: 'fa-mace',
+    icon: 'fa-hand-fist',
     rarity: 'common',
     description: 'A spiked metal ball on a shaft.',
     weight: 4,
@@ -689,7 +689,7 @@ export const SRD_ITEMS: Omit<InventoryItem, 'quantity'>[] = [
   {
     name: 'Trident',
     type: 'weapon',
-    icon: 'fa-sword',
+    icon: 'fa-khanda',
     rarity: 'common',
     description: 'A three-pronged spear used in fishing and combat.',
     weight: 4,
@@ -703,7 +703,7 @@ export const SRD_ITEMS: Omit<InventoryItem, 'quantity'>[] = [
   {
     name: 'Net',
     type: 'weapon',
-    icon: 'fa-net',
+    icon: 'fa-hand-fist',
     rarity: 'common',
     description: 'A mesh net used to entangle creatures.',
     weight: 3,
@@ -852,7 +852,7 @@ export const SRD_ITEMS: Omit<InventoryItem, 'quantity'>[] = [
   {
     name: 'Priest\'s Pack',
     type: 'gear',
-    icon: 'fa-pouch',
+    icon: 'fa-suitcase',
     rarity: 'common',
     description: 'Includes a backpack, blanket, candles, tinderbox, alms box, rations, and waterskin.',
     weight: 20,
