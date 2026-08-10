@@ -1,11 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { CombatState, Character } from '../../../types';
 import { isDebugMode } from '../../../utils/debug';
 import { cx } from '../primitives/cx';
 import Avatar from '../primitives/Avatar';
 import Button from '../primitives/Button';
 import IconButton from '../primitives/IconButton';
-import Tooltip from '../primitives/Tooltip';
 import QuickActionsSheet from './QuickActionsSheet';
 import EnemyTurnBar from './EnemyTurnBar';
 
@@ -32,11 +31,6 @@ interface ComposerProps {
   combat?: CombatState;
   character?: Character | null;
   onInputChanged?: (value: string) => void;
-  /** Accepted for parity with the old InputArea API. Recovery/spellbook modals
-   *  are owned by the parent (ChatColumn/layout) — the Composer only invokes
-   *  the simple opener callbacks below. */
-  onArcaneRecovery?: (characterId: string, selections: Array<{ level: number; count: number }>) => void;
-  onNaturalRecovery?: (characterId: string, selections: Array<{ level: number; count: number }>) => void;
   placeholder?: string;
   /** Simple openers — the actual modals live outside this component. */
   onOpenArcaneRecovery?: () => void;
@@ -169,24 +163,15 @@ const Composer: React.FC<ComposerProps> = ({
       ? 'The GM is narrating...'
       : placeholder ?? 'What do you do, adventurer?';
 
-  const mic = useMemo(
-    () => (
-      <Tooltip
-        content={recognitionSupported ? (isListening ? 'Stop listening' : 'Speak action') : 'Speech recognition unavailable'}
-        disabled={false}
-      >
-        <IconButton
-          icon={isListening ? 'fa-microphone' : 'fa-microphone-lines'}
-          variant={isListening ? 'danger' : 'ghost'}
-          tip={isListening ? 'Stop listening' : 'Speak action'}
-          disabled={effectivelyLocked || !recognitionSupported}
-          onClick={toggleListening}
-          className={isListening ? 'animate-pulse' : undefined}
-          aria-label="Speak action"
-        />
-      </Tooltip>
-    ),
-    [isListening, effectivelyLocked, recognitionSupported, toggleListening],
+  const micButton = (
+    <IconButton
+      icon={isListening ? 'fa-microphone' : 'fa-microphone-lines'}
+      variant={isListening ? 'danger' : 'ghost'}
+      tip={isListening ? 'Stop listening' : (recognitionSupported ? 'Speak action' : 'Speech recognition unavailable')}
+      disabled={effectivelyLocked || !recognitionSupported}
+      onClick={toggleListening}
+      className={isListening ? 'animate-pulse' : undefined}
+    />
   );
 
   return (
@@ -230,7 +215,7 @@ const Composer: React.FC<ComposerProps> = ({
             />
           </div>
 
-          {mic}
+          {micButton}
           <IconButton
             icon="fa-dice-d20"
             variant="subtle"

@@ -138,9 +138,9 @@ describe('MockMCPServer', () => {
       expect(server.getFullState().party[0].name).toBe('Renamed Hero');
     });
 
-    it('setCharacter delegates to joinParty', () => {
+    it('joinParty adds a second member', () => {
       const char = makeCharacter({ id: 'hero-2' });
-      server.setCharacter(char);
+      server.joinParty(char);
       expect(server.getFullState().party).toHaveLength(1);
     });
 
@@ -1948,7 +1948,7 @@ const roundTripped = deepClone(char.conditions);
 
   describe('start_combat with enemies array', () => {
     it('registers enemies and starts combat', async () => {
-      server.setCharacter(makeCharacter());
+      server.joinParty(makeCharacter());
       const result = await server.start_combat(undefined, [
         { name: 'Goblin', ac: 15, hp: 7 },
         { name: 'Orc', ac: 13, hp: 15 },
@@ -1963,7 +1963,7 @@ const roundTripped = deepClone(char.conditions);
   describe('update_inventory with cost_gp', () => {
     it('deducts currency when adding an item', async () => {
       const c = makeCharacter();
-      server.setCharacter(c);
+      server.joinParty(c);
       const target = server.getTarget('hero-1') || server.getTarget('Hero');
       if (!target) throw new Error('Expected character target');
       const prevGp = target.currency.gp;
@@ -1978,7 +1978,7 @@ const roundTripped = deepClone(char.conditions);
 
   describe('short_rest with narration', () => {
     it('advances time when narration is provided', async () => {
-      server.setCharacter(makeCharacter());
+      server.joinParty(makeCharacter());
       const result = await server.short_rest('hero-1', 'The party catches their breath.', true);
       expect(result.success).toBe(true);
     });
@@ -1986,7 +1986,7 @@ const roundTripped = deepClone(char.conditions);
 
   describe('long_rest with narration', () => {
     it('advances time when narration is provided', async () => {
-      server.setCharacter(makeCharacter());
+      server.joinParty(makeCharacter());
       const result = await server.long_rest('The party sleeps soundly.', true);
       expect(result.success).toBe(true);
     });
@@ -2142,7 +2142,7 @@ const roundTripped = deepClone(char.conditions);
     it('performs an attack roll against an enemy', async () => {
       vi.mocked(cryptoRoll).mockReturnValue(10);
       const c = makeCharacter();
-      server.setCharacter(c);
+      server.joinParty(c);
       await server.start_combat(undefined, [{ name: 'Goblin', ac: 10, hp: 7 }]);
       const result = await server.player_attack('hero-1', 'Longsword', 'Goblin');
       expect(result.success).toBe(true);
@@ -2152,7 +2152,7 @@ const roundTripped = deepClone(char.conditions);
   describe('spell_effect', () => {
     it('auto-succeeds for level 3 or lower spells', async () => {
       const c = makeCharacter({ class: 'Wizard' });
-      server.setCharacter(c);
+      server.joinParty(c);
       const result = await server.spell_effect('counter', 'hero-1', 3);
       expect(result.success).toBe(true);
       expect(result.data?.autoSuccess).toBe(true);
@@ -2162,7 +2162,7 @@ const roundTripped = deepClone(char.conditions);
   describe('allocateStatPoints', () => {
     it('allocates stat points and skills in bulk', async () => {
       const c = makeCharacter({ unusedStatPoints: 2, unusedSkillPoints: 2, skills: {} });
-      server.setCharacter(c);
+      server.joinParty(c);
       const result = server.allocateStatPoints({ str: 2 }, 'hero-1', { stealth: 1 }, 0);
       expect(result.success).toBe(true);
       const updated = server.getTarget('hero-1');
@@ -2174,7 +2174,7 @@ const roundTripped = deepClone(char.conditions);
 
   describe('check_skill with onSuccess', () => {
     it('fires onSuccess consequence on success', async () => {
-      server.setCharacter(makeCharacter());
+      server.joinParty(makeCharacter());
       vi.mocked(cryptoRoll).mockReturnValue(20);
       const onSuccess = { awardCurrency: { gp: 5 }, logLore: { title: 'L', content: 'C', category: 'History' as const } };
       const result = await server.check_skill('perception', 5, 'hero-1', onSuccess);
@@ -2183,7 +2183,7 @@ const roundTripped = deepClone(char.conditions);
       expect(result.message).toContain('New Lore Entry Recorded');
     });
     it('does NOT fire onSuccess on failure', async () => {
-      server.setCharacter(makeCharacter());
+      server.joinParty(makeCharacter());
       vi.mocked(cryptoRoll).mockReturnValue(1);
       const onSuccess = { awardCurrency: { gp: 100 } };
       const result = await server.check_skill('athletics', 30, 'hero-1', onSuccess);
@@ -2194,7 +2194,7 @@ const roundTripped = deepClone(char.conditions);
 
   describe('move_to with skillCheck', () => {
     it('performs skill check on arrival', async () => {
-      server.setCharacter(makeCharacter());
+      server.joinParty(makeCharacter());
       vi.mocked(cryptoRoll).mockReturnValue(15);
       const skillCheck = { skill_name: 'perception', difficulty: 5 };
       const result = await server.move_to('Ancient Library', 'A dark library', 'hero-1', skillCheck);
@@ -2205,7 +2205,7 @@ const roundTripped = deepClone(char.conditions);
 
   describe('make_save on enemy targets', () => {
     it('rolls save for an enemy with fallback stats', async () => {
-      server.setCharacter(makeCharacter());
+      server.joinParty(makeCharacter());
       await server.start_combat(undefined, [{ name: 'Orc', ac: 13, hp: 15 }]);
       const result = await server.make_save('Orc', 'dex', 12);
       expect(result.success).toBe(true);
@@ -2215,7 +2215,7 @@ const roundTripped = deepClone(char.conditions);
 
   describe('exhaustion tracking', () => {
     it('applies exhaustion after 16 hours awake', async () => {
-      server.setCharacter(makeCharacter());
+      server.joinParty(makeCharacter());
 
       const state = server.getFullState();
       state.lastLongRestTime = 0;
@@ -2233,7 +2233,7 @@ const roundTripped = deepClone(char.conditions);
       const c = makeCharacter({
         inventory: [{ name: 'Stick', quantity: 1, type: 'gear' }]
       });
-      server.setCharacter(c);
+      server.joinParty(c);
       const result = await server.update_inventory('Magic Wand', 'add', 1, undefined, 'hero-1', undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, true);
       expect(result.success).toBe(false);
       expect(result.message).toContain('No recipe found');
@@ -2242,7 +2242,7 @@ const roundTripped = deepClone(char.conditions);
       const c = makeCharacter({
         inventory: [{ name: 'Herbalism kit', quantity: 1, type: 'gear' }]
       });
-      server.setCharacter(c);
+      server.joinParty(c);
       const result = await server.update_inventory('Potion of Healing', 'add', 1, undefined, 'hero-1', undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, true);
       expect(result.success).toBe(false);
       expect(result.message).toContain('Missing ingredient');
@@ -2251,7 +2251,7 @@ const roundTripped = deepClone(char.conditions);
 
   describe('faction reputation', () => {
     it('updates reputation on quest completion', async () => {
-      server.setCharacter(makeCharacter());
+      server.joinParty(makeCharacter());
       await server.upsert_quest('Help the Guard', 'Rescue villagers', 'completed', undefined, [{ faction: 'City Guard', delta: 20 }]);
       const state = server.getFullState();
       expect(state.factionReputations?.['city guard']).toBe(20);
@@ -2261,7 +2261,7 @@ const roundTripped = deepClone(char.conditions);
   describe('cast_spell with reaction', () => {
     it('rejects when reaction already used this turn', async () => {
       const c = makeCharacter({ reactionUsedThisTurn: true });
-      server.setCharacter(c);
+      server.joinParty(c);
       const result = await server.cast_spell('hero-1', 'shield', 1, [], undefined, true);
       expect(result.success).toBe(false);
       expect(result.message).toContain('reaction');
@@ -2272,7 +2272,7 @@ const roundTripped = deepClone(char.conditions);
     it('resolves enemy turn and returns on player turn', async () => {
       vi.mocked(cryptoRoll).mockReturnValue(10);
       const c = makeCharacter();
-      server.setCharacter(c);
+      server.joinParty(c);
       await server.start_combat(undefined, [{ name: 'Goblin', ac: 10, hp: 7 }]);
       const state0 = server.getFullState();
       if (!state0.combat) throw new Error('Expected combat to be active');

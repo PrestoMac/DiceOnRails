@@ -16,7 +16,7 @@ export const ok = (data: unknown, message: string): MCPResponse => ({ success: t
 
 /** Generates a random alphanumeric ID of the specified length. */
 export function generateId(length = 9): string {
-  return Math.random().toString(36).substr(2, length);
+  return Math.random().toString(36).slice(2, 2 + length);
 }
 
 /** Checks if a query string loosely matches an entity by ID or name.

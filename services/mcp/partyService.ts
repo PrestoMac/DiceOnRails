@@ -4,7 +4,6 @@ import { ensureGameStateFields } from './stateService';
 
 /** Service interface for managing party members and resource lookups. */
 export interface PartyService {
-  setCharacter(character: Character): void;
   joinParty(character: Character): void;
   getTarget(id?: string): Character | undefined;
   getResource(uri: string): unknown;
@@ -13,10 +12,6 @@ export interface PartyService {
 /** Creates a new PartyService instance operating on the given GameState. */
 export function createPartyService(state: GameState): PartyService {
   return {
-    setCharacter(character: Character) {
-      this.joinParty(character);
-    },
-
     joinParty(character: Character) {
       const existingIdx = state.party.findIndex(c => c.id === character.id);
       if (!character.hitDice) {

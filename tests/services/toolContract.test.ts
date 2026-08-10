@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { tools } from '../../services/llm/toolDefinitions';
+import { tools } from '../../services/llm/tools';
 
 const EXPECTED_TOOL_NAMES = [
   'roll_dice', 'add_enemy', 'start_combat', 'next_turn', 'end_combat',

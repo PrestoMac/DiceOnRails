@@ -6,14 +6,13 @@ interface HpBarProps {
   current: number;
   max: number;
   className?: string;
-  height?: 'sm' | 'md' | 'lg';
+  height?: 'sm' | 'md';
   showNumbers?: boolean;
 }
 
 const HEIGHTS: Record<NonNullable<HpBarProps['height']>, string> = {
   sm: 'h-1.5',
   md: 'h-2.5',
-  lg: 'h-4',
 };
 
 const HpBar: React.FC<HpBarProps> = ({ current, max, className, height = 'md', showNumbers = false }) => {

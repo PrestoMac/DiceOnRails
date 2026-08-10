@@ -7,6 +7,7 @@ import Sheet from '../primitives/Sheet';
 import Tabs from '../primitives/Tabs';
 import Chip from '../primitives/Chip';
 import { cx } from '../primitives/cx';
+import { SCHOOL_ICONS } from '../game/sheets/DetailModals';
 
 interface QuickActionsSheetProps {
   open: boolean;
@@ -30,12 +31,6 @@ interface QuickAction {
   category: QuickCategory;
   badge?: string;
 }
-
-const SCHOOL_ICONS: Record<string, string> = {
-  evocation: 'fa-fire', abjuration: 'fa-shield', conjuration: 'fa-wand-sparkles',
-  divination: 'fa-eye', enchantment: 'fa-heart', illusion: 'fa-cloud',
-  necromancy: 'fa-skull', transmutation: 'fa-flask',
-};
 
 const CATEGORY_META: Record<QuickCategory, { label: string; icon: string; accent: string }> = {
   spell: { label: 'Spells', icon: 'fa-wand-sparkles', accent: 'text-arcane-400' },

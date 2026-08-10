@@ -31,13 +31,6 @@ export interface SpellcastingService {
    *  Atomic. Requires `character.pendingSpellSwap === true`; consumes it on success. */
   swap_known_spell(characterId: string, oldSpellId: string, newSpellId: string): Promise<MCPResponse>;
   use_resource(characterId: string, resourceId: string, targetId?: string, amount?: number): Promise<MCPResponse>;
-  abilityCheckForSpell(caster: Character, targetSpellLevel: number): { roll: number; total: number; dc: number; success: boolean; ability: string; abilityMod: number; profBonus: number } | null;
-  getDotDamageFormula(spellId: string, slotLevel: number): string;
-  getDotDamageType(spellId: string): string;
-  getDotSaveStat(spellId: string): string | undefined;
-  getDotAddsAbilityMod(spellId: string): boolean;
-  applyAcBuff(target: Character, source: string, bonus: number, duration: number, durationUnit?: 'round' | 'minute'): void;
-  applyWeaponBuff(target: Character, source: string, duration: number, durationUnit?: 'round' | 'minute'): void;
 }
 
 /** Creates a new SpellcastingService instance operating on the given GameState. */
@@ -139,14 +132,6 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
   }
 
   return {
-    getDotDamageFormula,
-    getDotDamageType,
-    getDotSaveStat,
-    getDotAddsAbilityMod,
-    applyAcBuff,
-    applyWeaponBuff,
-    abilityCheckForSpell,
-
     async cast_spell(characterId, spellId, slotLevel = 0, targets = [], targetSaveResults, reaction, metamagic) {
       const char = deps.getTarget(characterId);
       if (!char) return fail('Character not found.');

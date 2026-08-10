@@ -6,22 +6,18 @@ interface ToggleProps {
   on: boolean;
   onToggle: () => void;
   label?: string;
-  disabled?: boolean;
-  className?: string;
 }
 
-const Toggle: React.FC<ToggleProps> = ({ on, onToggle, label, disabled = false, className }) => (
+const Toggle: React.FC<ToggleProps> = ({ on, onToggle, label }) => (
   <button
     type="button"
     role="switch"
     aria-checked={on}
     aria-label={label}
-    disabled={disabled}
     onClick={onToggle}
     className={cx(
-      'relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed border',
+      'relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 cursor-pointer shrink-0 border',
       on ? 'bg-ember-600 border-ember-500/50' : 'bg-obsidian-800 border-white/10',
-      className,
     )}
   >
     <span

@@ -78,7 +78,7 @@ const HallScreen: React.FC<HallScreenProps> = ({
   };
 
   return (
-    <Screen dots>
+    <Screen>
       <div className="flex-1 min-h-0 overflow-y-auto v2-scrollbar">
         <div className="w-full max-w-6xl mx-auto px-4 py-8 md:py-12">
           <div className="flex flex-wrap items-end justify-between gap-4 mb-8">

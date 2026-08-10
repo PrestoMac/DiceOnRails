@@ -22,7 +22,7 @@ function makeLLMResponse(content: string, toolCalls: Array<{ name: string; args:
     message: {
       content,
       tool_calls: toolCalls.map(tc => ({
-        id: `call_${Math.random().toString(36).substr(2, 8)}`,
+        id: `call_${Math.random().toString(36).slice(2, 10)}`,
         type: 'function',
         function: { name: tc.name, arguments: JSON.stringify(tc.args) },
       })),

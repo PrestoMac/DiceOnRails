@@ -272,7 +272,6 @@ services/llm/
 ├── portrait.ts           # generatePortrait (character portrait image), buildPortraitPrompt
 ├── contextManager.ts     # Token-budget enforcement + episode-checkpoint pipeline
 ├── tokenEstimation.ts    # Heuristic length→token estimator + budget constants
-├── toolDefinitions.ts    # Re-export shim (tools + TOOL_MODE_INSTRUCTION)
 ├── toolFilter.ts         # Strips irrelevant tools from the schema based on state
 ├── prompts/
 │   └── toolModePrompt.ts # TOOL_MODE_INSTRUCTION — the giant system instruction
@@ -632,7 +631,7 @@ Designed as a single config table (`XP_CONFIG`) to make tuning game feel a one-l
 
 ### `summoningEngine.ts` / `teleportationEngine.ts` / `transformationEngine.ts`
 
-Specialized mechanics for summons (create summoned creatures with CR caps), teleportation (Misty Step, Dimension Door range checks), and transformations (Polymorph, Wild Shape, True Polymorph with beast CR caps by level / class). The beast form templates (`BEAST_TEMPLATES` → `BEAST_FORMS`) include Wolf, Panther, Brown Bear, Dire Wolf, Giant Eagle, Giant Crocodile (CR 5, swim), and Tyrannosaurus Rex (CR 8). `data/beasts.ts` re-exports these as the `BEAST_FORMS_CATALOG` — the engine is the single source of truth. `createTransformationState.originalForm.ac` preserves the character's pre-shape AC.
+Specialized mechanics for summons (create summoned creatures with CR caps), teleportation (Misty Step, Dimension Door range checks), and transformations (Polymorph, Wild Shape, True Polymorph with beast CR caps by level / class). The beast form templates (`BEAST_TEMPLATES` → `BEAST_FORMS`) include Wolf, Panther, Brown Bear, Dire Wolf, Giant Eagle, Giant Crocodile (CR 5, swim), and Tyrannosaurus Rex (CR 8); the engine is the single source of truth. `createTransformationState.originalForm.ac` preserves the character's pre-shape AC.
 
 ### `auditor.ts`
 
@@ -927,7 +926,7 @@ data/
 └── glossary.ts           # Jargon glossary entries surfaced in the Compendium Glossary tab
 ```
 
-These same catalogs are re-exported via `utils/classes.ts`, `utils/races.ts`, `utils/spells.ts`, `utils/feats.ts`, `utils/monsters.ts`, `utils/srdItems.ts` and accessible through the `utils/index.ts` barrel.
+These same catalogs are re-exported via `utils/classes.ts`, `utils/races.ts`, `utils/spells.ts`, `utils/feats.ts`, `utils/monsters.ts`, `utils/srdItems.ts` (each utils module imports its catalog and exposes convenience helpers / lookup maps).
 
 The `data/constants.ts` file is re-exported via the top-level `constants.ts`, which also defines `SYSTEM_INSTRUCTION`, `PROGRESSION_SYSTEM_PROMPT`, and `INITIAL_CHARACTER` (a frozen default character template — used in tests and as a fallback).
 
@@ -1113,7 +1112,7 @@ These are unwritten rules that hold across the codebase. Violate them at your pe
 ### Files
 
 - **No comments.** Codebase convention is to write self-documenting code. (Inline `// ───` section banners appear in some services but are rare.)
-- **No barrel exports for components.** Components are imported by direct path (e.g. `./components/chat/MessageBubble` historically; today `./components/modals/SpellDetailModal`). Services and utils do have barrels (`services/index.ts`, `utils/index.ts`).
+- **No barrel exports for components.** Components are imported by direct path (e.g. `./components/chat/MessageBubble` historically; today `./components/modals/SpellDetailModal`). The legacy `utils/index.ts` / `hooks/index.ts` barrels were removed as dead code; utils and hooks are imported by direct sub-module path.
 - **Hook names start with `use`.** Context hooks are `useXContext` (e.g. `useGameContext`); raw hooks are `useX` (e.g. `useGameState`).
 - **All React components are default exports.** All engine functions are named exports.
 

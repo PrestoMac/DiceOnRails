@@ -1,8 +1,6 @@
 import { getEnv } from "../utils/envHelper";
 import { isDebugMode } from "../utils/debug";
-
-/** Supported LLM provider identifiers. */
-export type LLMProvider = 'openai' | 'openrouter';
+import { LLMProvider } from "../types";
 
 /** Builds the full /chat/completions URL for a given provider, using a custom base URL or falling back to defaults. */
 export function buildChatCompletionUrl(provider: LLMProvider, customBase?: string): string {
@@ -98,8 +96,7 @@ export function buildSessionId(campaignId?: string): string {
         try {
             const existing = typeof localStorage !== 'undefined' ? localStorage.getItem(ANON_KEY) : null;
             if (existing) return existing;
-            // Generate a simple random ID without crypto dependency
-            const id = `anon-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+            const id = `anon-${crypto.randomUUID()}`;
             if (typeof localStorage !== 'undefined') localStorage.setItem(ANON_KEY, id);
             return id;
         } catch {

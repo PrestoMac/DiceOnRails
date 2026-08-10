@@ -102,7 +102,6 @@ export class MockMCPServer {
   }
 
 
-  public setCharacter(character: Character) { this.party.setCharacter(character); }
   public joinParty(character: Character) { this.party.joinParty(character); }
   public getTarget(id?: string): Character | undefined { return this.party.getTarget(id); }
   public getResource(uri: string): unknown { return this.party.getResource(uri); }

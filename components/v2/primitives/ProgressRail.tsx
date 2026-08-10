@@ -22,11 +22,10 @@ interface ProgressRailProps {
 
 /** Step navigator with completion checks — the forge's progress spine. */
 const ProgressRail: React.FC<ProgressRailProps> = ({ steps, currentKey, onJump, orientation = 'side', className }) => {
-  const currentIndex = steps.findIndex((s) => s.key === currentKey);
   if (orientation === 'top') {
     return (
       <div className={cx('flex items-center gap-1 overflow-x-auto v2-noscroll', className)}>
-        {steps.map((step, i) => {
+        {steps.map((step) => {
           const active = step.key === currentKey;
           const clickable = step.done && !active;
           return (
@@ -53,7 +52,6 @@ const ProgressRail: React.FC<ProgressRailProps> = ({ steps, currentKey, onJump, 
                 {step.label}
               </span>
               {active && <span className="block w-6 h-0.5 rounded bg-ember-500" />}
-              {i === currentIndex && null}
             </button>
           );
         })}

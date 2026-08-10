@@ -6,7 +6,7 @@ import { Z } from './layers';
 interface TooltipProps {
   content: React.ReactNode;
   children: React.ReactNode;
-  side?: 'top' | 'bottom' | 'left' | 'right';
+  side?: 'top' | 'bottom' | 'left';
   className?: string;
   disabled?: boolean;
 }
@@ -32,7 +32,6 @@ const Tooltip: React.FC<TooltipProps> = ({ content, children, side = 'top', clas
     let y = r.top - gap;
     if (side === 'bottom') y = r.bottom + gap;
     if (side === 'left') { x = r.left - gap; y = r.top + r.height / 2; }
-    if (side === 'right') { x = r.right + gap; y = r.top + r.height / 2; }
     setPos({ x, y });
     setVisible(true);
   };
@@ -59,7 +58,6 @@ const Tooltip: React.FC<TooltipProps> = ({ content, children, side = 'top', clas
     top: '-translate-x-1/2 -translate-y-full',
     bottom: '-translate-x-1/2',
     left: '-translate-x-full -translate-y-1/2',
-    right: '-translate-y-1/2',
   };
 
   return (

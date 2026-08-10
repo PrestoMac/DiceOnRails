@@ -236,7 +236,7 @@ const QuickStartScreen: React.FC<QuickStartScreenProps> = ({
   );
 
   return (
-    <Screen dots>
+    <Screen>
       <div className="absolute top-4 left-4 md:top-6 md:left-6">
         <Button variant="ghost" size="sm" icon="fa-arrow-left" onClick={step === 'grounds' ? handleBackToSelect : onBack}>
           Back

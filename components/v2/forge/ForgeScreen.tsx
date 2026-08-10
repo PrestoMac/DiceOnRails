@@ -331,7 +331,7 @@ const ForgeScreen: React.FC<ForgeScreenProps> = ({
   const continueIcon = currentStep.key === 'review' ? (hasGrounds ? 'fa-map-location-dot' : 'fa-flag-checkered') : 'fa-arrow-right';
 
   return (
-    <Screen dots>
+    <Screen>
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row">
         {/* Mobile top rail */}
         <div className="lg:hidden sticky top-0 z-20 bg-obsidian-950/85 backdrop-blur border-b border-white/[0.06] px-3 py-2">

@@ -17,15 +17,10 @@ export function calculateXPToNextLevel(currentLevel: number): number {
   return getXpForLevel(currentLevel + 1) - getXpForLevel(currentLevel);
 }
 
-/** Calculates the maximum hit points for a character, delegating to the class engine. */
-export function calculateMaxHp(character: Character): number {
-  return classEngineCalculateMaxHp(character);
-}
-
 /** Calculates the HP gain a character would receive upon leveling up by comparing current and next-level max HP. */
 export function calculateHPGainForLevelUp(character: Character): number {
   const oldMax = character.hp.max;
-  const newMax = calculateMaxHp({ ...character, level: character.level + 1 });
+  const newMax = classEngineCalculateMaxHp({ ...character, level: character.level + 1 });
   return newMax - oldMax;
 }
 
@@ -108,7 +103,7 @@ export function awardExperience(
     }
 
     const oldMaxHp = character.hp.max;
-    const newMaxHp = calculateMaxHp(updated);
+    const newMaxHp = classEngineCalculateMaxHp(updated);
     const hpDiff = newMaxHp - oldMaxHp;
     updated.hp = updateHp(character.hp.current + hpDiff, newMaxHp);
     updated.resources = recalculateResourcePools(updated);
@@ -195,7 +190,7 @@ export function applyStatAllocation(
 
   updated.resources = recalculateResourcePools(updated);
 
-  const newMaxHp = calculateMaxHp(updated);
+  const newMaxHp = classEngineCalculateMaxHp(updated);
   const hpGained = newMaxHp - oldHp;
   updated.hp = updateHp(character.hp.current + Math.max(0, hpGained), newMaxHp);
 

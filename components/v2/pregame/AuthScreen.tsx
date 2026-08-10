@@ -84,7 +84,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onComplete }) => {
   };
 
   return (
-    <Screen dots center>
+    <Screen center>
       <div className="w-full max-h-[100dvh] overflow-y-auto v2-scrollbar px-4 py-10">
         <div className="w-full max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-10 items-center">
           {/* Brand panel */}

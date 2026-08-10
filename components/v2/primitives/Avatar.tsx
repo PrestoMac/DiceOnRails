@@ -6,10 +6,8 @@ interface AvatarProps {
   name: string;
   src?: string | null;
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
-  ring?: 'ember' | 'arcane' | 'none';
+  ring?: 'ember' | 'none';
   className?: string;
-  onClick?: () => void;
-  title?: string;
 }
 
 const SIZES: Record<NonNullable<AvatarProps['size']>, { box: string; text: string }> = {
@@ -22,11 +20,10 @@ const SIZES: Record<NonNullable<AvatarProps['size']>, { box: string; text: strin
 
 const RINGS: Record<NonNullable<AvatarProps['ring']>, string> = {
   ember: 'ring-2 ring-ember-500/50',
-  arcane: 'ring-2 ring-arcane-500/50',
   none: 'ring-1 ring-white/10',
 };
 
-const Avatar: React.FC<AvatarProps> = ({ name, src, size = 'md', ring = 'none', className, onClick, title }) => {
+const Avatar: React.FC<AvatarProps> = ({ name, src, size = 'md', ring = 'none', className }) => {
   const s = SIZES[size];
   const content = src ? (
     <img src={src} alt={name} className="w-full h-full object-cover" loading="lazy" />
@@ -35,22 +32,8 @@ const Avatar: React.FC<AvatarProps> = ({ name, src, size = 'md', ring = 'none', 
       {(name || '?').trim().charAt(0).toUpperCase() || '?'}
     </span>
   );
-  const cls = cx(
-    'inline-flex items-center justify-center rounded-full overflow-hidden bg-obsidian-800 shrink-0',
-    s.box,
-    RINGS[ring],
-    onClick && 'cursor-pointer hover:brightness-110 transition',
-    className,
-  );
-  if (onClick) {
-    return (
-      <button type="button" onClick={onClick} title={title ?? name} aria-label={title ?? name} className={cls}>
-        {content}
-      </button>
-    );
-  }
   return (
-    <span className={cls} title={title}>
+    <span className={cx('inline-flex items-center justify-center rounded-full overflow-hidden bg-obsidian-800 shrink-0', s.box, RINGS[ring], className)} title={name}>
       {content}
     </span>
   );

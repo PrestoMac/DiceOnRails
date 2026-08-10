@@ -69,7 +69,7 @@ const ChoiceCard: React.FC<{
 
 /** Decision screen before character creation: Quick Start (preset hero) vs Custom Forge (full wizard). */
 const PathScreen: React.FC<PathScreenProps> = ({ onQuickStart, onCustom, onBack }) => (
-  <Screen dots center>
+  <Screen center>
     <div className="absolute top-4 left-4 md:top-6 md:left-6">
       <Button variant="ghost" size="sm" icon="fa-arrow-left" onClick={onBack}>
         Back

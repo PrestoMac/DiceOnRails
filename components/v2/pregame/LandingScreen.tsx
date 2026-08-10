@@ -73,7 +73,7 @@ const LandingScreen: React.FC<{ onComplete: () => void }> = ({ onComplete }) => 
   };
 
   return (
-    <Screen dots center className={`transition-opacity duration-300 ${fading ? 'opacity-0' : 'opacity-100'}`}>
+    <Screen center className={`transition-opacity duration-300 ${fading ? 'opacity-0' : 'opacity-100'}`}>
       {/* Slow-spinning d20 watermark */}
       <i
         className="fas fa-dice-d20 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-[44vmin] text-ember-500/[0.06] animate-spin-slow pointer-events-none"

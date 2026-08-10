@@ -18,25 +18,18 @@ interface RecoverySheetProps {
 
 const MAX_SLOT_LEVEL = 5;
 
-const KIND_META: Record<RecoveryKind, { title: string; icon: string; accentText: string; confirmClasses: string }> = {
+const KIND_META: Record<RecoveryKind, { title: string; icon: string; accentText: string }> = {
   arcane: {
     title: 'Arcane Recovery',
     icon: 'fa-hat-wizard',
     accentText: 'text-arcane-300',
-    confirmClasses:
-      'bg-arcane-700 hover:bg-arcane-600 text-arcane-200 border-arcane-500/40 shadow-[0_4px_20px_rgba(139,124,246,0.25)]',
   },
   natural: {
     title: 'Natural Recovery',
     icon: 'fa-leaf',
     accentText: 'text-verdant-400',
-    confirmClasses:
-      'bg-verdant-700 hover:bg-verdant-600 text-verdant-300 border-verdant-500/40 shadow-[0_4px_20px_rgba(63,166,106,0.25)]',
   },
 };
-
-const CONFIRM_BASE =
-  'inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs rounded-md font-display font-semibold uppercase tracking-wider border transition-all duration-150 cursor-pointer disabled:bg-obsidian-750 disabled:text-parchment-faint disabled:border-obsidian-700 disabled:shadow-none disabled:cursor-not-allowed select-none';
 
 /** Emberlight V2 unified short-rest slot-recovery sheet — merges the legacy
  *  ArcaneRecoveryModal (wizard) and NaturalRecoveryModal (Circle of the Land
@@ -123,9 +116,9 @@ const RecoverySheet: React.FC<RecoverySheetProps> = ({ kind, character, open, on
       footer={(
         <div className="flex gap-3 justify-end">
           <Button variant="ghost" size="sm" onClick={handleClose}>Cancel</Button>
-          <button type="button" onClick={handleConfirm} disabled={!canRecover} className={cx(CONFIRM_BASE, meta.confirmClasses)}>
+          <Button variant={kind === 'arcane' ? 'arcane' : 'verdant'} size="sm" onClick={handleConfirm} disabled={!canRecover}>
             Recover Slots
-          </button>
+          </Button>
         </div>
       )}
     >

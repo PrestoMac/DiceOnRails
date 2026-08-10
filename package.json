@@ -19,7 +19,6 @@
     "test:live:tier3": "npx tsx tests/live/run_all.ts",
     "test:all": "npm test && npm run test:live:tier3",
     "install-app": "node scripts/install.js",
-
     "prepare": "husky"
   },
   "dependencies": {
@@ -29,7 +28,6 @@
     "chalk": "^5.6.2",
     "dotenv": "^17.2.3",
     "inquirer": "^13.2.0",
-    "lucide-react": "^1.31.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-markdown": "^10.1.0"
@@ -37,7 +35,6 @@
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
-
     "@types/node": "^22.14.0",
     "@typescript-eslint/eslint-plugin": "^8.64.0",
     "@typescript-eslint/parser": "^8.64.0",

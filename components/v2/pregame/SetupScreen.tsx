@@ -199,7 +199,7 @@ const SetupScreen: React.FC = () => {
   ];
 
   return (
-    <Screen dots center>
+    <Screen center>
       <div className="w-full max-h-[100dvh] overflow-y-auto v2-scrollbar px-4 py-10">
         <div className="w-full max-w-lg mx-auto bg-obsidian-900/70 border border-white/[0.06] rounded-2xl p-6 md:p-8 shadow-2xl">
           <div className="text-center mb-6">

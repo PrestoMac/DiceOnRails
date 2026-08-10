@@ -1,7 +1,6 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Message, MessageRole, RollData } from '../../../types';
-import type { AppSettings } from '../../../types';
 import { cx } from '../primitives/cx';
 import Avatar from '../primitives/Avatar';
 import Chip from '../primitives/Chip';
@@ -12,7 +11,6 @@ import { formatMessageText } from './format';
 
 interface MessageBubbleProps {
   message: Message;
-  settings: AppSettings;
   isLastUserMessage: boolean;
   portraitUrl?: string;
   showAvatar: boolean;
@@ -48,8 +46,6 @@ const LegacyRollBadge: React.FC<{ roll: LegacyRoll }> = ({ roll }) => (
 /** Renders one chat message in the Emberlight V2 voice: narration prose, player bubbles, system cards, or isolated tool logs. */
 const MessageBubble: React.FC<MessageBubbleProps> = ({
   message,
-  // `settings` is accepted for API parity (TTS voice config) — the actual
-  // speak/cleanup pipeline is owned by ChatColumn, which calls onSpeak.
   isLastUserMessage,
   portraitUrl,
   showAvatar,

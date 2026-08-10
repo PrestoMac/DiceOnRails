@@ -17,9 +17,7 @@ export const ForgeAdjBtn: React.FC<{
   onClick: () => void;
   disabled?: boolean;
   icon: 'plus' | 'minus';
-  /** Visual intent: 'add' hovers verdant, 'remove' hovers blood. */
-  tone?: 'add' | 'remove';
-}> = ({ onClick, disabled, icon, tone = icon === 'plus' ? 'add' : 'remove' }) => (
+}> = ({ onClick, disabled, icon }) => (
   <button
     type="button"
     onClick={onClick}
@@ -28,7 +26,7 @@ export const ForgeAdjBtn: React.FC<{
     className={cx(
       'w-7 h-7 inline-flex items-center justify-center rounded-md text-[11px] border transition-colors cursor-pointer select-none',
       'bg-obsidian-800 border-white/[0.08] text-parchment-dim disabled:opacity-25 disabled:cursor-not-allowed',
-      tone === 'add' ? 'hover:border-verdant-500/50 hover:text-verdant-300 hover:bg-verdant-500/10' : 'hover:border-blood-500/50 hover:text-blood-300 hover:bg-blood-500/10',
+      icon === 'plus' ? 'hover:border-verdant-500/50 hover:text-verdant-300 hover:bg-verdant-500/10' : 'hover:border-blood-500/50 hover:text-blood-300 hover:bg-blood-500/10',
     )}
   >
     <i className={cx('fas', `fa-${icon}`)} aria-hidden="true" />

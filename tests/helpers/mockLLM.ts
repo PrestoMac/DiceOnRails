@@ -45,7 +45,7 @@ export function createMockAgentLoop(options: MockAgentLoopOptions) {
 
     for (const toolCall of currentBatch) {
       const msg: Message = {
-        id: `mock-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: `mock-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
         role: 'tool' as MessageRole,
         text: '',
         timestamp: Date.now(),

@@ -67,7 +67,7 @@ export function createSummonedCreature(
   _casterLevel: number
 ): Enemy | null {
   const t = TEMPLATES[template.toLowerCase()];
-  return t ? buildCreature(t, casterId, `summon-${Math.random().toString(36).substr(2, 9)}`) : null;
+  return t ? buildCreature(t, casterId, `summon-${Math.random().toString(36).slice(2, 11)}`) : null;
 }
 
 /** Filters out summoned creatures whose duration has expired or have 0 HP, decrementing duration for survivors. */

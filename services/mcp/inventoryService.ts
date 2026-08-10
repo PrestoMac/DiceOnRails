@@ -30,9 +30,9 @@ function normalizeCurrency(totalCp: number): Currency {
   return { gp, sp, cp };
 }
 
-const RECIPES: Record<string, { result: string; resultType: 'weapon' | 'armor' | 'potion' | 'gear'; requiredTools: string[]; ingredients: Array<{ item: string; quantity: number }>; craftTime: number; dc?: number; description: string; }> = {
-  'potion of healing': { result: 'Potion of Healing', resultType: 'potion', requiredTools: ['herbalism kit'], ingredients: [{ item: 'herbs', quantity: 2 }], craftTime: 60, description: 'Brews a Potion of Healing (restores 2d4+2 HP).' },
-  'alchemists-fire': { result: "Alchemist's Fire", resultType: 'gear', requiredTools: ['alchemists-supplies'], ingredients: [{ item: 'sulfur', quantity: 1 }, { item: 'oil', quantity: 1 }], craftTime: 30, description: 'Crafts a flask of Alchemist\'s Fire.' }
+const RECIPES: Record<string, { result: string; resultType: 'weapon' | 'armor' | 'potion' | 'gear'; requiredTools: string[]; ingredients: Array<{ item: string; quantity: number }>; description: string; }> = {
+  'potion of healing': { result: 'Potion of Healing', resultType: 'potion', requiredTools: ['herbalism kit'], ingredients: [{ item: 'herbs', quantity: 2 }], description: 'Brews a Potion of Healing (restores 2d4+2 HP).' },
+  'alchemists-fire': { result: "Alchemist's Fire", resultType: 'gear', requiredTools: ['alchemists-supplies'], ingredients: [{ item: 'sulfur', quantity: 1 }, { item: 'oil', quantity: 1 }], description: 'Crafts a flask of Alchemist\'s Fire.' }
 };
 
 function getRecipe(name: string): Record<string, unknown> | undefined { return RECIPES[name.toLowerCase()]; }
@@ -50,12 +50,9 @@ export interface InventoryDeps {
 export interface InventoryService {
   updateInventoryDirectly(newInventory: InventoryItem[], targetId?: string): void;
   updateCurrencyDirectly(newCurrency: Currency, targetId?: string): void;
-  normalizeCurrency(totalCp: number): Currency;
-  lookupItemInDB(cleanName: string): Promise<{ data: Record<string, unknown> | null; error: unknown }>;
   update_inventory(item_name: string, action: 'add' | 'remove' | 'edit', quantity?: number, new_name?: string, targetId?: string, type?: 'weapon' | 'armor' | 'potion' | 'shield' | 'gear' | 'other', rarity?: 'common' | 'uncommon' | 'rare' | 'very rare' | 'legendary', description?: string, stats?: InventoryItem['stats'], equipped?: boolean, cost_gp?: number, cost_sp?: number, cost_cp?: number, autoDeductMarketPrice?: boolean, craft?: boolean): Promise<MCPResponse>;
   adjust_currency(gp?: number, sp?: number, cp?: number, targetId?: string): Promise<MCPResponse>;
   inflict_damage(amount: number, targetId?: string, damageType?: string, options?: { skipTargetDerivedReductions?: boolean }): Promise<MCPResponse>;
-  parseCost(srdCost: string): { gp: number; sp: number; cp: number } | null;
   clearCurrencyAdjustment(): void;
   getLastCurrencyAdjustment(): { targetId: string; amount: number; timestamp: number } | null;
 }
@@ -64,8 +61,12 @@ export interface InventoryService {
 export function createInventoryService(state: GameState, deps: InventoryDeps): InventoryService {
   let lastCurrencyAdjustment: { targetId: string; amount: number; timestamp: number } | null = null;
 
-  function _now(): number {
-    return Date.now();
+  async function lookupItemInDB(cleanName: string): Promise<{ data: Record<string, unknown> | null; error: unknown }> {
+    return deps.supabase
+      .from('srd_items')
+      .select('*')
+      .ilike('name', cleanName)
+      .maybeSingle();
   }
 
   return {
@@ -84,17 +85,6 @@ export function createInventoryService(state: GameState, deps: InventoryDeps): I
       }
     },
 
-    normalizeCurrency,
-    parseCost,
-
-    async lookupItemInDB(cleanName) {
-      return deps.supabase
-        .from('srd_items')
-        .select('*')
-        .ilike('name', cleanName)
-        .maybeSingle();
-    },
-
     async adjust_currency(gp = 0, sp = 0, cp = 0, targetId) {
       const target = deps.getTarget(targetId);
       if (!target) return fail("Target character not found for currency adjustment.");
@@ -103,7 +93,7 @@ export function createInventoryService(state: GameState, deps: InventoryDeps): I
       const safeSp = Number(sp) || 0;
       const safeCp = Number(cp) || 0;
 
-      const now = _now();
+      const now = Date.now();
       const totalAdjustment = safeGp * 100 + safeSp * 10 + safeCp;
       if (lastCurrencyAdjustment &&
         lastCurrencyAdjustment.targetId === target.id &&
@@ -273,7 +263,7 @@ export function createInventoryService(state: GameState, deps: InventoryDeps): I
 
       if (autoDeductMarketPrice) {
         try {
-          const srdData = await this.lookupItemInDB(cleanName);
+          const srdData = await lookupItemInDB(cleanName);
           const srdCost = srdData?.data?.cost;
           if (srdCost) {
             const parsed = parseCost(srdCost);
@@ -352,7 +342,7 @@ export function createInventoryService(state: GameState, deps: InventoryDeps): I
 
           if (!finalType || !finalDesc) {
             try {
-              const { data, error } = await this.lookupItemInDB(cleanName);
+              const { data, error } = await lookupItemInDB(cleanName);
               if (data && !error) {
                 finalType = data.type;
                 finalRarity = data.rarity;

@@ -2,12 +2,12 @@ import { describe, it, expect } from 'vitest';
 import {
   getXpForLevel,
   calculateXPToNextLevel,
-  calculateMaxHp,
   calculateHPGainForLevelUp,
   awardExperience,
   applyStatAllocation,
   getProgressionContext,
 } from '../../services/progressionService';
+import { calculateMaxHp } from '../../services/classEngine';
 import { Character } from '../../types';
 
 function makeCharacter(overrides: Partial<Character> = {}): Character {

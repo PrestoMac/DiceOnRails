@@ -412,7 +412,6 @@ const ChatColumn: React.FC<ChatColumnProps> = ({
             <MessageBubble
               key={msg.id}
               message={msg}
-              settings={settings}
               isLastUserMessage={msg.id === lastUserMessageId}
               portraitUrl={portraitUrl}
               showAvatar={showAvatar}

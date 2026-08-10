@@ -1,7 +1,6 @@
 import React from 'react';
 import Modal from './Modal';
 import Button from './Button';
-import { cx } from './cx';
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -29,7 +28,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 }) => (
   <Modal open={open} onClose={onCancel} title={title} icon={icon} size="sm">
     {body && <div className="text-sm text-parchment-dim leading-relaxed">{body}</div>}
-    <div className={cx('mt-6 flex gap-3', danger ? 'flex-row-reverse' : 'flex-row-reverse')}>
+    <div className="mt-6 flex gap-3 flex-row-reverse">
       <Button variant={danger ? 'danger' : 'primary'} onClick={onConfirm} size="sm" className="flex-1">
         {confirmLabel}
       </Button>

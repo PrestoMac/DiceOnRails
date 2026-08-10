@@ -6,20 +6,11 @@ interface EntityIconProps {
   icon?: string;
   /** Custom image URL (overrides FA icon when set). */
   iconUrl?: string;
-  /** Size in Tailwind classes. */
-  size?: 'xs' | 'sm' | 'md' | 'lg';
   /** Additional CSS classes. */
   className?: string;
   /** Alt text for image icons. */
   alt?: string;
 }
-
-const SIZE_CLASSES: Record<NonNullable<EntityIconProps['size']>, string> = {
-  xs: 'w-4 h-4 text-[10px]',
-  sm: 'w-6 h-6 text-xs',
-  md: 'w-8 h-8 text-sm',
-  lg: 'w-10 h-10 text-base',
-};
 
 /**
  * Renders either a Font Awesome icon or a custom image URL.
@@ -28,11 +19,10 @@ const SIZE_CLASSES: Record<NonNullable<EntityIconProps['size']>, string> = {
 export const EntityIcon: React.FC<EntityIconProps> = ({
   icon,
   iconUrl,
-  size = 'md',
   className,
   alt = '',
 }) => {
-  const sizeClass = SIZE_CLASSES[size];
+  const sizeClass = 'w-10 h-10 text-base';
 
   if (iconUrl) {
     return (

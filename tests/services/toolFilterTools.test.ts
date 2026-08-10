@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { MockMCPServer } from '../../services/mcpService';
 import { filterTools } from '../../services/llm/toolFilter';
-import { tools } from '../../services/llm/toolDefinitions';
+import { tools } from '../../services/llm/tools';
 import { makeCharacter, makeWizard } from '../helpers/characters';
 
 describe('toolFilter', () => {

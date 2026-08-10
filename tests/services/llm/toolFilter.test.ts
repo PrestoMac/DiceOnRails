@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { GameState } from '../../../types';
 import { filterTools } from '../../../services/llm/toolFilter';
-import { tools } from '../../../services/llm/toolDefinitions';
+import { tools } from '../../../services/llm/tools';
 
 function makeState(overrides: Partial<GameState> = {}): GameState {
   return {

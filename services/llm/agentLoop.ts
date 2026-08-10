@@ -33,7 +33,7 @@ const SYNTHESIS_NUDGE = 'All actions have resolved. Now call narrate_turn ONCE t
 
 function createToolMessage(toolName: string, result: MCPResponse, toolCallId?: string): Message {
     return {
-        id: `tool-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+        id: `tool-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         role: MessageRole.TOOL,
         text: `[System:${toolName}] ${result.message}`,
         timestamp: Date.now(),
@@ -547,7 +547,7 @@ export async function runAgentLoop(
           const logs = narrateResult.data?.logs;
           if (Array.isArray(logs) && logs.length > 0) {
             toolMessages.push({
-              id: `sys-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+              id: `sys-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
               role: MessageRole.SYSTEM,
               text: logs.join('\n'),
               timestamp: Date.now(),
@@ -564,7 +564,7 @@ export async function runAgentLoop(
           const logs = narrateResult.data?.logs;
           if (Array.isArray(logs) && logs.length > 0) {
             toolMessages.push({
-              id: `sys-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+              id: `sys-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
               role: MessageRole.SYSTEM,
               text: logs.join('\n'),
               timestamp: Date.now(),
