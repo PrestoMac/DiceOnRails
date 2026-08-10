@@ -2,6 +2,7 @@ import React from 'react';
 import Tooltip from '../../primitives/Tooltip';
 import Card, { SectionHeader } from '../../primitives/Card';
 import Chip from '../../primitives/Chip';
+import EntityIcon from '../../primitives/EntityIcon';
 import { cx } from '../../primitives/cx';
 import { CLASSES_CATALOG } from '../../../../utils/classes';
 import { INVOCATIONS_CATALOG, getInvocationCount } from '../../../../data/invocations';
@@ -79,8 +80,8 @@ const PathStep: React.FC<PathStepProps> = ({ wizard, updateWizard }) => {
                 <AssessmentBadge status={status} reason={reason} />
               </div>
               <div className="flex items-center gap-3 mb-1">
-                <div className="w-10 h-10 rounded-full bg-obsidian-800 border border-white/[0.08] flex items-center justify-center text-ember-400 shrink-0">
-                  <i className={cx('fas', cls.icon, 'text-lg')} aria-hidden="true" />
+                <div className="w-10 h-10 rounded-full bg-obsidian-800 border border-white/[0.08] flex items-center justify-center text-ember-400 shrink-0 overflow-hidden">
+                  <EntityIcon icon={cls.icon} iconUrl={cls.iconUrl} size="lg" alt={cls.name} />
                 </div>
                 <div>
                   <h3 className="font-display font-bold text-base text-parchment tracking-wide">{cls.name}</h3>

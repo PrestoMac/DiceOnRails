@@ -10,6 +10,7 @@ import Screen from '../primitives/Screen';
 import Button from '../primitives/Button';
 import Chip from '../primitives/Chip';
 import Tooltip from '../primitives/Tooltip';
+import EntityIcon from '../primitives/EntityIcon';
 import { cx } from '../primitives/cx';
 import StartingGroundsPicker from './shared/StartingGroundsPicker';
 
@@ -212,8 +213,8 @@ const QuickStartScreen: React.FC<QuickStartScreenProps> = ({
     selectedSpec && raceDef && classDef ? (
       <div className="flex flex-col gap-3">
         <div className="flex items-center gap-3 rounded-xl bg-obsidian-900/70 border border-white/[0.06] px-4 py-3">
-          <span className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-arcane-500/10 border border-arcane-500/30 text-arcane-300 shrink-0">
-            <i className={cx('fas', classDef.icon)} aria-hidden="true" />
+          <span className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-arcane-500/10 border border-arcane-500/30 text-arcane-300 shrink-0 overflow-hidden">
+            <EntityIcon icon={classDef.icon} iconUrl={classDef.iconUrl} size="lg" alt={classDef.name} />
           </span>
           <div className="min-w-0">
             <p className="font-display font-semibold text-parchment truncate">{selectedSpec.name}</p>

@@ -27,6 +27,8 @@ export interface ClassDefinition {
   subclasses: SubclassSummary[];
   subclassLevel: 1 | 2 | 3;
   icon: string;
+  /** Custom icon URL (overrides Font Awesome icon when set). */
+  iconUrl?: string;
   description: string;
   flavor: string;
 }
@@ -157,6 +159,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     ],
     subclassLevel: 3,
     icon: 'fa-shield-halved',
+    iconUrl: '/icons/classes/fighter.webp',
 
     description: 'A master of martial combat, skilled with a variety of weapons and armor.',
     flavor: 'Fighters are the backbone of any adventuring party, trained in all styles of combat.',
@@ -249,6 +252,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     ],
     subclassLevel: 3,
     icon: 'fa-hammer',
+    iconUrl: '/icons/classes/barbarian.webp',
 
     description: 'A fierce warrior who can enter a battle fury, shrugging off damage while wreaking havoc.',
     flavor: 'Barbarians are the embodiment of primal fury, channeling raw emotion into devastating combat.',
@@ -341,6 +345,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     ],
     subclassLevel: 3,
     icon: 'fa-guitar',
+    iconUrl: '/icons/classes/bard.webp',
 
     description: 'An inspiring magician whose power echoes the music of creation.',
     flavor: 'Bards weave magic through music, poetry, and oration, inspiring allies and confounding foes.',
@@ -478,6 +483,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     ],
     subclassLevel: 1,
     icon: 'fa-cross',
+    iconUrl: '/icons/classes/cleric.webp',
 
     description: 'A priestly champion who wields divine magic in service of a higher power.',
     flavor: 'Clerics are the mortal conduits of divine will, channeling the power of the gods.',
@@ -568,6 +574,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     ],
     subclassLevel: 2,
     icon: 'fa-leaf',
+    iconUrl: '/icons/classes/druid.webp',
 
     description: 'A priest of the Old Faith, wielding the powers of nature and animal transformation.',
     flavor: 'Druids draw power from the natural world, protecting it with primal magic.',
@@ -651,6 +658,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     ],
     subclassLevel: 3,
     icon: 'fa-fist-raised',
+    iconUrl: '/icons/classes/monk.webp',
 
     description: 'A master of martial arts, harnessing ki to perform extraordinary feats.',
     flavor: 'Monks blend martial discipline with spiritual energy, fighting with unarmed strikes and monk weapons.',
@@ -760,6 +768,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     ],
     subclassLevel: 3,
     icon: 'fa-sun',
+    iconUrl: '/icons/classes/paladin.webp',
 
     description: 'A holy warrior bound by a sacred oath to fight for justice and righteousness.',
     flavor: 'Paladins stand at the intersection of martial prowess and divine conviction.',
@@ -857,6 +866,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     ],
     subclassLevel: 3,
     icon: 'fa-crosshairs',
+    iconUrl: '/icons/classes/ranger.webp',
 
     description: 'A warrior who combines martial prowess with nature magic to track and hunt foes.',
     flavor: 'Rangers are masters of the wild, tracking enemies across any terrain.',
@@ -971,6 +981,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     ],
     subclassLevel: 3,
     icon: 'fa-user-ninja',
+    iconUrl: '/icons/classes/rogue.webp',
 
     description: 'A scoundrel who uses stealth and guile to overcome obstacles and enemies.',
     flavor: 'Rogues rely on their wits, stealth, and precision to survive in a dangerous world.',
@@ -1061,6 +1072,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     ],
     subclassLevel: 1,
     icon: 'fa-hat-wizard',
+    iconUrl: '/icons/classes/sorcerer.webp',
 
     description: 'A spellcaster who draws on inherent magic from a bloodline or other mystical source.',
     flavor: 'Sorcerers channel magic through their very being, bending reality with raw charisma.',
@@ -1147,6 +1159,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     ],
     subclassLevel: 1,
     icon: 'fa-skull',
+    iconUrl: '/icons/classes/warlock.webp',
 
     description: 'A wielder of magic derived from a pact with an otherworldly patron.',
     flavor: 'Warlocks seek forbidden knowledge and power through bargains with supernatural entities.',
@@ -1313,6 +1326,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     ],
     subclassLevel: 2,
     icon: 'fa-book-dead',
+    iconUrl: '/icons/classes/wizard.webp',
 
     description: 'A scholarly magic-user who casts spells through study and memorization.',
     flavor: 'Wizards are the quintessential spellcasters, wielding magic through years of arcane study.',

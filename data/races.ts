@@ -28,6 +28,8 @@ export interface RaceDefinition {
   traits: RacialTrait[];
   languages: string[];
   icon: string;
+  /** Custom icon URL (overrides Font Awesome icon when set). */
+  iconUrl?: string;
   flavor: string;
   subraces?: SubraceDefinition[];
 }
@@ -68,7 +70,7 @@ export const RACES_CATALOG: RaceDefinition[] = [
     subraces: [
       { id: 'high-elf', name: 'High Elf', description: 'High elves are graceful warriors and wizards, educated in magic and lore.', asi: { dex: 2, int: 1 }, traits: [{ id: 'elf-cantrip', name: 'Elf Cantrip', description: 'You know one cantrip of your choice from the wizard spell list.', kind: 'passive' , icon: 'fa-wand-magic-sparkles'}, { id: 'elf-weapon-training', name: 'Elf Weapon Training', description: 'You have proficiency with the longsword, shortsword, shortbow, and longbow.', kind: 'passive' , icon: 'fa-sword'}] },
       { id: 'wood-elf', name: 'Wood Elf', description: 'Wood elves are stealthy recluses, at home in the deepest forests.', asi: { dex: 2, wis: 1 }, speedBonus: 5, traits: [{ id: 'elf-weapon-training', name: 'Elf Weapon Training', description: 'You have proficiency with the longsword, shortsword, shortbow, and longbow.', kind: 'passive' , icon: 'fa-sword'}, { id: 'mask-of-the-wild', name: 'Mask of the Wild', description: 'You can hide even when lightly obscured by foliage, rain, snow, or other natural phenomena.', kind: 'passive' , icon: 'fa-user-secret'}] },
-      { id: 'drow', name: 'Dark Elf (Drow)', description: 'Drow elves dwell in the Underdark, adapted to its perpetual twilight.', asi: { dex: 2, cha: 1 }, darkvision: 120, traits: [{ id: 'drow-magic', name: 'Drow Magic', description: 'You know the dancing lights cantrip. At L3, you can cast faerie fire once per day. At L5, you can cast darkness once per day.', kind: 'passive' , icon: 'fa-wand-magic-sparkles'}, { id: 'drow-weapon-training', name: 'Drow Weapon Training', description: 'You have proficiency with rapiers, shortswords, and hand crossbows.', kind: 'passive' , icon: 'fa-sword'}] },
+      { id: 'drow', name: 'Dark Elf (Drow)', iconUrl: '/icons/races/drow.webp', description: 'Drow elves dwell in the Underdark, adapted to its perpetual twilight.', asi: { dex: 2, cha: 1 }, darkvision: 120, traits: [{ id: 'drow-magic', name: 'Drow Magic', description: 'You know the dancing lights cantrip. At L3, you can cast faerie fire once per day. At L5, you can cast darkness once per day.', kind: 'passive' , icon: 'fa-wand-magic-sparkles'}, { id: 'drow-weapon-training', name: 'Drow Weapon Training', description: 'You have proficiency with rapiers, shortswords, and hand crossbows.', kind: 'passive' , icon: 'fa-sword'}] },
     ],
   },
   {
@@ -163,7 +165,7 @@ export const RACES_CATALOG: RaceDefinition[] = [
   },
   {
     id: 'half-elf',
-    name: 'Half-Elf',
+    name: 'Half-Elf', iconUrl: '/icons/races/half-elf.webp',
     description: 'Walking in two worlds but truly belonging to neither, half-elves combine what some say are the best qualities of their elf and human parents.',
     asi: 'flexible-2',
     asiChoice: 1,
