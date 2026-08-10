@@ -175,9 +175,9 @@ export const useGameActions = (
         }
     }, [gameState]);
 
-    // Rebuilds ctxRef from a state object's persistent ctx fields. `bumpGeneration`
+    // Rebuilds ctxRef from a state object's persistent ctx fields. `bump`
     // increments the rewind generation so remote clients discard stale context.
-    const rebuildCtxFrom = (state: unknown, opts: { bumpGeneration?: boolean } = {}) => {
+    const rebuildCtxFrom = (state: unknown, bump = false) => {
         const gs = state as { ctx?: { episodeCheckpoints?: unknown[]; frozenRawHistory?: string; frozenRawTokens?: number; frozenMessageCount?: number; turnCounter?: number; generation?: number } };
         ctxRef.current = {
             episodeCheckpoints: (gs.ctx?.episodeCheckpoints as string[]) ?? [],
@@ -187,7 +187,7 @@ export const useGameActions = (
             turnCounter: gs.ctx?.turnCounter ?? 0,
             isCompressing: false,
             compressPromise: null,
-            generation: (gs.ctx?.generation ?? 0) + (opts.bumpGeneration ? 1 : 0),
+            generation: (gs.ctx?.generation ?? 0) + (bump ? 1 : 0),
         };
     };
 
@@ -743,7 +743,7 @@ export const useGameActions = (
                 processingRef.current = false; setIsLoading(false);
 
                 if (emergencySnap) mcpServer.restoreSnapshot(emergencySnap);
-                rebuildCtxFrom(mcpServer.getFullState(), { bumpGeneration: true });
+                rebuildCtxFrom(mcpServer.getFullState(), true);
 
                 if (isSyncableCampaign(currentCampaignId)) {
                     const cleanState = { ...mcpServer.getFullState(), isProcessing: false, processingUser: undefined };
@@ -768,7 +768,7 @@ export const useGameActions = (
             processingRef.current = false; setIsLoading(false);
 
             if (emergencySnap) mcpServer.restoreSnapshot(emergencySnap);
-            rebuildCtxFrom(mcpServer.getFullState(), { bumpGeneration: true });
+            rebuildCtxFrom(mcpServer.getFullState(), true);
 
             if (isSyncableCampaign(currentCampaignId)) {
                 const cleanState = { ...mcpServer.getFullState(), isProcessing: false, processingUser: undefined };
@@ -804,7 +804,7 @@ export const useGameActions = (
         setMessages(restoredMessages); setGameState(mcpServer.getFullState());
         messagesRef.current = restoredMessages;
 
-        rebuildCtxFrom(restoredState, { bumpGeneration: true });
+        rebuildCtxFrom(restoredState, true);
 
         if (isSyncableCampaign(currentCampaignId)) {
             const cleanState = { ...mcpServer.getFullState(), isProcessing: false, processingUser: undefined };
