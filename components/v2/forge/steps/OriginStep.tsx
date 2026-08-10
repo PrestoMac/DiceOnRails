@@ -1,6 +1,7 @@
 import React from 'react';
 import Tooltip from '../../primitives/Tooltip';
 import Card, { SectionHeader } from '../../primitives/Card';
+import EntityIcon from '../../primitives/EntityIcon';
 import { cx } from '../../primitives/cx';
 import { RACES_CATALOG } from '../../../../utils/races';
 import { STAT_INFO } from '../../../../data/referenceConstants';
@@ -48,7 +49,14 @@ const OriginStep: React.FC<OriginStepProps> = ({ wizard, updateWizard }) => {
               <div className="absolute top-2 right-2">
                 <AssessmentBadge status={status} reason={reason} />
               </div>
-              <h3 className="font-display font-bold text-base text-parchment tracking-wide pr-7">{race.name}</h3>
+              <div className="flex items-center gap-3 mb-1">
+                <div className="w-10 h-10 rounded-full bg-obsidian-800 border border-white/[0.08] flex items-center justify-center text-ember-400 shrink-0 overflow-hidden">
+                  <EntityIcon icon={race.icon} iconUrl={race.iconUrl} size="lg" alt={race.name} />
+                </div>
+                <div>
+                  <h3 className="font-display font-bold text-base text-parchment tracking-wide pr-7">{race.name}</h3>
+                </div>
+              </div>
               <p className="text-xs text-parchment-faint italic mt-1">{race.description}</p>
               <div className="mt-2 flex flex-wrap gap-1">
                 {typeof race.asi === 'object'
