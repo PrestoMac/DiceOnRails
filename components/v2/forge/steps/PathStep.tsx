@@ -116,7 +116,7 @@ const PathStep: React.FC<PathStepProps> = ({ wizard, updateWizard }) => {
 
       {selectedClass.startingEquipment && selectedClass.startingEquipment.length > 0 && (
         <Card>
-          <SectionHeader icon="fa-backpack">Starting Equipment Included</SectionHeader>
+          <SectionHeader icon="fa-suitcase">Starting Equipment Included</SectionHeader>
           <div className="flex flex-wrap gap-1.5">
             {selectedClass.startingEquipment.map(item => (
               <Chip key={item} color="neutral" className="capitalize">{item}</Chip>

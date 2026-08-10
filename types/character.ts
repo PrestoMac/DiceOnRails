@@ -19,6 +19,8 @@ export interface InventoryItem {
     strengthReq?: number;
     stealthDisadv?: boolean;
   };
+  /** Font Awesome icon for the item (defaults to type icon if not set). */
+  icon?: string;
 }
 
 /** Represents a character's currency holdings in gold, silver, and copper pieces. */
@@ -142,6 +144,8 @@ export interface ClassFeature {
     multi?: boolean;
     count?: number;
   };
+  /** Font Awesome icon for the feature. */
+  icon?: string;
 }
 
 /** A feature granted by a character subclass at a specific level. */
@@ -164,6 +168,8 @@ export interface SubclassSummary {
   description: string;
   features: SubclassFeature[];
   domainSpells?: string[];
+  /** Font Awesome icon for the subclass. */
+  icon?: string;
 }
 
 /** A trait granted by a character's race. */
@@ -174,6 +180,8 @@ export interface RacialTrait {
   kind: 'passive' | 'resource' | 'action' | 'spell-like';
   effect?: { kind: EffectKind; payload?: Record<string, unknown> };
   grantsResource?: string;
+  /** Font Awesome icon for the racial trait. */
+  icon?: string;
 }
 
 /** The 13 damage types available in D&D 5e. */

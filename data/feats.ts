@@ -32,7 +32,7 @@ export const FEATS_CATALOG: FeatDefinition[] = [
     name: 'Two-Weapon Fighting',
     category: 'combat',
     shortName: 'TWF',
-    icon: 'fa-swords',
+    icon: 'fa-khanda',
     description: 'When you engage in two-weapon fighting, you can add your ability modifier to the damage of the bonus attack.',
     mechanicalEffect: 'Add ability modifier to off-hand attack damage (no longer just ability mod-less damage).',
     effectType: 'flag',
@@ -43,7 +43,7 @@ export const FEATS_CATALOG: FeatDefinition[] = [
     name: 'Great Weapon Fighting',
     category: 'combat',
     shortName: 'GWF',
-    icon: 'fa-helmet-battle',
+    icon: 'fa-shield-halved',
     description: 'When you roll a 1 or 2 on a damage die for an attack you make with a melee weapon that you are wielding with two hands, you can reroll the die. You must use the new roll.',
     mechanicalEffect: 'Reroll damage dice of 1 or 2 on heavy melee attacks (must use the new roll).',
     effectType: 'flag',
@@ -358,7 +358,7 @@ export const FEATS_CATALOG: FeatDefinition[] = [
 ];
 
 export const FEAT_CATEGORIES: { key: FeatCategory; label: string; icon: string }[] = [
-  { key: 'combat', label: 'Combat', icon: 'fa-swords' },
+  { key: 'combat', label: 'Combat', icon: 'fa-khanda' },
   { key: 'armor', label: 'Armor', icon: 'fa-shield-halved' },
   { key: 'saving-throw', label: 'Saves & Defense', icon: 'fa-shield' },
   { key: 'magic', label: 'Magic', icon: 'fa-hat-wizard' },

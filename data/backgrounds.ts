@@ -30,6 +30,8 @@ export interface BackgroundDefinition {
   ideals: IdealEntry[];
   bonds: string[];
   flaws: string[];
+  /** Font Awesome icon for the background. */
+  icon?: string;
 }
 
 export interface AlignmentDefinition {
@@ -103,6 +105,7 @@ export const ALIGNMENTS: AlignmentDefinition[] = [
 export const BACKGROUNDS_CATALOG: BackgroundDefinition[] = [
   {
     id: 'acolyte',
+  icon: 'fa-hands-praying',
     name: 'Acolyte',
     description: 'You have spent your life in the service of a temple, learning ancient rites and tradition.',
     feature: {
@@ -147,6 +150,7 @@ export const BACKGROUNDS_CATALOG: BackgroundDefinition[] = [
   },
   {
     id: 'charlatan',
+  icon: 'fa-masks-theater',
     name: 'Charlatan',
     description: 'You have always had a way with people, using your charm and wit to swindle and deceive.',
     feature: {
@@ -191,6 +195,7 @@ export const BACKGROUNDS_CATALOG: BackgroundDefinition[] = [
   },
   {
     id: 'criminal',
+  icon: 'fa-user-secret',
     name: 'Criminal',
     description: 'You are an experienced criminal with a history of breaking the law and surviving by your wits.',
     feature: {
@@ -235,6 +240,7 @@ export const BACKGROUNDS_CATALOG: BackgroundDefinition[] = [
   },
   {
     id: 'entertainer',
+  icon: 'fa-masks-theater',
     name: 'Entertainer',
     description: 'You thrive in front of an audience, knowing how to entrance, amuse, and move them.',
     feature: {
@@ -279,6 +285,7 @@ export const BACKGROUNDS_CATALOG: BackgroundDefinition[] = [
   },
   {
     id: 'folk-hero',
+  icon: 'fa-crown',
     name: 'Folk Hero',
     description: 'You come from a humble background, but you are destined for greater things.',
     feature: {
@@ -323,6 +330,7 @@ export const BACKGROUNDS_CATALOG: BackgroundDefinition[] = [
   },
   {
     id: 'guild-artisan',
+  icon: 'fa-hammer',
     name: 'Guild Artisan',
     description: 'You are a member of an artisan\'s guild, skilled in a specialized field and well-connected.',
     feature: {
@@ -367,6 +375,7 @@ export const BACKGROUNDS_CATALOG: BackgroundDefinition[] = [
   },
   {
     id: 'hermit',
+  icon: 'fa-person-hiking',
     name: 'Hermit',
     description: 'You lived in seclusion for a formative part of your life, seeking enlightenment and truth.',
     feature: {
@@ -411,6 +420,7 @@ export const BACKGROUNDS_CATALOG: BackgroundDefinition[] = [
   },
   {
     id: 'noble',
+  icon: 'fa-crown',
     name: 'Noble',
     description: 'You understand wealth, power, and privilege, carrying the weight of a noble title.',
     feature: {
@@ -455,6 +465,7 @@ export const BACKGROUNDS_CATALOG: BackgroundDefinition[] = [
   },
   {
     id: 'outlander',
+  icon: 'fa-compass',
     name: 'Outlander',
     description: 'You grew up in the wilds, far from civilization and the comforts of the city.',
     feature: {
@@ -499,6 +510,7 @@ export const BACKGROUNDS_CATALOG: BackgroundDefinition[] = [
   },
   {
     id: 'sage',
+  icon: 'fa-book',
     name: 'Sage',
     description: 'You spent years learning the lore of the multiverse, devoted to study and research.',
     feature: {
@@ -543,6 +555,7 @@ export const BACKGROUNDS_CATALOG: BackgroundDefinition[] = [
   },
   {
     id: 'sailor',
+  icon: 'fa-anchor',
     name: 'Sailor',
     description: 'You sailed on a seagoing vessel for years, learning to survive on the rolling waves.',
     feature: {
@@ -587,6 +600,7 @@ export const BACKGROUNDS_CATALOG: BackgroundDefinition[] = [
   },
   {
     id: 'soldier',
+  icon: 'fa-khanda',
     name: 'Soldier',
     description: 'War has been your life for as long as you can recall, training you for the battlefield.',
     feature: {
@@ -631,6 +645,7 @@ export const BACKGROUNDS_CATALOG: BackgroundDefinition[] = [
   },
   {
     id: 'urchin',
+  icon: 'fa-person-walking',
     name: 'Urchin',
     description: 'You grew up on the streets, alone and orphaned, surviving by your wits.',
     feature: {

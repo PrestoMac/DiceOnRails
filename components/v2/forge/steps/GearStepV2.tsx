@@ -218,7 +218,7 @@ const GearStepV2: React.FC<GearStepV2Props> = ({ wizard, updateWizard }) => {
           small
           items={[
             { key: 'shop', label: 'Shop', icon: 'fa-store' },
-            { key: 'equipment', label: 'Equipment', icon: 'fa-backpack', badge: inventory.length },
+            { key: 'equipment', label: 'Equipment', icon: 'fa-suitcase', badge: inventory.length },
           ]}
           active={mobileTab}
           onChange={key => setMobileTab(key as 'equipment' | 'shop')}

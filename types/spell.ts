@@ -59,6 +59,8 @@ export interface SpellDefinition {
     atSlotLevel: number;
     value: number;
   }>;
+  /** Font Awesome icon for the spell (defaults to school icon if not set). */
+  icon?: string;
 }
 
 /** A profile defining how a class handles spellcasting (tradition, ability, slots, pact magic). */

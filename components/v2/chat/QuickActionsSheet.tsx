@@ -42,7 +42,7 @@ const CATEGORY_META: Record<QuickCategory, { label: string; icon: string; accent
   weapon: { label: 'Weapons', icon: 'fa-khanda', accent: 'text-blood-400' },
   feature: { label: 'Features', icon: 'fa-bolt', accent: 'text-ember-400' },
   skill: { label: 'Skills', icon: 'fa-dice-d20', accent: 'text-verdant-400' },
-  item: { label: 'Items', icon: 'fa-flask-round-potion', accent: 'text-frost-400' },
+  item: { label: 'Items', icon: 'fa-flask', accent: 'text-frost-400' },
   rest: { label: 'Rest', icon: 'fa-bed', accent: 'text-parchment-dim' },
   death: { label: 'Rest', icon: 'fa-skull', accent: 'text-blood-400' },
 };
@@ -108,7 +108,7 @@ function useQuickActions(character: Character | null | undefined): QuickAction[]
       actions.push({
         id: `spell-${spellId}`,
         label: spell.name,
-        icon: SCHOOL_ICONS[spell.school] || 'fa-hat-wizard',
+        icon: spell.icon || SCHOOL_ICONS[spell.school] || 'fa-hat-wizard',
         fillText: isUnpreparedRitual && character.class === 'wizard' ? `Cast ${spell.name} as a ritual` : `Cast ${spell.name}`,
         hint: `${spell.name} — ${levelLabel}${ritualNote}. ${spell.school.charAt(0).toUpperCase() + spell.school.slice(1)}. ${spell.castingTime}, ${spell.range}${extras ? `. ${extras}` : ''}. ${shortDesc.slice(0, 120)}${shortDesc.length > 120 ? '...' : ''}`,
         category: 'spell',

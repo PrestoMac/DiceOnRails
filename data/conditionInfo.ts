@@ -53,7 +53,7 @@ export const CONDITION_INFO: Record<string, ConditionInfoEntry> = {
     ],
   },
   grappled: {
-    icon: 'fa-hand-grab',
+    icon: 'fa-hand',
     summary: 'Speed becomes 0.',
     effects: [
       'Your speed becomes 0, and you cannot benefit from any bonus to your speed.',

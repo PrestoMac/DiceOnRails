@@ -70,14 +70,17 @@ const SpellsStepV2: React.FC<SpellsStepV2Props> = ({ wizard, updateWizard }) => 
           isSelected ? 'border-arcane-500/60 bg-arcane-500/10' : 'border-white/[0.08] bg-obsidian-900/60 hover:border-white/20',
         )}
       >
-        <button type="button" className="flex-1 text-left font-bold text-parchment cursor-pointer" onClick={onToggle}>
-          {spell.name}
-          {showLevel && <span className="text-parchment-faint font-normal"> (L{spell.level})</span>}
-          {spell.requiresConcentration && (
-            <Tooltip content="Requires concentration" side="top">
-              <i className="fas fa-arrows-to-circle text-[8px] text-arcane-300/70 ml-1.5" aria-hidden="true" />
-            </Tooltip>
-          )}
+        <button type="button" className="flex items-center gap-2 flex-1 text-left font-bold text-parchment cursor-pointer" onClick={onToggle}>
+          <i className={cx('fas text-[10px]', spell.icon || 'fa-hat-wizard', 'text-arcane-400 shrink-0')} aria-hidden="true" />
+          <span>
+            {spell.name}
+            {showLevel && <span className="text-parchment-faint font-normal"> (L{spell.level})</span>}
+            {spell.requiresConcentration && (
+              <Tooltip content="Requires concentration" side="top">
+                <i className="fas fa-arrows-to-circle text-[8px] text-arcane-300/70 ml-1.5" aria-hidden="true" />
+              </Tooltip>
+            )}
+          </span>
         </button>
         <IconButton icon="fa-circle-info" variant="ghost" size="sm" tip="View spell details" onClick={() => setViewingSpell(spell)} />
       </div>

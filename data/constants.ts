@@ -5,27 +5,29 @@ export interface SkillDefinition {
   label: string;
   stat: 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
   description: string;
+  /** Font Awesome icon for the skill. */
+  icon?: string;
 }
 
 export const SKILLS_LIST: readonly SkillDefinition[] = [
-  { name: 'athletics', label: 'Athletics', stat: 'str', description: 'Climbing, jumping, swimming, and physical force' },
-  { name: 'acrobatics', label: 'Acrobatics', stat: 'dex', description: 'Balance, flips, tumbling, and nimble moves' },
-  { name: 'sleight of hand', label: 'Sleight of Hand', stat: 'dex', description: 'Manual dexterity, picking pockets, and tricks' },
-  { name: 'stealth', label: 'Stealth', stat: 'dex', description: 'Sneaking, moving silently, and hiding' },
-  { name: 'arcana', label: 'Arcana', stat: 'int', description: 'Spells, magical items, and planes of existence' },
-  { name: 'history', label: 'History', stat: 'int', description: 'Historical events, legendary figures, and lore' },
-  { name: 'investigation', label: 'Investigation', stat: 'int', description: 'Searching for clues, solving mysteries' },
-  { name: 'nature', label: 'Nature', stat: 'int', description: 'Plants, animals, weather, and wild lands' },
-  { name: 'religion', label: 'Religion', stat: 'int', description: 'Deities, holy symbols, cults, and prayers' },
-  { name: 'animal handling', label: 'Animal Handling', stat: 'wis', description: 'Taming beasts, riding mounts, sensing animal intent' },
-  { name: 'insight', label: 'Insight', stat: 'wis', description: 'Sensing motives, spotting lies, reading body language' },
-  { name: 'medicine', label: 'Medicine', stat: 'wis', description: 'Healing wounds, diagnosing diseases' },
-  { name: 'perception', label: 'Perception', stat: 'wis', description: 'Noticing hidden things, listening, alertness' },
-  { name: 'survival', label: 'Survival', stat: 'wis', description: 'Foraging, tracking, building fire, navigating' },
-  { name: 'deception', label: 'Deception', stat: 'cha', description: 'Lying, putting on disguises, acting' },
-  { name: 'intimidation', label: 'Intimidation', stat: 'cha', description: 'Coercing, threatening, displays of authority' },
-  { name: 'performance', label: 'Performance', stat: 'cha', description: 'Entertaining, singing, acting, playing music' },
-  { name: 'persuasion', label: 'Persuasion', stat: 'cha', description: 'Diplomacy, honest arguments, negotiating' },
+  { name: 'athletics', label: 'Athletics', stat: 'str', description: 'Climbing, jumping, swimming, and physical force', icon: 'fa-person-running' },
+  { name: 'acrobatics', label: 'Acrobatics', stat: 'dex', description: 'Balance, flips, tumbling, and nimble moves', icon: 'fa-person-skating' },
+  { name: 'sleight of hand', label: 'Sleight of Hand', stat: 'dex', description: 'Manual dexterity, picking pockets, and tricks', icon: 'fa-hand-sparkles' },
+  { name: 'stealth', label: 'Stealth', stat: 'dex', description: 'Sneaking, moving silently, and hiding', icon: 'fa-user-secret' },
+  { name: 'arcana', label: 'Arcana', stat: 'int', description: 'Spells, magical items, and planes of existence', icon: 'fa-wand-magic-sparkles' },
+  { name: 'history', label: 'History', stat: 'int', description: 'Historical events, legendary figures, and lore', icon: 'fa-book' },
+  { name: 'investigation', label: 'Investigation', stat: 'int', description: 'Searching for clues, solving mysteries', icon: 'fa-magnifying-glass' },
+  { name: 'nature', label: 'Nature', stat: 'int', description: 'Plants, animals, weather, and wild lands', icon: 'fa-tree' },
+  { name: 'religion', label: 'Religion', stat: 'int', description: 'Deities, holy symbols, cults, and prayers', icon: 'fa-cross' },
+  { name: 'animal handling', label: 'Animal Handling', stat: 'wis', description: 'Taming beasts, riding mounts, sensing animal intent', icon: 'fa-paw' },
+  { name: 'insight', label: 'Insight', stat: 'wis', description: 'Sensing motives, spotting lies, reading body language', icon: 'fa-eye' },
+  { name: 'medicine', label: 'Medicine', stat: 'wis', description: 'Healing wounds, diagnosing diseases', icon: 'fa-heart-pulse' },
+  { name: 'perception', label: 'Perception', stat: 'wis', description: 'Noticing hidden things, listening, alertness', icon: 'fa-eye' },
+  { name: 'survival', label: 'Survival', stat: 'wis', description: 'Foraging, tracking, building fire, navigating', icon: 'fa-compass' },
+  { name: 'deception', label: 'Deception', stat: 'cha', description: 'Lying, putting on disguises, acting', icon: 'fa-masks-theater' },
+  { name: 'intimidation', label: 'Intimidation', stat: 'cha', description: 'Coercing, threatening, displays of authority', icon: 'fa-skull' },
+  { name: 'performance', label: 'Performance', stat: 'cha', description: 'Entertaining, singing, acting, playing music', icon: 'fa-guitar' },
+  { name: 'persuasion', label: 'Persuasion', stat: 'cha', description: 'Diplomacy, honest arguments, negotiating', icon: 'fa-comments' },
 ];
 
 export const XP_TABLE: readonly XPTableEntry[] = Object.freeze([

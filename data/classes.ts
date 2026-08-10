@@ -57,11 +57,12 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     statPriority: ['str', 'con', 'cha', 'dex', 'wis', 'int'],
     features: [
       { id: 'fighting-style', name: 'Fighting Style', description: 'You adopt a particular style of fighting as your specialty.', level: 1, kind: 'subclass',
-        choice: { label: 'Choose a Fighting Style', options: FIGHTING_STYLE_OPTIONS.filter(fs => fs.id !== 'protection') },
+
+        choice: { label: 'Choose a Fighting Style', options: FIGHTING_STYLE_OPTIONS.filter(fs => fs.id !== 'protection') , icon: 'fa-sword'},
         effect: { kind: 'fighting-style' }
       },
-      { id: 'second-wind', name: 'Second Wind', description: 'Bonus action: regain 1d10 + fighter level HP, once per short rest.', level: 1, kind: 'resource', grantsResource: 'second-wind' },
-      { id: 'action-surge-1', name: 'Action Surge (1 use)', description: 'On your turn, take one additional action.', level: 2, kind: 'resource', grantsResource: 'action-surge' },
+      { id: 'second-wind', name: 'Second Wind', description: 'Bonus action: regain 1d10 + fighter level HP, once per short rest.', level: 1, kind: 'resource', grantsResource: 'second-wind', icon: 'fa-heart-pulse' },
+      { id: 'action-surge-1', name: 'Action Surge (1 use)', description: 'On your turn, take one additional action.', level: 2, kind: 'resource', grantsResource: 'action-surge', icon: 'fa-bolt' },
       { id: 'extra-attack-1', name: 'Extra Attack', description: 'You can attack twice when you take the Attack action.', level: 5, kind: 'passive', effect: { kind: 'extra-attack', payload: { count: 2 } } },
       { id: 'extra-attack-2', name: 'Extra Attack (2)', description: 'You can attack three times.', level: 11, kind: 'passive', effect: { kind: 'extra-attack', payload: { count: 3 } } },
       { id: 'indomitable-1', name: 'Indomitable (1 use)', description: 'Reroll a failed save.', level: 9, kind: 'resource', grantsResource: 'indomitable' },
@@ -74,35 +75,44 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
         id: 'champion',
         parentClass: 'fighter',
         name: 'Champion',
+
         description: 'The archetypal Champion focuses on the development of raw physical power honed to deadly perfection.',
         features: [
-          { id: 'improved-critical', name: 'Improved Critical', description: 'Your weapon attacks score a critical hit on a roll of 19 or 20.', level: 3, kind: 'passive', effect: { kind: 'crit-range', payload: { min: 19 } } },
+          { id: 'improved-critical', name: 'Improved Critical', description: 'Your weapon attacks score a critical hit on a roll of 19 or 20.', level: 3, kind: 'passive', effect: { kind: 'crit-range', payload: { min: 19 , icon: 'fa-crosshairs'} } },
+
           { id: 'remarkable-athlete', name: 'Remarkable Athlete', description: 'Add half your proficiency bonus (round up) to any Strength, Dexterity, or Constitution check you make that doesn\'t already use your proficiency bonus.', level: 7, kind: 'passive' },
+
           { id: 'additional-fighting-style', name: 'Additional Fighting Style', description: 'Choose a second fighting style.', level: 10, kind: 'subclass',
-            choice: { label: 'Choose a second Fighting Style', options: FIGHTING_STYLE_OPTIONS.filter(fs => fs.id !== 'protection') },
+            choice: { label: 'Choose a second Fighting Style', options: FIGHTING_STYLE_OPTIONS.filter(fs => fs.id !== 'protection') , icon: 'fa-sword'},
             effect: { kind: 'fighting-style' }
           },
-          { id: 'superior-critical', name: 'Superior Critical', description: 'Your weapon attacks score a critical hit on a roll of 18-20.', level: 15, kind: 'passive', effect: { kind: 'crit-range', payload: { min: 18 } } },
-          { id: 'survivor', name: 'Survivor', description: 'At the start of each of your turns, you regain hit points equal to 5 + your Constitution modifier if you have no more than half your hit points left.', level: 18, kind: 'passive' },
+          { id: 'superior-critical', name: 'Superior Critical', description: 'Your weapon attacks score a critical hit on a roll of 18-20.', level: 15, kind: 'passive', effect: { kind: 'crit-range', payload: { min: 18 , icon: 'fa-crosshairs'} } },
+
+          { id: 'survivor', name: 'Survivor', description: 'At the start of each of your turns, you regain hit points equal to 5 + your Constitution modifier if you have no more than half your hit points left.', level: 18, kind: 'passive' , icon: 'fa-heart-pulse'},
+
         ],
       },
       {
         id: 'battle-master',
         parentClass: 'fighter',
         name: 'Battle Master',
+
         description: 'Fighters of the Battle Master archetype are students of combat who use tactical maneuvers.',
         features: [
           { id: 'combat-superiority', name: 'Combat Superiority', description: 'You learn three combat maneuvers and have superiority dice (d8) equal to 4 + fighter level. Recover on short rest.', level: 3, kind: 'resource', grantsResource: 'superiority-dice' },
           { id: 'student-of-war', name: 'Student of War', description: 'You gain proficiency with one type of artisan\'s tools of your choice.', level: 3, kind: 'passive' },
           { id: 'know-your-enemy', name: 'Know Your Enemy', description: 'If you observe a creature for 1 minute, you learn its relative combat capabilities.', level: 7, kind: 'passive' },
+
           { id: 'improved-combat-superiority', name: 'Improved Combat Superiority', description: 'Your superiority dice increase to d10 at level 9, d12 at level 17.', level: 9, kind: 'passive' },
           { id: 'relentless', name: 'Relentless', description: 'When you roll initiative and have no superiority dice remaining, you regain one.', level: 15, kind: 'passive' },
+
         ],
       },
       {
         id: 'eldritch-knight',
         parentClass: 'fighter',
         name: 'Eldritch Knight',
+
         description: 'Eldritch Knights blend martial prowess with arcane magic, casting wizard spells.',
         spellcasting: {
           tradition: 'third',
@@ -138,6 +148,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
           { id: 'spellcasting-ek', name: 'Spellcasting', description: 'You can cast wizard spells using Intelligence. You know 2 cantrips from the wizard spell list.', level: 3, kind: 'passive', effect: { kind: 'spellcasting' } },
           { id: 'weapon-bond', name: 'Weapon Bond', description: 'You can bond with two weapons. You can\'t be disarmed of bonded weapons and can summon one as a bonus action.', level: 3, kind: 'passive' },
           { id: 'war-magic', name: 'War Magic', description: 'When you cast a cantrip, you can make a weapon attack as a bonus action.', level: 7, kind: 'passive' },
+
           { id: 'eldritch-strike', name: 'Eldritch Strike', description: 'When you hit a creature with a weapon attack, it has disadvantage on the next save against your spell.', level: 10, kind: 'passive' },
           { id: 'arcane-charge', name: 'Arcane Charge', description: 'You can teleport up to 30 ft before making an attack.', level: 15, kind: 'passive' },
           { id: 'improved-war-magic', name: 'Improved War Magic', description: 'When you cast a spell with a casting time of 1 action, you can make a weapon attack as a bonus action.', level: 18, kind: 'passive' },
@@ -145,7 +156,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
       },
     ],
     subclassLevel: 3,
-    icon: 'fa-shield-halved',
+
     description: 'A master of martial combat, skilled with a variety of weapons and armor.',
     flavor: 'Fighters are the backbone of any adventuring party, trained in all styles of combat.',
   },
@@ -165,6 +176,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     statPriority: ['str', 'con', 'dex', 'wis', 'cha', 'int'],
     features: [
       { id: 'rage', name: 'Rage', description: 'In battle, you fight with primal ferocity. On your turn, you can enter a rage as a bonus action. While raging: advantage on STR checks/saves, +2 rage damage on melee attacks with STR, resistance to bludgeoning/piercing/slashing. Rage ends early if you end your turn with no attack or no hostile creature within reach. 2 uses per long rest (3 at L3, 4 at L6, 5 at L12, 6 at L17, unlimited at L20).', level: 1, kind: 'resource', grantsResource: 'rage', effect: { kind: 'damage-bonus', payload: { amount: '2', condition: 'raging' } } },
+
       { id: 'rage-resist-bludgeoning', name: 'Rage (Bludgeoning Resistance)', description: 'While raging, you have resistance to bludgeoning damage.', level: 1, kind: 'passive', effect: { kind: 'damage-resistance', payload: { type: 'bludgeoning', condition: 'raging' } } },
       { id: 'rage-resist-piercing', name: 'Rage (Piercing Resistance)', description: 'While raging, you have resistance to piercing damage.', level: 1, kind: 'passive', effect: { kind: 'damage-resistance', payload: { type: 'piercing', condition: 'raging' } } },
       { id: 'rage-resist-slashing', name: 'Rage (Slashing Resistance)', description: 'While raging, you have resistance to slashing damage.', level: 1, kind: 'passive', effect: { kind: 'damage-resistance', payload: { type: 'slashing', condition: 'raging' } } },
@@ -172,9 +184,12 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
       { id: 'rage-damage-3', name: 'Rage (Greater Damage)', description: 'Rage damage increases to +4 at Barbarian level 16.', level: 16, kind: 'passive', effect: { kind: 'damage-bonus', payload: { amount: '1', condition: 'raging' } } },
       { id: 'unarmored-defense-barb', name: 'Unarmored Defense', description: 'Without armor, AC = 10 + DEX mod + CON mod. You can use a shield and still gain this benefit.', level: 1, kind: 'passive', effect: { kind: 'ac-formula', payload: { formula: '10 + DEX + CON' } } },
       { id: 'reckless-attack', name: 'Reckless Attack', description: 'When you make your first attack on your turn, you can decide to attack recklessly, gaining advantage on all melee weapon attacks this turn but attack rolls against you have advantage until your next turn.', level: 2, kind: 'passive', effect: { kind: 'reckless-attack' } },
+
       { id: 'danger-sense', name: 'Danger Sense', description: 'Advantage on DEX saves against effects you can see (e.g. traps, spells).', level: 2, kind: 'passive', effect: { kind: 'advantage-on-save', payload: { against: 'seen-effect', stat: 'dex' } } },
+
       { id: 'extra-attack-barb', name: 'Extra Attack', description: 'You can attack twice when you take the Attack action.', level: 5, kind: 'passive', effect: { kind: 'extra-attack', payload: { count: 2 } } },
       { id: 'fast-movement', name: 'Fast Movement', description: 'Speed increases by 10 feet while not wearing heavy armor.', level: 5, kind: 'passive', effect: { kind: 'speed-bonus', payload: { bonus: 10, condition: 'no-heavy-armor' } } },
+
       { id: 'feral-instinct', name: 'Feral Instinct', description: 'Advantage on initiative rolls. If surprised, you can act normally on your first turn if you enter rage.', level: 7, kind: 'passive' },
       { id: 'brutal-critical-1', name: 'Brutal Critical (1 die)', description: 'Roll one additional damage die on a melee weapon crit.', level: 9, kind: 'passive', effect: { kind: 'crit-bonus-dice', payload: { count: 1 } } },
       { id: 'brutal-critical-2', name: 'Brutal Critical (2 dice)', description: 'Roll two additional damage dice on a melee weapon crit.', level: 13, kind: 'passive', effect: { kind: 'crit-bonus-dice', payload: { count: 2 } } },
@@ -189,6 +204,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
         id: 'berserker',
         parentClass: 'barbarian',
         name: 'Path of the Berserker',
+
         description: 'A warrior who unleashes a furious frenzy in battle.',
         features: [
           { id: 'frenzy', name: 'Frenzy', description: 'While raging, you can make a single melee weapon attack as a bonus action on each of your turns. When your rage ends, you suffer one level of exhaustion.', level: 3, kind: 'passive', effect: { kind: 'frenzy-exhaustion' } },
@@ -201,6 +217,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
         id: 'totem-warrior',
         parentClass: 'barbarian',
         name: 'Path of the Totem Warrior',
+
         description: 'You enter a spiritual pact with a totem spirit, drawing on its power during your rage.',
         features: [
           { id: 'spirit-seeker', name: 'Spirit Seeker', description: 'You learn the beast sense and speak with animals spells. You can cast speak with animals once per long rest without a spell slot.', level: 3, kind: 'passive' },
@@ -230,7 +247,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
       },
     ],
     subclassLevel: 3,
-    icon: 'fa-hammer',
+
     description: 'A fierce warrior who can enter a battle fury, shrugging off damage while wreaking havoc.',
     flavor: 'Barbarians are the embodiment of primal fury, channeling raw emotion into devastating combat.',
   },
@@ -280,13 +297,18 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     },
     features: [
       { id: 'bardic-inspiration', name: 'Bardic Inspiration', description: 'Bonus action: grant a creature a d6 inspiration die (d8 at L5, d10 at L10, d12 at L15) to add to one ability check, attack roll, or save. Uses equal to CHA mod per long rest.', level: 1, kind: 'resource', grantsResource: 'bardic-inspiration' },
+
       { id: 'jack-of-all-trades', name: 'Jack of All Trades', description: 'Add half your proficiency bonus (round down) to any ability check you make that doesn\'t already include your proficiency bonus.', level: 2, kind: 'passive', effect: { kind: 'jack-of-all-trades' } },
+
       { id: 'song-of-rest', name: 'Song of Rest', description: 'You and friendly creatures who hear your song regain 1d6 extra HP on a short rest.', level: 2, kind: 'passive' },
+
       { id: 'expertise-1', name: 'Expertise', description: 'Choose two skill proficiencies. Your proficiency bonus is doubled for those skills.', level: 3, kind: 'passive', effect: { kind: 'skill-expertise' } },
       { id: 'font-of-inspiration', name: 'Font of Inspiration', description: 'You regain all uses of Bardic Inspiration on a short rest.', level: 5, kind: 'passive' },
       { id: 'countercharm', name: 'Countercharm', description: 'You can use an action to grant allies within 30 ft advantage on saves against being charmed or frightened.', level: 6, kind: 'passive' },
+
       { id: 'expertise-2', name: 'Expertise (2 more)', description: 'Choose two more skills for expertise.', level: 10, kind: 'passive', effect: { kind: 'skill-expertise' } },
       { id: 'superior-inspiration', name: 'Superior Inspiration', description: 'When you roll initiative and have no Bardic Inspiration uses remaining, you regain one use.', level: 20, kind: 'passive' },
+
     ],
     subclasses: [
       {
@@ -298,6 +320,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
           { id: 'bonus-proficiencies', name: 'Bonus Proficiencies', description: 'Gain proficiency with three skills of your choice.', level: 3, kind: 'passive' },
           { id: 'cutting-words', name: 'Cutting Words', description: 'When a creature you can see within 60 ft makes an attack, ability check, or damage roll, you can use your reaction to subtract a Bardic Inspiration die from the roll.', level: 3, kind: 'reaction' },
           { id: 'additional-magical-secrets', name: 'Additional Magical Secrets', description: 'Learn two spells from any class.', level: 6, kind: 'passive' },
+
           { id: 'peerless-skill', name: 'Peerless Skill', description: 'When you make an ability check, you can expend a Bardic Inspiration die and add the roll to the check.', level: 14, kind: 'passive' },
         ],
       },
@@ -315,7 +338,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
       },
     ],
     subclassLevel: 3,
-    icon: 'fa-guitar',
+
     description: 'An inspiring magician whose power echoes the music of creation.',
     flavor: 'Bards weave magic through music, poetry, and oration, inspiring allies and confounding foes.',
   },
@@ -368,8 +391,10 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
       { id: 'channel-divinity-2', name: 'Channel Divinity (2 uses)', description: 'Gain a second use of Channel Divinity per short rest.', level: 6, kind: 'resource' },
       { id: 'destroy-undead-cr-half', name: 'Destroy Undead (CR 1/2)', description: 'Undead of CR 1/2 or lower that fail their save against Turn Undead are destroyed.', level: 5, kind: 'passive' },
       { id: 'divine-strike', name: 'Divine Strike', description: 'Once per turn when you hit with a weapon attack, add 1d8 radiant damage.', level: 8, kind: 'passive' },
+
       { id: 'channel-divinity-3', name: 'Channel Divinity (3 uses)', description: 'Gain a third use of Channel Divinity per short rest.', level: 18, kind: 'resource' },
       { id: 'divine-intervention', name: 'Divine Intervention', description: 'You can call on your deity to intervene on your behalf. 10% chance of success, increasing by 1% per level.', level: 10, kind: 'passive' },
+
     ],
     subclasses: [
       {
@@ -398,6 +423,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
           { id: 'radiance-of-the-dawn', name: 'Radiance of the Dawn', description: 'Dispel magical darkness within 30 ft. Creatures in the area make a CON save or take radiant damage.', level: 2, kind: 'passive' },
           { id: 'improved-flare', name: 'Improved Flare', description: 'Your Warding Flare now imposes disadvantage on all attack rolls against the target, not just one.', level: 6, kind: 'passive' },
           { id: 'potent-spellcasting', name: 'Potent Spellcasting', description: 'Add your WIS mod to damage of cleric cantrips.', level: 8, kind: 'passive', effect: { kind: 'damage-bonus', payload: { amount: 'WIS', condition: 'cantrip' } } },
+
           { id: 'corona-of-light', name: 'Corona of Light', description: 'As an action, emit sunlight for 1 minute. You have adv on fire spells, and creatures in the area take extra radiant damage.', level: 17, kind: 'passive' },
         ],
       },
@@ -448,7 +474,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
       },
     ],
     subclassLevel: 1,
-    icon: 'fa-cross',
+
     description: 'A priestly champion who wields divine magic in service of a higher power.',
     flavor: 'Clerics are the mortal conduits of divine will, channeling the power of the gods.',
   },
@@ -497,11 +523,15 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     },
     features: [
       { id: 'druidic', name: 'Druidic', description: 'You know Druidic, the secret language of druids.', level: 1, kind: 'passive' },
+
       { id: 'wild-shape-1', name: 'Wild Shape (1 use)', description: 'Use an action to transform into a beast you\'ve seen. 2 uses per short rest. CR limits increase at higher levels.', level: 2, kind: 'resource', grantsResource: 'wild-shape' },
       { id: 'wild-shape-2', name: 'Wild Shape (improved)', description: 'Wild Shape: swimming speed at L4, flying speed at L8.', level: 4, kind: 'passive' },
       { id: 'timeless-body', name: 'Timeless Body', description: 'You age 1 year for every 10 years that pass.', level: 18, kind: 'passive' },
+
       { id: 'beast-spells', name: 'Beast Spells', description: 'You can cast spells while in Wild Shape form.', level: 18, kind: 'passive' },
+
       { id: 'archdruid', name: 'Archdruid', description: 'Wild Shape has unlimited uses. You can ignore verbal, somatic, and material components for your spells.', level: 20, kind: 'passive' },
+
     ],
     subclasses: [
       {
@@ -513,6 +543,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
           { id: 'bonus-cantrip', name: 'Bonus Cantrip', description: 'Learn one additional druid cantrip of your choice.', level: 2, kind: 'passive' },
           { id: 'natural-recovery', name: 'Natural Recovery', description: 'During a short rest, you can recover expended spell slots with a total combined level equal to or less than half your druid level (round up).', level: 2, kind: 'passive' },
           { id: 'lands-stride', name: 'Land\'s Stride', description: 'Moving through nonmagical difficult terrain costs you no extra movement. You can also pass through nonmagical plants without being slowed and without taking damage from them.', level: 6, kind: 'passive' },
+
           { id: 'natures-ward', name: 'Nature\'s Ward', description: 'You can\'t be charmed or frightened by elementals or fey.', level: 10, kind: 'passive' },
           { id: 'natures-sanctuary', name: 'Nature\'s Sanctuary', description: 'Beasts and plant creatures are hesitant to attack you. When one attacks you, it must make a WIS save or choose a different target.', level: 14, kind: 'passive' },
         ],
@@ -532,7 +563,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
       },
     ],
     subclassLevel: 2,
-    icon: 'fa-leaf',
+
     description: 'A priest of the Old Faith, wielding the powers of nature and animal transformation.',
     flavor: 'Druids draw power from the natural world, protecting it with primal magic.',
   },
@@ -553,14 +584,19 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     features: [
       { id: 'unarmored-defense-monk', name: 'Unarmored Defense', description: 'Without armor, AC = 10 + DEX mod + WIS mod.', level: 1, kind: 'passive', effect: { kind: 'ac-formula', payload: { formula: '10 + DEX + WIS' } } },
       { id: 'martial-arts', name: 'Martial Arts', description: 'You can use DEX for unarmed strikes and monk weapons. Unarmed strike damage is 1d4 (scales up at higher levels). You can make an unarmed strike as a bonus action after the Attack action.', level: 1, kind: 'passive' },
+
       { id: 'ki', name: 'Ki', description: 'Your training unlocks the use of ki, a magical energy. Ki points equal to monk level. Spend on Flurry of Blows, Patient Defense, Step of the Wind. Recover on short rest.', level: 2, kind: 'resource', grantsResource: 'ki' },
+
       { id: 'flurry-of-blows', name: 'Flurry of Blows', description: 'Spend 1 ki to make two unarmed strikes as a bonus action after the Attack action.', level: 2, kind: 'passive' },
       { id: 'patient-defense', name: 'Patient Defense', description: 'Spend 1 ki to take the Dodge action as a bonus action.', level: 2, kind: 'passive' },
       { id: 'step-of-the-wind', name: 'Step of the Wind', description: 'Spend 1 ki to take the Dash or Disengage action as a bonus action.', level: 2, kind: 'passive' },
       { id: 'deflect-missiles', name: 'Deflect Missiles', description: 'Use your reaction to deflect or catch a ranged weapon attack. Reduce damage by 1d10 + DEX mod + monk level.', level: 3, kind: 'passive' },
+
       { id: 'slow-fall', name: 'Slow Fall', description: 'Reduce falling damage by 5 × monk level.', level: 4, kind: 'passive' },
+
       { id: 'extra-attack-monk', name: 'Extra Attack', description: 'You can attack twice when you take the Attack action.', level: 5, kind: 'passive', effect: { kind: 'extra-attack', payload: { count: 2 } } },
       { id: 'stunning-strike', name: 'Stunning Strike', description: 'Spend 1 ki when you hit with a melee attack to force the target to make a CON save or be stunned until the end of your next turn.', level: 5, kind: 'passive' },
+
       { id: 'unarmored-movement', name: 'Unarmored Movement', description: 'Speed increases by 10 feet while not wearing armor or wielding a shield.', level: 2, kind: 'passive', effect: { kind: 'speed-bonus', payload: { bonus: 10, condition: 'no-armor' } } },
       { id: 'evasion-monk', name: 'Evasion', description: 'When you make a DEX save against an effect that deals half damage on success, you take no damage on success and half on failure.', level: 7, kind: 'passive', effect: { kind: 'evasion' } },
       { id: 'stillness-of-mind', name: 'Stillness of Mind', description: 'Use an action to end one effect causing you to be charmed or frightened.', level: 7, kind: 'passive' },
@@ -609,7 +645,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
       },
     ],
     subclassLevel: 3,
-    icon: 'fa-fist-raised',
+
     description: 'A master of martial arts, harnessing ki to perform extraordinary feats.',
     flavor: 'Monks blend martial discipline with spiritual energy, fighting with unarmed strikes and monk weapons.',
   },
@@ -659,14 +695,18 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     features: [
       { id: 'lay-on-hands-pool', name: 'Lay on Hands', description: 'Healing pool of 5 × paladin level. Use an action to heal a creature or cure a disease or poison.', level: 1, kind: 'resource', grantsResource: 'lay-on-hands-pool' },
       { id: 'divine-sense', name: 'Divine Sense', description: 'As an action, detect celestial, fiend, or undead within 60 ft. Uses: 1 + CHA mod per long rest.', level: 1, kind: 'resource', grantsResource: 'divine-sense' },
+
       { id: 'divine-smite', name: 'Divine Smite', description: 'When you hit with a melee weapon attack, you can expend a spell slot to deal extra radiant damage: 2d8 for L1, +1d8 per level above 1 (max 5d8).', level: 2, kind: 'passive' },
+
       { id: 'fighting-style-pal', name: 'Fighting Style', description: 'You adopt a fighting style as your specialty.', level: 2, kind: 'subclass',
         choice: { label: 'Choose a Fighting Style', options: FIGHTING_STYLE_OPTIONS.filter(fs => fs.id !== 'protection') },
         effect: { kind: 'fighting-style' }
       },
       { id: 'divine-health', name: 'Divine Health', description: 'You are immune to disease.', level: 3, kind: 'passive', effect: { kind: 'condition-immunity', payload: { condition: 'diseased' } } },
+
       { id: 'extra-attack-pal', name: 'Extra Attack', description: 'You can attack twice when you take the Attack action.', level: 5, kind: 'passive', effect: { kind: 'extra-attack', payload: { count: 2 } } },
       { id: 'aura-of-protection', name: 'Aura of Protection', description: 'You and friendly creatures within 10 ft add your CHA mod to all saving throws.', level: 6, kind: 'passive', effect: { kind: 'aura-of-protection', payload: { stat: 'cha', radius: 10 } } },
+
       { id: 'aura-of-courage', name: 'Aura of Courage', description: 'You and friendly creatures within 10 ft can\'t be frightened.', level: 10, kind: 'passive' },
       { id: 'improved-divine-smite', name: 'Improved Divine Smite', description: 'Your melee weapon attacks deal an extra 1d8 radiant damage on top of any other damage.', level: 11, kind: 'passive', effect: { kind: 'damage-bonus', payload: { amount: '1d8', condition: 'always' } } },
       { id: 'cleansing-touch', name: 'Cleansing Touch', description: 'Use an action to end one spell affecting a creature you touch. Uses: CHA mod per long rest.', level: 14, kind: 'passive' },
@@ -713,7 +753,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
       },
     ],
     subclassLevel: 3,
-    icon: 'fa-sun',
+
     description: 'A holy warrior bound by a sacred oath to fight for justice and righteousness.',
     flavor: 'Paladins stand at the intersection of martial prowess and divine conviction.',
   },
@@ -763,15 +803,19 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     },
     features: [
       { id: 'favored-enemy', name: 'Favored Enemy', description: 'Choose a favored enemy type: beasts, fey, humanoids, monstrosities, or undead. Advantage on Survival to track them and Intelligence checks to recall info about them.', level: 1, kind: 'passive' },
+
       { id: 'natural-explorer', name: 'Natural Explorer', description: 'Choose a favored terrain. Your proficiency bonus is doubled for certain skills in that terrain, and movement through difficult terrain doesn\'t slow you.', level: 1, kind: 'passive' },
+
       { id: 'fighting-style-rgr', name: 'Fighting Style', description: 'Choose a fighting style.', level: 2, kind: 'subclass',
         choice: { label: 'Choose a Fighting Style', options: FIGHTING_STYLE_OPTIONS.filter(fs => fs.id !== 'great-weapon-fighting' && fs.id !== 'protection') },
         effect: { kind: 'fighting-style' }
       },
       { id: 'primeval-awareness', name: 'Primeval Awareness', description: 'Use your action to sense the presence of your favored enemy type within 1 mile (or 6 miles in your favored terrain).', level: 3, kind: 'passive' },
+
       { id: 'extra-attack-rgr', name: 'Extra Attack', description: 'You can attack twice when you take the Attack action.', level: 5, kind: 'passive', effect: { kind: 'extra-attack', payload: { count: 2 } } },
       { id: 'lands-stride-rgr', name: 'Land\'s Stride', description: 'Nonmagical difficult terrain costs no extra movement. Pass through plants without being slowed.', level: 8, kind: 'passive' },
       { id: 'hide-in-plain-sight', name: 'Hide in Plain Sight', description: 'Create camouflage to give yourself +10 to Stealth while remaining still.', level: 10, kind: 'passive' },
+
       { id: 'vanish', name: 'Vanish', description: 'Hide as a bonus action. Can\'t be tracked by nonmagical means.', level: 14, kind: 'passive' },
       { id: 'feral-senses', name: 'Feral Senses', description: 'You are aware of the location of any hidden or invisible creature within 30 ft.', level: 18, kind: 'passive' },
       { id: 'foe-slayer', name: 'Foe Slayer', description: 'Once per turn, when you hit your favored enemy, you can add your WIS mod to the attack roll or damage roll.', level: 20, kind: 'passive' },
@@ -781,6 +825,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
         id: 'hunter',
         parentClass: 'ranger',
         name: 'Hunter',
+
         description: 'Hunters are skilled trackers and slayers of specific prey.',
         features: [
           { id: 'hunters-prey', name: 'Hunter\'s Prey', description: 'Choose Colossus Slayer (1d8 extra damage if target below max HP), Giant Killer (reaction attack after Large+ creature hits you), or Horde Breaker (attack a second creature within 5 ft).', level: 3, kind: 'passive' },
@@ -793,6 +838,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
         id: 'beast-master',
         parentClass: 'ranger',
         name: 'Beast Master',
+
         description: 'Rangers of the Beast Master archetype form a magical bond with a beast companion.',
         features: [
           { id: 'rangers-companion', name: 'Ranger\'s Companion', description: 'You gain a beast companion that obeys your commands. It acts on your turn and can attack when you command it.', level: 3, kind: 'passive' },
@@ -803,7 +849,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
       },
     ],
     subclassLevel: 3,
-    icon: 'fa-bow-arrow',
+
     description: 'A warrior who combines martial prowess with nature magic to track and hunt foes.',
     flavor: 'Rangers are masters of the wild, tracking enemies across any terrain.',
   },
@@ -824,12 +870,19 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     features: [
       { id: 'expertise-rogue-1', name: 'Expertise', description: 'Choose two skills to gain expertise (double proficiency bonus).', level: 1, kind: 'passive', effect: { kind: 'skill-expertise' } },
       { id: 'sneak-attack', name: 'Sneak Attack', description: 'Once per turn, deal 1d6 extra damage (scales at L3, L5, L7, L9, L11, L13, L15, L17, L19) with a finesse/ranged weapon if you have advantage or an ally is within 5 ft.', level: 1, kind: 'passive', effect: { kind: 'sneak-attack', payload: { extraDiceAtLevel: { 1: 1, 3: 2, 5: 3, 7: 4, 9: 5, 11: 6, 13: 7, 15: 8, 17: 9, 19: 10 } } } },
+
       { id: 'thieves-cant', name: 'Thieves\' Cant', description: 'You know the secret language of thieves.', level: 1, kind: 'passive' },
+
       { id: 'cunning-action', name: 'Cunning Action', description: 'Use a bonus action to Dash, Disengage, or Hide.', level: 2, kind: 'passive' },
+
       { id: 'uncanny-dodge', name: 'Uncanny Dodge', description: 'When an attacker you can see hits you, use your reaction to halve the attack\'s damage.', level: 5, kind: 'passive' },
+
       { id: 'evasion', name: 'Evasion', description: 'When you make a DEX save against an effect that deals half damage on success, you take no damage on success and half on failure.', level: 7, kind: 'passive', effect: { kind: 'evasion' } },
+
       { id: 'reliable-talent', name: 'Reliable Talent', description: 'Whenever you make an ability check you\'re proficient in, a roll of 9 or lower counts as 10.', level: 11, kind: 'passive', effect: { kind: 'reliable-talent' } },
+
       { id: 'blindsense', name: 'Blindsense', description: 'If you can hear, you know the location of any hidden or invisible creature within 10 ft.', level: 14, kind: 'passive' },
+
       { id: 'slippery-mind', name: 'Slippery Mind', description: 'You gain proficiency in WIS saving throws.', level: 15, kind: 'passive' },
       { id: 'elusive', name: 'Elusive', description: 'No attack roll has advantage against you while you aren\'t incapacitated.', level: 18, kind: 'passive' },
       { id: 'stroke-of-luck', name: 'Stroke of Luck', description: 'If you miss with an attack or fail an ability check, you can treat the d20 as a 20. Once per short rest.', level: 20, kind: 'passive' },
@@ -839,6 +892,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
         id: 'thief',
         parentClass: 'rogue',
         name: 'Thief',
+
         description: 'Thieves are masters of stealth and subterfuge, using their skills to take what they want.',
         features: [
           { id: 'fast-hands', name: 'Fast Hands', description: 'Use your bonus action to make a Sleight of Hand check, use thieves\' tools, or Use an Object action.', level: 3, kind: 'passive' },
@@ -852,6 +906,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
         id: 'assassin',
         parentClass: 'rogue',
         name: 'Assassin',
+
         description: 'Rogues of the Assassin archetype are deadly killers who strike from the shadows.',
         features: [
           { id: 'bonus-proficiencies-assassin', name: 'Bonus Proficiencies', description: 'You gain proficiency with disguise kit and poisoner\'s kit.', level: 3, kind: 'passive' },
@@ -865,6 +920,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
         id: 'arcane-trickster',
         parentClass: 'rogue',
         name: 'Arcane Trickster',
+
         description: 'Arcane Tricksters blend rogue cunning with wizard magic.',
         spellcasting: {
           tradition: 'third',
@@ -906,7 +962,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
       },
     ],
     subclassLevel: 3,
-    icon: 'fa-user-ninja',
+
     description: 'A scoundrel who uses stealth and guile to overcome obstacles and enemies.',
     flavor: 'Rogues rely on their wits, stealth, and precision to survive in a dangerous world.',
   },
@@ -956,17 +1012,21 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     },
     features: [
       { id: 'sorcerous-origin', name: 'Sorcerous Origin', description: 'Choose your sorcerous origin, which defines the source of your innate magic.', level: 1, kind: 'subclass' },
+
       { id: 'sorcery-points', name: 'Sorcery Points', description: 'You have sorcery points equal to your sorcerer level. Spend on metamagic or convert to spell slots (recover on long rest).', level: 2, kind: 'resource', grantsResource: 'sorcery-points' },
       { id: 'metamagic', name: 'Metamagic', description: 'Choose two metamagic options (at L3, L10, L17). Spend sorcery points to modify spells.', level: 3, kind: 'passive', effect: { kind: 'metamagic-option', payload: { options: ['twinned', 'quickened', 'subtle', 'empowered', 'careful', 'distant', 'extended', 'heightened'] } } },
+
       { id: 'metamagic-2', name: 'Metamagic (1 more)', description: 'Choose one additional metamagic option.', level: 10, kind: 'passive' },
       { id: 'metamagic-3', name: 'Metamagic (1 more)', description: 'Choose one additional metamagic option.', level: 17, kind: 'passive' },
       { id: 'sorcerous-restoration', name: 'Sorcerous Restoration', description: 'When you finish a short rest, regain 4 sorcery points.', level: 20, kind: 'passive' },
+
     ],
     subclasses: [
       {
         id: 'draconic-bloodline',
         parentClass: 'sorcerer',
         name: 'Draconic Bloodline',
+
         description: 'Your innate magic comes from draconic blood that runs through your veins.',
         features: [
           { id: 'draconic-resilience', name: 'Draconic Resilience', description: 'Your HP maximum increases by 1 per sorcerer level. AC = 13 + DEX when unarmored.', level: 1, kind: 'passive', effect: { kind: 'ac-formula', payload: { formula: '13 + DEX' } } },
@@ -979,6 +1039,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
         id: 'wild-magic',
         parentClass: 'sorcerer',
         name: 'Wild Magic',
+
         description: 'Your magic is wild and unpredictable, surging with chaotic energy.',
         features: [
           { id: 'wild-magic-surge', name: 'Wild Magic Surge', description: 'After casting a spell of 1st level or higher, roll on the Wild Magic Surge table for a random effect.', level: 1, kind: 'passive' },
@@ -990,7 +1051,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
       },
     ],
     subclassLevel: 1,
-    icon: 'fa-hat-wizard',
+
     description: 'A spellcaster who draws on inherent magic from a bloodline or other mystical source.',
     flavor: 'Sorcerers channel magic through their very being, bending reality with raw charisma.',
   },
@@ -1022,14 +1083,18 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     },
     features: [
       { id: 'otherworldly-patron', name: 'Otherworldly Patron', description: 'Choose your otherworldly patron, the source of your warlock powers.', level: 1, kind: 'subclass' },
+
       { id: 'pact-magic', name: 'Pact Magic', description: 'Your spell slots recharge on a short rest. You always cast spells at the highest slot level you have.', level: 1, kind: 'passive', effect: { kind: 'pact-magic' } },
+
       { id: 'eldritch-invocations-2', name: 'Eldritch Invocations (2)', description: 'Learn two eldritch invocations of your choice. Gain an additional invocation at L5, L7, L9, L12, L15, L18.', level: 2, kind: 'passive' },
       { id: 'pact-boon', name: 'Pact Boon', description: 'Choose a pact boon: Pact of the Chain (familiar), Pact of the Blade (magic weapon), Pact of the Tome (bonus cantrips).', level: 3, kind: 'subclass' },
+
       { id: 'mystic-arcanum-6', name: 'Mystic Arcanum (6th)', description: 'Learn one 6th-level spell that you can cast once per long rest.', level: 11, kind: 'passive' },
       { id: 'mystic-arcanum-7', name: 'Mystic Arcanum (7th)', description: 'Learn one 7th-level spell that you can cast once per long rest.', level: 13, kind: 'passive' },
       { id: 'mystic-arcanum-8', name: 'Mystic Arcanum (8th)', description: 'Learn one 8th-level spell that you can cast once per long rest.', level: 15, kind: 'passive' },
       { id: 'mystic-arcanum-9', name: 'Mystic Arcanum (9th)', description: 'Learn one 9th-level spell that you can cast once per long rest.', level: 17, kind: 'passive' },
       { id: 'eldritch-master', name: 'Eldritch Master', description: 'When you roll initiative and have no pact magic slots remaining, you regain one.', level: 20, kind: 'passive' },
+
     ],
     subclasses: [
       {
@@ -1071,7 +1136,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
       },
     ],
     subclassLevel: 1,
-    icon: 'fa-skull',
+
     description: 'A wielder of magic derived from a pact with an otherworldly patron.',
     flavor: 'Warlocks seek forbidden knowledge and power through bargains with supernatural entities.',
   },
@@ -1121,9 +1186,13 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     features: [
       { id: 'spellcasting-wiz', name: 'Spellcasting', description: 'You have a spellbook containing the spells you know. You can prepare wizard spells from your spellbook equal to INT mod + wizard level.', level: 1, kind: 'passive', effect: { kind: 'spellcasting' } },
       { id: 'arcane-recovery', name: 'Arcane Recovery', description: 'Once per day during a short rest, recover expended spell slots with a total level equal to or less than half your wizard level (round up).', level: 1, kind: 'resource', grantsResource: 'arcane-recovery' },
+
       { id: 'arcane-tradition', name: 'Arcane Tradition', description: 'Choose an arcane tradition at level 2, defining your specialized school of magic.', level: 2, kind: 'subclass' },
+
       { id: 'spell-mastery', name: 'Spell Mastery', description: 'Choose a 1st and 2nd level spell from your spellbook. You can cast them at their lowest level without expending a slot.', level: 18, kind: 'passive' },
+
       { id: 'signature-spells', name: 'Signature Spells', description: 'Choose two 3rd-level spells from your spellbook that are always prepared and can be cast once without a slot.', level: 20, kind: 'passive' },
+
     ],
     subclasses: [
       {
@@ -1232,7 +1301,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
       },
     ],
     subclassLevel: 2,
-    icon: 'fa-book-dead',
+
     description: 'A scholarly magic-user who casts spells through study and memorization.',
     flavor: 'Wizards are the quintessential spellcasters, wielding magic through years of arcane study.',
   },

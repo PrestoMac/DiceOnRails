@@ -149,13 +149,14 @@ const BackgroundSheet: React.FC<BackgroundSheetProps> = ({ character, open, onCl
                     onClick={() => update({ background: bg.id })}
                     disabled={readOnly}
                     className={cx(
-                      'px-2 py-1 rounded border text-[10px] font-bold transition-all',
+                      'flex items-center gap-1.5 px-2 py-1 rounded border text-[10px] font-bold transition-all',
                       character.background === bg.id
                         ? 'border-ember-500/60 bg-ember-500/10 text-ember-300'
                         : 'border-white/[0.08] bg-obsidian-900/40 text-parchment-mute hover:border-white/25',
                       readOnly && 'cursor-default opacity-60',
                     )}
                   >
+                    {bg.icon && <i className={cx('fas text-[8px]', bg.icon, 'text-ember-400')} aria-hidden="true" />}
                     {bg.name}
                   </button>
                 ))}

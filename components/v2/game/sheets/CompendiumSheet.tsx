@@ -29,7 +29,7 @@ const TAB_ITEMS = [
   { key: 'conditions', label: 'Conditions', icon: 'fa-circle-exclamation' },
   { key: 'rules', label: 'Rules', icon: 'fa-scroll' },
   { key: 'spells', label: 'Spells', icon: 'fa-hat-wizard' },
-  { key: 'items', label: 'Items', icon: 'fa-treasure-chest' },
+  { key: 'items', label: 'Items', icon: 'fa-box-open' },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -371,11 +371,16 @@ const SpellsTabV2: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-[52vh] overflow-y-auto v2-scrollbar pr-1">
         {filtered.slice(0, 200).map((s) => (
           <Card key={s.id} interactive className="p-2" onClick={() => setViewing(s)}>
-            <div className="flex items-baseline justify-between gap-2">
-              <span className="text-xs font-bold text-parchment truncate">{s.name}</span>
-              <span className="text-[9px] font-mono text-ember-400 shrink-0">{s.level === 0 ? 'Cantrip' : `L${s.level}`}</span>
+            <div className="flex items-center gap-2">
+              <i className={cx('fas text-[10px]', s.icon || 'fa-hat-wizard', 'text-arcane-400 shrink-0')} aria-hidden="true" />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-xs font-bold text-parchment truncate">{s.name}</span>
+                  <span className="text-[9px] font-mono text-ember-400 shrink-0">{s.level === 0 ? 'Cantrip' : `L${s.level}`}</span>
+                </div>
+                <span className="text-[10px] text-parchment-faint capitalize">{s.school}</span>
+              </div>
             </div>
-            <span className="text-[10px] text-parchment-faint capitalize">{s.school}</span>
           </Card>
         ))}
       </div>
@@ -456,17 +461,22 @@ const ItemsTabV2: React.FC = () => {
           };
           return (
             <Card key={`${item.name}-${idx}`} interactive className="p-2" onClick={() => setViewing(detail)}>
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="text-xs font-bold text-parchment truncate">{item.name}</span>
-                <span className={cx('text-[8px] uppercase font-bold shrink-0', rarityText(item.rarity))}>
-                  {item.rarity || 'common'}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 text-[10px] text-parchment-faint">
-                <span className="capitalize">{item.type || 'item'}</span>
-                {item.cost && <span>• {item.cost}</span>}
-                {item.stats?.damage && <span className="text-blood-400 font-mono">• {item.stats.damage}</span>}
-                {item.stats?.acFormula && <span className="text-frost-400 font-mono">• {item.stats.acFormula}</span>}
+              <div className="flex items-center gap-2">
+                <i className={cx('fas text-[10px]', item.icon || 'fa-gem', 'text-parchment-faint shrink-0')} aria-hidden="true" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-xs font-bold text-parchment truncate">{item.name}</span>
+                    <span className={cx('text-[8px] uppercase font-bold shrink-0', rarityText(item.rarity))}>
+                      {item.rarity || 'common'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px] text-parchment-faint">
+                    <span className="capitalize">{item.type || 'item'}</span>
+                    {item.cost && <span>• {item.cost}</span>}
+                    {item.stats?.damage && <span className="text-blood-400 font-mono">• {item.stats.damage}</span>}
+                    {item.stats?.acFormula && <span className="text-frost-400 font-mono">• {item.stats.acFormula}</span>}
+                  </div>
+                </div>
               </div>
             </Card>
           );

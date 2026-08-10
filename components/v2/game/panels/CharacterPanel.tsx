@@ -69,7 +69,7 @@ const STATS: (keyof Character['stats'])[] = ['str', 'dex', 'con', 'int', 'wis', 
 
 const ITEM_TYPE_ICONS: Record<string, string> = {
   weapon: 'fa-sword',
-  armor: 'fa-helmet-battle',
+  armor: 'fa-shield-halved',
   shield: 'fa-shield',
   potion: 'fa-flask',
   gear: 'fa-toolbox',
@@ -115,6 +115,7 @@ const FeatureAccordion: React.FC<FeatureAccordionProps> = ({ title, icon, featur
                 className="fas fa-chevron-right text-[9px] text-ember-600 transition-transform group-open:rotate-90"
                 aria-hidden="true"
               />
+              {f.icon && <i className={cx('fas text-[10px]', f.icon, 'text-ember-400/80')} aria-hidden="true" />}
               {f.level !== undefined && (
                 <span className="font-mono text-[10px] text-ember-500/80">L{f.level}</span>
               )}
@@ -907,19 +908,19 @@ const CharacterPanel: React.FC<CharacterPanelProps> = ({
                       </div>
                       <div className="flex flex-wrap gap-1">
                         {(spellList ?? []).map((sid) => {
-                          const spell = SPELLS_BY_ID[sid];
-                          if (!spell) return null;
-                          return (
-                            <Chip
-                              key={sid}
-                              color="arcane"
-                              icon={spell.level === 0 ? 'fa-hat-wizard' : undefined}
-                              onClick={() => setViewingSpell(spell)}
-                              title={`View ${spell.name} details`}
-                            >
-                              {spell.name}
-                            </Chip>
-                          );
+                           const spell = SPELLS_BY_ID[sid];
+                           if (!spell) return null;
+                           return (
+                             <Chip
+                               key={sid}
+                               color="arcane"
+                               icon={spell.icon || (spell.level === 0 ? 'fa-hat-wizard' : undefined)}
+                               onClick={() => setViewingSpell(spell)}
+                               title={`View ${spell.name} details`}
+                             >
+                               {spell.name}
+                             </Chip>
+                           );
                         })}
                       </div>
                     </div>
