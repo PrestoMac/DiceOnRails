@@ -108,7 +108,11 @@ export type EffectKind =
   | 'diamond-soul'
   | 'aura-of-protection'
   | 'evasion'
-  | 'frenzy-exhaustion';
+  | 'frenzy-exhaustion'
+  | 'remarkable-athlete'
+  | 'survivor'
+  | 'relentless'
+  | 'enhanced-wild-shape';
 
 /** A feature granted by a character class at a specific level. */
 export interface ClassFeature {

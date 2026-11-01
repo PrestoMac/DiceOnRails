@@ -82,7 +82,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
         features: [
           { id: 'improved-critical', name: 'Improved Critical', description: 'Your weapon attacks score a critical hit on a roll of 19 or 20.', level: 3, kind: 'passive', effect: { kind: 'crit-range', payload: { min: 19 } } },
 
-          { id: 'remarkable-athlete', name: 'Remarkable Athlete', description: 'Add half your proficiency bonus (round up) to any Strength, Dexterity, or Constitution check you make that doesn\'t already use your proficiency bonus.', level: 7, kind: 'passive' },
+          { id: 'remarkable-athlete', name: 'Remarkable Athlete', description: 'Add half your proficiency bonus (round up) to any Strength, Dexterity, or Constitution check you make that doesn\'t already use your proficiency bonus.', level: 7, kind: 'passive', effect: { kind: 'remarkable-athlete' } },
 
           { id: 'additional-fighting-style', name: 'Additional Fighting Style', description: 'Choose a second fighting style.', level: 10, kind: 'subclass',
             choice: { label: 'Choose a second Fighting Style', options: FIGHTING_STYLE_OPTIONS.filter(fs => fs.id !== 'protection') },
@@ -90,7 +90,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
           },
           { id: 'superior-critical', name: 'Superior Critical', description: 'Your weapon attacks score a critical hit on a roll of 18-20.', level: 15, kind: 'passive', effect: { kind: 'crit-range', payload: { min: 18 } } },
 
-          { id: 'survivor', name: 'Survivor', description: 'At the start of each of your turns, you regain hit points equal to 5 + your Constitution modifier if you have no more than half your hit points left.', level: 18, kind: 'passive' , icon: 'fa-heart-pulse'},
+          { id: 'survivor', name: 'Survivor', description: 'At the start of each of your turns, you regain hit points equal to 5 + your Constitution modifier if you have no more than half your hit points left.', level: 18, kind: 'passive' , icon: 'fa-heart-pulse', effect: { kind: 'survivor' } },
 
         ],
       },
@@ -106,7 +106,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
           { id: 'know-your-enemy', name: 'Know Your Enemy', description: 'If you observe a creature for 1 minute, you learn its relative combat capabilities.', level: 7, kind: 'passive' },
 
           { id: 'improved-combat-superiority', name: 'Improved Combat Superiority', description: 'Your superiority dice increase to d10 at level 9, d12 at level 17.', level: 9, kind: 'passive' },
-          { id: 'relentless', name: 'Relentless', description: 'When you roll initiative and have no superiority dice remaining, you regain one.', level: 15, kind: 'passive' },
+          { id: 'relentless', name: 'Relentless', description: 'When you roll initiative and have no superiority dice remaining, you regain one.', level: 15, kind: 'passive', effect: { kind: 'relentless' } },
 
         ],
       },
@@ -565,7 +565,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
         description: 'Druids of the Circle of the Moon are fierce guardians of the wilds who transform into beasts.',
         features: [
           { id: 'combat-wild-shape', name: 'Combat Wild Shape', description: 'You can use Wild Shape as a bonus action. You can also expend a spell slot to heal 1d8 HP per slot level while in beast form.', level: 2, kind: 'passive' },
-          { id: 'circle-form', name: 'Circle Forms', description: 'You can transform into beasts of CR 1 at level 2, scaling up to CR 6 at level 18.', level: 2, kind: 'passive' },
+          { id: 'circle-form', name: 'Circle Forms', description: 'You can transform into beasts of CR 1 at level 2, scaling up to CR 6 at level 18.', level: 2, kind: 'passive', effect: { kind: 'enhanced-wild-shape' } },
           { id: 'primal-strike', name: 'Primal Strike', description: 'Your beast form attacks count as magical for overcoming resistance.', level: 6, kind: 'passive' },
           { id: 'elemental-wild-shape', name: 'Elemental Wild Shape', description: 'You can transform into an air, earth, fire, or water elemental.', level: 10, kind: 'passive' },
           { id: 'thousand-forms', name: 'Thousand Forms', description: 'You can cast alter self at will.', level: 14, kind: 'passive' },
@@ -1183,6 +1183,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
       ability: 'int',
       prepMode: 'prepared',
       ritualCasting: true,
+      spellbook: true,
       cantripsKnown: [3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5],
       spellSlots: [
         [2,0,0,0,0,0,0,0,0],

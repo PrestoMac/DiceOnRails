@@ -286,7 +286,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
     player.reactionAvailable = true;
     player.reactionUsedThisTurn = false;
     player.recklessAttacking = false;
-    if (player.class.toLowerCase() === 'fighter' && player.subclassId === 'champion' && player.level >= 18 && player.hp.current > 0 && player.hp.current <= player.hp.max / 2) {
+    if (getEffects(player, 'survivor').length > 0 && player.hp.current > 0 && player.hp.current <= player.hp.max / 2) {
       const healed = Math.max(0, 5 + getMod(player.stats.con));
       const previous = player.hp.current;
       player.hp.current = Math.min(player.hp.max, previous + healed);
@@ -471,7 +471,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       for (const char of state.party) {
         char.reactionAvailable = true;
         char.reactionUsedThisTurn = false;
-        if (char.class.toLowerCase() === 'fighter' && char.subclassId === 'battle-master' && char.level >= 15) {
+        if (getEffects(char, 'relentless').length > 0) {
           const superiority = char.resources?.find(r => r.id === 'superiority-dice');
           if (superiority && superiority.current === 0) superiority.current = 1;
         }

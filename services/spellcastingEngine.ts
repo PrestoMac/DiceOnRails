@@ -8,16 +8,15 @@ import { getConditionEffects, getExhaustionPenalty, executeConditionOnRemove } f
 import { getAtWillInvocationSpells } from '../data/invocations';
 
 export function getMaxPactSlotLevel(character: Character): number {
-  if (character.class !== 'warlock') return 0;
-  if (character.level >= 9) return 5;
-  if (character.level >= 7) return 4;
-  if (character.level >= 5) return 3;
-  if (character.level >= 3) return 2;
-  return character.level >= 1 ? 1 : 0;
+  // Keyed on the catalog's pactMagic table rather than a class-name check: a
+  // class with pact slots resolves its level→slot-level row, any other class 0.
+  const slotLevels = getClassDef(character.class)?.spellcasting?.pactMagic?.slotLevels;
+  if (!slotLevels || character.level < 1) return 0;
+  return slotLevels[Math.min(character.level - 1, slotLevels.length - 1)] ?? 0;
 }
 
 function findSpellSlot(character: Character, level: number) {
-  if (character.class === 'warlock') {
+  if (getClassDef(character.class)?.spellcasting?.pactMagic) {
     return (character.resources ?? []).find(r => r.id === 'pactMagic');
   }
   return (character.resources ?? []).find(r => r.id === `spell-slot-${level}`);
@@ -131,7 +130,7 @@ export function getMaxCastableSlotLevel(character: Character): number {
     return 0;
   }
   const level = character.level;
-  if (character.class === 'warlock') {
+  if (classDef.spellcasting.pactMagic) {
     return getMaxPactSlotLevel(character);
   }
   const slotsRow = classDef.spellcasting.spellSlots?.[Math.min(level - 1, classDef.spellcasting.spellSlots.length - 1)];
@@ -197,7 +196,8 @@ export function learnSpell(character: Character, spellId: string): boolean {
   character.knownSpells ??= [];
   if (spell && !character.knownSpells.includes(spell.id)) {
     character.knownSpells.push(spell.id);
-    if (spell.level > 0 && character.class === 'wizard' && character.pendingWizardSpells && character.pendingWizardSpells > 0) {
+    const usesSpellbook = !!getClassDef(character.class)?.spellcasting?.spellbook;
+    if (spell.level > 0 && usesSpellbook && character.pendingWizardSpells && character.pendingWizardSpells > 0) {
       character.pendingWizardSpells -= 1;
       if (character.pendingWizardSpells <= 0) delete character.pendingWizardSpells;
     }
@@ -225,7 +225,7 @@ export function prepareSpell(character: Character, spellId: string): { ok: boole
     return { ok: false, reason: `${classDef.name} cannot prepare ${spell.name}.` };
   }
   if (spell.level === 0) return { ok: true };
-  if (character.class === 'wizard' && !(character.knownSpells ?? []).includes(spell.id)) {
+  if (effectiveSpellcasting.spellbook && !(character.knownSpells ?? []).includes(spell.id)) {
     return { ok: false, reason: `${spell.name} is not in your spellbook.` };
   }
   const maxSlot = getMaxCastableSlotLevel(character);
@@ -290,10 +290,10 @@ export function castSpell(
   const subclass = character.subclassId ? getSubclassDef(character.class, character.subclassId) : undefined;
   const profile = classDef?.spellcasting ?? (character.level >= (classDef?.subclassLevel ?? Infinity) ? subclass?.spellcasting : undefined);
   if (!profile) return { success: false, reason: `${classDef?.name || 'This class'} cannot cast spells.` };
-  const isAtWillInvocation = character.class.toLowerCase() === 'warlock' && getAtWillInvocationSpells(character.invocations).includes(spell.id);
+  const isAtWillInvocation = !!profile.pactMagic && getAtWillInvocationSpells(character.invocations).includes(spell.id);
   if (isAtWillInvocation && spell.level > 0 && !options?.isRitual) {
     slotLevel = spell.level as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
-  } else if (character.class.toLowerCase() === 'warlock' && spell.level > 0 && !options?.isRitual) {
+  } else if (profile.pactMagic && spell.level > 0 && !options?.isRitual) {
     if (slotLevel > getMaxPactSlotLevel(character)) return { success: false, reason: 'Spell level exceeds your pact slot level.' };
     slotLevel = getMaxPactSlotLevel(character) as 1 | 2 | 3 | 4 | 5;
   }
@@ -301,7 +301,7 @@ export function castSpell(
   if (spell.level === 0 || options?.isRitual) {
     const known = character.knownSpells ?? [];
     const prepared = character.preparedSpells ?? [];
-    if (character.class === 'wizard' && options?.isRitual) {
+    if (profile.spellbook && options?.isRitual) {
       if (!known.includes(spell.id)) {
         return { success: false, reason: `${spell.name} is not in your spellbook.` };
       }

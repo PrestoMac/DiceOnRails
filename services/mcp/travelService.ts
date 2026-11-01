@@ -313,7 +313,7 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
       };
       const afterSkill = applyEffects(target, 'onSkillCheck', skillCtx);
       const finalRoll = afterSkill.roll;
-      const remarkableAthlete = target.class.toLowerCase() === 'fighter' && target.subclassId === 'champion' && target.level >= 7 && ['str', 'dex', 'con'].includes(statKey) && skillRank === 0
+      const remarkableAthlete = getEffects(target, 'remarkable-athlete').length > 0 && ['str', 'dex', 'con'].includes(statKey) && skillRank === 0
         ? Math.ceil(getProficiencyBonus(target) / 2) : 0;
       const checkTotal = finalRoll + modifier + skillRank + afterSkill.skillBonus + remarkableAthlete - getExhaustionPenalty(target);
       const total = target.class.toLowerCase() === 'barbarian' && target.level >= 18 && statKey === 'str'

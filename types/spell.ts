@@ -76,4 +76,6 @@ export interface SpellcastingProfile {
     slots: number[];
     slotLevels: number[];
   };
+  /** True when spells must be learned into a spellbook before preparation (Wizard). */
+  spellbook?: boolean;
 }

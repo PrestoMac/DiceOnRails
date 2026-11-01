@@ -15,6 +15,7 @@ import { createStateService, StateService } from './mcp/stateService';
 import { createContentService, ContentService } from './mcp/contentService';
 import { createTravelService, TravelService, validateTravelTimeAdvance } from './mcp/travelService';
 import { getClassDef, calculateSpeed } from './classEngine';
+import { getEffects } from './effectDispatcher';
 
 export { generateId };
 
@@ -374,7 +375,7 @@ export class MockMCPServer {
     const isDruid = char.class === 'druid';
     if (isDruid) {
       const druidLevel = char.level;
-      const moonDruid = char.subclassId === 'circle-of-the-moon' && druidLevel >= 2;
+      const moonDruid = getEffects(char, 'enhanced-wild-shape').length > 0;
       const maxCR = moonDruid ? (druidLevel >= 6 ? Math.floor(druidLevel / 3) : 1) : druidLevel >= 8 ? 1 : druidLevel >= 4 ? 0.5 : 0.25;
       const crValue = beast.cr ?? 0;
       if (crValue > maxCR) {

@@ -82,6 +82,51 @@ function isSpentCaster(c: Character): boolean {
     return slots.length > 0 && slots.every(s => (s.current ?? 0) <= 0);
 }
 
+/** Returns a character resource by id, or undefined when not present. */
+function findRes(c: Character, id: string) {
+    return (c.resources || []).find(r => r.id === id);
+}
+
+/** True when the named resource exists with at least one use remaining. */
+const resourceCharged = (c: Character, id: string) => {
+    const r = findRes(c, id);
+    return !!r && r.current > 0;
+};
+
+/** True when the named resource is either untracked or still has a use. */
+const resourceAvailable = (c: Character, id: string) => {
+    const r = findRes(c, id);
+    return !r || r.current > 0;
+};
+
+/**
+ * Class / subclass / resource-gated suggestion lines, in precedence order.
+ * Each rule declares its own precondition; matching rules append their lines
+ * until the tray is full. Consolidates what were five scattered class `if`s.
+ */
+const RESOURCE_SUGGESTIONS: Array<{ when: (c: Character) => boolean; lines: string[] }> = [
+    {
+        when: c => c.class === 'monk' && c.level >= 2 && resourceCharged(c, 'ki'),
+        lines: ['Use Flurry of Blows for extra strikes', 'Spend Ki on Patient Defense', 'Use Stunning Strike on the enemy'],
+    },
+    {
+        when: c => c.class === 'druid' && c.subclassId === 'circle-of-the-land' && resourceAvailable(c, 'natural-recovery'),
+        lines: ['Use Natural Recovery to regain spell slots'],
+    },
+    {
+        when: c => c.class === 'warlock' && (c.invocations || []).includes('agonizing-blast'),
+        lines: ['Blast the enemy with Eldritch Blast + Agonizing Blast'],
+    },
+    {
+        when: c => c.class === 'fighter' && c.level >= 2 && resourceAvailable(c, 'action-surge'),
+        lines: ['Use Action Surge for an extra action'],
+    },
+    {
+        when: c => c.class === 'rogue' && c.level >= 2 && !!findRes(c, 'cunning-action'),
+        lines: ['Use Cunning Action to Dash, Disengage, or Hide'],
+    },
+];
+
 /**
  * Builds context-aware NON-COMBAT suggestions. Two modes:
  *   - Per-character (`characterId` supplied): class-aware chips mixed with the
@@ -128,33 +173,12 @@ export function buildExplorationSuggestions(state: GameState, characterId?: stri
     }
 
     // Subclass & resource-aware suggestions (gated by remaining capacity).
-    if (suggestions.length < MAX_SUGGESTIONS) {
-        if (character.class === 'monk' && character.level >= 2) {
-            const ki = (character.resources || []).find(r => r.id === 'ki');
-            if (ki && ki.current > 0) {
-                suggestions.push('Use Flurry of Blows for extra strikes');
-                if (suggestions.length < MAX_SUGGESTIONS) suggestions.push('Spend Ki on Patient Defense');
-                if (suggestions.length < MAX_SUGGESTIONS) suggestions.push('Use Stunning Strike on the enemy');
-            }
-        }
-        if (character.class === 'druid' && character.subclassId === 'circle-of-the-land') {
-            const nr = (character.resources || []).find(r => r.id === 'natural-recovery');
-            if (!nr || nr.current > 0) {
-                suggestions.push('Use Natural Recovery to regain spell slots');
-            }
-        }
-        if (character.class === 'warlock' && (character.invocations || []).includes('agonizing-blast')) {
-            suggestions.push('Blast the enemy with Eldritch Blast + Agonizing Blast');
-        }
-        if (character.class === 'fighter' && character.level >= 2) {
-            const as = (character.resources || []).find(r => r.id === 'action-surge');
-            if (!as || as.current > 0) {
-                suggestions.push('Use Action Surge for an extra action');
-            }
-        }
-        if (character.class === 'rogue' && character.level >= 2) {
-            const cu = (character.resources || []).find(r => r.id === 'cunning-action');
-            if (cu) suggestions.push('Use Cunning Action to Dash, Disengage, or Hide');
+    for (const rule of RESOURCE_SUGGESTIONS) {
+        if (suggestions.length >= MAX_SUGGESTIONS) break;
+        if (!rule.when(character)) continue;
+        for (const line of rule.lines) {
+            if (suggestions.length >= MAX_SUGGESTIONS) break;
+            suggestions.push(line);
         }
     }
 
