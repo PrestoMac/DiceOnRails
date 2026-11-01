@@ -79,6 +79,22 @@ describe('savesTools', () => {
   });
 
   describe('make_save', () => {
+    it('uses class save proficiency and does not double-count Resilient', async () => {
+      mockRoll(10);
+      server.joinParty(makeCharacter({ class: 'fighter', feats: ['resilient'], featChoices: { resilient: { saveStat: 'str' } }, stats: { str: 16, dex: 10, con: 10, int: 10, wis: 10, cha: 10 } }));
+      const result = await server.make_save('Valerius', 'str', 15);
+      expect(result.data.modifier).toBe(5);
+      expect(result.data.success).toBe(true);
+    });
+
+    it('applies Diamond Soul proficiency once', async () => {
+      mockRoll(10);
+      server.joinParty(makeCharacter({ class: 'monk', level: 14, feats: ['resilient'], featChoices: { resilient: { saveStat: 'wis' } }, stats: { str: 10, dex: 10, con: 10, int: 10, wis: 12, cha: 10 } }));
+      const result = await server.make_save('Valerius', 'wis', 16);
+      expect(result.data.modifier).toBe(6);
+      expect(result.data.success).toBe(true);
+    });
+
     it('succeeds against DC 10', async () => {
       mockRoll(15);
       server.joinParty(makeCharacter());

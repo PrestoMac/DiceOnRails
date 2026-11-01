@@ -58,7 +58,7 @@ export function awardExperience(
     const newUnusedPoints = character.unusedStatPoints + levelsGained * STAT_POINTS_PER_LEVEL;
     updated.unusedStatPoints = newUnusedPoints;
 
-    const skillPointsPerLevel = character.class === 'Rogue' ? 4 : 3;
+    const skillPointsPerLevel = character.class.toLowerCase() === 'rogue' ? 4 : 3;
     updated.unusedSkillPoints = (character.unusedSkillPoints ?? 0) + levelsGained * skillPointsPerLevel;
 
     if (ASI_LEVELS.includes(newLevel) && !updated.featSelections?.some(s => s.level === newLevel)) {
@@ -106,6 +106,7 @@ export function awardExperience(
     const newMaxHp = classEngineCalculateMaxHp(updated);
     const hpDiff = newMaxHp - oldMaxHp;
     updated.hp = updateHp(character.hp.current + hpDiff, newMaxHp);
+    updated.hitDice = { current: character.hitDice.current + levelsGained, max: character.hitDice.max + levelsGained };
     updated.resources = recalculateResourcePools(updated);
 
     return {
@@ -199,11 +200,9 @@ export function applyStatAllocation(
 
 /** Builds a human-readable progression context string including level, XP percentage, unspent points, and feats. */
 export function getProgressionContext(character: Character): string {
-  const currentLevelXp = getXpForLevel(character.level);
-  const nextLevelXp = character.experienceToNextLevel;
-  const levelRange = nextLevelXp - currentLevelXp;
+  const levelRange = character.experienceToNextLevel;
   const xpProgress = levelRange > 0
-    ? Math.round(((character.experience - currentLevelXp) / levelRange) * 100)
+    ? Math.round((character.experience / levelRange) * 100)
     : 100;
   const base = `Level ${character.level} (${character.experience}/${character.experienceToNextLevel} XP, ${xpProgress}%), ${character.unusedStatPoints} unspent stat points, ${character.unusedSkillPoints ?? 0} unspent skill points`;
   const feats = character.feats?.length ? ` | Feats: ${character.feats.join(', ')}` : '';

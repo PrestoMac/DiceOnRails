@@ -52,10 +52,13 @@ describe('progressionTools', () => {
     });
 
     it('subclass selection: set subclassId via level_up method', async () => {
-      const char = makeCharacter({ class: 'wizard', pendingSubclassFeature: true, unusedStatPoints: 4 });
+      const char = makeCharacter({ class: 'wizard', level: 2, pendingSubclassFeature: true, unusedStatPoints: 4 });
       server.joinParty(char);
       const result = await server.level_up('hero-1', { int: 2 }, 'school-of-evocation');
       expect(result.success).toBe(true);
+      expect(server.getTarget('hero-1')?.subclassId).toBe('school-of-evocation');
+      expect(server.getTarget('hero-1')?.stats.int).toBe(10);
+      expect(server.getTarget('hero-1')?.unusedStatPoints).toBe(2);
     });
 
     it('feat selection: assign a feat to character feats array', () => {
@@ -84,6 +87,20 @@ describe('progressionTools', () => {
   });
 
   describe('use_resource', () => {
+    it('does not consume a resource when the action fails or the amount is invalid', async () => {
+      const char = makeCharacter({ resources: [{ id: 'lay-on-hands-pool', name: 'Lay on Hands', current: 5, max: 5, resetOn: 'long', source: 'class', sourceId: 'paladin' }] });
+      server.joinParty(char);
+      expect((await server.use_resource('hero-1', 'lay-on-hands-pool', 'missing', 2)).success).toBe(false);
+      expect((await server.use_resource('hero-1', 'lay-on-hands-pool', 'hero-1', -3)).success).toBe(false);
+      expect(char.resources?.[0].current).toBe(5);
+    });
+
+    it('does not consume Wild Shape just to request its options', async () => {
+      const char = makeCharacter({ class: 'druid', level: 2, resources: [{ id: 'wild-shape', name: 'Wild Shape', current: 2, max: 2, resetOn: 'short', source: 'class', sourceId: 'druid' }] });
+      server.joinParty(char);
+      expect((await server.use_resource('hero-1', 'wild-shape')).success).toBe(true);
+      expect(char.resources?.[0].current).toBe(2);
+    });
     it('rage: barbarian uses rage - raging flag set, resource decremented', async () => {
       const barbarian = makeBarbarian();
       server.joinParty(barbarian);

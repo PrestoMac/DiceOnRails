@@ -3,6 +3,7 @@ import { fail } from './_shared';
 import { applyStatAllocation, getProgressionContext } from '../progressionService';
 import { computeXp, awardXpToParty, formatXpAwardLine } from '../xpEngine';
 import { applyEffects, LevelUpContext } from '../effectDispatcher';
+import { getClassDef, getSubclassDef, recalculateResourcePools } from '../classEngine';
 
 /**
  * Auto-awards an enemy's XP to the party on defeat. Combat XP is CR-based (via the
@@ -41,31 +42,29 @@ export function createProgressionService(state: GameState): ProgressionService {
 
   return {
     async level_up(targetId, statAllocations, subclassSelection, chosenFeats) {
-      const target = getTarget(targetId);
+      let target = getTarget(targetId);
       if (!target) return fail(`Character "${targetId}" not found.`);
 
-      const context = getProgressionContext(target);
-
-      if (context.pendingStatAllocations > 0) {
-        if (!statAllocations || Object.keys(statAllocations).length === 0) {
-          return fail(`${target.name} has pending Attribute Score Improvements (${context.pendingStatAllocations} points). Provide statAllocations.`);
-        }
-        const sum = Object.values(statAllocations).reduce((a, b) => a + b, 0);
-        if (sum !== context.pendingStatAllocations) {
-          return fail(`Allocated ${sum} points but require exactly ${context.pendingStatAllocations} points.`);
-        }
+      const subclassId = subclassSelection?.toLowerCase().trim();
+      if (subclassId) {
+        const classDef = getClassDef(target.class);
+        if (!getSubclassDef(target.class, subclassId)) return fail(`Unknown subclass: ${subclassSelection}.`);
+        if (target.subclassId && target.subclassId !== subclassId) return fail(`${target.name} already has a subclass.`);
+        if (target.level < (classDef?.subclassLevel ?? 1)) return fail(`${target.name} is not yet eligible to choose a subclass.`);
+      }
+      if (statAllocations && Object.keys(statAllocations).length > 0) {
         const applyResult = applyStatAllocation(target, statAllocations);
-        if (!applyResult.success) {
-          return fail(applyResult.message || "Failed to allocate stat points.");
-        }
+        if (applyResult.errors.length) return fail(applyResult.errors.join('; '));
+        target = applyResult.character;
       }
 
-      if (context.pendingSubclassSelection && subclassSelection) {
-        target.subclass = subclassSelection.toLowerCase().trim();
+      if (subclassId) {
+        target.subclassId = subclassId;
         target.pendingSubclassFeature = false;
+        target.resources = recalculateResourcePools(target);
       }
 
-      if (context.pendingFeatChoice && chosenFeats && chosenFeats.length > 0) {
+      if (target.pendingFeatChoice && chosenFeats && chosenFeats.length > 0) {
         target.feats = [...(target.feats || []), ...chosenFeats];
         target.pendingFeatChoice = false;
       }
@@ -97,7 +96,7 @@ export function createProgressionService(state: GameState): ProgressionService {
 
       return {
         success: true,
-        data: { character: target.name, level: target.level, stats: target.stats, feats: target.feats, subclass: target.subclass },
+        data: { character: target.name, level: target.level, stats: target.stats, feats: target.feats, subclass: target.subclassId },
         message: `Successfully processed level up choices for ${target.name}! Character is now level ${target.level}.`
       };
     },

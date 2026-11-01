@@ -366,7 +366,7 @@ export class MockMCPServer {
     const isDruid = char.class === 'druid';
     if (isDruid) {
       const druidLevel = char.level;
-      const maxCR = Math.max(0.25, Math.floor(druidLevel / 3));
+      const maxCR = druidLevel >= 8 ? 1 : druidLevel >= 4 ? 0.5 : 0.25;
       const crValue = beast.cr ?? 0;
       if (crValue > maxCR) {
         return fail(`Cannot wild shape into ${beast.name} (CR ${crValue}) - max CR for Druid level ${druidLevel} is ${maxCR}.`);

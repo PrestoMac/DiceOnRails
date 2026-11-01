@@ -439,6 +439,14 @@ describe('travelService — long_rest', () => {
     expect(char.hp.current).toBe(30);
   });
 
+  it('recovers hit dice once and restores short-rest resources on a long rest', async () => {
+    const char = makeChar({ level: 5, hitDice: { current: 0, max: 5 }, resources: [{ id: 'ki', name: 'Ki', current: 0, max: 5, resetOn: 'short', source: 'class', sourceId: 'monk' }] });
+    state.party.push(char);
+    await service.long_rest('Resting.');
+    expect(char.hitDice.current).toBe(2);
+    expect(char.resources[0].current).toBe(5);
+  });
+
   it('updates lastLongRestTime', async () => {
     state.party.push(makeChar());
     await service.long_rest('Resting.', true);

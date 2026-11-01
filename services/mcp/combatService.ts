@@ -2,7 +2,7 @@ import { Character, Enemy, EnemyAttack, GameState, InitiativeEntry, MCPResponse 
 import { cryptoRoll } from '../../utils/random';
 import { fail, fuzzyMatchEntity, generateId, ErrorCodes } from './_shared';
 import { lookupMonster } from '../../utils/monsters';
-import { getMod, getProficiencyBonus, calculateAc, getClassDef } from '../classEngine';
+import { getMod, getProficiencyBonus, calculateAc, getClassDef, getSavingThrowBonus } from '../classEngine';
 import { getConditionEffects, isIncapacitated, isUnconscious, removeCondition, tickConditions, tickConditionsByTime, rollSaveAgainstCondition, getExhaustionPenalty } from '../conditionEngine';
 import {
   getAlertInitiativeBonus,
@@ -883,10 +883,9 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       }
 
       if (partyTarget) {
-        const statVal = (partyTarget.stats as Record<string, number>)[mappedStat] || 10;
-        const mod = getMod(statVal);
-        const resilientBonus = getResilientSaveBonus(partyTarget, mappedStat as 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha');
-        let totalMod = mod + resilientBonus;
+        const saveStat = mappedStat as 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
+        const resilientBonus = getResilientSaveBonus(partyTarget, saveStat);
+        let totalMod = getSavingThrowBonus(partyTarget, saveStat);
 
         const initialRoll = cryptoRoll(20);
         const saveCtx: SaveRollContext = {
@@ -896,10 +895,13 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
           character: partyTarget,
           hasAdvantage: false,
           extraModifier: 0,
+          proficiencyIncluded: true,
           spellContext,
         };
         const afterEffects = applyEffects(partyTarget, 'onSaveRoll', saveCtx);
-        totalMod += afterEffects.extraModifier;
+        // Shield Master is already included in getSavingThrowBonus.
+        const shieldBonus = partyTarget.feats?.includes('shield-master') && mappedStat === 'dex' && partyTarget.inventory.some(i => i.equipped && i.type === 'shield') ? 2 : 0;
+        totalMod += afterEffects.extraModifier - shieldBonus;
         // reroll-ones (Halfling Lucky) may have replaced a natural 1 on the save
         let roll = afterEffects.roll;
 
@@ -923,7 +925,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
         }
         // Paladin also benefits from their own aura
         const selfAura = getEffects(partyTarget, 'aura-of-protection');
-        if (selfAura.length > 0) {
+        if (partyTarget.hp.current > 0 && selfAura.length > 0) {
           const chaMod = getMod(partyTarget.stats.cha);
           const bonus = Math.max(chaMod, 1);
           if (bonus > auraBonus) {

@@ -4,7 +4,8 @@ import { RACES_CATALOG, RaceDefinition } from '../utils/races';
 import { SubclassSummary } from '../types';
 import { getMod } from '../utils/dice';
 import { getExhaustionPenalty } from './conditionEngine';
-import { applyEffects, AcContext, SpeedContext, MaxHpContext } from './effectDispatcher';
+import { applyEffects, AcContext, SpeedContext, MaxHpContext, getEffects } from './effectDispatcher';
+import { getResilientSaveBonus } from './featsService';
 
 const abilityMod = getMod;
 export { getMod };
@@ -49,19 +50,22 @@ export function canEquipArmor(character: Character, armorType: 'light' | 'medium
   const classDef = getClassDef(character.class);
   if (!classDef) return armorType === 'light';
   if (classDef.armorProfs.includes(armorType)) return true;
+  if (character.race?.toLowerCase() === 'dwarf' && character.subraceId === 'mountain-dwarf' && (armorType === 'light' || armorType === 'medium')) return true;
   if ((character.armorProfs || []).includes(armorType)) return true;
-  return classDef.id === 'cleric' && character.divineDomain === 'life-domain' && armorType === 'heavy';
+  return classDef.id === 'cleric' && ['life-domain', 'nature-domain', 'tempest-domain', 'war-domain'].includes(character.subclassId || character.divineDomain || '') && armorType === 'heavy';
 }
 
 /** Determines the armor type category (light/medium/heavy/shield) from an inventory item's stats and name. */
 export function getArmorTypeFromItem(item: InventoryItem): 'light' | 'medium' | 'heavy' | 'shield' {
   if (item.type === 'shield') return 'shield';
   const formula = item.stats?.acFormula || '';
-  if (formula.startsWith('11')) return 'light';
-  if (/^1[2-5]/.test(formula)) return 'medium';
-  if (/^1[6-8]/.test(formula)) return 'heavy';
   const name = item.name?.toLowerCase() ?? '';
-  if (/(?:plate|chain mail|splint|scale mail)/.test(name)) return 'heavy';
+  if (/\b(padded|leather|studded leather)\b/.test(name)) return 'light';
+  if (/\b(hide|chain shirt|scale mail|breastplate|half plate)\b/.test(name)) return 'medium';
+  if (/\b(ring mail|chain mail|splint|plate)\b/.test(name)) return 'heavy';
+  if (/max\s*2/i.test(formula)) return 'medium';
+  if (/\+\s*dex/i.test(formula)) return 'light';
+  if (formula && Number.isFinite(Number(formula))) return 'heavy';
   return 'light';
 }
 
@@ -70,12 +74,12 @@ export function meetsCondition(character: Character, condition: string | undefin
   if (!condition) return true;
   if (condition === 'no-heavy-armor') {
     const equipped = character.inventory.find(i => i.equipped && i.type === 'armor');
-    return !equipped || /(?:leather|hide|chain shirt)/.test(equipped.name?.toLowerCase() ?? '');
+    return !equipped || getArmorTypeFromItem(equipped) !== 'heavy';
   }
   if (condition === 'no-armor') {
     return !character.inventory.some(i => i.equipped && (i.type === 'armor' || i.type === 'shield'));
   }
-  return true;
+  return false;
 }
 
 /** Parses an armor AC formula (e.g. '12 + DEX', '14 max 2') and returns the calculated AC value. */
@@ -107,20 +111,6 @@ export function calculateAc(character: Character, equippedArmor: InventoryItem |
     return ac;
   }
 
-  if (equippedArmor.type === 'shield') {
-    const ctx: AcContext = {
-      _hook: 'computeAc',
-      baseAc: 10 + dexMod + acBonus + shieldBonus,
-      character,
-      equippedArmor,
-      equippedWeaponCount: equippedWeapons.length,
-    };
-    const result = applyEffects(character, 'computeAc', ctx);
-    let ac = result.baseAc;
-    if (character.acMinimum && ac < character.acMinimum) ac = character.acMinimum;
-    return ac;
-  }
-
   const formula = equippedArmor.stats?.acFormula || '10 + DEX';
   let ac = parseArmorFormula(formula, dexMod) + shieldBonus + acBonus;
   const ctx: AcContext = {
@@ -140,19 +130,14 @@ export function getSavingThrowBonus(character: Character, stat: 'str'|'dex'|'con
   const ability = abilityMod(character.stats[stat]);
   const classDef = getClassDef(character.class);
   const profBonus = getProficiencyBonus(character);
-  const isProficient = classDef?.savingThrowProfs.includes(stat) ?? false;
+  const isProficient = (classDef?.savingThrowProfs.includes(stat) ?? false)
+    || (character.class.toLowerCase() === 'rogue' && character.level >= 15 && stat === 'wis')
+    || getResilientSaveBonus(character, stat) > 0
+    || getEffects(character, 'diamond-soul').length > 0;
   let bonus = ability + (isProficient ? profBonus : 0);
-  if (character.feats?.includes('resilient')) {
-    try {
-      bonus += getResilientSaveBonus(character, stat);
-    } catch { /* featsService unavailable in some contexts */ }
-  }
   if (character.feats?.includes('shield-master') && stat === 'dex' &&
       character.inventory.some(i => i.equipped && i.type === 'shield')) {
     bonus += 2;
-  }
-  if (stat === 'dex' && character.class === 'rogue' && character.level >= 15 && !isProficient) {
-    bonus += profBonus;
   }
   return bonus;
 }
@@ -205,7 +190,7 @@ export function getResource(character: Character, id: string): ResourcePool | un
 /** Attempts to spend `amount` from a character resource pool; returns false if insufficient. */
 export function spendResource(character: Character, id: string, amount = 1): boolean {
   const r = getResource(character, id);
-  if (!r || r.current < amount) return false;
+  if (!Number.isInteger(amount) || amount <= 0 || !r || r.current < amount) return false;
   r.current -= amount;
   return true;
 }
@@ -213,12 +198,12 @@ export function spendResource(character: Character, id: string, amount = 1): boo
 /** Restores resources that reset on the given rest type (short/long/turn); for long rests also recovers half hit dice. */
 export function recoverResources(character: Character, restType: 'short' | 'long' | 'turn'): void {
   for (const r of (character.resources || [])) {
-    if (r.resetOn === restType) r.current = r.max;
+    if (r.resetOn === restType || (restType === 'long' && r.resetOn === 'short')) r.current = r.max;
   }
   if (restType === 'long') {
     character.hitDice.current = Math.min(
       character.hitDice.max,
-      character.hitDice.current + Math.ceil(character.hitDice.max / 2)
+      character.hitDice.current + Math.max(1, Math.floor(character.hitDice.max / 2))
     );
   }
 }
@@ -228,7 +213,8 @@ export function getDamageResistances(character: Character): string[] {
   const result: string[] = [];
   const race = getRaceDef(character.race);
   for (const traitId of (character.racialTraits || [])) {
-    const trait = race?.traits.find(t => t.id === traitId);
+    const trait = race?.traits.find(t => t.id === traitId)
+      ?? race?.subraces?.find(sr => sr.id === character.subraceId)?.traits?.find(t => t.id === traitId);
     if (trait?.effect?.kind === 'damage-resistance') {
       const p = trait.effect.payload as Record<string, unknown> | undefined;
       if (p?.type === 'from-draconic-ancestry') {
@@ -252,7 +238,7 @@ export function recalculateResourcePools(character: Character): ResourcePool[] {
 
   if (classDef) {
     for (const feat of classDef.features) {
-      if (feat.level <= level && feat.kind === 'resource' && feat.grantsResource) {
+      if (feat.level <= level && feat.kind === 'resource' && feat.grantsResource && !resources.some(r => r.id === feat.grantsResource)) {
         let max = 1;
         let resetOn: 'short' | 'long' = 'long';
 
@@ -393,7 +379,7 @@ export function recalculateResourcePools(character: Character): ResourcePool[] {
         let resetOn: 'short' | 'long' = 'long';
 
         if (feat.grantsResource === 'superiority-dice') {
-          max = Math.min(4 + level, 8); // Battle Master: 4 at L3, scales to 8
+          max = level >= 15 ? 6 : level >= 7 ? 5 : 4;
           resetOn = 'short';
         } else if (feat.grantsResource === 'tides-of-chaos') {
           max = 1;

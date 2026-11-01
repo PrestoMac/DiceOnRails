@@ -159,7 +159,7 @@ export const RESOURCE_HANDLERS: Record<string, ResourceHandler> = {
     if (!char) return fail('Character not found.');
     if (char.class !== 'druid') return fail('Only Druids can use Wild Shape.');
     const druidLevel = char.level;
-    const maxCR = Math.max(0.25, Math.floor(druidLevel / 3));
+    const maxCR = druidLevel >= 8 ? 1 : druidLevel >= 4 ? 0.5 : 0.25;
     const flyAvailable = druidLevel >= 8;
     const swimAvailable = druidLevel >= 4;
     return {

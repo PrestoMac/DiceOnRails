@@ -879,15 +879,28 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
       // Info-only resources: the handler returns capacity/hint info without
       // spending the charge. The actual consumption happens through the
       // dedicated modal/tool paths (arcane_recovery / natural_recovery).
-      const INFO_ONLY_RESOURCES = new Set(['arcane-recovery', 'natural-recovery']);
-      if (!INFO_ONLY_RESOURCES.has(resourceId)) {
-        const ok = classEngineSpendResource(char, resourceId, amount ?? 1);
-        if (!ok) return fail(`Insufficient ${resourceId} remaining.`);
+      const INFO_ONLY_RESOURCES = new Set(['arcane-recovery', 'natural-recovery', 'wild-shape']);
+      const cost = amount ?? 1;
+      if (!Number.isInteger(cost) || cost <= 0) return fail('Resource amount must be a positive integer.');
+      const spent = !INFO_ONLY_RESOURCES.has(resourceId);
+      if (spent && !classEngineSpendResource(char, resourceId, cost)) {
+        return fail(`Insufficient ${resourceId} remaining.`);
       }
 
       const handler = RESOURCE_HANDLERS[resourceId];
       if (handler) {
-        return handler({ state, deps }, characterId, targetId, amount);
+        try {
+          const result = await handler({ state, deps }, characterId, targetId, amount);
+          if (!result.success && spent) {
+            const resource = char.resources?.find(r => r.id === resourceId);
+            if (resource) resource.current += cost;
+          }
+          return result;
+        } catch (error) {
+          const resource = char.resources?.find(r => r.id === resourceId);
+          if (spent && resource) resource.current += cost;
+          throw error;
+        }
       }
       return { success: true, data: {}, message: `Used ${resourceId}.` };
     },

@@ -90,7 +90,7 @@ export function buildCharacterFromWizard(
   // Add subrace trait ids
   if (subrace?.traits) for (const t of subrace.traits) { racialTraits.push(t.id); }
 
-  const tempChar = { id: 'player-temp', name, race: selectedRace.id, class: selectedClass.id, level, stats: fs, inventory, racialTraits };
+  const tempChar = { id: 'player-temp', name, race: selectedRace.id, class: selectedClass.id, subclassId: selectedSubclassId || undefined, level, stats: fs, inventory, racialTraits };
   const resources = recalculateResourcePools(tempChar as unknown as Character);
 
   const builtChar: Character = {
@@ -158,6 +158,7 @@ export function buildCharacterFromWizard(
         : [...selectedCantrips]
     ),
     subclassId: selectedSubclassId || undefined,
+    divineDomain: selectedClass.id === 'cleric' ? selectedSubclassId || undefined : undefined,
     // calculateMaxHp keys the Draconic Bloodline +1 HP/level bonus off sorcerousOrigin.
     sorcerousOrigin: (selectedClass.id === 'sorcerer' && selectedSubclassId === 'draconic-bloodline') ? 'draconic-bloodline' : undefined,
     subraceId: selectedSubraceId || undefined,

@@ -128,6 +128,12 @@ describe('progressionService', () => {
       expect(result.character.level).toBe(20);
     });
 
+    it('adds hit dice and the correct rogue skill points when leveling', () => {
+      const result = awardExperience(makeCharacter({ class: 'rogue', hitDice: { current: 0, max: 1 }, unusedSkillPoints: 0 }), 300);
+      expect(result.character.hitDice).toEqual({ current: 1, max: 2 });
+      expect(result.character.unusedSkillPoints).toBe(4);
+    });
+
     it('provides stat points on level up', () => {
       const char = makeCharacter({ unusedStatPoints: 0 });
       const result = awardExperience(char, 5000);

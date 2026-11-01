@@ -515,6 +515,17 @@ describe('polymorph_creature', () => {
     expect(wizard.hp.max).toBe(11);
   });
 
+  it('limits non-Moon druid Wild Shape to CR 1 even at high levels', async () => {
+    const druid = makeWizard();
+    druid.class = 'druid';
+    druid.level = 15;
+    druid.resources = [{ id: 'wild-shape', name: 'Wild Shape', current: 2, max: 2, resetOn: 'short', source: 'class', sourceId: 'druid' }];
+    server.joinParty(druid);
+    const result = await server.polymorph_creature('wizard-1', 'giant-crocodile');
+    expect(result.success).toBe(false);
+    expect(druid.resources[0].current).toBe(2);
+  });
+
   it('invalid form returns fail', async () => {
     const wizard = makeWizard();
     server.joinParty(wizard);

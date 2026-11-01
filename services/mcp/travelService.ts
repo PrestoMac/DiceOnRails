@@ -609,9 +609,8 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
         char.hp.current = char.hp.max;
         clearNonMinuteConditions(char);
         char.tempHp = 0;
-        const recovered = Math.max(1, Math.floor(char.level / 2));
         const prevHd = char.hitDice.current;
-        char.hitDice.current = Math.min(char.hitDice.max, char.hitDice.current + recovered);
+        classEngineRecoverResources(char, 'long');
         const classDef = getClassDef(char.class);
         const hitDieSize = classDef?.hitDie || 8;
         healResults.push({
@@ -625,7 +624,6 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
           hitDiceNew: char.hitDice.current,
           hitDiceMax: char.hitDice.max,
         });
-        classEngineRecoverResources(char, 'long');
         const restCtx: RestContext = { _hook: 'onLongRest', character: char };
         applyEffects(char, 'onLongRest', restCtx);
         // 2024 rule: each caster can replace one cantrip after a long rest, and prepared casters can re-prepare spells.

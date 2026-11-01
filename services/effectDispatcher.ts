@@ -1,4 +1,4 @@
-import { Character, EffectKind, SaveStat } from '../types';
+import { Character, EffectKind } from '../types';
 import { getClassDef, getRaceDef, getSubclassDef, meetsCondition, getProficiencyBonus } from './classEngine';
 import { getFeatById } from '../utils/feats';
 import { cryptoRoll } from '../utils/random';
@@ -86,6 +86,7 @@ export interface SaveRollContext extends HookContext {
   spellContext?: { spellName?: string; isMagical?: boolean; isCharm?: boolean };
   hasAdvantage: boolean;
   extraModifier: number;
+  proficiencyIncluded?: boolean;
   advantageSources?: string[];
 }
 
@@ -159,6 +160,7 @@ const HOOK_REGISTRY: Record<HookName, ReducerEntry[]> = {
       reduce: (ctx, payload, character) => {
         const acCtx = ctx as unknown as AcContext;
         const formula = (payload.formula as string) || '';
+        if (acCtx.equippedArmor || (character.class.toLowerCase() === 'monk' && character.inventory.some(i => i.equipped && i.type === 'shield'))) return ctx;
         const ac = getAcFormulaValue(formula, character);
         if (ac > acCtx.baseAc) {
           acCtx.baseAc = ac;
@@ -356,12 +358,13 @@ const HOOK_REGISTRY: Record<HookName, ReducerEntry[]> = {
         const dmgCtx = ctx as unknown as DamageTakenContext;
         const condition = payload.condition as string | undefined;
         if (condition === 'raging' && !character.raging) return ctx;
-        let type = (payload.type as string) || '';
-        if (type === 'from-draconic-ancestry') {
-          type = character.draconicDamageType || 'fire';
-        }
-        if (dmgCtx.amount > 0 && matchesType(dmgCtx.damageType, type)) {
+        const types = (payload.types as string[] | undefined) ?? [(payload.type as string) || ''];
+        if (condition && condition !== 'raging') return ctx;
+        const matches = types.some(type => matchesType(dmgCtx.damageType, type === 'from-draconic-ancestry' ? (character.draconicDamageType || 'fire') : type));
+        const marker = dmgCtx as DamageTakenContext & { _resistanceApplied?: boolean };
+        if (dmgCtx.amount > 0 && matches && !marker._resistanceApplied) {
           dmgCtx.amount = Math.floor(dmgCtx.amount / 2);
+          marker._resistanceApplied = true;
         }
         return ctx;
       },
@@ -436,8 +439,7 @@ const HOOK_REGISTRY: Record<HookName, ReducerEntry[]> = {
       reduce: (ctx, _payload, character) => {
         const saveCtx = ctx as unknown as SaveRollContext;
         const classDef = getClassDef(character.class);
-        const isProficient = classDef?.savingThrowProfs.includes(saveCtx.stat as SaveStat);
-        if (!isProficient) {
+        if (!saveCtx.proficiencyIncluded && !classDef?.savingThrowProfs.includes(saveCtx.stat as keyof Character['stats'])) {
           saveCtx.extraModifier += getProficiencyBonus(character);
         }
         return ctx;
@@ -549,8 +551,7 @@ const HOOK_REGISTRY: Record<HookName, ReducerEntry[]> = {
         const vals = (payload.skills as string[]) || [];
         if (!character.skills) character.skills = {};
         for (const skill of vals) {
-          if (character.skills[skill] === undefined) character.skills[skill] = 1;
-          else character.skills[skill] = (character.skills[skill] || 0) + 1;
+          character.skills[skill] = Math.max(character.skills[skill] || 0, 1);
         }
         return ctx;
       },
@@ -574,8 +575,7 @@ const HOOK_REGISTRY: Record<HookName, ReducerEntry[]> = {
         const vals = (payload.skills as string[]) || [];
         if (!character.skills) character.skills = {};
         for (const skill of vals) {
-          if (character.skills[skill] === undefined) character.skills[skill] = 1;
-          else character.skills[skill] = (character.skills[skill] || 0) + 1;
+          character.skills[skill] = Math.max(character.skills[skill] || 0, 1);
         }
         return ctx;
       },

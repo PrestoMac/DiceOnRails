@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { Character } from '../../types';
-import { calculateMaxHp, calculateAc, getProficiencyBonus, getSavingThrowBonus, calculateSpeed, getDarkvisionRange, canEquipArmor, getSpellSaveDc, getSpellAttackBonus, getDamageResistances, recalculateResourcePools } from '../../services/classEngine';
+import { calculateMaxHp, calculateAc, getProficiencyBonus, getSavingThrowBonus, calculateSpeed, getDarkvisionRange, canEquipArmor, getArmorTypeFromItem, getSpellSaveDc, getSpellAttackBonus, getDamageResistances, recalculateResourcePools } from '../../services/classEngine';
 import { applyCondition } from '../../services/conditionEngine';
+import { applyEffects, DamageTakenContext } from '../../services/effectDispatcher';
 
 function makeChar(overrides: Partial<Character> = {}): Character {
   return {
@@ -63,6 +64,13 @@ describe('classEngine', () => {
       expect(calculateAc(char, null)).toBe(10 + 2);
     });
 
+    it('does not apply unarmored defense while wearing armor or a monk shield', () => {
+      const armor = { name: 'Leather', quantity: 1, type: 'armor' as const, equipped: true, stats: { acFormula: '11 + DEX' } };
+      const stats = { str: 10, dex: 14, con: 18, int: 10, wis: 18, cha: 10 };
+      expect(calculateAc(makeChar({ class: 'barbarian', stats, inventory: [armor] }), armor)).toBe(13);
+      expect(calculateAc(makeChar({ class: 'monk', stats, inventory: [{ name: 'Shield', quantity: 1, type: 'shield', equipped: true }] }), null)).toBe(14);
+    });
+
     it('Dual Wielder feat adds +1 with two weapons', () => {
       const char = makeChar({ feats: ['dual-wielder'], stats: { str: 12, dex: 14, con: 14, int: 10, wis: 10, cha: 10 }, inventory: [{ name: 'Shortsword', quantity: 1, type: 'weapon', equipped: true }, { name: 'Scimitar', quantity: 1, type: 'weapon', equipped: true }] });
       expect(calculateAc(char, null)).toBe(10 + 2 + 1);
@@ -81,6 +89,12 @@ describe('classEngine', () => {
     it('Fighter has STR save proficiency', () => {
       const bonus = getSavingThrowBonus(makeChar(), 'str');
       expect(bonus).toBe(2 + 2);
+    });
+
+    it('grants Slippery Mind in Wisdom, without doubling class or Resilient proficiency', () => {
+      const rogue = makeChar({ class: 'rogue', level: 15, feats: ['resilient'], featChoices: { resilient: { saveStat: 'wis' } } });
+      expect(getSavingThrowBonus(rogue, 'wis')).toBe(5);
+      expect(getSavingThrowBonus(rogue, 'dex')).toBe(6);
     });
 
     it('Fighter does not have INT save proficiency', () => {
@@ -116,6 +130,16 @@ describe('classEngine', () => {
     it('Wizard cannot equip medium armor', () => expect(canEquipArmor(makeChar({ class: 'wizard' }), 'medium')).toBe(false));
     it('Fighter can equip heavy armor', () => expect(canEquipArmor(makeChar({ class: 'fighter' }), 'heavy')).toBe(true));
     it('Cleric Life Domain can equip heavy armor', () => expect(canEquipArmor(makeChar({ class: 'cleric', divineDomain: 'life-domain' }), 'heavy')).toBe(true));
+    it('Mountain Dwarves can wear light and medium armor but not shields', () => {
+      const dwarf = makeChar({ class: 'wizard', race: 'dwarf', subraceId: 'mountain-dwarf' });
+      expect(canEquipArmor(dwarf, 'medium')).toBe(true);
+      expect(canEquipArmor(dwarf, 'shield')).toBe(false);
+    });
+    it('classifies armor by its actual type rather than its base AC', () => {
+      expect(getArmorTypeFromItem({ name: 'Studded Leather', quantity: 1, type: 'armor', stats: { acFormula: '12 + DEX' } })).toBe('light');
+      expect(getArmorTypeFromItem({ name: 'Scale Mail', quantity: 1, type: 'armor', stats: { acFormula: '14 max 2' } })).toBe('medium');
+      expect(getArmorTypeFromItem({ name: 'Ring Mail', quantity: 1, type: 'armor', stats: { acFormula: '14' } })).toBe('heavy');
+    });
   });
 
   describe('getSpellSaveDc / getSpellAttackBonus', () => {
@@ -141,9 +165,42 @@ describe('classEngine', () => {
       expect(getDamageResistances(char)).toContain('poison');
     });
 
+    it('includes subrace resistance', () => {
+      expect(getDamageResistances(makeChar({ race: 'halfling', subraceId: 'stout', racialTraits: ['stout-resistance'] }))).toContain('poison');
+    });
+
     it('Tiefling has fire resistance from hellish-resistance', () => {
       const char = makeChar({ race: 'tiefling', racialTraits: ['hellish-resistance'] });
       expect(getDamageResistances(char)).toContain('fire');
+    });
+  });
+
+  describe('damage resistance', () => {
+    it('does not stack resistance from multiple sources', () => {
+      const char = makeChar({ class: 'warlock', level: 10, subclassId: 'the-great-old-one', race: 'human', racialTraits: [] });
+      const race = makeChar({ race: 'halfling', subraceId: 'stout', racialTraits: ['stout-resistance'] });
+      const ctx: DamageTakenContext = { _hook: 'onDamageTaken', amount: 31, damageType: 'poison', target: race };
+      applyEffects(race, 'onDamageTaken', ctx);
+      applyEffects(race, 'onDamageTaken', ctx);
+      expect(ctx.amount).toBe(15);
+      const psychic: DamageTakenContext = { _hook: 'onDamageTaken', amount: 30, damageType: 'psychic', target: char };
+      applyEffects(char, 'onDamageTaken', psychic);
+      expect(psychic.amount).toBe(15);
+    });
+  });
+
+  it('does not create duplicate pools when a feature scales with level', () => {
+    const resources = recalculateResourcePools(makeChar({ class: 'fighter', level: 17 }));
+    expect(resources.filter(r => r.id === 'indomitable')).toHaveLength(1);
+    expect(resources.find(r => r.id === 'indomitable')?.max).toBe(3);
+  });
+
+  describe('Battle Master resources', () => {
+    it('grants the correct superiority dice at each threshold', () => {
+      for (const [level, expected] of [[3, 4], [7, 5], [15, 6]]) {
+        const resources = recalculateResourcePools(makeChar({ class: 'fighter', subclassId: 'battle-master', level }));
+        expect(resources.find(r => r.id === 'superiority-dice')?.max).toBe(expected);
+      }
     });
   });
 

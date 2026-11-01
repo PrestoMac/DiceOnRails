@@ -44,6 +44,16 @@ function baseWizard(overrides: Partial<WizardState> = {}): WizardState {
 const mod = (n: number): number => Math.floor((n - 10) / 2);
 
 describe('buildCharacterFromWizard', () => {
+  it('does not turn racial skill proficiency into expertise', () => {
+    const { character } = buildCharacterFromWizard(baseWizard({ selectedRace: RACES_BY_ID['elf'] }), { isNewCampaign: true });
+    expect(character.skills?.perception).toBe(1);
+  });
+
+  it('grants Life Domain armor proficiency at creation', () => {
+    const { character } = buildCharacterFromWizard(baseWizard({ selectedClass: CLASSES_BY_ID['cleric'], selectedSubclassId: 'life-domain' }), { isNewCampaign: true });
+    expect(character.divineDomain).toBe('life-domain');
+  });
+
   describe('name validation', () => {
     it('rejects an empty name with an error and no character', () => {
       const { character, errors } = buildCharacterFromWizard(baseWizard({ name: '   ' }), { isNewCampaign: true });
