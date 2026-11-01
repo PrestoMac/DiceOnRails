@@ -224,8 +224,7 @@ const SetupScreen: React.FC = () => {
                 Let us configure your adventure. Enter your AI API key below.
               </p>
               <p className="text-xs text-parchment-mute">
-                Default provider is <strong className="text-parchment-dim">OpenRouter</strong> (you can change this later in
-                Settings). Get a free key at{' '}
+                Get an <strong className="text-parchment-dim">OpenRouter</strong> key at{' '}
                 <a
                   href="https://openrouter.ai/keys"
                   target="_blank"
@@ -240,19 +239,11 @@ const SetupScreen: React.FC = () => {
                 label="LLM API Key"
                 type="password"
                 icon="fa-key"
-                placeholder="sk-or-v1-... or sk-proj-..."
+                placeholder="sk-or-v1-..."
                 value={config.VITE_LLM_API_KEY}
                 onChange={updateConfig('VITE_LLM_API_KEY')}
                 error={keyError ?? undefined}
                 hint="Required. Never leaves your machine except to call the model provider."
-              />
-              <TextField
-                label="LLM API Base"
-                icon="fa-server"
-                placeholder={DEFAULT_LLM_BASE}
-                value={config.VITE_LLM_API_BASE}
-                onChange={updateConfig('VITE_LLM_API_BASE')}
-                hint="Optional. Leave as the OpenRouter default unless you self-host."
               />
               <TextField
                 label="Image Router API Key"

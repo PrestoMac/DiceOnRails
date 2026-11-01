@@ -450,7 +450,10 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
 
       for (const char of state.party) {
         if (char.deathSaves?.isStable) continue;
-        const roll = cryptoRoll(20);
+        let roll = cryptoRoll(20);
+        if (char.class.toLowerCase() === 'barbarian' && char.level >= 7) {
+          roll = Math.max(roll, cryptoRoll(20));
+        }
         const mod = getMod(char.stats.dex) + getAlertInitiativeBonus(char);
         initiative.push({
           id: char.id,
@@ -1140,7 +1143,9 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
 
       const abilityMod = isRanged
         ? getMod(attacker.stats?.dex ?? 10)
-        : getMod(attacker.stats?.str ?? 10);
+        : isMonk && isUnarmed && !attacker.inventory.some(i => i.equipped && (i.type === 'armor' || i.type === 'shield'))
+          ? Math.max(getMod(attacker.stats?.str ?? 10), getMod(attacker.stats?.dex ?? 10))
+          : getMod(attacker.stats?.str ?? 10);
       const profBonus = getProficiencyBonus(attacker as unknown as Character);
       let atkBonus = abilityMod + profBonus;
       if (sharpshooter || greatWeaponMaster) atkBonus -= 5;
@@ -1200,7 +1205,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       if (weaponItem?.stats?.damage) {
         damageDice = weaponItem.stats.damage;
         dmgType = weaponItem.stats.damageType || (isRanged ? 'piercing' : 'slashing');
-      } else if (isMonk) {
+      } else if (isMonk && isUnarmed && !attacker.inventory.some(i => i.equipped && (i.type === 'armor' || i.type === 'shield'))) {
         const monkLevel = attacker.level;
         const martialArtsDie = monkLevel >= 17 ? '1d10' : monkLevel >= 11 ? '1d8' : monkLevel >= 5 ? '1d6' : '1d4';
         damageDice = martialArtsDie;
@@ -1230,7 +1235,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
 
       let damageTotal = damageResults.reduce((a, b) => a + b, 0) + flatMod;
 
-      if (isUnarmed && !isMonk) {
+      if (isUnarmed && damageDice === '1d1') {
         damageTotal += abilityMod;
       } else if (isOffHand) {
         if (getEffects(attacker, 'offhand-modifier').length > 0 || attacker.fightingStyle === 'two-weapon-fighting' || attacker.fightingStyleTwo === 'two-weapon-fighting') damageTotal += abilityMod;

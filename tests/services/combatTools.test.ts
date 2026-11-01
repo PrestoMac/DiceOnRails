@@ -44,6 +44,16 @@ describe('combatTools', () => {
     server = createTestServer();
   });
 
+  it('rolls barbarian initiative with Feral Instinct advantage', async () => {
+    server.joinParty(makeBarbarian({ level: 7 }));
+    await server.add_enemy('Goblin');
+    mockRoll(3);
+    mockRollSequence(3, 17, 8);
+    await server.start_combat();
+    const player = server.getFullState().combat.initiative.find(entry => entry.type === 'player');
+    expect(player?.rawRoll).toBe(17);
+  });
+
   describe('add_enemy', () => {
     it('happy path: adds Goblin to combat state', async () => {
       const result = await server.add_enemy('Goblin');
@@ -244,6 +254,30 @@ describe('combatTools', () => {
       const stateAfter = server.getFullState();
       expect(stateAfter.combat).toBeDefined();
       expect(stateAfter.combat.enemies[0].hp.current).toBeLessThan(hpBefore);
+    });
+
+    it('uses Dexterity and the Martial Arts die for an unarmored monk unarmed strike', async () => {
+      server.joinParty(makeCharacter({ class: 'monk', level: 5, inventory: [], stats: { str: 8, dex: 18, con: 12, int: 10, wis: 12, cha: 10 } }));
+      await server.add_enemy('Goblin', 10, 100);
+      mockRoll(10);
+      await server.start_combat();
+      mockRollSequence(10, 10, 4);
+      const result = await server.player_attack('Valerius', 'Unarmed', 'Goblin');
+      expect(result.data.attackRoll).toBe(17);
+      expect(result.data.damageDice).toBe('1d6');
+      expect(result.data.damage).toBe(8);
+    });
+
+    it('does not apply Martial Arts while wearing armor', async () => {
+      server.joinParty(makeCharacter({ class: 'monk', level: 5, stats: { str: 14, dex: 18, con: 12, int: 10, wis: 12, cha: 10 } }));
+      await server.add_enemy('Goblin', 10, 100);
+      mockRoll(10);
+      await server.start_combat();
+      mockRollSequence(10, 10, 1);
+      const result = await server.player_attack('Valerius', 'Unarmed', 'Goblin');
+      expect(result.data.attackRoll).toBe(15);
+      expect(result.data.damageDice).toBe('1d1');
+      expect(result.data.damage).toBe(3);
     });
 
     it('Champion Superior Critical (18-20) crits on a natural 18', async () => {

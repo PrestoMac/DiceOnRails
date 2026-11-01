@@ -20,7 +20,7 @@ export default defineConfig(({ mode }) => {
 
   const proxyConfig = {
     '/api': {
-      target: env.VITE_LLM_PROXY_TARGET || env.VITE_LLM_API_BASE || 'https://opencode.ai/zen/go/v1',
+      target: 'https://openrouter.ai/api/v1',
       changeOrigin: true,
       rewrite: (path: string) => path.replace(/^\/api/, ''),
     },
@@ -53,7 +53,7 @@ export default defineConfig(({ mode }) => {
 
                     let envContent = '';
                     envContent += `VITE_LLM_API_KEY=${data.VITE_LLM_API_KEY || ''}\n`;
-                    envContent += `VITE_LLM_API_BASE=${data.VITE_LLM_API_BASE || 'https://openrouter.ai/api/v1'}\n`;
+                    envContent += 'VITE_LLM_API_BASE=https://openrouter.ai/api/v1\n';
                     envContent += `VITE_IMAGE_ROUTER_API_KEY=${data.VITE_IMAGE_ROUTER_API_KEY || ''}\n`;
                     envContent += `VITE_SUPABASE_URL=${data.VITE_SUPABASE_URL}\n`;
                     envContent += `VITE_SUPABASE_ANON_KEY=${data.VITE_SUPABASE_ANON_KEY}\n`;

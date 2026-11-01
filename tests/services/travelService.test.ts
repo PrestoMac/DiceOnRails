@@ -58,6 +58,14 @@ describe('travelService — narrate_turn', () => {
     });
   });
 
+  it('applies Indomitable Might to Strength checks at barbarian level 18', async () => {
+    state.party.push(makeChar({ class: 'barbarian', level: 18, stats: { str: 20, dex: 12, con: 13, int: 10, wis: 11, cha: 10 } }));
+    vi.mocked(cryptoRoll).mockReturnValue(2);
+    const result = await service.check_skill('athletics', 19, 'hero-1');
+    expect(result.data.total).toBe(20);
+    expect(result.data.success).toBe(true);
+  });
+
   describe('time advancement', () => {
     it('does not advance time when timePassed is 0', async () => {
       state.party.push(makeChar());

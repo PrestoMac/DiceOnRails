@@ -53,7 +53,7 @@ async function main() {
             {
                 type: 'input',
                 name: 'VITE_LLM_API_KEY',
-                message: 'AI API Key (OpenRouter or OpenAI):',
+                message: 'OpenRouter API Key:',
                 validate: input => input ? true : 'API Key is required',
             },
             {

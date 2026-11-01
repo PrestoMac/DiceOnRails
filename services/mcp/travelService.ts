@@ -312,7 +312,9 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
       };
       const afterSkill = applyEffects(target, 'onSkillCheck', skillCtx);
       const finalRoll = afterSkill.roll;
-      const total = finalRoll + modifier + skillRank + afterSkill.skillBonus - getExhaustionPenalty(target);
+      const checkTotal = finalRoll + modifier + skillRank + afterSkill.skillBonus - getExhaustionPenalty(target);
+      const total = target.class.toLowerCase() === 'barbarian' && target.level >= 18 && statKey === 'str'
+        ? Math.max(checkTotal, target.stats.str) : checkTotal;
       const success = total >= difficulty;
 
       let xpGained = 0;

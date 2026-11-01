@@ -11,7 +11,7 @@ export default async function handler(
 ) {
   response.setHeader('Access-Control-Allow-Origin', '*');
   response.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  response.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  response.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, HTTP-Referer, X-Title');
 
   if (request.method === 'OPTIONS') {
     response.statusCode = 200;
@@ -25,8 +25,7 @@ export default async function handler(
     return response.end(JSON.stringify({ error: 'Method not allowed' }));
   }
 
-  const targetBase = process.env.VITE_LLM_PROXY_TARGET || 'https://opencode.ai/zen/go/v1';
-  const targetUrl = `${targetBase.replace(/\/+$/, '')}/chat/completions`;
+  const targetUrl = 'https://openrouter.ai/api/v1/chat/completions';
 
   const chunks: Buffer[] = [];
   for await (const chunk of request) {
@@ -39,6 +38,8 @@ export default async function handler(
       headers: {
         'Content-Type': 'application/json',
         Authorization: request.headers.authorization || '',
+        'HTTP-Referer': request.headers['http-referer'] || '',
+        'X-Title': 'DiceOnRails',
       },
       body: Buffer.concat(chunks).toString(),
     });

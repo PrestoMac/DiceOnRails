@@ -2,9 +2,11 @@ import { getEnv } from "../utils/envHelper";
 import { isDebugMode } from "../utils/debug";
 import { LLMProvider } from "../types";
 
-/** Builds the full /chat/completions URL for a given provider, using a custom base URL or falling back to defaults. */
+/** Builds an OpenRouter chat URL, optionally using the same-origin proxy. */
 export function buildChatCompletionUrl(provider: LLMProvider, customBase?: string): string {
-    const base = customBase || getEnv("VITE_LLM_API_BASE") || (provider === 'openai' ? 'https://api.openai.com/v1' : 'https://openrouter.ai/api/v1');
+    const configured = customBase || getEnv("VITE_LLM_API_BASE");
+    // Old saved custom endpoints must not receive OpenRouter credentials.
+    const base = configured?.replace(/\/+$/, '') === '/api' ? '/api' : 'https://openrouter.ai/api/v1';
     const url = `${base.replace(/\/+$/, '')}/chat/completions`;
     if (isDebugMode) console.log('[LLM Client] buildChatCompletionUrl', { provider, customBase, resolvedBase: base, finalUrl: url });
     return url;
@@ -16,10 +18,8 @@ export function buildChatCompletionHeaders(provider: LLMProvider, apiKey: string
         "Content-Type": "application/json",
         "Authorization": `Bearer ${apiKey}`,
     };
-    if (provider === 'openrouter') {
-        headers["HTTP-Referer"] = origin || (typeof window !== 'undefined' ? window.location.origin : "http://localhost:5173");
-        headers["X-Title"] = "DiceOnRails";
-    }
+    headers["HTTP-Referer"] = origin || (typeof window !== 'undefined' ? window.location.origin : "http://localhost:5173");
+    headers["X-Title"] = "DiceOnRails";
     if (isDebugMode) {
         const safe = { ...headers, Authorization: headers.Authorization ? `Bearer ${headers.Authorization.slice(0, 16)}...` : 'MISSING' };
         console.log('[LLM Client] buildChatCompletionHeaders', { provider, origin, headers: safe });
@@ -34,45 +34,21 @@ export function resolveApiKey(settingsKey?: string): string | undefined {
     return key;
 }
 
-/** Resolves the LLM provider based on the API base URL or explicit provider argument. */
+/** Treats legacy provider settings as OpenRouter. */
 export function resolveProvider(provider?: LLMProvider, apiBase?: string): LLMProvider {
-    const base = apiBase || getEnv("VITE_LLM_API_BASE");
-    const envVar = getEnv("VITE_LLM_API_BASE");
-    let result: LLMProvider;
-    if (base && !base.includes('openrouter.ai')) {
-        result = 'openai';
-    } else {
-        result = provider || 'openrouter';
-    }
-    if (isDebugMode) console.log('[LLM Client] resolveProvider', { providerArg: provider, apiBase, envVar, baseUsed: base, result });
-    return result;
+    if (isDebugMode) console.log('[LLM Client] resolveProvider', { provider, apiBase, result: 'openrouter' });
+    return 'openrouter';
 }
 
-/** Strips the provider prefix from a model name when using a non-OpenRouter base URL. */
+/** Preserves OpenRouter's provider/model identifier. */
 export function normalizeModelName(model: string, apiBase?: string): string {
-    const base = apiBase || getEnv("VITE_LLM_API_BASE");
-    const envVar = getEnv("VITE_LLM_API_BASE");
-    let result: string;
-    if (base && !base.includes('openrouter.ai')) {
-        result = model.split('/').pop() || model;
-    } else {
-        result = model;
-    }
-    if (isDebugMode) console.log('[LLM Client] normalizeModelName', { model, apiBase, envVar, baseUsed: base, result });
-    return result;
+    if (isDebugMode) console.log('[LLM Client] normalizeModelName', { model, apiBase });
+    return model;
 }
 
-/** Resolves the final model name to send in the request, stripping the 'opencode/' prefix for opencode proxy. */
+/** Preserves OpenRouter's provider/model identifier. */
 export function resolveRequestModel(model: string, apiBase?: string): string {
-    const base = apiBase || getEnv("VITE_LLM_API_BASE") || '';
-    let result: string;
-    if (base.includes('opencode.ai') && model.startsWith('opencode/')) {
-        result = model.slice('opencode/'.length);
-    } else {
-        result = normalizeModelName(model, base);
-    }
-    if (isDebugMode) console.log('[LLM Client] resolveRequestModel', { model, apiBase, envVar: getEnv("VITE_LLM_API_BASE"), baseUsed: base, result });
-    return result;
+    return normalizeModelName(model, apiBase);
 }
 
 /**
