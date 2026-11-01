@@ -42,10 +42,18 @@ const ACTOR_ID_ARGS: Record<string, string[]> = {
   level_up: ['targetId'],
 };
 
+/** A single tool implementation: receives the raw args bag and dispatch options,
+ *  returns the tool result. Registered by name in the tool registry so adding or
+ *  modifying a tool is a single entry rather than a branch in a giant switch. */
+type ToolHandler = (args: Record<string, unknown>, options?: { deferFinalize?: boolean }) => Promise<MCPResponse>;
+
 /** Central server-class that owns the game state and wires together all sub-services (party, inventory, combat, spells, progression, travel, content, state).
  *  Acts as the single canonical source of truth; all game state mutations must go through this class. */
 export class MockMCPServer {
   private state: GameState;
+
+  /** Lazily-built tool registry (name → handler), constructed once on first dispatch. */
+  private _toolHandlers?: Record<string, ToolHandler>;
 
   readonly party: PartyService;
   readonly inventory: InventoryService;
@@ -484,6 +492,200 @@ export class MockMCPServer {
 
 
   /**
+   * Builds the tool-name → handler registry (lazily cached). Each handler receives the
+   * raw args bag plus dispatch options and returns the tool's MCPResponse. Keeping tools
+   * as discrete named entries — rather than cases in one giant switch — makes adding,
+   * removing, or modifying a tool a single localized change.
+   */
+  private getToolHandlers(): Record<string, ToolHandler> {
+    if (this._toolHandlers) return this._toolHandlers;
+    const finalize = async (args: Record<string, unknown>, base: Promise<MCPResponse> | MCPResponse, options?: { deferFinalize?: boolean }) =>
+      this.maybeFinalizeTurn(args, await base, options?.deferFinalize);
+    this._toolHandlers = {
+      roll_dice: (args) => this.travel.roll_dice(
+        Number(args.sides ?? 20), Number(args.count ?? 1), Number(args.modifier ?? 0),
+        args.target_ac !== undefined ? Number(args.target_ac) : undefined,
+        args.target_name as string | undefined, args.roll_label as string | undefined,
+        args.isDamageRoll as boolean | undefined, args.isOffHand as boolean | undefined,
+        args.weaponName as string | undefined, args.attackerId as string | undefined
+      ),
+      add_enemy: (args) => this.combat.add_enemy(String(args.name || ''), args.ac !== undefined ? Number(args.ac) : undefined, args.hp !== undefined ? Number(args.hp) : undefined, undefined, args.cr !== undefined ? Number(args.cr) : undefined, args.xp !== undefined ? Number(args.xp) : undefined),
+      start_combat: (args) => this.combat.start_combat(args.targetId as string | undefined, args.enemies as unknown as Array<{ name: string; ac?: number; hp?: number; cr?: number; xp?: number; size?: string; type?: string }>),
+      next_turn: () => this.combat.next_turn(),
+      end_combat: () => this.combat.end_combat(),
+      player_attack: (args) => this.combat.player_attack(String(args.attackerId || ''), String(args.weaponName || ''), String(args.targetId || args.target_name || args.target || ''), args.isOffHand as boolean | undefined, args.isSneakAttack as boolean | undefined, args.sharpshooter as boolean | undefined, args.greatWeaponMaster as boolean | undefined, args.reckless as boolean | undefined, args.divineSmite as { slotLevel: number } | undefined),
+      move_to: (args, options) => finalize(args, this.travel.move_to(String(args.location_name || 'Unknown'), String(args.description || ''), args.targetId as string | undefined, args.skillCheck as unknown as { skill_name?: string; difficulty?: number; onSuccess?: unknown }, args.significance as LocationSignificance | undefined), options),
+      check_skill: (args, options) => finalize(args, this.travel.check_skill(String(args.skill_name || ''), Number(args.difficulty ?? 10), args.targetId as string, args.onSuccess as Record<string, unknown>), options),
+      inflict_damage: (args) => this.inventory.inflict_damage(Number(args.amount ?? 0), (args.targetId || args.target_name) as string, args.damageType as string),
+      adjust_currency: (args, options) => finalize(args, this.inventory.adjust_currency(Number(args.gp ?? 0), Number(args.sp ?? 0), Number(args.cp ?? 0), args.targetId as string), options),
+      update_inventory: async (args, options) => {
+        const batchItems = Array.isArray(args.items) ? args.items as Array<Record<string, unknown>> : [];
+        if (batchItems.length > 0) {
+          const msgs: string[] = [];
+          let anyFail = false;
+          for (const it of batchItems) {
+            const r = await this.inventory.update_inventory(
+              String(it.item_name || ''), String(it.action || 'add') as 'add' | 'remove' | 'edit',
+              Number(it.quantity ?? 1), undefined, args.targetId as string,
+              it.type as unknown as InventoryItem['type'], it.rarity as unknown as InventoryItem['rarity'],
+              it.description as string, it.stats as unknown as InventoryItem['stats'], undefined,
+              undefined, undefined, undefined, undefined, undefined);
+            msgs.push(r.message);
+            if (!r.success) anyFail = true;
+          }
+          return finalize(args, { success: !anyFail, data: { batch: batchItems.length, character: args.targetId }, message: msgs.join('\n') }, options);
+        }
+        return finalize(args, this.inventory.update_inventory(String(args.item_name || ''), String(args.action || 'add') as 'add' | 'remove' | 'edit', Number(args.quantity ?? 1), args.new_name as string | undefined, args.targetId as string, args.type as unknown as InventoryItem['type'], args.rarity as unknown as InventoryItem['rarity'], args.description as string, args.stats as unknown as InventoryItem['stats'], args.equipped as boolean, args.cost_gp as number | undefined, args.cost_sp as number | undefined, args.cost_cp as number | undefined, args.autoDeductMarketPrice as boolean | undefined, args.craft as boolean | undefined), options);
+      },
+      upsert_quest: (args, options) => finalize(args, this.content.upsert_quest(String(args.title || ''), String(args.description || ''), String(args.status || 'active') as 'active' | 'completed' | 'failed', args.difficulty as QuestDifficulty | undefined, args.reputationChanges as unknown as Array<{ faction: string; delta: number }>), options),
+      log_lore: (args, options) => finalize(args, this.content.log_lore(String(args.title || ''), String(args.content || ''), String(args.category || 'History')), options),
+      make_save: (args, options) => finalize(args, this.combat.make_save(String(args.targetId || ''), String(args.stat || 'dex'), Number(args.dc ?? 10)), options),
+      roll_death_save: (args) => this.combat.roll_death_save(String(args.targetId || '')),
+      level_up: async (args) => {
+        const baseRes = this.progression.allocateStatPoints((args.stats || {}) as unknown as Partial<Record<keyof Character['stats'], number>>, args.targetId as string, (args.skills || {}) as Record<string, number>, Number(args.hpDeviation ?? 0));
+        if (!baseRes.success) return baseRes;
+        const chained: string[] = [];
+        const targetIdForSpells = String(args.targetId || '');
+        for (const sid of (args.learnSpells as string[] || [])) {
+          const r = await this.spells.manage_spellbook(targetIdForSpells, 'learn', String(sid || ''));
+          chained.push(r.message);
+        }
+        for (const sid of (args.prepareSpells as string[] || [])) {
+          const r = await this.spells.manage_spellbook(targetIdForSpells, 'prepare', String(sid || ''));
+          chained.push(r.message);
+        }
+        return chained.length > 0
+          ? { success: true, data: { ...baseRes.data, spellsChained: chained.length }, message: baseRes.message + '\n' + chained.join('\n') }
+          : baseRes;
+      },
+      long_rest: (args) => this.travel.long_rest(args.narration as string | undefined, args.autoAdvanceTime as boolean | undefined),
+      short_rest: (args) => this.travel.short_rest(args.targetId as string | undefined, args.narration as string | undefined, args.autoAdvanceTime as boolean | undefined),
+      cast_spell: (args) => {
+        let targetsList = (args.targets as string[]) || [];
+        if (targetsList.length === 0 && (args.targetId || args.target_name)) {
+          targetsList = [String(args.targetId || args.target_name)];
+        }
+        return this.spells.cast_spell(String(args.characterId || args.casterId || ''), String(args.spellId || ''), Number(args.slotLevel ?? 0), targetsList, undefined, args.reaction as boolean | undefined, args.metamagic as { option?: string } | undefined);
+      },
+      spell_effect: (args) => this.spells.spell_effect(String(args.mode || 'counter') as 'counter' | 'dispel', String(args.casterId || ''), Number(args.targetSpellLevel ?? 3), args.targetId as string),
+      manage_spellbook: (args) => this.spells.manage_spellbook(String(args.characterId || args.targetId || ''), String(args.action || 'learn') as 'learn' | 'prepare' | 'unprepare' | 'forget' | 'finish_prep', String(args.spellId || '')),
+      use_resource: (args) => this.spells.use_resource(String(args.characterId || args.targetId || ''), String(args.resourceId || ''), args.targetId as string, args.amount as number),
+      natural_recovery: (args) => this.natural_recovery(String(args.characterId || ''), Array.isArray(args.selections) ? args.selections as Array<{ level: number; count: number }> : []),
+      summon_creature: (args) => this.summon_creature(String(args.casterId || ''), String(args.creatureName || args.template || ''), Number(args.count ?? 1)),
+      teleport_creature: (args) => this.teleport_creature(String(args.characterId || args.targetId || ''), String(args.destination || ''), Number(args.range ?? 30)),
+      polymorph_creature: (args) => this.polymorph_creature(String(args.characterId || args.targetId || ''), String(args.newForm || args.beastForm || 'wolf'), Number(args.duration ?? 60)),
+      move_token: (args) => {
+        // VTT: move a combatant token to a new grid cell.
+        const tokenIdRaw = String(args.tokenId || '');
+        const targetX = Number(args.x ?? 0);
+        const targetY = Number(args.y ?? 0);
+        if (!this.state.battleMap) {
+          return { success: false, data: {}, message: 'No active battle map. Call init_battle_map first.' };
+        }
+        // Accept character name or id
+        const resolvedToken = this.state.battleMap.tokens.find(
+          t => t.id === tokenIdRaw || t.name.toLowerCase() === tokenIdRaw.toLowerCase()
+        );
+        if (!resolvedToken) {
+          return { success: false, data: {}, message: `Token "${tokenIdRaw}" not found on battle map.` };
+        }
+        // Capture from-position before mutating
+        const fromPos = { ...resolvedToken.pos };
+        // Movement validation: warn if the move exceeds the creature's speed.
+        const dist = distanceCells(resolvedToken.pos, { x: targetX, y: targetY });
+        let speed = 30; // default medium creature
+        if (resolvedToken.type === 'player') {
+          const char = this.state.party.find(c => c.id === resolvedToken.id);
+          if (char) speed = calculateSpeed(char);
+        }
+        const maxCells = Math.max(1, Math.round(speed / 5));
+        let moveMsg = `${resolvedToken.name} moved to (${targetX}, ${targetY}) on the battle map.`;
+        if (dist > maxCells) {
+          moveMsg += ` WARNING: Movement of ${dist} cells exceeds ${resolvedToken.name}'s speed (${speed} ft = ${maxCells} cells).`;
+        }
+        this.state.battleMap = gridMoveToken(this.state.battleMap, resolvedToken.id, { x: targetX, y: targetY });
+        const moved = this.state.battleMap.tokens.find(t => t.id === resolvedToken.id);
+        // Record movement for LLM context (persists until next move or combat end)
+        this.state.lastTokenMove = {
+          tokenId: resolvedToken.id,
+          from: fromPos,
+          to: { x: targetX, y: targetY },
+        };
+        return {
+          success: true,
+          data: { tokenId: resolvedToken.id, name: resolvedToken.name, x: moved?.pos.x, y: moved?.pos.y },
+          message: moveMsg,
+        };
+      },
+      init_battle_map: (args) => {
+        // VTT: initialise a battle map and auto-place all combatants.
+        const mapWidth  = Math.min(40, Math.max(5, Number(args.width  ?? 20)));
+        const mapHeight = Math.min(30, Math.max(5, Number(args.height ?? 15)));
+        const mapLabel  = args.label ? String(args.label) : (this.state.party[0]?.location ?? 'Battle');
+        let bmap = initBattleMap(mapWidth, mapHeight, mapLabel);
+        // Auto-place party members
+        bmap = autoPlaceParty(bmap, this.state.party.map(c => ({ id: c.id, name: c.name })));
+        // Auto-place enemies if combat is active
+        if (this.state.combat?.enemies) {
+          bmap = autoPlaceEnemies(bmap, this.state.combat.enemies.filter(e => !e.isDead).map(e => ({ id: e.id, name: e.name })));
+        }
+        this.state.battleMap = bmap;
+        return {
+          success: true,
+          data: { width: mapWidth, height: mapHeight, label: mapLabel, tokenCount: bmap.tokens.length },
+          message: `Battle map "${mapLabel}" initialised (${mapWidth}×${mapHeight}). ${bmap.tokens.length} tokens placed.`,
+        };
+      },
+      cast_ritual: async (args) => {
+        const ritualRes = await this.spells.cast_ritual(String(args.characterId || args.casterId || ''), String(args.spellId || ''));
+        if (!this.state.combat?.isActive && ritualRes.success) {
+          const rawRitualNarration = typeof args.narration === 'string' && (args.narration as string).trim()
+            ? (args.narration as string)
+            : `${String(args.characterId || args.casterId || 'The caster')} completes the ${String(args.spellId || '')} ritual.`;
+          const ritualNarration = sanitizeNarration(rawRitualNarration) || rawRitualNarration;
+          const ritualTime = await this.travel.narrate_turn(ritualNarration, 10);
+          const ritualData = ritualTime.data as { logs?: unknown } | undefined;
+          const ritualLogs = Array.isArray(ritualData?.logs) ? ritualData.logs as string[] : [];
+          return { success: true, data: { ...ritualRes.data, ...ritualTime.data, narration: ritualNarration, timeResult: ritualTime.data, timePassed: 10 }, message: ritualLogs.length > 0 ? ritualRes.message + '\n' + ritualLogs.join('\n') : ritualRes.message };
+        }
+        return ritualRes;
+      },
+      narrate_turn: async (args) => {
+        if (Array.isArray(args.suggestions)) {
+          this.state.lastSuggestions = args.suggestions
+            .filter((s: unknown): s is string => typeof s === 'string' && s.trim().length > 0)
+            .map(s => s.slice(0, 80))
+            .slice(0, 3);
+          if (isDebugMode) console.log(`[narrate_turn] Stored ${this.state.lastSuggestions.length} suggestions on state:`, this.state.lastSuggestions);
+        } else if (isDebugMode) {
+          console.log('[narrate_turn] No suggestions in args');
+        }
+        // Multiplayer per-character suggestions: if the LLM provided a
+        // suggestionsByCharacter map, store it as the source of truth. Solo
+        // never sends this field; the flat `suggestions` above is used.
+        if (args.suggestionsByCharacter && typeof args.suggestionsByCharacter === 'object' && !Array.isArray(args.suggestionsByCharacter)) {
+          const map: Record<string, string[]> = {};
+          for (const [k, v] of Object.entries(args.suggestionsByCharacter as Record<string, unknown>)) {
+            if (Array.isArray(v)) {
+              const cleaned = v
+                .filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
+                .map(s => s.slice(0, 80))
+                .slice(0, 3);
+              if (cleaned.length > 0) map[k] = cleaned;
+            }
+          }
+          if (Object.keys(map).length > 0) {
+            this.state.lastSuggestionsByCharacter = map;
+            if (isDebugMode) console.log(`[narrate_turn] Stored per-character suggestions for ${Object.keys(map).length} characters`);
+          }
+        }
+        return this.travel.narrate_turn(sanitizeNarration(String(args.narration || '')), Number(args.timePassed ?? 0), args.xp as number | undefined, args.roleplay as 'dialogue' | 'creative' | undefined);
+      },
+    };
+    return this._toolHandlers;
+  }
+
+  /**
    * Routes an LLM tool call by name to the appropriate sub-service, dispatching across 29 cases (28 tools + unknown default).
    * The optional `options.deferFinalize` flag skips inline-turn finalization on action tools — used by the
    * agent loop's multi-action synthesis path so that 2+ parallel finalizing tools don't each stack gameTime
@@ -500,225 +702,10 @@ export class MockMCPServer {
           return { success: false, data: {}, message: validation.message };
         }
       }
-      let res: MCPResponse;
-      switch (name) {
-        case 'roll_dice':
-          res = await this.travel.roll_dice(
-            Number(args.sides ?? 20), Number(args.count ?? 1), Number(args.modifier ?? 0),
-            args.target_ac !== undefined ? Number(args.target_ac) : undefined,
-            args.target_name as string | undefined, args.roll_label as string | undefined,
-            args.isDamageRoll as boolean | undefined, args.isOffHand as boolean | undefined,
-            args.weaponName as string | undefined, args.attackerId as string | undefined
-          ); break;
-        case 'add_enemy':
-          res = await this.combat.add_enemy(String(args.name || ''), args.ac !== undefined ? Number(args.ac) : undefined, args.hp !== undefined ? Number(args.hp) : undefined, undefined, args.cr !== undefined ? Number(args.cr) : undefined, args.xp !== undefined ? Number(args.xp) : undefined); break;
-        case 'start_combat':
-          res = await this.combat.start_combat(args.targetId as string | undefined, args.enemies as unknown as Array<{ name: string; ac?: number; hp?: number; cr?: number; xp?: number; size?: string; type?: string }>); break;
-        case 'next_turn':
-          res = await this.combat.next_turn(); break;
-        case 'end_combat':
-          res = await this.combat.end_combat(); break;
-        case 'player_attack':
-          res = await this.combat.player_attack(String(args.attackerId || ''), String(args.weaponName || ''), String(args.targetId || args.target_name || args.target || ''), args.isOffHand as boolean | undefined, args.isSneakAttack as boolean | undefined, args.sharpshooter as boolean | undefined, args.greatWeaponMaster as boolean | undefined, args.reckless as boolean | undefined, args.divineSmite as { slotLevel: number } | undefined); break;
-        case 'move_to': {
-          res = await this.travel.move_to(String(args.location_name || 'Unknown'), String(args.description || ''), args.targetId as string | undefined, args.skillCheck as unknown as { skill_name?: string; difficulty?: number; onSuccess?: unknown }, args.significance as LocationSignificance | undefined);
-          res = await this.maybeFinalizeTurn(args, res, options?.deferFinalize);
-          break;
-        }
-        case 'check_skill':
-          res = await this.maybeFinalizeTurn(args, await this.travel.check_skill(String(args.skill_name || ''), Number(args.difficulty ?? 10), args.targetId as string, args.onSuccess as Record<string, unknown>), options?.deferFinalize); break;
-        case 'inflict_damage':
-          res = await this.inventory.inflict_damage(Number(args.amount ?? 0), (args.targetId || args.target_name) as string, args.damageType as string); break;
-        case 'adjust_currency':
-          res = await this.maybeFinalizeTurn(args, await this.inventory.adjust_currency(Number(args.gp ?? 0), Number(args.sp ?? 0), Number(args.cp ?? 0), args.targetId as string), options?.deferFinalize); break;
-        case 'update_inventory': {
-          const batchItems = Array.isArray(args.items) ? args.items as Array<Record<string, unknown>> : [];
-          if (batchItems.length > 0) {
-            const msgs: string[] = [];
-            let anyFail = false;
-            for (const it of batchItems) {
-              const r = await this.inventory.update_inventory(
-                String(it.item_name || ''), String(it.action || 'add') as 'add' | 'remove' | 'edit',
-                Number(it.quantity ?? 1), undefined, args.targetId as string,
-                it.type as unknown as InventoryItem['type'], it.rarity as unknown as InventoryItem['rarity'],
-                it.description as string, it.stats as unknown as InventoryItem['stats'], undefined,
-                undefined, undefined, undefined, undefined, undefined);
-              msgs.push(r.message);
-              if (!r.success) anyFail = true;
-            }
-            res = await this.maybeFinalizeTurn(args, { success: !anyFail, data: { batch: batchItems.length, character: args.targetId }, message: msgs.join('\n') }, options?.deferFinalize);
-          } else {
-            res = await this.maybeFinalizeTurn(args, await this.inventory.update_inventory(String(args.item_name || ''), String(args.action || 'add') as 'add' | 'remove' | 'edit', Number(args.quantity ?? 1), args.new_name as string | undefined, args.targetId as string, args.type as unknown as InventoryItem['type'], args.rarity as unknown as InventoryItem['rarity'], args.description as string, args.stats as unknown as InventoryItem['stats'], args.equipped as boolean, args.cost_gp as number | undefined, args.cost_sp as number | undefined, args.cost_cp as number | undefined, args.autoDeductMarketPrice as boolean | undefined, args.craft as boolean | undefined), options?.deferFinalize);
-          }
-          break;
-        }
-        case 'upsert_quest':
-          res = await this.maybeFinalizeTurn(args, await this.content.upsert_quest(String(args.title || ''), String(args.description || ''), String(args.status || 'active') as 'active' | 'completed' | 'failed', args.difficulty as QuestDifficulty | undefined, args.reputationChanges as unknown as Array<{ faction: string; delta: number }>), options?.deferFinalize); break;
-        case 'log_lore':
-          res = await this.maybeFinalizeTurn(args, await this.content.log_lore(String(args.title || ''), String(args.content || ''), String(args.category || 'History')), options?.deferFinalize); break;
-        case 'make_save':
-          res = await this.maybeFinalizeTurn(args, await this.combat.make_save(String(args.targetId || ''), String(args.stat || 'dex'), Number(args.dc ?? 10)), options?.deferFinalize); break;
-        case 'roll_death_save':
-          res = await this.combat.roll_death_save(String(args.targetId || '')); break;
-        case 'level_up': {
-          const baseRes = this.progression.allocateStatPoints((args.stats || {}) as unknown as Partial<Record<keyof Character['stats'], number>>, args.targetId as string, (args.skills || {}) as Record<string, number>, Number(args.hpDeviation ?? 0));
-          if (!baseRes.success) { res = baseRes; break; }
-          const chained: string[] = [];
-          const targetIdForSpells = String(args.targetId || '');
-          for (const sid of (args.learnSpells as string[] || [])) {
-            const r = await this.spells.manage_spellbook(targetIdForSpells, 'learn', String(sid || ''));
-            chained.push(r.message);
-          }
-          for (const sid of (args.prepareSpells as string[] || [])) {
-            const r = await this.spells.manage_spellbook(targetIdForSpells, 'prepare', String(sid || ''));
-            chained.push(r.message);
-          }
-          res = chained.length > 0
-            ? { success: true, data: { ...baseRes.data, spellsChained: chained.length }, message: baseRes.message + '\n' + chained.join('\n') }
-            : baseRes;
-          break;
-        }
-        case 'long_rest':
-          res = await this.travel.long_rest(args.narration as string | undefined, args.autoAdvanceTime as boolean | undefined); break;
-        case 'short_rest':
-          res = await this.travel.short_rest(args.targetId as string | undefined, args.narration as string | undefined, args.autoAdvanceTime as boolean | undefined); break;
-        case 'cast_spell': {
-          let targetsList = (args.targets as string[]) || [];
-          if (targetsList.length === 0 && (args.targetId || args.target_name)) {
-            targetsList = [String(args.targetId || args.target_name)];
-          }
-          res = await this.spells.cast_spell(String(args.characterId || args.casterId || ''), String(args.spellId || ''), Number(args.slotLevel ?? 0), targetsList, undefined, args.reaction as boolean | undefined, args.metamagic as { option?: string } | undefined); break;
-        }
-        case 'spell_effect':
-          res = await this.spells.spell_effect(String(args.mode || 'counter') as 'counter' | 'dispel', String(args.casterId || ''), Number(args.targetSpellLevel ?? 3), args.targetId as string); break;
-        case 'manage_spellbook':
-          res = await this.spells.manage_spellbook(String(args.characterId || args.targetId || ''), String(args.action || 'learn') as 'learn' | 'prepare' | 'unprepare' | 'forget' | 'finish_prep', String(args.spellId || '')); break;
-
-        case 'use_resource':
-          res = await this.spells.use_resource(String(args.characterId || args.targetId || ''), String(args.resourceId || ''), args.targetId as string, args.amount as number); break;
-        case 'natural_recovery':
-          res = await this.natural_recovery(String(args.characterId || ''), Array.isArray(args.selections) ? args.selections as Array<{ level: number; count: number }> : []); break;
-        case 'summon_creature':
-          res = await this.summon_creature(String(args.casterId || ''), String(args.creatureName || args.template || ''), Number(args.count ?? 1)); break;
-        case 'teleport_creature':
-          res = await this.teleport_creature(String(args.characterId || args.targetId || ''), String(args.destination || ''), Number(args.range ?? 30)); break;
-        case 'polymorph_creature':
-          res = await this.polymorph_creature(String(args.characterId || args.targetId || ''), String(args.newForm || args.beastForm || 'wolf'), Number(args.duration ?? 60)); break;
-        case 'move_token': {
-          // VTT: move a combatant token to a new grid cell.
-          const tokenIdRaw = String(args.tokenId || '');
-          const targetX = Number(args.x ?? 0);
-          const targetY = Number(args.y ?? 0);
-          if (!this.state.battleMap) {
-            res = { success: false, data: {}, message: 'No active battle map. Call init_battle_map first.' };
-          } else {
-            // Accept character name or id
-            const resolvedToken = this.state.battleMap.tokens.find(
-              t => t.id === tokenIdRaw || t.name.toLowerCase() === tokenIdRaw.toLowerCase()
-            );
-            if (!resolvedToken) {
-              res = { success: false, data: {}, message: `Token "${tokenIdRaw}" not found on battle map.` };
-            } else {
-              // Capture from-position before mutating
-              const fromPos = { ...resolvedToken.pos };
-              // Movement validation: warn if the move exceeds the creature's speed.
-              const dist = distanceCells(resolvedToken.pos, { x: targetX, y: targetY });
-              let speed = 30; // default medium creature
-              if (resolvedToken.type === 'player') {
-                const char = this.state.party.find(c => c.id === resolvedToken.id);
-                if (char) speed = calculateSpeed(char);
-              }
-              const maxCells = Math.max(1, Math.round(speed / 5));
-              let moveMsg = `${resolvedToken.name} moved to (${targetX}, ${targetY}) on the battle map.`;
-              if (dist > maxCells) {
-                moveMsg += ` WARNING: Movement of ${dist} cells exceeds ${resolvedToken.name}'s speed (${speed} ft = ${maxCells} cells).`;
-              }
-              this.state.battleMap = gridMoveToken(this.state.battleMap, resolvedToken.id, { x: targetX, y: targetY });
-              const moved = this.state.battleMap.tokens.find(t => t.id === resolvedToken.id);
-              res = {
-                success: true,
-                data: { tokenId: resolvedToken.id, name: resolvedToken.name, x: moved?.pos.x, y: moved?.pos.y },
-                message: moveMsg,
-              };
-              // Record movement for LLM context (persists until next move or combat end)
-              this.state.lastTokenMove = {
-                tokenId: resolvedToken.id,
-                from: fromPos,
-                to: { x: targetX, y: targetY },
-              };
-            }
-          }
-          break;
-        }
-        case 'init_battle_map': {
-          // VTT: initialise a battle map and auto-place all combatants.
-          const mapWidth  = Math.min(40, Math.max(5, Number(args.width  ?? 20)));
-          const mapHeight = Math.min(30, Math.max(5, Number(args.height ?? 15)));
-          const mapLabel  = args.label ? String(args.label) : (this.state.party[0]?.location ?? 'Battle');
-          let bmap = initBattleMap(mapWidth, mapHeight, mapLabel);
-          // Auto-place party members
-          bmap = autoPlaceParty(bmap, this.state.party.map(c => ({ id: c.id, name: c.name })));
-          // Auto-place enemies if combat is active
-          if (this.state.combat?.enemies) {
-            bmap = autoPlaceEnemies(bmap, this.state.combat.enemies.filter(e => !e.isDead).map(e => ({ id: e.id, name: e.name })));
-          }
-          this.state.battleMap = bmap;
-          res = {
-            success: true,
-            data: { width: mapWidth, height: mapHeight, label: mapLabel, tokenCount: bmap.tokens.length },
-            message: `Battle map "${mapLabel}" initialised (${mapWidth}×${mapHeight}). ${bmap.tokens.length} tokens placed.`,
-          };
-          break;
-        }
-        case 'cast_ritual': {
-          const ritualRes = await this.spells.cast_ritual(String(args.characterId || args.casterId || ''), String(args.spellId || ''));
-          if (!this.state.combat?.isActive && ritualRes.success) {
-            const rawRitualNarration = typeof args.narration === 'string' && (args.narration as string).trim()
-              ? (args.narration as string)
-              : `${String(args.characterId || args.casterId || 'The caster')} completes the ${String(args.spellId || '')} ritual.`;
-            const ritualNarration = sanitizeNarration(rawRitualNarration) || rawRitualNarration;
-            const ritualTime = await this.travel.narrate_turn(ritualNarration, 10);
-            const ritualData = ritualTime.data as { logs?: unknown } | undefined;
-            const ritualLogs = Array.isArray(ritualData?.logs) ? ritualData.logs as string[] : [];
-            res = { success: true, data: { ...ritualRes.data, ...ritualTime.data, narration: ritualNarration, timeResult: ritualTime.data, timePassed: 10 }, message: ritualLogs.length > 0 ? ritualRes.message + '\n' + ritualLogs.join('\n') : ritualRes.message };
-          } else {
-            res = ritualRes;
-          }
-          break;
-        }
-        case 'narrate_turn':
-          if (Array.isArray(args.suggestions)) {
-            this.state.lastSuggestions = args.suggestions
-              .filter((s: unknown): s is string => typeof s === 'string' && s.trim().length > 0)
-              .map(s => s.slice(0, 80))
-              .slice(0, 3);
-            if (isDebugMode) console.log(`[narrate_turn] Stored ${this.state.lastSuggestions.length} suggestions on state:`, this.state.lastSuggestions);
-          } else if (isDebugMode) {
-            console.log('[narrate_turn] No suggestions in args');
-          }
-          // Multiplayer per-character suggestions: if the LLM provided a
-          // suggestionsByCharacter map, store it as the source of truth. Solo
-          // never sends this field; the flat `suggestions` above is used.
-          if (args.suggestionsByCharacter && typeof args.suggestionsByCharacter === 'object' && !Array.isArray(args.suggestionsByCharacter)) {
-            const map: Record<string, string[]> = {};
-            for (const [k, v] of Object.entries(args.suggestionsByCharacter as Record<string, unknown>)) {
-              if (Array.isArray(v)) {
-                const cleaned = v
-                  .filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
-                  .map(s => s.slice(0, 80))
-                  .slice(0, 3);
-                if (cleaned.length > 0) map[k] = cleaned;
-              }
-            }
-            if (Object.keys(map).length > 0) {
-              this.state.lastSuggestionsByCharacter = map;
-              if (isDebugMode) console.log(`[narrate_turn] Stored per-character suggestions for ${Object.keys(map).length} characters`);
-            }
-          }
-          res = await this.travel.narrate_turn(sanitizeNarration(String(args.narration || '')), Number(args.timePassed ?? 0), args.xp as number | undefined, args.roleplay as 'dialogue' | 'creative' | undefined); break;
-        default:
-          res = fail(`Unknown tool: ${name}`);
-      }
+      const handler = this.getToolHandlers()[name];
+      let res: MCPResponse = handler
+        ? await handler(args, options)
+        : fail(`Unknown tool: ${name}`);
       if (isDebugMode) {
         console.log(`[executeToolCall] Outcome of ${name}:`, res);
       }
