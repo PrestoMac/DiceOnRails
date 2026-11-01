@@ -2565,6 +2565,22 @@ const roundTripped = deepClone(char.conditions);
     expect(enemy?.conditions?.some(c => c.id === 'stunned')).toBe(false);
   });
 
+  it('does not report Stunning Strike as applied to an immune target', async () => {
+    const server = new MockMCPServer();
+    const monk = makeCharacter({ class: 'monk', level: 5, resources: [{ id: 'ki', name: 'Ki', current: 1, max: 1, resetOn: 'short', source: 'class', sourceId: 'monk' }] });
+    server.joinParty(monk);
+    await server.add_enemy('Dummy', 10, 100);
+    await server.start_combat();
+    const enemy = server.getFullState().combat.enemies[0];
+    enemy.conditionsImmunities = ['stunned'];
+    vi.mocked(cryptoRoll).mockReturnValue(1);
+    const result = await server.use_resource(monk.id, 'ki', enemy.id);
+    expect(result.success).toBe(true);
+    expect(result.data.stunned).toBe(false);
+    expect(result.message).toContain('immune');
+    expect(enemy.conditions?.some(c => c.id === 'stunned')).not.toBe(true);
+  });
+
   describe('use_resource channel-divinity Turn Undead save (regression)', () => {
     it('destroys eligible undead on a failed save at cleric level 5', async () => {
       vi.mocked(cryptoRoll).mockReturnValue(1);

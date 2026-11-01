@@ -66,6 +66,20 @@ describe('cast_spell', () => {
     expect(enemy.hp.current).toBeLessThan(enemy.hp.max);
   });
 
+  it('reports damage after resistance rather than the pre-resistance roll', async () => {
+    const wizard = makeWizard();
+    server.joinParty(wizard);
+    await server.add_enemy('Dummy', 10, 200);
+    await server.start_combat();
+    const enemy = server.getFullState().combat.enemies[0];
+    enemy.damageResistances = ['fire'];
+    const result = await server.cast_spell(wizard.id, 'fireball', 3, [enemy.id], { [enemy.id]: false });
+    expect(result.success).toBe(true);
+    const applied = 200 - enemy.hp.current;
+    expect(applied).toBeGreaterThan(0);
+    expect(result.message).toContain(`Dummy ${applied} fire`);
+  });
+
   it('healing spell increases target HP and consumes slot', async () => {
     const cleric = makeCleric();
     const ally = makeCharacter({ id: 'ally-1', name: 'Ally', hp: { current: 5, max: 20 } });

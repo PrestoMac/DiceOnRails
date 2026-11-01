@@ -109,7 +109,8 @@ export const RESOURCE_HANDLERS: Record<string, ResourceHandler> = {
       return { success: true, data: { stunned: false, dc }, message: `${enemy.name} made the CON save (DC ${dc}) and resisted Stunning Strike.` };
     }
     const combat = ctx.state.combat;
-    applyCondition(enemy, { id: 'stunned', source: char.id, duration: 1, durationUnit: combat?.isActive ? 'permanent' : 'round', expiresAfterTurn: combat?.isActive ? { actorId: char.id, appliedRound: combat.round } : undefined });
+    const applied = applyCondition(enemy, { id: 'stunned', source: char.id, duration: 1, durationUnit: combat?.isActive ? 'permanent' : 'round', expiresAfterTurn: combat?.isActive ? { actorId: char.id, appliedRound: combat.round } : undefined });
+    if (!applied) return { success: true, data: { stunned: false, dc }, message: `${enemy.name} is immune to being stunned.` };
     return { success: true, data: { stunned: true, dc }, message: `${enemy.name} failed the CON save (DC ${dc}) and is STUNNED until the end of your next turn.` };
   },
 

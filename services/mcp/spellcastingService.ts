@@ -308,10 +308,11 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
             const cleanId = t.targetId.toLowerCase().trim();
             return rt === t.targetId || rt.toLowerCase() === cleanId;
           }) || t.targetId;
-          damageBreakdown.push({ name: nameOfTarget(resolvedTargetId), rolled: t.damage, dealt: dmg, savePassed });
           const dmgResult = await deps.inflict_damage(dmg, resolvedTargetId, result.damage.type);
           if (!dmgResult.success) {
             state.sessionLogs.push(`Damage to ${t.targetId} failed: ${dmgResult.message}`);
+          } else {
+            damageBreakdown.push({ name: nameOfTarget(resolvedTargetId), rolled: t.damage, dealt: Number(dmgResult.data?.damage ?? dmg), savePassed });
           }
         }
       } else if (result.damage?.perTarget) {
@@ -321,10 +322,11 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
             const cleanId = t.targetId.toLowerCase().trim();
             return rt === t.targetId || rt.toLowerCase() === cleanId;
           }) || t.targetId;
-          damageBreakdown.push({ name: nameOfTarget(resolvedTargetId), rolled: t.damage, dealt: dmg });
           const dmgResult = await deps.inflict_damage(dmg, resolvedTargetId, result.damage.type);
           if (!dmgResult.success) {
             state.sessionLogs.push(`Damage to ${t.targetId} failed: ${dmgResult.message}`);
+          } else {
+            damageBreakdown.push({ name: nameOfTarget(resolvedTargetId), rolled: t.damage, dealt: Number(dmgResult.data?.damage ?? dmg) });
           }
         }
       } else if (result.damage && targets.length > 0) {

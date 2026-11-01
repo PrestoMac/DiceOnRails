@@ -197,6 +197,7 @@ describe('RESOURCE_HANDLERS', () => {
           enemies: [{ id: 'goblin-1', name: 'goblin-1', ac: 12, hp: { current: 7, max: 7 }, stats: { str: 10, dex: 12, con: 10, int: 6, wis: 8, cha: 6 }, attacks: [], isDead: false, conditions: [] }],
         },
       });
+      vi.mocked(applyCondition).mockReturnValueOnce(true);
       const result = await RESOURCE_HANDLERS['ki'](ctx, 'test-char', 'goblin-1');
       expect(result.success).toBe(true);
       expect(result.data?.stunned).toBe(true);
