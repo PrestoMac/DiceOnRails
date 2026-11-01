@@ -12,13 +12,9 @@ import {
   rerollDamageValueIfApplicable,
   getHeavyArmorMasterReduction,
   getAlertInitiativeBonus,
-  getSpeedBonus,
   getResilientSaveBonus,
-  getShieldMasterSaveBonus,
   getProficiencyBonus,
-  getToughHpBonus,
   getMaxHp,
-  getDualWielderAcBonus,
   applyAsiChoice,
   applyFeatChoice,
   filterAvailableFeats,
@@ -276,23 +272,6 @@ describe('featsService', () => {
     });
   });
 
-  describe('Mobile speed bonus', () => {
-    it('returns 0 without feats', () => {
-      const c = makeCharacter();
-      expect(getSpeedBonus(c)).toBe(0);
-    });
-
-    it('returns 10 with mobile', () => {
-      const c = makeCharacter({ feats: ['mobile'] });
-      expect(getSpeedBonus(c)).toBe(10);
-    });
-
-    it('stacks mobile + athlete', () => {
-      const c = makeCharacter({ feats: ['mobile', 'athlete'] });
-      expect(getSpeedBonus(c)).toBe(20);
-    });
-  });
-
   describe('Resilient save bonus', () => {
     it('returns 0 without the feat', () => {
       const c = makeCharacter();
@@ -310,82 +289,11 @@ describe('featsService', () => {
     });
   });
 
-  describe('Shield Master save bonus', () => {
-    it('returns 0 without the feat', () => {
-      const c = makeCharacter();
-      expect(getShieldMasterSaveBonus(c, 'dex')).toBe(0);
-    });
-
-    it('returns 0 for non-dex saves', () => {
-      const c = makeCharacter({
-        feats: ['shield-master'],
-        inventory: [{ name: 'Shield', quantity: 1, type: 'shield', equipped: true }]
-      });
-      expect(getShieldMasterSaveBonus(c, 'con')).toBe(0);
-    });
-
-    it('returns 2 for dex saves with shield equipped', () => {
-      const c = makeCharacter({
-        feats: ['shield-master'],
-        inventory: [{ name: 'Shield', quantity: 1, type: 'shield', equipped: true }]
-      });
-      expect(getShieldMasterSaveBonus(c, 'dex')).toBe(2);
-    });
-
-    it('returns 0 for dex saves without shield equipped', () => {
-      const c = makeCharacter({
-        feats: ['shield-master'],
-        inventory: [{ name: 'Shield', quantity: 1, type: 'shield', equipped: false }]
-      });
-      expect(getShieldMasterSaveBonus(c, 'dex')).toBe(0);
-    });
-  });
-
-  describe('Tough HP bonus', () => {
-    it('returns 0 without the feat', () => {
-      const c = makeCharacter({ level: 5 });
-      expect(getToughHpBonus(c)).toBe(0);
-    });
-
-    it('returns 2 * level with the feat', () => {
-      const c = makeCharacter({ level: 5, feats: ['tough'] });
-      expect(getToughHpBonus(c)).toBe(10);
-    });
-  });
-
   describe('getMaxHp includes Tough bonus', () => {
     it('adds 2 HP per level when Tough is taken', () => {
       const c1 = makeCharacter({ level: 5 });
       const c2 = makeCharacter({ level: 5, feats: ['tough'] });
       expect(getMaxHp(c2) - getMaxHp(c1)).toBe(10);
-    });
-  });
-
-  describe('Dual Wielder AC bonus', () => {
-    it('returns 0 without the feat', () => {
-      const c = makeCharacter();
-      expect(getDualWielderAcBonus(c)).toBe(0);
-    });
-
-    it('returns 1 with feat and two equipped weapons', () => {
-      const c = makeCharacter({
-        feats: ['dual-wielder'],
-        inventory: [
-          { name: 'Shortsword', quantity: 1, type: 'weapon', equipped: true },
-          { name: 'Dagger', quantity: 1, type: 'weapon', equipped: true }
-        ]
-      });
-      expect(getDualWielderAcBonus(c)).toBe(1);
-    });
-
-    it('returns 0 with feat but only one equipped weapon', () => {
-      const c = makeCharacter({
-        feats: ['dual-wielder'],
-        inventory: [
-          { name: 'Shortsword', quantity: 1, type: 'weapon', equipped: true }
-        ]
-      });
-      expect(getDualWielderAcBonus(c)).toBe(0);
     });
   });
 

@@ -57,8 +57,7 @@ export const FEATS_CATALOG: FeatDefinition[] = [
     icon: 'fa-crosshairs',
     description: 'Thanks to extensive practice with the crossbow, you ignore the loading quality of crossbows with which you are proficient. Being within 5 feet of an enemy doesn\'t impose disadvantage on your ranged attack rolls.',
     mechanicalEffect: 'No disadvantage on ranged attacks when an enemy is within 5 feet.',
-    effectType: 'flag',
-    effect: { kind: 'ignore-ranged-penalty' }
+    effectType: 'flag'
   },
   {
     id: 'dual-wielder',
@@ -91,7 +90,6 @@ export const FEATS_CATALOG: FeatDefinition[] = [
     description: 'When you are wielding a finesse weapon with which you are proficient and another creature hits you with a melee attack, you can use your reaction to add your proficiency bonus to your AC for that attack, potentially causing it to miss.',
     mechanicalEffect: 'Add proficiency bonus to AC against one melee attack per round (reaction).',
     effectType: 'modifier',
-    effect: { kind: 'reaction-ac-bonus', payload: { bonusType: 'proficiency' } },
     prerequisites: { stat: { dex: 13 } }
   },
   {
@@ -113,8 +111,7 @@ export const FEATS_CATALOG: FeatDefinition[] = [
     icon: 'fa-bolt',
     description: 'When you use your action to Dash, you can use a bonus action to make one melee weapon attack or to shove a creature. If you move at least 10 feet in a straight line immediately before taking this bonus action, you either gain a +5 bonus to the attack\'s damage roll (if you chose to attack) or push the target up to 10 feet away (if you chose to shove).',
     mechanicalEffect: 'After a Dash bonus action, gain +5 damage on a single melee attack. Narratively tracked.',
-    effectType: 'flavor',
-    effect: { kind: 'charge-damage', payload: { bonus: 5 } }
+    effectType: 'flavor'
   },
   {
     id: 'grappler',
@@ -124,8 +121,7 @@ export const FEATS_CATALOG: FeatDefinition[] = [
     icon: 'fa-hand-fist',
     description: 'You\'ve developed the skills necessary to hold your own in close-quarters grappling. You have advantage on attack rolls against a creature you are grappling. You can use your action to try to pin a creature grappled by you.',
     mechanicalEffect: 'Advantage on attack rolls against grappled targets. Narratively tracked.',
-    effectType: 'flavor',
-    effect: { kind: 'grapple-advantage' }
+    effectType: 'flavor'
   },
   {
     id: 'elemental-adept',
@@ -135,8 +131,7 @@ export const FEATS_CATALOG: FeatDefinition[] = [
     icon: 'fa-fire',
     description: 'When you gain this feat, choose one of the following damage types: acid, cold, fire, lightning, or thunder. Spells you cast ignore resistance to that damage type. When you roll damage for a spell that deals damage of that type, you can treat any 1 on a damage die as a 2.',
     mechanicalEffect: 'Ignore resistance to a chosen element; treat 1s as 2s on that damage type. (Recorded; engine does not yet model spell damage.)',
-    effectType: 'flavor',
-    effect: { kind: 'elemental-adept' }
+    effectType: 'flavor'
   },
   {
     id: 'resilient',
@@ -156,8 +151,7 @@ export const FEATS_CATALOG: FeatDefinition[] = [
     icon: 'fa-eye',
     description: 'Always on the lookout for danger, you gain the following benefits: you gain a +5 bonus to Initiative. You can\'t be surprised. Creatures within 5 feet of you that you can\'t see don\'t gain advantage on attack rolls against you.',
     mechanicalEffect: '+5 to initiative rolls.',
-    effectType: 'modifier',
-    effect: { kind: 'initiative-bonus', payload: { bonus: 5 } }
+    effectType: 'modifier'
   },
   {
     id: 'tough',
@@ -179,7 +173,6 @@ export const FEATS_CATALOG: FeatDefinition[] = [
     description: 'You can use your armor to deflect strikes that would kill others. You gain the following benefits: increase your Strength score by 1, to a maximum of 20. While you are wearing heavy armor, bludgeoning, piercing, and slashing damage from nonmagical attacks against you is reduced by 3.',
     mechanicalEffect: 'Reduce non-magical B/P/S damage by 3 while wearing heavy armor. The +1 ASI is applied separately.',
     effectType: 'modifier',
-    effect: { kind: 'damage-reduction', payload: { amount: 3, types: ['bludgeoning', 'piercing', 'slashing'] } },
     prerequisites: { armorProf: ['heavy'] }
   },
   {
@@ -190,8 +183,7 @@ export const FEATS_CATALOG: FeatDefinition[] = [
     icon: 'fa-shield-heart',
     description: 'When you roll a Hit Die to regain hit points, the minimum number of hit points you regain equals twice your Constitution modifier (minimum of 2).',
     mechanicalEffect: 'Minimum hit die roll equals 2 × CON modifier. (Death-save inspired flavor: advantage on death saves; engine gives a +1 bonus to death save roll.)',
-    effectType: 'modifier',
-    effect: { kind: 'death-save-bonus', payload: { bonus: 1 } }
+    effectType: 'modifier'
   },
   {
     id: 'skilled',
@@ -201,8 +193,7 @@ export const FEATS_CATALOG: FeatDefinition[] = [
     icon: 'fa-graduation-cap',
     description: 'You gain proficiency in any combination of three skills or tools of your choice.',
     mechanicalEffect: 'Pick 3 skills to add +1 rank each. Engine-applied via the level-up modal.',
-    effectType: 'modifier',
-    effect: { kind: 'extra-skill-profs', payload: { count: 3 } }
+    effectType: 'modifier'
   },
   {
     id: 'observant',
@@ -212,8 +203,7 @@ export const FEATS_CATALOG: FeatDefinition[] = [
     icon: 'fa-binoculars',
     description: 'Quick to notice details, you have a +5 bonus to passive Perception (Wisdom) and passive Investigation (Intelligence).',
     mechanicalEffect: '+5 to passive Perception and passive Investigation. (Engine tracks; surfaced in skill display.)',
-    effectType: 'modifier',
-    effect: { kind: 'passive-skill-bonus', payload: { skills: ['perception', 'investigation'], bonus: 5 } }
+    effectType: 'modifier'
   },
   {
     id: 'magic-initiate',
@@ -223,8 +213,7 @@ export const FEATS_CATALOG: FeatDefinition[] = [
     icon: 'fa-hat-wizard',
     description: 'Choose a class: bard, cleric, druid, sorcerer, warlock, or wizard. You learn two cantrips of your choice from that class\'s spell list. You also learn one 1st-level spell of your choice from that spell list.',
     mechanicalEffect: 'Recorded as a flavor feat — the engine has no spell system yet. LLM narrates the chosen cantrips and 1st-level spell.',
-    effectType: 'flavor',
-    effect: { kind: 'magic-initiate' }
+    effectType: 'flavor'
   },
   {
     id: 'ritual-caster',
@@ -234,8 +223,7 @@ export const FEATS_CATALOG: FeatDefinition[] = [
     icon: 'fa-book',
     description: 'You have learned a number of rituals that you can cast as rituals. Choose a class: bard, cleric, druid, sorcerer, warlock, or wizard. You acquire a ritual book holding two 1st-level spells of your choice that have the ritual tag from that class\'s spell list.',
     mechanicalEffect: 'Recorded as a flavor feat — the engine has no spell system yet. LLM narrates the chosen rituals.',
-    effectType: 'flavor',
-    effect: { kind: 'ritual-caster' }
+    effectType: 'flavor'
   },
   {
     id: 'spell-sniper',
@@ -245,8 +233,7 @@ export const FEATS_CATALOG: FeatDefinition[] = [
     icon: 'fa-bullseye',
     description: 'You have learned techniques to enhance your attacks with certain kinds of spells, granting the following benefits: when you cast a spell that requires a ranged attack roll, the spell\'s range is doubled. Your ranged spell attacks ignore half cover and three-quarters cover.',
     mechanicalEffect: 'Recorded as a flavor feat — the engine has no spell or cover system yet.',
-    effectType: 'flavor',
-    effect: { kind: 'spell-sniper' }
+    effectType: 'flavor'
   },
   {
     id: 'lightly-armored',
@@ -322,8 +309,7 @@ export const FEATS_CATALOG: FeatDefinition[] = [
     icon: 'fa-flag',
     description: 'You can spend 10 minutes inspiring your companions, shoring up their resolve to fight. Once you have used this ability, you can\'t use it again until you finish a short or long rest. Choose up to six friendly creatures within 30 feet who can see or hear you, and who can understand you. Each gains temporary hit points equal to your level + your Charisma modifier.',
     mechanicalEffect: 'Flavor feat — the LLM narrates the temporary HP grant on a 10-minute speech.',
-    effectType: 'flavor',
-    effect: { kind: 'temp-hp-from-level-and-cha' }
+    effectType: 'flavor'
   },
   {
     id: 'linguist',

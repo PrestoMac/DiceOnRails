@@ -65,12 +65,12 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
       },
       { id: 'second-wind', name: 'Second Wind', description: 'Bonus action: regain 1d10 + fighter level HP, once per short rest.', level: 1, kind: 'resource', grantsResource: 'second-wind', icon: 'fa-heart-pulse' },
       { id: 'action-surge-1', name: 'Action Surge (1 use)', description: 'On your turn, take one additional action.', level: 2, kind: 'resource', grantsResource: 'action-surge', icon: 'fa-bolt' },
-      { id: 'extra-attack-1', name: 'Extra Attack', description: 'You can attack twice when you take the Attack action.', level: 5, kind: 'passive', effect: { kind: 'extra-attack', payload: { count: 2 } } },
-      { id: 'extra-attack-2', name: 'Extra Attack (2)', description: 'You can attack three times.', level: 11, kind: 'passive', effect: { kind: 'extra-attack', payload: { count: 3 } } },
+      { id: 'extra-attack-1', name: 'Extra Attack', description: 'You can attack twice when you take the Attack action.', level: 5, kind: 'passive' },
+      { id: 'extra-attack-2', name: 'Extra Attack (2)', description: 'You can attack three times.', level: 11, kind: 'passive' },
       { id: 'indomitable-1', name: 'Indomitable (1 use)', description: 'Reroll a failed save.', level: 9, kind: 'resource', grantsResource: 'indomitable' },
       { id: 'indomitable-2', name: 'Indomitable (2 uses)', description: 'Reroll a failed save, 2 uses.', level: 13, kind: 'resource', grantsResource: 'indomitable' },
       { id: 'indomitable-3', name: 'Indomitable (3 uses)', description: 'Reroll a failed save, 3 uses.', level: 17, kind: 'resource', grantsResource: 'indomitable' },
-      { id: 'extra-attack-3', name: 'Extra Attack (3)', description: 'You can attack four times.', level: 20, kind: 'passive', effect: { kind: 'extra-attack', payload: { count: 4 } } },
+      { id: 'extra-attack-3', name: 'Extra Attack (3)', description: 'You can attack four times.', level: 20, kind: 'passive' },
     ],
     subclasses: [
       {
@@ -147,7 +147,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
           ],
         },
         features: [
-          { id: 'spellcasting-ek', name: 'Spellcasting', description: 'You can cast wizard spells using Intelligence. You know 2 cantrips from the wizard spell list.', level: 3, kind: 'passive', effect: { kind: 'spellcasting' } },
+          { id: 'spellcasting-ek', name: 'Spellcasting', description: 'You can cast wizard spells using Intelligence. You know 2 cantrips from the wizard spell list.', level: 3, kind: 'passive' },
           { id: 'weapon-bond', name: 'Weapon Bond', description: 'You can bond with two weapons. You can\'t be disarmed of bonded weapons and can summon one as a bonus action.', level: 3, kind: 'passive' },
           { id: 'war-magic', name: 'War Magic', description: 'When you cast a cantrip, you can make a weapon attack as a bonus action.', level: 7, kind: 'passive' },
 
@@ -191,7 +191,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
 
       { id: 'danger-sense', name: 'Danger Sense', description: 'Advantage on DEX saves against effects you can see (e.g. traps, spells).', level: 2, kind: 'passive', effect: { kind: 'advantage-on-save', payload: { against: 'seen-effect', stat: 'dex' } } },
 
-      { id: 'extra-attack-barb', name: 'Extra Attack', description: 'You can attack twice when you take the Attack action.', level: 5, kind: 'passive', effect: { kind: 'extra-attack', payload: { count: 2 } } },
+      { id: 'extra-attack-barb', name: 'Extra Attack', description: 'You can attack twice when you take the Attack action.', level: 5, kind: 'passive' },
       { id: 'fast-movement', name: 'Fast Movement', description: 'Speed increases by 10 feet while not wearing heavy armor.', level: 5, kind: 'passive', effect: { kind: 'speed-bonus', payload: { bonus: 10, condition: 'no-heavy-armor' } } },
 
       { id: 'feral-instinct', name: 'Feral Instinct', description: 'Advantage on initiative rolls. If surprised, you can act normally on your first turn if you enter rage.', level: 7, kind: 'passive' },
@@ -338,7 +338,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
         features: [
           { id: 'bonus-proficiencies-valor', name: 'Bonus Proficiencies', description: 'You gain proficiency with medium armor, shields, and martial weapons.', level: 3, kind: 'passive', effect: { kind: 'armor-proficiency', payload: { armor: 'medium' } } },
           { id: 'combat-inspiration', name: 'Combat Inspiration', description: 'When you grant Bardic Inspiration, the creature can use it to add the die to weapon damage, or subtract it from damage taken.', level: 3, kind: 'passive' },
-          { id: 'extra-attack-valor', name: 'Extra Attack', description: 'You can attack twice when you take the Attack action.', level: 6, kind: 'passive', effect: { kind: 'extra-attack', payload: { count: 2 } } },
+          { id: 'extra-attack-valor', name: 'Extra Attack', description: 'You can attack twice when you take the Attack action.', level: 6, kind: 'passive' },
           { id: 'bards-magical-secrets-valor', name: 'Magical Secrets', description: 'Choose two spells from any class. They count as bard spells for you.', level: 14, kind: 'passive' },
         ],
       },
@@ -606,7 +606,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
 
       { id: 'slow-fall', name: 'Slow Fall', description: 'Reduce falling damage by 5 × monk level.', level: 4, kind: 'passive' },
 
-      { id: 'extra-attack-monk', name: 'Extra Attack', description: 'You can attack twice when you take the Attack action.', level: 5, kind: 'passive', effect: { kind: 'extra-attack', payload: { count: 2 } } },
+      { id: 'extra-attack-monk', name: 'Extra Attack', description: 'You can attack twice when you take the Attack action.', level: 5, kind: 'passive' },
       { id: 'stunning-strike', name: 'Stunning Strike', description: 'Spend 1 ki when you hit with a melee attack to force the target to make a CON save or be stunned until the end of your next turn.', level: 5, kind: 'passive' },
 
       { id: 'unarmored-movement', name: 'Unarmored Movement', description: 'Speed increases by 10 feet while not wearing armor or wielding a shield.', level: 2, kind: 'passive', effect: { kind: 'speed-bonus', payload: { bonus: 10, condition: 'no-armor' } } },
@@ -718,7 +718,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
       },
       { id: 'divine-health', name: 'Divine Health', description: 'You are immune to disease.', level: 3, kind: 'passive', effect: { kind: 'condition-immunity', payload: { condition: 'diseased' } } },
 
-      { id: 'extra-attack-pal', name: 'Extra Attack', description: 'You can attack twice when you take the Attack action.', level: 5, kind: 'passive', effect: { kind: 'extra-attack', payload: { count: 2 } } },
+      { id: 'extra-attack-pal', name: 'Extra Attack', description: 'You can attack twice when you take the Attack action.', level: 5, kind: 'passive' },
       { id: 'aura-of-protection', name: 'Aura of Protection', description: 'You and friendly creatures within 10 ft add your CHA mod to all saving throws.', level: 6, kind: 'passive', effect: { kind: 'aura-of-protection', payload: { stat: 'cha', radius: 10 } } },
 
       { id: 'aura-of-courage', name: 'Aura of Courage', description: 'You and friendly creatures within 10 ft can\'t be frightened.', level: 10, kind: 'passive' },
@@ -828,7 +828,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
       },
       { id: 'primeval-awareness', name: 'Primeval Awareness', description: 'Use your action to sense the presence of your favored enemy type within 1 mile (or 6 miles in your favored terrain).', level: 3, kind: 'passive' },
 
-      { id: 'extra-attack-rgr', name: 'Extra Attack', description: 'You can attack twice when you take the Attack action.', level: 5, kind: 'passive', effect: { kind: 'extra-attack', payload: { count: 2 } } },
+      { id: 'extra-attack-rgr', name: 'Extra Attack', description: 'You can attack twice when you take the Attack action.', level: 5, kind: 'passive' },
       { id: 'lands-stride-rgr', name: 'Land\'s Stride', description: 'Nonmagical difficult terrain costs no extra movement. Pass through plants without being slowed.', level: 8, kind: 'passive' },
       { id: 'hide-in-plain-sight', name: 'Hide in Plain Sight', description: 'Create camouflage to give yourself +10 to Stealth while remaining still.', level: 10, kind: 'passive' },
 
@@ -971,7 +971,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
           ],
         },
         features: [
-          { id: 'spellcasting-at', name: 'Spellcasting', description: 'You can cast wizard spells using Intelligence. You know 2 cantrips from the wizard spell list.', level: 3, kind: 'passive', effect: { kind: 'spellcasting' } },
+          { id: 'spellcasting-at', name: 'Spellcasting', description: 'You can cast wizard spells using Intelligence. You know 2 cantrips from the wizard spell list.', level: 3, kind: 'passive' },
           { id: 'mage-hand-legerdemain', name: 'Mage Hand Legerdemain', description: 'Your mage hand is invisible and can perform additional tasks.', level: 3, kind: 'passive' },
           { id: 'magical-ambush', name: 'Magical Ambush', description: 'If you are hidden when you cast a spell, creatures have disadvantage on saves against it.', level: 9, kind: 'passive' },
           { id: 'versatile-trickster', name: 'Versatile Trickster', description: 'You can use mage hand to distract creatures, giving you advantage on attacks.', level: 13, kind: 'passive' },
@@ -1106,7 +1106,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
     features: [
       { id: 'otherworldly-patron', name: 'Otherworldly Patron', description: 'Choose your otherworldly patron, the source of your warlock powers.', level: 1, kind: 'subclass' },
 
-      { id: 'pact-magic', name: 'Pact Magic', description: 'Your spell slots recharge on a short rest. You always cast spells at the highest slot level you have.', level: 1, kind: 'passive', effect: { kind: 'pact-magic' } },
+      { id: 'pact-magic', name: 'Pact Magic', description: 'Your spell slots recharge on a short rest. You always cast spells at the highest slot level you have.', level: 1, kind: 'passive' },
 
       { id: 'eldritch-invocations-2', name: 'Eldritch Invocations (2)', description: 'Learn two eldritch invocations of your choice. Gain an additional invocation at L5, L7, L9, L12, L15, L18.', level: 2, kind: 'passive' },
       { id: 'pact-boon', name: 'Pact Boon', description: 'Choose a pact boon: Pact of the Chain (familiar), Pact of the Blade (magic weapon), Pact of the Tome (bonus cantrips).', level: 3, kind: 'subclass' },
@@ -1208,7 +1208,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
       ],
     },
     features: [
-      { id: 'spellcasting-wiz', name: 'Spellcasting', description: 'You have a spellbook containing the spells you know. You can prepare wizard spells from your spellbook equal to INT mod + wizard level.', level: 1, kind: 'passive', effect: { kind: 'spellcasting' } },
+      { id: 'spellcasting-wiz', name: 'Spellcasting', description: 'You have a spellbook containing the spells you know. You can prepare wizard spells from your spellbook equal to INT mod + wizard level.', level: 1, kind: 'passive' },
       { id: 'arcane-recovery', name: 'Arcane Recovery', description: 'Once per day during a short rest, recover expended spell slots with a total level equal to or less than half your wizard level (round up).', level: 1, kind: 'resource', grantsResource: 'arcane-recovery' },
 
       { id: 'arcane-tradition', name: 'Arcane Tradition', description: 'Choose an arcane tradition at level 2, defining your specialized school of magic.', level: 2, kind: 'subclass' },

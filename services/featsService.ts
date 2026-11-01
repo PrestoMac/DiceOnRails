@@ -109,11 +109,6 @@ export function getEquippedArmorType(char: Character): 'light' | 'medium' | 'hea
   return 'light';
 }
 
-/** Checks whether a character has a shield equipped in their inventory. */
-export function hasShieldEquipped(char: Character): boolean {
-  return char.inventory.some(i => i.equipped && i.type === 'shield');
-}
-
 /** Returns the off-hand ability modifier for two-weapon fighting if the character has the Two-Weapon Fighting feat. */
 export function getOffHandAbilityModifier(char: Character): number {
   if (!hasFeat(char, 'two-weapon-fighting')) return 0;
@@ -166,31 +161,11 @@ export function getAlertInitiativeBonus(char: Character): number {
   return hasFeat(char, 'alert') ? 5 : 0;
 }
 
-/** Returns the speed bonus from the Mobile feat (+10). */
-export function getMobileSpeedBonus(char: Character): number {
-  return hasFeat(char, 'mobile') ? 10 : 0;
-}
-
-/** Returns the speed bonus from the Athlete feat (+10). */
-export function getAthleteSpeedBonus(char: Character): number {
-  return hasFeat(char, 'athlete') ? 10 : 0;
-}
-
-/** Returns the combined speed bonus from Mobile and Athlete feats. */
-export function getSpeedBonus(char: Character): number {
-  return getMobileSpeedBonus(char) + getAthleteSpeedBonus(char);
-}
-
 /** Returns the saving throw bonus from the Resilient feat for a specific stat (equal to proficiency bonus if the chosen stat matches). */
 export function getResilientSaveBonus(char: Character, stat: 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha'): number {
   if (!hasFeat(char, 'resilient')) return 0;
   const choice = getResilientStat(char) || 'con';
   return choice === stat ? ceProficiencyBonus(char) : 0;
-}
-
-/** Returns the saving throw bonus from the Shield Master feat for DEX saves while a shield is equipped. */
-export function getShieldMasterSaveBonus(char: Character, stat: 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha'): number {
-  return (hasFeat(char, 'shield-master') && stat === 'dex' && hasShieldEquipped(char)) ? 2 : 0;
 }
 
 /** Returns the death save bonus (+1) from the Durable or Resilient (CON) feats. */
@@ -200,25 +175,9 @@ export function getDeathSaveBonus(char: Character): number {
   return 0;
 }
 
-/** Returns the bonus HP from the Tough feat (character level * 2). */
-export function getToughHpBonus(char: Character): number {
-  return hasFeat(char, 'tough') ? char.level * 2 : 0;
-}
-
 /** Calculates and returns the character's maximum HP using the progression service. */
 export function getMaxHp(char: Character): number {
   return calculateMaxHp(char);
-}
-
-/** Returns the AC bonus (+1) from the Dual Wielder feat if two weapons are equipped. */
-export function getDualWielderAcBonus(char: Character): number {
-  if (!hasFeat(char, 'dual-wielder')) return 0;
-  return char.inventory.filter(i => i.equipped && i.type === 'weapon').length >= 2 ? 1 : 0;
-}
-
-/** Returns the passive perception/investigation bonus from the Observant feat (+5). */
-export function getObservantPassiveBonus(char: Character, _skill: 'perception' | 'investigation'): number {
-  return hasFeat(char, 'observant') ? 5 : 0;
 }
 
 /** Applies an Ability Score Improvement allocation to a character, validating the total is exactly 2 points and stats do not exceed 20. */

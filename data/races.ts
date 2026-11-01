@@ -142,7 +142,7 @@ export const RACES_CATALOG: RaceDefinition[] = [
       { id: 'draconic-ancestry', name: 'Draconic Ancestry', description: 'You choose one dragon type (Black, Blue, Brass, Bronze, Copper, Gold, Green, Red, Silver, White). Your breath weapon and damage resistance use this type.', kind: 'passive' },
       { id: 'breath-weapon', name: 'Breath Weapon', description: 'Action: exhale destructive energy. Blue and Bronze breathe a 30-ft line; Brass, Copper, Gold, Green, Red, Silver, White breathe a 30-ft cone. Each creature in the area makes a DEX save (DC 8 + CON mod + prof). On fail, take 2d6 damage (3d6 at L6, 4d6 at L11, 5d6 at L16). 1 use per short rest.', kind: 'resource', grantsResource: 'breath-weapon',
 
-        effect: { kind: 'breath-weapon', payload: { saveDC: '8 + CON + prof', damage: '2d6', scaling: { 6: '3d6', 11: '4d6', 16: '5d6' } } }, icon: 'fa-fire' },
+        icon: 'fa-fire' },
       { id: 'damage-resistance-dragonborn', name: 'Damage Resistance', description: 'You have resistance to the damage type associated with your draconic ancestry.', kind: 'passive', effect: { kind: 'damage-resistance', payload: { type: 'from-draconic-ancestry' } } },
     ],
     languages: ['common', 'draconic'],

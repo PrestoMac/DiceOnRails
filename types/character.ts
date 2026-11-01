@@ -73,14 +73,15 @@ export type ClassFeatureKind =
   | 'proficiency'
   | 'spell-like';
 
-/** Known effect kind identifiers used by class/race/feat effect payloads. */
+/** Effect kind identifiers consumed by the engine. Each kind maps to a reducer in
+ *  effectDispatcher's HOOK_REGISTRY or is read directly via getEffects(). Kinds that
+ *  no reducer and no consumer reads have been removed. */
 export type EffectKind =
   | 'ac-formula'
   | 'speed-bonus'
   | 'damage-resistance'
   | 'damage-immunity'
   | 'damage-vulnerability'
-  | 'damage-reduction'
   | 'advantage-on-save'
   | 'condition-immunity'
   | 'crit-bonus-dice'
@@ -89,11 +90,7 @@ export type EffectKind =
   | 'damage-bonus'
   | 'sneak-attack'
   | 'healing-bonus'
-  | 'attack-bonus'
   | 'reckless-attack'
-  | 'extra-attack'
-  | 'pact-magic'
-  | 'spellcasting'
   | 'save-proficiency'
   | 'skill-proficiency'
   | 'skill-expertise'
@@ -102,31 +99,15 @@ export type EffectKind =
   | 'hp-per-level'
   | 'shield-bonus-to-save'
   | 'dual-wielder-ac'
-  | 'initiative-bonus'
-  | 'passive-skill-bonus'
   | 'armor-proficiency'
-  | 'death-save-bonus'
-  | 'extra-skill-profs'
-  | 'charge-damage'
-  | 'grapple-advantage'
-  | 'elemental-adept'
-  | 'reaction-ac-bonus'
-  | 'ignore-ranged-penalty'
-  | 'magic-initiate'
-  | 'ritual-caster'
-  | 'spell-sniper'
-  | 'temp-hp-from-level-and-cha'
   | 'metamagic-option'
-  | 'breath-weapon'
   | 'language'
-  | 'weapon-proficiency'
   | 'fighting-style'
   | 'jack-of-all-trades'
   | 'reliable-talent'
   | 'diamond-soul'
   | 'aura-of-protection'
   | 'evasion'
-  | 'two-weapon-fighting'
   | 'frenzy-exhaustion';
 
 /** A feature granted by a character class at a specific level. */
