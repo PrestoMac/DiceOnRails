@@ -79,6 +79,13 @@ describe('savesTools', () => {
   });
 
   describe('make_save', () => {
+    it('grants Rage advantage on Strength saving throws', async () => {
+      server.joinParty(makeCharacter({ class: 'barbarian', raging: true }));
+      mockRollSequence(2, 16);
+      const result = await server.make_save('Valerius', 'str', 12);
+      expect(result.data.roll).toBe(16);
+    });
+
     it('uses class save proficiency and does not double-count Resilient', async () => {
       mockRoll(10);
       server.joinParty(makeCharacter({ class: 'fighter', feats: ['resilient'], featChoices: { resilient: { saveStat: 'str' } }, stats: { str: 16, dex: 10, con: 10, int: 10, wis: 10, cha: 10 } }));
@@ -136,6 +143,14 @@ describe('savesTools', () => {
       expect(result.data.roll).not.toBe(1);
     });
 
+    it('only grants racial poison and fear advantage for the matching effect', async () => {
+      server.joinParty(makeCharacter({ race: 'dwarf', racialTraits: ['dwarven-resilience', 'dwarven-resilience-saves'] }));
+      mockRoll(5);
+      expect((await server.make_save('Valerius', 'con', 20)).message).not.toContain('advantage');
+      mockRollSequence(5, 18);
+      expect((await server.make_save('Valerius', 'con', 20, { isPoison: true })).data.roll).toBe(18);
+    });
+
     it('Gnome Cunning grants advantage on spell-originated WIS save vs magic', async () => {
       // Gnome Cunning: INT/WIS/CHA saves vs magic get advantage. The 4th make_save
       // arg now carries { isMagical: true } for ALL spell saves (not just charm).
@@ -186,6 +201,20 @@ describe('savesTools', () => {
       // Roll 10 + DEX mod 0 + Aura bonus 3 (CHA +3) = 13 >= 12 -> success
       expect(result.data.success).toBe(true);
       expect(result.message).toContain('Aura of Protection');
+    });
+
+    it('limits Aura of Protection to nearby allies when a battle map exists', async () => {
+      mockRoll(10);
+      server.joinParty(makeCharacter({ id: 'pal', name: 'Paladin', class: 'paladin', level: 6, stats: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 16 } }));
+      server.joinParty(makeCharacter({ id: 'ally', name: 'Ally', stats: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 } }));
+      const state = server.getFullState();
+      state.battleMap = { width: 20, height: 20, cellSize: 40, tokens: [{ id: 'pal', name: 'Paladin', type: 'player', pos: { x: 0, y: 0 } }, { id: 'ally', name: 'Ally', type: 'player', pos: { x: 5, y: 0 } }] };
+      server.loadState(state);
+      expect((await server.make_save('ally', 'dex', 12)).data.success).toBe(false);
+      const map = server.getFullState().battleMap;
+      if (!map) throw new Error('Battle map missing');
+      map.tokens[1].pos.x = 2;
+      expect((await server.make_save('ally', 'dex', 12)).data.success).toBe(true);
     });
 
     it('Aura of Protection uses the highest CHA mod among multiple Paladins', async () => {

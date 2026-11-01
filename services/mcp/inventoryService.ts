@@ -143,6 +143,7 @@ export function createInventoryService(state: GameState, deps: InventoryDeps): I
               dmg *= 2;
             }
           }
+          if (dmg > 0 && enemy.conditions) enemy.conditions = enemy.conditions.filter(c => !c.id.startsWith('turned-'));
           const oldHp = enemy.hp.current;
           const newHp = Math.max(0, oldHp - dmg);
           enemy.hp.current = newHp;
@@ -186,6 +187,7 @@ export function createInventoryService(state: GameState, deps: InventoryDeps): I
       }
 
       let effectiveDmg = safeAmount;
+      let hamReduction = 0;
       if (!options?.skipTargetDerivedReductions) {
         const dmgCtx: DamageTakenContext = {
           _hook: 'onDamageTaken',
@@ -196,31 +198,47 @@ export function createInventoryService(state: GameState, deps: InventoryDeps): I
         const afterEffects = applyEffects(target, 'onDamageTaken', dmgCtx);
         effectiveDmg = afterEffects.amount;
         const ham = getHeavyArmorMasterReduction(target, damageType);
-        effectiveDmg = Math.max(0, effectiveDmg - ham);
-        if (target.tempHp && target.tempHp > 0) {
-          const absorbed = Math.min(target.tempHp, effectiveDmg);
-          target.tempHp -= absorbed;
-          effectiveDmg -= absorbed;
-        }
+        hamReduction = Math.min(effectiveDmg, ham);
+        effectiveDmg -= hamReduction;
       }
-      const current = target.hp.current;
-      const newHp = Math.max(0, current - effectiveDmg);
-      const displayedDmg = options?.skipTargetDerivedReductions ? safeAmount : effectiveDmg;
+      const displayedDmg = effectiveDmg;
+      if (target.tempHp && target.tempHp > 0) {
+        const absorbed = Math.min(target.tempHp, effectiveDmg);
+        target.tempHp -= absorbed;
+        effectiveDmg -= absorbed;
+      }
+      let current = target.hp.current;
+      const transformation = target.runtime?.transformationState;
+      if (transformation?.originalForm && current > 0 && effectiveDmg >= current) {
+        effectiveDmg -= current;
+        target.stats = { ...transformation.originalForm.stats };
+        target.hp = { ...transformation.originalForm.hp };
+        if (target.runtime) target.runtime.transformationState = undefined;
+        current = target.hp.current;
+      }
+      let newHp = Math.max(0, current - effectiveDmg);
+      let enduranceUsed = false;
+      const endurance = target.resources?.find(r => r.id === 'relentless-endurance');
+      const killedOutright = effectiveDmg - current >= target.hp.max;
+      if (current > 0 && newHp === 0 && !killedOutright && target.race.toLowerCase() === 'half-orc' && endurance && endurance.current > 0) {
+        endurance.current -= 1;
+        enduranceUsed = true;
+        newHp = 1;
+      }
       target.hp.current = newHp;
 
       if (newHp === 0 && current > 0) {
         deps.initializeDeathSaves(target);
         if (target.concentrationSpellId) engineBreakConcentration(target, 'incapacitated');
-      } else if (newHp === 0 && current === 0 && target.deathSaves) {
+      } else if (displayedDmg > 0 && newHp === 0 && current === 0 && target.deathSaves) {
         target.deathSaves.failures++;
         if (target.deathSaves.failures >= 3) {
           deps.updateInitiativeDeathStatus(target.id, true);
         }
       }
-      const hamReduction = options?.skipTargetDerivedReductions ? 0 : (safeAmount - effectiveDmg);
       const hamNote = hamReduction > 0 ? ` (Heavy Armor Master reduced by ${hamReduction})` : '';
 
-      const concResult = engineBreakConcentration(target, 'damaged', displayedDmg);
+      const concResult = displayedDmg > 0 ? engineBreakConcentration(target, 'damaged', displayedDmg) : { broken: false };
       if (concResult.broken && state.combat?.activeDoTs) {
         state.combat.activeDoTs = state.combat.activeDoTs.filter(
           dot => dot.casterId !== target.id
@@ -239,8 +257,8 @@ export function createInventoryService(state: GameState, deps: InventoryDeps): I
 
       return {
         success: true,
-        data: { character: target.name, previousHp: current, newHp, damage: displayedDmg, hamReduction, concentrationSave },
-        message: `${target.name} took ${displayedDmg} damage${damageType ? ' (' + damageType + ')' : ''}${hamNote}. Current HP: ${newHp}/${target.hp.max}${target.deathSaves ? ' — DYING!' : ''}${concentrationNote}`
+        data: { character: target.name, previousHp: current, newHp, damage: displayedDmg, hamReduction, concentrationSave, enduranceUsed },
+        message: `${target.name} took ${displayedDmg} damage${damageType ? ' (' + damageType + ')' : ''}${hamNote}. Current HP: ${newHp}/${target.hp.max}${target.deathSaves ? ' — DYING!' : ''}${enduranceUsed ? ' — Relentless Endurance leaves them at 1 HP!' : ''}${concentrationNote}`
       };
     },
 

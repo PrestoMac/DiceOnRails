@@ -32,6 +32,14 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
 }
 
 describe('progressionService', () => {
+  it('applies Primal Champion once when crossing level 20', () => {
+    const char = makeCharacter({ class: 'barbarian', level: 19, experience: calculateXPToNextLevel(19) - 1, stats: { str: 22, dex: 10, con: 18, int: 10, wis: 10, cha: 10 } });
+    const result = awardExperience(char, 1);
+    expect(result.character.stats.str).toBe(24);
+    expect(result.character.stats.con).toBe(22);
+    expect(awardExperience(result.character, 1).character.stats.con).toBe(22);
+  });
+
   describe('getXpForLevel', () => {
     it('returns correct XP for known levels', () => {
       expect(getXpForLevel(1)).toBe(0);

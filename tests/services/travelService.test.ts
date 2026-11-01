@@ -66,6 +66,19 @@ describe('travelService — narrate_turn', () => {
     expect(result.data.success).toBe(true);
   });
 
+  it('applies Remarkable Athlete only to nonproficient physical checks', async () => {
+    state.party.push(makeChar({ class: 'fighter', subclassId: 'champion', level: 7, skills: { athletics: 1 } }));
+    vi.mocked(cryptoRoll).mockReturnValue(10);
+    expect((await service.check_skill('dex', 15, 'hero-1')).data.total).toBe(13);
+    expect((await service.check_skill('athletics', 15, 'hero-1')).data.total).toBe(13);
+  });
+
+  it('grants raging barbarians advantage on Strength checks', async () => {
+    state.party.push(makeChar({ class: 'barbarian', raging: true }));
+    vi.mocked(cryptoRoll).mockReturnValueOnce(2).mockReturnValueOnce(15);
+    expect((await service.check_skill('strength', 10, 'hero-1')).data.roll).toBe(15);
+  });
+
   describe('time advancement', () => {
     it('does not advance time when timePassed is 0', async () => {
       state.party.push(makeChar());

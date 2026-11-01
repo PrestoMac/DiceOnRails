@@ -158,7 +158,7 @@ export class MockMCPServer {
   public async next_turn(autoResolveEnemies?: boolean): Promise<MCPResponse> { return this.combat.next_turn(autoResolveEnemies); }
   public async end_combat(): Promise<MCPResponse> { return this.combat.end_combat(); }
   public async enemy_attack(enemyId: string, targetId?: string, attackIndex?: number): Promise<MCPResponse> { return this.combat.enemy_attack(enemyId, targetId, attackIndex); }
-  public async make_save(targetId: string, stat: string, dc: number, spellContext?: { isMagical?: boolean; isCharm?: boolean }): Promise<MCPResponse> { return this.combat.make_save(targetId, stat, dc, spellContext); }
+  public async make_save(targetId: string, stat: string, dc: number, spellContext?: { isMagical?: boolean; isCharm?: boolean; isPoison?: boolean; isFrightened?: boolean; isSeen?: boolean }): Promise<MCPResponse> { return this.combat.make_save(targetId, stat, dc, spellContext); }
   public async roll_death_save(targetId?: string): Promise<MCPResponse> { return this.combat.roll_death_save(targetId); }
   public getCurrentTurnInfo(): { name: string; type: 'player' | 'enemy'; id: string } | null { return this.combat.getCurrentTurnInfo(); }
   public updateInitiativeDeathStatus(id: string, isDead: boolean): void { this.combat.updateInitiativeDeathStatus(id, isDead); }
@@ -188,7 +188,7 @@ export class MockMCPServer {
   public async natural_recovery(characterId: string, selections: Array<{ level: number; count: number }>): Promise<MCPResponse> { return this.travel.natural_recovery(characterId, selections); }
 
 
-  public async cast_spell(characterId: string, spellId: string, slotLevel?: number, targets?: string[], targetSaveResults?: Record<string, boolean>, reaction?: boolean): Promise<MCPResponse> { return this.spells.cast_spell(characterId, spellId, slotLevel, targets, targetSaveResults, reaction); }
+  public async cast_spell(characterId: string, spellId: string, slotLevel?: number, targets?: string[], targetSaveResults?: Record<string, boolean>, reaction?: boolean, metamagic?: { option?: string }): Promise<MCPResponse> { return this.spells.cast_spell(characterId, spellId, slotLevel, targets, targetSaveResults, reaction, metamagic); }
   public async resolve_dot_damage(spellId: string, targetId: string, casterId?: string): Promise<MCPResponse> { return this.spells.resolve_dot_damage(spellId, targetId, casterId); }
   public async cast_ritual(characterId: string, spellId: string): Promise<MCPResponse> { return this.spells.cast_ritual(characterId, spellId); }
   public async spell_effect(mode: 'counter' | 'dispel', casterId: string, targetSpellLevel: number, targetId?: string): Promise<MCPResponse> { return this.spells.spell_effect(mode, casterId, targetSpellLevel, targetId); }
@@ -366,7 +366,8 @@ export class MockMCPServer {
     const isDruid = char.class === 'druid';
     if (isDruid) {
       const druidLevel = char.level;
-      const maxCR = druidLevel >= 8 ? 1 : druidLevel >= 4 ? 0.5 : 0.25;
+      const moonDruid = char.subclassId === 'circle-of-the-moon' && druidLevel >= 2;
+      const maxCR = moonDruid ? (druidLevel >= 6 ? Math.floor(druidLevel / 3) : 1) : druidLevel >= 8 ? 1 : druidLevel >= 4 ? 0.5 : 0.25;
       const crValue = beast.cr ?? 0;
       if (crValue > maxCR) {
         return fail(`Cannot wild shape into ${beast.name} (CR ${crValue}) - max CR for Druid level ${druidLevel} is ${maxCR}.`);
@@ -382,11 +383,18 @@ export class MockMCPServer {
         return fail(`No wild shape charges remaining (${wsResource?.current ?? 0}/${wsResource?.max ?? 2}).`);
       }
       wsResource.current -= 1;
-      const transformation = applyWildShape(char, beast, Math.max(30, (druidLevel / 2) * 60));
+      const previous = char.runtime?.transformationState?.originalForm;
+      if (previous) {
+        char.stats = { ...previous.stats };
+        char.hp = { ...previous.hp };
+        if (char.runtime) char.runtime.transformationState = undefined;
+      }
+      const transformation = applyWildShape(char, beast, Math.floor(druidLevel / 2) * 60);
       if (!char.runtime) char.runtime = {};
       char.runtime.transformationState = transformation;
       char.hp.max = beast.hp.max;
       char.hp.current = beast.hp.max;
+      if (beast.stats) char.stats = { ...char.stats, str: beast.stats.str, dex: beast.stats.dex, con: beast.stats.con };
       this.state.sessionLogs.push(`${char.name} uses Wild Shape to become a ${beast.name}!`);
       return {
         success: true,
@@ -398,11 +406,18 @@ export class MockMCPServer {
     if (classDef?.spellcasting && beast.cr && beast.cr > char.level) {
       return fail(`Cannot polymorph into ${beast.name} (CR ${beast.cr}) - exceeds character level ${char.level}.`);
     }
+    const previous = char.runtime?.transformationState?.originalForm;
+    if (previous) {
+      char.stats = { ...previous.stats };
+      char.hp = { ...previous.hp };
+      if (char.runtime) char.runtime.transformationState = undefined;
+    }
     const transformation = applyPolymorph(char, beast, duration);
     if (!char.runtime) char.runtime = {};
     char.runtime.transformationState = transformation;
     char.hp.max = beast.hp.max;
     char.hp.current = beast.hp.max;
+    if (beast.stats) char.stats = { ...beast.stats };
     this.state.sessionLogs.push(`${char.name} transforms into a ${beast.name}!`);
     return {
       success: true,
@@ -572,7 +587,7 @@ export class MockMCPServer {
           if (targetsList.length === 0 && (args.targetId || args.target_name)) {
             targetsList = [String(args.targetId || args.target_name)];
           }
-          res = await this.spells.cast_spell(String(args.characterId || args.casterId || ''), String(args.spellId || ''), Number(args.slotLevel ?? 0), targetsList, args.targetSaveResults as Record<string, boolean> | undefined, args.reaction as boolean | undefined, args.metamagic as { option?: string } | undefined); break;
+          res = await this.spells.cast_spell(String(args.characterId || args.casterId || ''), String(args.spellId || ''), Number(args.slotLevel ?? 0), targetsList, undefined, args.reaction as boolean | undefined, args.metamagic as { option?: string } | undefined); break;
         }
         case 'spell_effect':
           res = await this.spells.spell_effect(String(args.mode || 'counter') as 'counter' | 'dispel', String(args.casterId || ''), Number(args.targetSpellLevel ?? 3), args.targetId as string); break;

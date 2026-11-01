@@ -44,6 +44,12 @@ function baseWizard(overrides: Partial<WizardState> = {}): WizardState {
 const mod = (n: number): number => Math.floor((n - 10) / 2);
 
 describe('buildCharacterFromWizard', () => {
+  it('applies Primal Champion when creating a level 20 barbarian', () => {
+    const { character } = buildCharacterFromWizard(baseWizard({ level: 20, selectedClass: CLASSES_BY_ID.barbarian }), { isNewCampaign: true });
+    expect(character.stats.str).toBe(20);
+    expect(character.stats.con).toBe(18);
+  });
+
   it('does not turn racial skill proficiency into expertise', () => {
     const { character } = buildCharacterFromWizard(baseWizard({ selectedRace: RACES_BY_ID['elf'] }), { isNewCampaign: true });
     expect(character.skills?.perception).toBe(1);

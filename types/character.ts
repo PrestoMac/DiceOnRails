@@ -206,6 +206,7 @@ export interface ActiveCondition {
   saveDC?: number;
   onFailedSave?: 'none' | 'half';
   onRemove?: RemoveEffect;
+  expiresAfterTurn?: { actorId: string; appliedRound: number };
 }
 
 /** An ability score used for saving throws. */
@@ -220,6 +221,8 @@ export interface TransformationState {
     attacks: unknown[];
   } | null;
   transformedInto: string | null;
+  formAc?: number;
+  formSpeed?: number;
   transformationType: 'polymorph' | 'wild-shape' | 'true-polymorph' | null;
   duration: number;
   casterId: string;

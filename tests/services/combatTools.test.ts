@@ -44,6 +44,17 @@ describe('combatTools', () => {
     server = createTestServer();
   });
 
+  it('removes turn-bound conditions when combat ends and prevents incapacitated attacks', async () => {
+    const hero = makeCharacter({ conditions: [{ id: 'stunned', source: 'enemy', duration: 1, durationUnit: 'permanent', expiresAfterTurn: { actorId: 'enemy', appliedRound: 1 } }] });
+    server.joinParty(hero);
+    await server.add_enemy('Goblin');
+    await server.start_combat();
+    const enemy = server.getFullState().combat.enemies[0];
+    expect((await server.player_attack(hero.id, 'Longsword', enemy.id)).success).toBe(false);
+    await server.end_combat();
+    expect(hero.conditions?.some(c => c.id === 'stunned')).toBe(false);
+  });
+
   it('rolls barbarian initiative with Feral Instinct advantage', async () => {
     server.joinParty(makeBarbarian({ level: 7 }));
     await server.add_enemy('Goblin');
@@ -187,6 +198,23 @@ describe('combatTools', () => {
       expect(stateAfter.combat.turnIndex).not.toBe(turnBefore);
     });
 
+    it('refreshes reactions and applies Champion Survivor at each turn start', async () => {
+      const champion = makeCharacter({ class: 'fighter', subclassId: 'champion', level: 18, hp: { current: 20, max: 60 }, reactionAvailable: false, reactionUsedThisTurn: true });
+      server.joinParty(champion);
+      await server.add_enemy('Dummy', 10, 100);
+      mockRollSequence(18, 5);
+      await server.start_combat();
+      expect(champion.hp.current).toBe(27);
+      expect(champion.reactionAvailable).toBe(true);
+      champion.reactionAvailable = false;
+      champion.reactionUsedThisTurn = true;
+      await server.next_turn(false);
+      expect(champion.reactionAvailable).toBe(false);
+      await server.next_turn(false);
+      expect(champion.hp.current).toBe(34);
+      expect(champion.reactionAvailable).toBe(true);
+    });
+
     it('rejects next_turn outside combat', async () => {
       const result = await server.next_turn();
       expect(result.success).toBe(false);
@@ -278,6 +306,29 @@ describe('combatTools', () => {
       expect(result.data.attackRoll).toBe(15);
       expect(result.data.damageDice).toBe('1d1');
       expect(result.data.damage).toBe(3);
+    });
+
+    it('adds only three Brutal Critical dice at level 17', async () => {
+      server.joinParty(makeBarbarian({ level: 17, race: 'human', racialTraits: [], inventory: [{ name: 'Greataxe', type: 'weapon', quantity: 1, equipped: true, stats: { damage: '1d12', damageType: 'slashing' } }] }));
+      await server.add_enemy('Training Dummy', 10, 1000);
+      mockRoll(2);
+      await server.start_combat();
+      mockRollSequence(20, 10, 2, 2, 2, 2, 2);
+      const result = await server.player_attack('Grishnak', 'Greataxe', 'Training Dummy');
+      expect(result.data.damage).toBe(13); // five d12 rolls of 2 + STR 3
+    });
+
+    it('applies smite radiant damage separately from weapon resistance', async () => {
+      const paladin = makeCharacter({ class: 'paladin', level: 2, inventory: [{ name: 'Longsword', type: 'weapon', quantity: 1, equipped: true, stats: { damage: '1d8', damageType: 'slashing' } }], resources: [{ id: 'spell-slot-1', name: 'slot', current: 1, max: 1, resetOn: 'long', source: 'class', sourceId: 'paladin' }] });
+      server.joinParty(paladin);
+      await server.add_enemy('Dummy', 10, 100, undefined, undefined, undefined, undefined, undefined, ['slashing']);
+      mockRoll(10);
+      await server.start_combat();
+      mockRollSequence(10, 10, 4, 3, 3);
+      const result = await server.player_attack('Valerius', 'Longsword', 'Dummy', false, false, false, false, false, { slotLevel: 1 });
+      expect(result.data.radiantDamage).toBe(6);
+      expect(result.data.damage).toBe(9); // floor((4 + 2) / 2) slashing + 6 radiant
+      expect(paladin.resources?.[0].current).toBe(0);
     });
 
     it('Champion Superior Critical (18-20) crits on a natural 18', async () => {
@@ -372,6 +423,16 @@ describe('combatTools', () => {
       expect(damageDealt).toBe(12);
     });
 
+    it('does not apply Dueling to two-handed weapons', async () => {
+      server.joinParty(makeCharacter({ fightingStyle: 'dueling', inventory: [{ name: 'Greatsword', type: 'weapon', quantity: 1, equipped: true, stats: { damage: '2d6', damageType: 'slashing', properties: ['heavy', 'two-handed'] } }] }));
+      await server.add_enemy('Dummy', 10, 100);
+      mockRoll(10);
+      await server.start_combat();
+      mockRollSequence(10, 10, 3, 4);
+      const result = await server.player_attack('Valerius', 'Greatsword', 'Dummy');
+      expect(result.data.damage).toBe(9);
+    });
+
     it('Great Weapon Fighting rerolls 1s and 2s on damage dice', async () => {
       // GWF: when you roll a 1 or 2 on a damage die for a two-handed melee weapon,
       // you can reroll it. The engine uses the reroll.
@@ -427,7 +488,7 @@ describe('combatTools', () => {
       expect(damageDealt).toBe(8);
     });
 
-    it('applies sharpshooter and sneak attack feat flags', async () => {
+    it('does not grant Sharpshooter or Sneak Attack to a fighter who lacks them', async () => {
       mockRoll(20);
       server.joinParty(makeCharacter({
         inventory: [{
@@ -446,7 +507,8 @@ describe('combatTools', () => {
       const stateAfter = server.getFullState();
       expect(stateAfter.combat).toBeDefined();
       const damageDealt = hpBefore - stateAfter.combat.enemies[0].hp.current;
-      expect(damageDealt).toBeGreaterThan(6);
+      expect(result.data.damage).toBe(40); // two mocked d6 rolls on a critical hit; no unowned bonuses
+      expect(damageDealt).toBeGreaterThan(0);
     });
 
     it('message contains no literal "NaN" when stats are malformed (regression)', async () => {
@@ -691,7 +753,7 @@ describe('combatTools', () => {
         ],
       });
       server.joinParty(paladin);
-      await server.add_enemy('Goblin');
+      await server.add_enemy('Goblin', undefined, 100);
       await server.start_combat();
       // Rolls: attack d20 (15), resolveAdvantage always rolls a 2nd d20 (10, unused),
       // weapon damage 1d6 (4), then 2 smite d8s (5, 6).
@@ -720,6 +782,28 @@ describe('combatTools', () => {
       await server.inflict_damage(5, 'Valerius');
       const hpAfter = server.getFullState().party[0].hp.current;
       expect(hpAfter).toBe(hpBefore - 5);
+    });
+
+    it('does not add a death-save failure when resistance reduces damage to zero', async () => {
+      server.joinParty(makeCharacter({ race: 'tiefling', racialTraits: ['hellish-resistance'], hp: { current: 0, max: 12 }, deathSaves: { successes: 0, failures: 0, isStable: false } }));
+      await server.inflict_damage(1, 'Valerius', 'fire');
+      expect(server.getFullState().party[0].deathSaves?.failures).toBe(0);
+    });
+
+    it('automatically uses Relentless Endurance once, but not for massive damage', async () => {
+      const pool = { id: 'relentless-endurance', name: 'Relentless Endurance', current: 1, max: 1, resetOn: 'long' as const, source: 'race' as const, sourceId: 'half-orc' };
+      server.joinParty(makeCharacter({ race: 'half-orc', hp: { current: 5, max: 12 }, resources: [pool] }));
+      const result = await server.inflict_damage(6, 'Valerius');
+      expect(result.data.enduranceUsed).toBe(true);
+      expect(server.getFullState().party[0].hp.current).toBe(1);
+      expect(pool.current).toBe(0);
+      await server.inflict_damage(1, 'Valerius');
+      expect(server.getFullState().party[0].hp.current).toBe(0);
+      const other = makeCharacter({ id: 'orc-2', name: 'Orc', race: 'half-orc', hp: { current: 5, max: 12 }, resources: [{ ...pool, current: 1 }] });
+      server.joinParty(other);
+      await server.inflict_damage(17, 'Orc');
+      expect(other.hp.current).toBe(0);
+      expect(other.resources?.[0].current).toBe(1);
     });
 
     it('accumulates death save failures when already at 0 HP (B6)', async () => {
@@ -755,6 +839,19 @@ describe('combatTools', () => {
       await server.enemy_attack('Goblin', 'Valerius');
       const hpAfter = server.getFullState().party[0].hp.current;
       expect(hpAfter).toBeLessThan(hpBefore);
+    });
+
+    it('applies Rage resistance and temporary hit points to enemy weapon damage', async () => {
+      server.joinParty(makeBarbarian({ raging: true, hp: { current: 40, max: 40 }, tempHp: 3 }));
+      await server.add_enemy('Goblin');
+      mockRoll(10);
+      await server.start_combat();
+      mockRollSequence(15, 10, 6);
+      const result = await server.enemy_attack('Goblin', 'Grishnak');
+      const player = server.getFullState().party[0];
+      expect(result.data.damage).toBe(4); // (1d6 + 2) / 2
+      expect(player.tempHp).toBe(0);
+      expect(player.hp.current).toBe(39);
     });
 
     it('misses when rolling a natural 1', async () => {

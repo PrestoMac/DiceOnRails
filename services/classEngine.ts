@@ -13,7 +13,9 @@ export { getMod };
 /** Returns the spellcasting ability modifier value for the character's class, or null if not a spellcaster. */
 function spellAbilityValue(character: Character): number | null {
   const classDef = getClassDef(character.class);
-  return classDef?.spellcasting ? getMod(character.stats[classDef.spellcasting.ability]) : null;
+  const subclass = character.subclassId ? getSubclassDef(character.class, character.subclassId) : undefined;
+  const profile = classDef?.spellcasting ?? (character.level >= (classDef?.subclassLevel ?? Infinity) ? subclass?.spellcasting : undefined);
+  return profile ? getMod(character.stats[profile.ability]) : null;
 }
 
 /** Looks up a class definition by its lowercase ID from the classes catalog. */
@@ -91,6 +93,8 @@ function parseArmorFormula(formula: string, dexMod: number): number {
 
 /** Calculates a character's full Armor Class considering armor, shield, class features (AC formulas from dispatcher), feats, and bonuses. */
 export function calculateAc(character: Character, equippedArmor: InventoryItem | null): number {
+  const formAc = character.runtime?.transformationState?.formAc;
+  if (formAc != null) return formAc + (character.acBonus || 0);
   const dexMod = abilityMod(character.stats.dex);
   const hasShield = character.inventory.some(i => i.equipped && i.type === 'shield');
   const shieldBonus = hasShield ? 2 : 0;
@@ -161,6 +165,8 @@ export function getSpellAttackBonus(character: Character): number {
 
 /** Calculates a character's speed in feet, accounting for all sources via the dispatcher, plus exhaustion penalties. */
 export function calculateSpeed(character: Character): number {
+  const formSpeed = character.runtime?.transformationState?.formSpeed;
+  if (formSpeed != null) return Math.max(0, formSpeed - getExhaustionPenalty(character) * 5);
   const race = getRaceDef(character.race);
   if (!race) return 30;
   const ctx: SpeedContext = {

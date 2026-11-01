@@ -196,8 +196,8 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
 
       { id: 'feral-instinct', name: 'Feral Instinct', description: 'Advantage on initiative rolls. If surprised, you can act normally on your first turn if you enter rage.', level: 7, kind: 'passive' },
       { id: 'brutal-critical-1', name: 'Brutal Critical (1 die)', description: 'Roll one additional damage die on a melee weapon crit.', level: 9, kind: 'passive', effect: { kind: 'crit-bonus-dice', payload: { count: 1 } } },
-      { id: 'brutal-critical-2', name: 'Brutal Critical (2 dice)', description: 'Roll two additional damage dice on a melee weapon crit.', level: 13, kind: 'passive', effect: { kind: 'crit-bonus-dice', payload: { count: 2 } } },
-      { id: 'brutal-critical-3', name: 'Brutal Critical (3 dice)', description: 'Roll three additional damage dice on a melee weapon crit.', level: 17, kind: 'passive', effect: { kind: 'crit-bonus-dice', payload: { count: 3 } } },
+      { id: 'brutal-critical-2', name: 'Brutal Critical (2 dice)', description: 'Roll two additional damage dice on a melee weapon crit.', level: 13, kind: 'passive', effect: { kind: 'crit-bonus-dice', payload: { count: 1 } } },
+      { id: 'brutal-critical-3', name: 'Brutal Critical (3 dice)', description: 'Roll three additional damage dice on a melee weapon crit.', level: 17, kind: 'passive', effect: { kind: 'crit-bonus-dice', payload: { count: 1 } } },
       { id: 'relentless-rage', name: 'Relentless Rage', description: 'If you drop to 0 HP while raging and don\'t die outright, make a CON save (DC = 10 + damage taken). On success, drop to 1 HP and keep raging.', level: 11, kind: 'passive' },
       { id: 'persistent-rage', name: 'Persistent Rage', description: 'Your rage ends only if you choose to end it or are knocked unconscious.', level: 15, kind: 'passive' },
       { id: 'indomitable-might', name: 'Indomitable Might', description: 'If a STR check is less than your STR score, treat it as your STR score.', level: 18, kind: 'passive' },
@@ -722,7 +722,7 @@ export const CLASSES_CATALOG: ClassDefinition[] = [
       { id: 'aura-of-protection', name: 'Aura of Protection', description: 'You and friendly creatures within 10 ft add your CHA mod to all saving throws.', level: 6, kind: 'passive', effect: { kind: 'aura-of-protection', payload: { stat: 'cha', radius: 10 } } },
 
       { id: 'aura-of-courage', name: 'Aura of Courage', description: 'You and friendly creatures within 10 ft can\'t be frightened.', level: 10, kind: 'passive' },
-      { id: 'improved-divine-smite', name: 'Improved Divine Smite', description: 'Your melee weapon attacks deal an extra 1d8 radiant damage on top of any other damage.', level: 11, kind: 'passive', effect: { kind: 'damage-bonus', payload: { amount: '1d8', condition: 'always' } } },
+      { id: 'improved-divine-smite', name: 'Improved Divine Smite', description: 'Your melee weapon attacks deal an extra 1d8 radiant damage on top of any other damage.', level: 11, kind: 'passive' },
       { id: 'cleansing-touch', name: 'Cleansing Touch', description: 'Use an action to end one spell affecting a creature you touch. Uses: CHA mod per long rest.', level: 14, kind: 'passive' },
     ],
     subclasses: [

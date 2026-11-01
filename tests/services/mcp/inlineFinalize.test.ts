@@ -121,7 +121,7 @@ describe('inline turn finalization (collapse action + narrate_turn)', () => {
 
   describe('cast_ritual auto-advances 10 minutes (S3)', () => {
     it('advances gameTime by 10 with no separate narrate_turn', async () => {
-      server.joinParty(makeWizard({ preparedSpells: ['magic-missile', 'shield', 'fireball', 'burning-hands', 'fire-bolt', 'alarm'] }));
+      server.joinParty(makeWizard({ knownSpells: ['alarm'], preparedSpells: ['alarm'] }));
       const gameTimeBefore = server.getFullState().gameTime ?? 0;
 
       const res = await server.executeToolCall('cast_ritual', {

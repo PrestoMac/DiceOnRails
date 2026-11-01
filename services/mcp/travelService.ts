@@ -3,7 +3,7 @@ import { cryptoRoll } from '../../utils/random';
 import { fail } from './_shared';
 import { SKILLS_LIST } from '../../constants';
 import { isDebugMode } from '../../utils/debug';
-import { getMod, getClassDef, recoverResources as classEngineRecoverResources } from '../classEngine';
+import { getMod, getClassDef, getProficiencyBonus, recoverResources as classEngineRecoverResources } from '../classEngine';
 import { computeXp, awardXpToParty, formatXpAwardLine } from '../xpEngine';
 import { getConditionEffects, applyCondition, tickConditionsByTime, tickConditionsByRounds, hasCondition, getExhaustionPenalty, parseExhaustionLevel, executeConditionOnRemove } from '../conditionEngine';
 import { getTimePeriod, AMBIENT_LINES } from '../../utils/timeUtils';
@@ -302,7 +302,8 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
 
       const skillRank = matchedSkill ? (target.skills?.[matchedSkill] || 0) : 0;
 
-      const roll = cryptoRoll(20);
+      let roll = cryptoRoll(20);
+      if (target.class.toLowerCase() === 'barbarian' && target.raging && statKey === 'str') roll = Math.max(roll, cryptoRoll(20));
       const skillCtx: SkillCheckContext = {
         _hook: 'onSkillCheck',
         roll,
@@ -312,7 +313,9 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
       };
       const afterSkill = applyEffects(target, 'onSkillCheck', skillCtx);
       const finalRoll = afterSkill.roll;
-      const checkTotal = finalRoll + modifier + skillRank + afterSkill.skillBonus - getExhaustionPenalty(target);
+      const remarkableAthlete = target.class.toLowerCase() === 'fighter' && target.subclassId === 'champion' && target.level >= 7 && ['str', 'dex', 'con'].includes(statKey) && skillRank === 0
+        ? Math.ceil(getProficiencyBonus(target) / 2) : 0;
+      const checkTotal = finalRoll + modifier + skillRank + afterSkill.skillBonus + remarkableAthlete - getExhaustionPenalty(target);
       const total = target.class.toLowerCase() === 'barbarian' && target.level >= 18 && statKey === 'str'
         ? Math.max(checkTotal, target.stats.str) : checkTotal;
       const success = total >= difficulty;
@@ -687,17 +690,20 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
 
       const maxLevels = Math.ceil(char.level / 2);
       for (const sel of selections) {
-        if (sel.count < 0) return fail('Selection count cannot be negative.');
+        if (!Number.isInteger(sel.count) || sel.count < 0 || !Number.isInteger(sel.level)) return fail('Slot levels and counts must be non-negative integers.');
       }
       const totalRequested = selections.reduce((sum, s) => sum + s.level * s.count, 0);
       if (totalRequested > maxLevels) return fail(`Cannot recover ${totalRequested} levels of spell slots. Maximum is ${maxLevels} (half your wizard level, rounded up).`);
 
-      const recovered: Array<{ level: number; count: number }> = [];
       for (const sel of selections) {
         if (sel.level < 1 || sel.level > 5) return fail(`Arcane Recovery cannot target level ${sel.level} slots. Only levels 1–5 are eligible.`);
+        if (sel.count > 0 && !char.resources?.some(r => r.id === `spell-slot-${sel.level}`)) return fail(`No level ${sel.level} spell slot resource found on ${char.name}.`);
+      }
+      const recovered: Array<{ level: number; count: number }> = [];
+      for (const sel of selections) {
         if (sel.count < 1) continue;
         const slot = char.resources?.find(r => r.id === `spell-slot-${sel.level}`);
-        if (!slot) return fail(`No level ${sel.level} spell slot resource found on ${char.name}.`);
+        if (!slot) continue;
         const actual = Math.min(sel.count, slot.max - slot.current);
         if (actual > 0) {
           slot.current += actual;
@@ -728,7 +734,7 @@ export function createTravelService(state: GameState, deps: TravelDeps): TravelS
 
       const maxLevels = Math.ceil(char.level / 2);
       for (const sel of selections) {
-        if (sel.count < 0) return fail('Selection count cannot be negative.');
+        if (!Number.isInteger(sel.count) || sel.count < 0 || !Number.isInteger(sel.level)) return fail('Slot levels and counts must be non-negative integers.');
       }
       const totalRequested = selections.reduce((sum, s) => sum + s.level * s.count, 0);
       if (totalRequested > maxLevels) return fail(`Cannot recover ${totalRequested} levels of spell slots. Maximum is ${maxLevels} (half your druid level, rounded up).`);

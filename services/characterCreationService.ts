@@ -74,6 +74,11 @@ export function buildCharacterFromWizard(
     }
   });
 
+  if (selectedClass.id === 'barbarian' && level >= 20) {
+    fs.str = Math.min(24, fs.str + 4);
+    fs.con = Math.min(24, fs.con + 4);
+  }
+
   // Populate expertise skills for Bards (L3+) and Rogues (L1+).
   // Skills with rank >= 2 in the allocation map are treated as expertise choices.
   const expertiseSkills: string[] = [];

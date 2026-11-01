@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Character, Enemy } from '../../types';
-import { hasSpellSlot, consumeSpellSlot, getCantripsKnown, getSpellsKnown, getMaxPrepared, castSpell, breakConcentration, checkConcentrationExpiry, canLearnSpell, learnSpell, prepareSpell, unprepareSpell } from '../../services/spellcastingEngine';
+import { hasSpellSlot, consumeSpellSlot, getMaxPactSlotLevel, getCantripsKnown, getSpellsKnown, getMaxPrepared, castSpell, breakConcentration, checkConcentrationExpiry, canLearnSpell, learnSpell, prepareSpell, unprepareSpell } from '../../services/spellcastingEngine';
 
 const mockCryptoRoll = vi.fn();
 vi.mock('../../utils/random', () => ({
@@ -50,6 +50,45 @@ function makeBard(overrides: Partial<Character> = {}): Character {
 }
 
 describe('spellcastingEngine', () => {
+  it('scales pact slot level from first through ninth level', () => {
+    for (const [level, expected] of [[1, 1], [2, 1], [3, 2], [5, 3], [7, 4], [9, 5], [20, 5]]) {
+      expect(getMaxPactSlotLevel(makeWizard({ class: 'warlock', level }))).toBe(expected);
+    }
+  });
+
+  it('casts an invocation spell at its base level without a slot or known-spell entry', () => {
+    const warlock = makeWizard({ class: 'warlock', level: 9, invocations: ['armor-of-shadows'], knownSpells: [], preparedSpells: [], resources: [] });
+    const result = castSpell(warlock, 'mage-armor', 0, [{ id: warlock.id }]);
+    expect(result.success).toBe(true);
+    expect(warlock.resources).toEqual([]);
+  });
+
+  it('lets an Eldritch Knight cast a known cantrip using Intelligence', () => {
+    const fighter = makeWizard({ class: 'fighter', subclassId: 'eldritch-knight', level: 3, knownSpells: ['fire-bolt'], preparedSpells: [] });
+    const result = castSpell(fighter, 'fire-bolt', 0, [{ id: 'target', ac: 10 }]);
+    expect(result.success).toBe(true);
+    expect(result.attackRoll?.total).toBe(16);
+  });
+
+  it('uses the wizard spell list for Eldritch Knight spell learning', () => {
+    const fighter = makeWizard({ class: 'fighter', subclassId: 'eldritch-knight', level: 3, knownSpells: [], preparedSpells: [] });
+    expect(canLearnSpell(fighter, 'magic-missile').ok).toBe(true);
+  });
+
+  it('uses the subclass casting ability for spell healing', () => {
+    const fighter = makeWizard({ class: 'fighter', subclassId: 'eldritch-knight', level: 3, knownSpells: ['cure-wounds'], preparedSpells: [] });
+    const result = castSpell(fighter, 'cure-wounds', 1, [{ id: 'target' }]);
+    expect(result.success).toBe(true);
+    expect(result.healing).toBe(7);
+  });
+
+  it('uses Constitution save proficiency only when the caster has it', () => {
+    mockCryptoRoll.mockReturnValueOnce(10);
+    const wizard = makeWizard({ concentrationSpellId: 'bless' });
+    const result = breakConcentration(wizard, 'damaged', 20);
+    expect(result.modifier).toBe(1);
+  });
+
   describe('hasSpellSlot / consumeSpellSlot', () => {
     it('Wizard has L1 slots', () => expect(hasSpellSlot(makeWizard(), 1)).toBe(true));
     it('Wizard has no L4 slots', () => expect(hasSpellSlot(makeWizard(), 4)).toBe(false));

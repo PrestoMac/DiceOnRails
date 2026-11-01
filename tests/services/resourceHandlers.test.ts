@@ -202,7 +202,7 @@ describe('RESOURCE_HANDLERS', () => {
       expect(result.data?.stunned).toBe(true);
       expect(vi.mocked(applyCondition)).toHaveBeenCalledTimes(1);
       const cond = vi.mocked(applyCondition).mock.calls[0][1];
-      expect(cond.id.startsWith('stunning-strike-')).toBe(true);
+      expect(cond.id).toBe('stunned');
       expect(cond.duration).toBe(1);
     });
   });

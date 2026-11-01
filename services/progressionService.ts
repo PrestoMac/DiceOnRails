@@ -55,6 +55,9 @@ export function awardExperience(
 
   if (leveledUp) {
     const levelsGained = newLevel - oldLevel;
+    if (character.class.toLowerCase() === 'barbarian' && oldLevel < 20 && newLevel >= 20) {
+      updated.stats = { ...character.stats, str: Math.min(24, character.stats.str + 4), con: Math.min(24, character.stats.con + 4) };
+    }
     const newUnusedPoints = character.unusedStatPoints + levelsGained * STAT_POINTS_PER_LEVEL;
     updated.unusedStatPoints = newUnusedPoints;
 

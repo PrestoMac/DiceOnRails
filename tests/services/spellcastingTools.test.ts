@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MockMCPServer } from '../../services/mcpService';
 import { makeCharacter, makeWizard, makeCleric, makeBarbarian } from '../helpers/characters';
 import { applyCondition, hasCondition } from '../../services/conditionEngine';
+import { calculateAc, calculateSpeed } from '../../services/classEngine';
 import { extractRollData } from '../../services/llm/narration';
 
 vi.mock('../../utils/random', () => ({
@@ -167,6 +168,79 @@ describe('cast_spell', () => {
     const result = await server.cast_spell('wizard-1', 'magic-missile', 1);
 
     expect(result.success).toBe(false);
+  });
+
+  it('blocks spellcasting while raging without spending a slot', async () => {
+    const wizard = makeWizard({ raging: true });
+    server.joinParty(wizard);
+    const slot = wizard.resources.find(r => r.id === 'spell-slot-1');
+    const before = slot?.current;
+    const result = await server.cast_spell(wizard.id, 'magic-missile', 1);
+    expect(result.success).toBe(false);
+    expect(slot?.current).toBe(before);
+  });
+
+  it('rejects nonexistent damage targets before spending a spell slot', async () => {
+    const wizard = makeWizard();
+    server.joinParty(wizard);
+    await server.add_enemy('Goblin');
+    await server.start_combat();
+    const slot = wizard.resources.find(r => r.id === 'spell-slot-3');
+    const before = slot?.current;
+    const result = await server.cast_spell(wizard.id, 'fireball', 3, ['missing']);
+    expect(result.success).toBe(false);
+    expect(slot?.current).toBe(before);
+  });
+
+  it('rejects unavailable metamagic without consuming a spell slot or concentration', async () => {
+    const wizard = makeWizard({ concentrationSpellId: 'bless' });
+    server.joinParty(wizard);
+    const slot = wizard.resources.find(r => r.id === 'spell-slot-1');
+    const before = slot?.current;
+    const result = await server.cast_spell(wizard.id, 'magic-missile', 1, [], undefined, undefined, { option: 'quickened' });
+    expect(result.success).toBe(false);
+    expect(slot?.current).toBe(before);
+    expect(wizard.concentrationSpellId).toBe('bless');
+  });
+
+  it('rejects metamagic when sorcery points are insufficient without spending a slot', async () => {
+    const sorcerer = makeWizard({ class: 'sorcerer', knownSpells: ['magic-missile'], metamagicOptions: ['quickened'], resources: [
+      { id: 'spell-slot-1', name: 'Slot', current: 1, max: 1, resetOn: 'long', source: 'class', sourceId: 'sorcerer' },
+      { id: 'sorcery-points', name: 'Points', current: 1, max: 3, resetOn: 'long', source: 'class', sourceId: 'sorcerer' },
+    ] });
+    server.joinParty(sorcerer);
+    const result = await server.cast_spell(sorcerer.id, 'magic-missile', 1, [], undefined, undefined, { option: 'quickened' });
+    expect(result.success).toBe(false);
+    expect(sorcerer.resources[0].current).toBe(1);
+    expect(sorcerer.resources[1].current).toBe(1);
+  });
+
+  it('removes concentration damage-over-time effects when entering rage', async () => {
+    const wizard = makeWizard({ knownSpells: ['flaming-sphere'], preparedSpells: ['flaming-sphere'] });
+    wizard.resources.push({ id: 'rage', name: 'Rage', current: 1, max: 1, resetOn: 'long', source: 'class', sourceId: 'barbarian' });
+    server.joinParty(wizard);
+    await server.add_enemy('Ogre', 10, 100);
+    await server.start_combat();
+    const combat = server.getFullState().combat;
+    if (!combat) throw new Error('Expected combat');
+    expect((await server.cast_spell(wizard.id, 'flaming-sphere', 2, [combat.enemies[0].id])).success).toBe(true);
+    expect(combat.activeDoTs).toHaveLength(1);
+    expect((await server.use_resource(wizard.id, 'rage')).success).toBe(true);
+    expect(wizard.concentrationSpellId).toBeUndefined();
+    expect(combat.activeDoTs).toHaveLength(0);
+  });
+
+  it('removes the old damage-over-time effect when concentration changes', async () => {
+    const wizard = makeWizard({ knownSpells: ['flaming-sphere', 'bless'], preparedSpells: ['flaming-sphere', 'bless'] });
+    server.joinParty(wizard);
+    await server.add_enemy('Ogre', 10, 100);
+    await server.start_combat();
+    const combat = server.getFullState().combat;
+    if (!combat) throw new Error('Expected combat');
+    expect((await server.cast_spell(wizard.id, 'flaming-sphere', 2, [combat.enemies[0].id])).success).toBe(true);
+    expect(combat.activeDoTs?.some(dot => dot.spellId === 'flaming-sphere')).toBe(true);
+    expect((await server.cast_spell(wizard.id, 'bless', 1, [wizard.id])).success).toBe(true);
+    expect(combat.activeDoTs?.some(dot => dot.spellId === 'flaming-sphere')).toBe(false);
   });
 
   it('concentration spell sets concentrationSpellId', async () => {
@@ -526,6 +600,21 @@ describe('polymorph_creature', () => {
     expect(druid.resources[0].current).toBe(2);
   });
 
+  it('uses Moon Druid CR limits and restores the original form with excess damage', async () => {
+    const druid = makeWizard({ class: 'druid', subclassId: 'circle-of-the-moon', level: 6, hp: { current: 20, max: 32 }, resources: [{ id: 'wild-shape', name: 'Wild Shape', current: 2, max: 2, resetOn: 'short', source: 'class', sourceId: 'druid' }] });
+    const originalStats = { ...druid.stats };
+    server.joinParty(druid);
+    expect((await server.polymorph_creature('wizard-1', 'brown-bear')).success).toBe(true);
+    expect(druid.stats.str).toBe(19);
+    expect(druid.stats.int).toBe(originalStats.int);
+    expect(calculateAc(druid, null)).toBe(11);
+    expect(calculateSpeed(druid)).toBe(40);
+    await server.inflict_damage(40, 'wizard-1');
+    expect(druid.hp).toEqual({ current: 14, max: 32 });
+    expect(druid.stats).toEqual(originalStats);
+    expect(druid.runtime?.transformationState).toBeUndefined();
+  });
+
   it('invalid form returns fail', async () => {
     const wizard = makeWizard();
     server.joinParty(wizard);
@@ -554,6 +643,8 @@ describe('polymorph_creature', () => {
     await server.polymorph_creature('wizard-1', 'brown-bear', 60);
 
     expect(wizard.hp.max).toBe(34);
+    await server.narrate_turn('Time passes', 61);
+    expect(wizard.hp.max).toBe(32);
   });
 
   it('concentration is retained during polymorph', async () => {
@@ -618,7 +709,7 @@ describe('cast_ritual', () => {
   });
 
   it('casts a valid spell as ritual without consuming spell slots', async () => {
-    const wizard = makeWizard();
+    const wizard = makeWizard({ knownSpells: ['detect-magic'] });
     server.joinParty(wizard);
     const slot = wizard.resources?.find(r => r.id === 'spell-slot-1');
     const initialSlots = slot?.current ?? 0;
@@ -631,7 +722,7 @@ describe('cast_ritual', () => {
   });
 
   it('casts a ritual spell even when 0 spell slots remain', async () => {
-    const wizard = makeWizard();
+    const wizard = makeWizard({ knownSpells: ['detect-magic'] });
     const slot = wizard.resources?.find(r => r.id === 'spell-slot-1');
     if (slot) slot.current = 0;
     server.joinParty(wizard);
@@ -641,6 +732,13 @@ describe('cast_ritual', () => {
     expect(result.success).toBe(true);
     expect(result.data?.ritual).toBe(true);
     expect(slot?.current).toBe(0);
+  });
+
+  it('rejects a ritual absent from the spellbook', async () => {
+    const wizard = makeWizard();
+    server.joinParty(wizard);
+    const result = await server.cast_ritual(wizard.id, 'detect-magic');
+    expect(result.success).toBe(false);
   });
 
   it('invalid spell returns fail', async () => {

@@ -1,5 +1,5 @@
 import { Character, ResourcePool, SaveStat } from '../types';
-import { getClassDef, getSubclassDef, getMod, getProficiencyBonus, getSpellSaveDc, getSpellAttackBonus } from './classEngine';
+import { getClassDef, getSubclassDef, getMod, getSpellSaveDc, getSpellAttackBonus, getSavingThrowBonus } from './classEngine';
 import { rollDice } from './diceEngine';
 import { parseDiceFormula } from '../utils/dice';
 import { cryptoRoll } from '../utils/random';
@@ -9,12 +9,11 @@ import { getAtWillInvocationSpells } from '../data/invocations';
 
 export function getMaxPactSlotLevel(character: Character): number {
   if (character.class !== 'warlock') return 0;
-  if (character.level >= 17) return 5;
-  if (character.level >= 11) return 4;
-  if (character.level >= 9) return 3;
-  if (character.level >= 5) return 2;
-  if (character.level >= 3) return 1;
-  return 0;
+  if (character.level >= 9) return 5;
+  if (character.level >= 7) return 4;
+  if (character.level >= 5) return 3;
+  if (character.level >= 3) return 2;
+  return character.level >= 1 ? 1 : 0;
 }
 
 function findSpellSlot(character: Character, level: number) {
@@ -161,8 +160,9 @@ export function canLearnSpell(character: Character, spellId: string): { ok: bool
   const effectiveSpellcasting = classDef?.spellcasting || (hasSubclassSpellcasting ? subclassDef.spellcasting : undefined);
 
   if (!effectiveSpellcasting) return { ok: false, reason: `${classDef?.name || 'This class'} cannot cast spells.` };
-  if (!spell.classes.includes(character.class)) {
-    return { ok: false, reason: `${classDef.name} cannot learn ${spell.name}.` };
+  const spellListClass = hasSubclassSpellcasting ? 'wizard' : character.class.toLowerCase();
+  if (!spell.classes.includes(spellListClass)) {
+    return { ok: false, reason: `${classDef?.name || 'This class'} cannot learn ${spell.name}.` };
   }
   if (spell.level === 0) {
     const cap = getCantripsKnown(character, character.level);
@@ -285,8 +285,18 @@ export function castSpell(
 ): CastResult {
   const spell = SPELLS_BY_ID[spellId.toLowerCase()];
   if (!spell) return { success: false, reason: 'Unknown spell.' };
+  if (character.raging) return { success: false, reason: 'Cannot cast spells while raging.' };
   const classDef = getClassDef(character.class);
-  if (!classDef?.spellcasting) return { success: false, reason: `${classDef?.name || 'This class'} cannot cast spells.` };
+  const subclass = character.subclassId ? getSubclassDef(character.class, character.subclassId) : undefined;
+  const profile = classDef?.spellcasting ?? (character.level >= (classDef?.subclassLevel ?? Infinity) ? subclass?.spellcasting : undefined);
+  if (!profile) return { success: false, reason: `${classDef?.name || 'This class'} cannot cast spells.` };
+  const isAtWillInvocation = character.class.toLowerCase() === 'warlock' && getAtWillInvocationSpells(character.invocations).includes(spell.id);
+  if (isAtWillInvocation && spell.level > 0 && !options?.isRitual) {
+    slotLevel = spell.level as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+  } else if (character.class.toLowerCase() === 'warlock' && spell.level > 0 && !options?.isRitual) {
+    if (slotLevel > getMaxPactSlotLevel(character)) return { success: false, reason: 'Spell level exceeds your pact slot level.' };
+    slotLevel = getMaxPactSlotLevel(character) as 1 | 2 | 3 | 4 | 5;
+  }
 
   if (spell.level === 0 || options?.isRitual) {
     const known = character.knownSpells ?? [];
@@ -304,17 +314,15 @@ export function castSpell(
     }
     // At-will invocation spells (Armor of Shadows, Fiendish Vigor, …) are cast
     // without expending a spell slot.
-    const atWill = getAtWillInvocationSpells(character.invocations);
-    const isAtWillInvocation = atWill.includes(spell.id);
     if (!isAtWillInvocation && !hasSpellSlot(character, slotLevel as 1|2|3|4|5|6|7|8|9)) {
       return { success: false, reason: `No level ${slotLevel} spell slot remaining.` };
     }
     const known = character.knownSpells ?? [];
     const prepared = character.preparedSpells ?? [];
-    if (classDef.spellcasting.prepMode === 'known' && !known.includes(spell.id)) {
+    if (!isAtWillInvocation && profile.prepMode === 'known' && !known.includes(spell.id)) {
       return { success: false, reason: `You haven't learned ${spell.name}.` };
     }
-    if (classDef.spellcasting.prepMode === 'prepared' && !prepared.includes(spell.id)) {
+    if (!isAtWillInvocation && profile.prepMode === 'prepared' && !prepared.includes(spell.id)) {
       return { success: false, reason: `${spell.name} is not prepared.` };
     }
     if (!isAtWillInvocation) {
@@ -381,13 +389,13 @@ export function castSpell(
         const { total: diceDamage, rolls } = rollDiceWithDetails(count, sides);
         let finalDiceDamage = diceDamage;
         if (isCrit) finalDiceDamage *= 2;
-        const abilityMod = addAbilityMod ? getAbilityMod(character, classDef.spellcasting.ability) : 0;
+        const abilityMod = addAbilityMod ? getAbilityMod(character, profile.ability) : 0;
         beamDamage = finalDiceDamage + flatBonus + abilityMod;
 
         // Agonizing Blast invocation: add CHA mod to Eldritch Blast damage per beam
         let agonizingMod = 0;
         if (spell.id === 'eldritch-blast' && character.invocations?.includes('agonizing-blast')) {
-          agonizingMod = getAbilityMod(character, classDef.spellcasting.ability);
+          agonizingMod = getAbilityMod(character, profile.ability);
           beamDamage += agonizingMod;
         }
 
@@ -421,7 +429,7 @@ export function castSpell(
 
     if (spell.damage) {
       const { count, sides, flatBonus, addAbilityMod } = parseDice(spell.damage.dice);
-      const abilityMod = addAbilityMod ? getAbilityMod(character, classDef.spellcasting.ability) : 0;
+      const abilityMod = addAbilityMod ? getAbilityMod(character, profile.ability) : 0;
       const perTarget = targets.map((t, idx) => {
         const { total: diceDamage, rolls } = rollDiceWithDetails(count, sides);
         const totalDmg = diceDamage + flatBonus + abilityMod;
@@ -453,7 +461,7 @@ export function castSpell(
     }
   } else if (spell.healing) {
     const { count, sides, flatBonus, addAbilityMod } = parseDice(spell.healing);
-    const abilityMod = addAbilityMod ? getAbilityMod(character, classDef.spellcasting.ability) : 0;
+    const abilityMod = addAbilityMod ? getAbilityMod(character, profile.ability) : 0;
     result.healing = rollDice(count, sides) + abilityMod + flatBonus;
   } else if (spell.autoHit && spell.damage && targets.length > 0) {
     const { count, sides, flatBonus } = parseDice(spell.damage.dice);
@@ -625,7 +633,7 @@ export function breakConcentration(character: Character, reason: 'damaged' | 'vo
   const spellId = character.concentrationSpellId;
   if (reason === 'damaged') {
     const dc = Math.max(10, Math.floor(damage / 2));
-    const modifier = getAbilityMod(character, 'con') + getProficiencyBonus(character);
+    const modifier = getSavingThrowBonus(character, 'con');
     const d20Roll = cryptoRoll(20);
     const roll = d20Roll + modifier - getExhaustionPenalty(character);
     const success = roll >= dc;

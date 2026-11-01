@@ -1550,6 +1550,33 @@ describe('MockMCPServer', () => {
   });
 
   describe('use_resource breath-weapon color lookup', () => {
+    it('applies breath damage after the ancestry save and resistance', async () => {
+      vi.mocked(cryptoRoll).mockImplementation((sides = 20) => sides === 20 ? 1 : 4);
+      const char = makeCharacter({ race: 'dragonborn', draconicAncestry: 'green', resources: [{ id: 'breath-weapon', name: 'Breath Weapon', current: 1, max: 1, resetOn: 'short', source: 'race', sourceId: 'dragonborn' }] });
+      const server = new MockMCPServer();
+      server.joinParty(char);
+      await server.add_enemy('Dummy', 10, 100);
+      await server.start_combat();
+      const enemy = server.getFullState().combat.enemies[0];
+      enemy.damageResistances = ['poison'];
+      const result = await server.use_resource(char.id, 'breath-weapon', enemy.id);
+      expect(result.success).toBe(true);
+      expect(result.data.saveStat).toBe('con');
+      expect(result.data.saved).toBe(false);
+      expect(result.data.dealt).toBe(4);
+      expect(enemy.hp.current).toBe(96);
+    });
+
+    it('does not spend breath weapon on an invalid combat target', async () => {
+      const char = makeCharacter({ race: 'dragonborn', resources: [{ id: 'breath-weapon', name: 'Breath Weapon', current: 1, max: 1, resetOn: 'short', source: 'race', sourceId: 'dragonborn' }] });
+      const server = new MockMCPServer();
+      server.joinParty(char);
+      await server.add_enemy('Goblin');
+      await server.start_combat();
+      const result = await server.use_resource(char.id, 'breath-weapon', 'missing');
+      expect(result.success).toBe(false);
+      expect(char.resources[0].current).toBe(1);
+    });
     it('uses draconicDamageType set on character for blue dragonborn', async () => {
       vi.mocked(cryptoRoll).mockImplementation(() => 4);
       const char = makeCharacter({
@@ -1993,6 +2020,18 @@ const roundTripped = deepClone(char.conditions);
   });
 
   describe('arcane_recovery', () => {
+    it('does not restore earlier slots if a later selection is invalid', async () => {
+      const server = new MockMCPServer();
+      const wizard = makeWizard({ level: 10, resources: [
+        { id: 'spell-slot-1', name: 'Level 1', current: 0, max: 4, resetOn: 'long', source: 'class', sourceId: 'wizard' },
+        { id: 'arcane-recovery', name: 'Arcane Recovery', current: 1, max: 1, resetOn: 'long', source: 'class', sourceId: 'wizard' },
+      ] });
+      server.joinParty(wizard);
+      const result = await server.arcane_recovery(wizard.id, [{ level: 1, count: 1 }, { level: 2, count: 1 }]);
+      expect(result.success).toBe(false);
+      expect(wizard.resources?.[0].current).toBe(0);
+      expect(wizard.resources?.[1].current).toBe(1);
+    });
     function makeWizard(overrides: Partial<Character> = {}): Character {
       return {
         id: 'wizard-1', name: 'Magus', class: 'wizard', race: 'elf', level: 5,
@@ -2506,7 +2545,39 @@ const roundTripped = deepClone(char.conditions);
     });
   });
 
+  it('applies Stunning Strike as a real condition until the end of the monk’s next turn', async () => {
+    const server = new MockMCPServer();
+    const monk = makeCharacter({ id: 'monk-1', name: 'Monk', class: 'monk', level: 5, inventory: [], resources: [{ id: 'ki', name: 'Ki', current: 2, max: 2, resetOn: 'short', source: 'class', sourceId: 'monk' }] });
+    server.joinParty(monk);
+    await server.add_enemy('Dummy', 10, 100);
+    vi.mocked(cryptoRoll).mockReturnValueOnce(18).mockReturnValueOnce(5);
+    await server.start_combat();
+    const enemy = server.getFullState().combat?.enemies[0];
+    if (!enemy) throw new Error('Expected enemy');
+    vi.mocked(cryptoRoll).mockReturnValue(1);
+    const result = await server.use_resource('monk-1', 'ki', enemy.id);
+    expect(result.data.stunned).toBe(true);
+    expect(enemy?.conditions?.some(c => c.id === 'stunned')).toBe(true);
+    expect((await server.enemy_attack(enemy.id, monk.id)).success).toBe(false);
+    await server.next_turn(false);
+    expect(enemy?.conditions?.some(c => c.id === 'stunned')).toBe(true);
+    await server.next_turn(false);
+    expect(enemy?.conditions?.some(c => c.id === 'stunned')).toBe(false);
+  });
+
   describe('use_resource channel-divinity Turn Undead save (regression)', () => {
+    it('destroys eligible undead on a failed save at cleric level 5', async () => {
+      vi.mocked(cryptoRoll).mockReturnValue(1);
+      const server = new MockMCPServer();
+      server.joinParty(makeCharacter({ id: 'cleric-1', class: 'cleric', level: 5, resources: [{ id: 'channel-divinity', name: 'Channel Divinity', current: 1, max: 1, resetOn: 'short', source: 'class', sourceId: 'cleric' }] }));
+      await server.add_enemy('Skeleton', 13, 13, undefined, 0.25, undefined, undefined, 'undead');
+      const enemy = server.getFullState().combat?.enemies[0];
+      const result = await server.use_resource('cleric-1', 'channel-divinity', enemy?.id);
+      expect(result.data.destroyed).toBe(true);
+      expect(enemy?.isDead).toBe(true);
+      expect(enemy?.hp.current).toBe(0);
+    });
+
     it('turns undead when the WIS save FAILS', async () => {
       // Save d20 = 1 → total 1 vs DC 12 → failure → undead IS turned.
       vi.mocked(cryptoRoll).mockReturnValue(1);
@@ -2531,6 +2602,8 @@ const roundTripped = deepClone(char.conditions);
       const data = result.data as { turned: boolean; dc: number };
       expect(data.turned).toBe(true);
       expect(result.message).toMatch(/failed the WIS save/i);
+      await server.inflict_damage(1, enemyId);
+      expect(enemy?.conditions?.some(c => c.id.startsWith('turned-'))).toBe(false);
     });
 
     it('resists (not turned) when the WIS save SUCCEEDS', async () => {

@@ -15,7 +15,7 @@ import { getAtWillInvocationSpells } from '../../data/invocations';
 export interface SpellcastingDeps {
   getTarget: (id?: string) => Character | undefined;
   inflict_damage: (amount: number, targetId?: string, damageType?: string, options?: { skipTargetDerivedReductions?: boolean }) => Promise<MCPResponse>;
-  make_save: (targetId: string, stat: string, dc: number, spellContext?: { isMagical?: boolean; isCharm?: boolean }) => Promise<MCPResponse>;
+  make_save: (targetId: string, stat: string, dc: number, spellContext?: { isMagical?: boolean; isCharm?: boolean; isPoison?: boolean; isFrightened?: boolean; isSeen?: boolean }) => Promise<MCPResponse>;
   syncInitiativeConditions: () => void;
 }
 
@@ -123,10 +123,11 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
 
   function breakConcentrationWithCleanup(char: Character): void {
     if (!char.concentrationSpellId) return;
+    const spellId = char.concentrationSpellId;
     engineBreakConcentration(char, 'voluntary');
     if (state.combat?.activeDoTs) {
       state.combat.activeDoTs = state.combat.activeDoTs.filter(
-        dot => !(dot.casterId === char.id && dot.spellId === char.concentrationSpellId)
+        dot => !(dot.casterId === char.id && dot.spellId === spellId)
       );
     }
   }
@@ -135,6 +136,7 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
     async cast_spell(characterId, spellId, slotLevel = 0, targets = [], targetSaveResults, reaction, metamagic) {
       const char = deps.getTarget(characterId);
       if (!char) return fail('Character not found.');
+      if (char.raging) return fail(`${char.name} cannot cast spells while raging.`);
 
       if (reaction) {
         if (!char.reactionAvailable || char.reactionUsedThisTurn) {
@@ -144,6 +146,20 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
 
       const classDef = getClassDef(char.class);
       const spellDef = SPELLS_BY_ID[spellId.toLowerCase().replace(/\s+/g, '-')];
+      const metamagicOption = metamagic?.option;
+      const pointCosts: Record<string, number> = {
+        twinned: Math.max(1, spellDef?.level || 0), heightened: 3, quickened: 2,
+        subtle: 1, empowered: 1, careful: 1, distant: 1, extended: 1,
+      };
+      if (metamagicOption) {
+        if (!Object.hasOwn(pointCosts, metamagicOption) || !char.metamagicOptions?.includes(metamagicOption)) {
+          return fail(`${char.name} does not have the ${metamagicOption} metamagic option.`);
+        }
+        const points = char.resources?.find(r => r.id === 'sorcery-points');
+        if (!points || points.current < pointCosts[metamagicOption]) {
+          return fail(`Insufficient sorcery points for ${metamagicOption} spell (needs ${pointCosts[metamagicOption]}).`);
+        }
+      }
 
       const isSelfTargetSpell =
         spellDef?.range === 'Self' ||
@@ -165,6 +181,15 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
         }
       }
 
+      if (spellDef?.damage && targets.length > 0 && state.combat?.isActive) {
+        const validTargets = targets.filter(targetId =>
+          state.combat?.enemies.some(e => fuzzyMatchEntity(e, targetId)) || !!deps.getTarget(targetId)
+        );
+        if (validTargets.length === 0) {
+          return fail(`No valid targets found for ${spellDef.name}. Targets [${targets.join(', ')}] are not in combat or party. For damage spells, enemies must be registered via add_enemy first, then combat started with start_combat.`);
+        }
+      }
+
       const enrichedTargets = targets.map(id => {
         const enemy = state.combat?.enemies.find(e => e.id === id || e.name.toLowerCase() === id.toLowerCase());
         const player = deps.getTarget(id);
@@ -176,9 +201,13 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
           _attacksAgainstHaveAdvantage: condFx?.attacksAgainstHaveAdvantage ?? false,
         };
       });
+      const previousConcentration = char.concentrationSpellId;
       const result = engineCastSpell(char, spellId, slotLevel as 0|1|2|3|4|5|6|7|8|9, enrichedTargets, state.combat ? { enemies: state.combat.enemies, party: state.party } : undefined);
       if (!result.success) {
         return { success: false, data: result, message: result.reason || 'Spell cast failed.' };
+      }
+      if (result.concentrationEnded && previousConcentration && state.combat?.activeDoTs) {
+        state.combat.activeDoTs = state.combat.activeDoTs.filter(dot => !(dot.casterId === char.id && dot.spellId === previousConcentration));
       }
 
       if (result.concentrationStarted) {
@@ -196,22 +225,7 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
 
       if (metamagic && metamagic.option) {
         const opt = metamagic.option;
-        if (!char.metamagicOptions?.length) {
-          if (result.success) {
-            return { success: false, data: result, message: `${char.name} does not have metamagic options (requires Sorcerer L3+).` };
-          }
-        }
-        const pointCosts: Record<string, number> = {
-          twinned: (spellDef?.level || 1) >= 1 ? (spellDef?.level || 1) : 1,
-          heightened: 3,
-          quickened: 2,
-          subtle: 1,
-          empowered: 1,
-          careful: 1,
-          distant: 1,
-          extended: 1,
-        };
-        const pointCost = pointCosts[opt] || 1;
+        const pointCost = pointCosts[opt];
 
         const ptsSpent = classEngineSpendResource(char, 'sorcery-points', pointCost);
         if (!ptsSpent) {
@@ -241,27 +255,6 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
         result.message = (result.message || '') + ` [Metamagic: ${opt}]`;
       }
       // ---- end metamagic ----
-
-      if (result.damage && targets.length > 0 && state.combat?.isActive) {
-        const validatedTargets: string[] = [];
-        const unresolvedTargets: string[] = [];
-        for (const targetId of targets) {
-          const isEnemy = state.combat.enemies.some(e => fuzzyMatchEntity(e, targetId));
-          const isParty = !!deps.getTarget(targetId);
-          if (isEnemy || isParty) {
-            validatedTargets.push(targetId);
-          } else {
-            unresolvedTargets.push(targetId);
-          }
-        }
-        if (unresolvedTargets.length > 0 && validatedTargets.length === 0) {
-          return {
-            success: false,
-            data: result,
-            message: `No valid targets found for ${spellDef?.name || 'spell'}. Targets [${unresolvedTargets.join(', ')}] are not in combat or party. For damage spells, enemies must be registered via add_enemy first, then combat started with start_combat.`
-          };
-        }
-      }
 
       const resolvedTargets = targets.map(targetId => {
         const cleanId = targetId.toLowerCase().trim();
@@ -296,7 +289,7 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
           // damage on a success; 'none' negates it entirely (0 damage on success).
           const savePassed = llmOverride !== undefined
             ? llmOverride === true
-            : (await deps.make_save(t.targetId, saveStat, saveDC, { isMagical: true, isCharm: isCharmSpell })).data?.success === true;
+            : (await deps.make_save(t.targetId, saveStat, saveDC, { isMagical: true, isCharm: isCharmSpell, isPoison: result.damage.type === 'poison', isFrightened: spellDef.condition?.type === 'frightened' })).data?.success === true;
           // Evasion (Rogue L7 / Monk L7): on a successful DEX save, take 0 damage
           // instead of half; on a failed DEX save, take half instead of full.
           const targetChar = deps.getTarget(t.targetId);
@@ -439,7 +432,7 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
             const llmOverride = targetSaveResults?.[targetId];
             const savePassed = llmOverride !== undefined
               ? llmOverride === true
-              : (await deps.make_save(targetId, saveStat, resolvedSaveDC, { isMagical: true, isCharm: isCharmCondition })).data?.success === true;
+              : (await deps.make_save(targetId, saveStat, resolvedSaveDC, { isMagical: true, isCharm: isCharmCondition, isPoison: condDef.type === 'poisoned', isFrightened: condDef.type === 'frightened' })).data?.success === true;
             if (savePassed) continue;
           }
 
@@ -684,6 +677,7 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
         if (idx > -1) char.preparedSpells?.splice(idx, 1);
       }
 
+      if (!result.success) return fail(result.reason || 'Ritual cast failed.');
       state.sessionLogs.push(`${char.name} casts ${spell.name} as a ritual.`);
 
       return {
@@ -890,7 +884,11 @@ export function createSpellcastingService(state: GameState, deps: SpellcastingDe
       const handler = RESOURCE_HANDLERS[resourceId];
       if (handler) {
         try {
+          const previousConcentration = char.concentrationSpellId;
           const result = await handler({ state, deps }, characterId, targetId, amount);
+          if (previousConcentration && !char.concentrationSpellId && state.combat?.activeDoTs) {
+            state.combat.activeDoTs = state.combat.activeDoTs.filter(dot => !(dot.casterId === char.id && dot.spellId === previousConcentration));
+          }
           if (!result.success && spent) {
             const resource = char.resources?.find(r => r.id === resourceId);
             if (resource) resource.current += cost;

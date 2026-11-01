@@ -46,12 +46,15 @@ export const RESOURCE_HANDLERS: Record<string, ResourceHandler> = {
     if (!target) return fail('Target not found.');
     const healed = Math.min(amount, target.hp.max - target.hp.current);
     target.hp.current = Math.min(target.hp.max, target.hp.current + healed);
+    if (target.hp.current > 0 && target.deathSaves) delete target.deathSaves;
     return { success: true, data: { healed }, message: `Lay on Hands healed ${healed} HP for ${target.name}.` };
   },
 
-  'breath-weapon': async (ctx, characterId) => {
+  'breath-weapon': async (ctx, characterId, targetId) => {
     const char = ctx.deps.getTarget(characterId);
     if (!char) return fail('Character not found.');
+    const enemy = targetId ? ctx.state.combat?.enemies?.find(e => fuzzyMatchEntity(e, targetId)) : undefined;
+    if (targetId && ctx.state.combat?.isActive && (!enemy || enemy.isDead)) return fail(`Target "${targetId}" is not an active enemy.`);
     const conMod = getMod(char.stats.con);
     const profBonus = getProficiencyBonus(char);
     const dc = 8 + conMod + profBonus;
@@ -61,7 +64,18 @@ export const RESOURCE_HANDLERS: Record<string, ResourceHandler> = {
     const ancestryDmgTypes: Record<string, string> = { black: 'acid', blue: 'lightning', brass: 'fire', bronze: 'lightning', copper: 'acid', gold: 'fire', green: 'poison', red: 'fire', silver: 'cold', white: 'cold' };
     const dmgType = ancestryDmgTypes[char.draconicAncestry || 'red'] || 'fire';
     char.draconicDamageType = dmgType;
-    return { success: true, data: { saveDC: dc, damage: { total: damage, type: dmgType } }, message: `Breath weapon used. DEX save DC ${dc}, ${dmgDice} ${dmgType} damage on fail, half on success.` };
+    const saveStat = ['brass', 'gold', 'green', 'silver', 'white'].includes(char.draconicAncestry || 'red') ? 'con' : 'dex';
+    let dealt: number | undefined;
+    let saved: boolean | undefined;
+    if (enemy) {
+      const save = await ctx.deps.make_save(enemy.id, saveStat, dc, { isPoison: dmgType === 'poison' });
+      if (!save.success) return save;
+      saved = save.data?.success === true;
+      const result = await ctx.deps.inflict_damage(saved ? Math.floor(damage / 2) : damage, enemy.id, dmgType);
+      if (!result.success) return result;
+      dealt = Number(result.data?.damage ?? 0);
+    }
+    return { success: true, data: { saveDC: dc, saveStat, saved, dealt, damage: { total: damage, type: dmgType } }, message: `Breath weapon used. ${saveStat.toUpperCase()} save DC ${dc}, ${dmgDice} ${dmgType} damage on fail, half on success.${enemy ? ` ${enemy.name} takes ${dealt} damage.` : ''}` };
   },
 
   ki: async (ctx, characterId, targetId, _amount) => {
@@ -94,7 +108,8 @@ export const RESOURCE_HANDLERS: Record<string, ResourceHandler> = {
     if (saved) {
       return { success: true, data: { stunned: false, dc }, message: `${enemy.name} made the CON save (DC ${dc}) and resisted Stunning Strike.` };
     }
-    applyCondition(enemy, { id: 'stunning-strike-' + Date.now(), source: char.id, duration: 1 });
+    const combat = ctx.state.combat;
+    applyCondition(enemy, { id: 'stunned', source: char.id, duration: 1, durationUnit: combat?.isActive ? 'permanent' : 'round', expiresAfterTurn: combat?.isActive ? { actorId: char.id, appliedRound: combat.round } : undefined });
     return { success: true, data: { stunned: true, dc }, message: `${enemy.name} failed the CON save (DC ${dc}) and is STUNNED until the end of your next turn.` };
   },
 
@@ -126,11 +141,16 @@ export const RESOURCE_HANDLERS: Record<string, ResourceHandler> = {
       if (saved) {
         return { success: true, data: { turned: false, dc }, message: `${enemy.name} made the WIS save (DC ${dc}) and resisted Turn Undead.` };
       }
-      applyCondition(enemy, { id: 'turned-' + Date.now(), source: char.id, duration: 10, durationUnit: 'minute' });
+      const crLimit = char.level >= 17 ? 4 : char.level >= 14 ? 3 : char.level >= 11 ? 2 : char.level >= 8 ? 1 : char.level >= 5 ? 0.5 : -1;
+      if (crLimit >= 0 && typeof enemy.cr === 'number' && enemy.cr <= crLimit) {
+        const result = await ctx.deps.inflict_damage(enemy.hp.current, enemy.id, undefined, { skipTargetDerivedReductions: true });
+        if (!result.success) return result;
+        return { success: true, data: { turned: false, destroyed: true, dc }, message: `${enemy.name} failed the WIS save (DC ${dc}) and is destroyed. ${result.message}` };
+      }
+      applyCondition(enemy, { id: 'turned-' + Date.now(), source: char.id, duration: 1, durationUnit: 'minute' });
       return { success: true, data: { turned: true, dc }, message: `${enemy.name} failed the WIS save (DC ${dc}) and is TURNED for 1 minute or until it takes damage.` };
     }
-    const crLimit = char.level >= 17 ? 4 : char.level >= 14 ? 3 : char.level >= 11 ? 2 : char.level >= 8 ? 1 : char.level >= 5 ? 0.5 : 0;
-    return { success: true, data: { crLimit }, message: `Channel Divinity: Destroy Undead. CR ≤ ${crLimit} undead within 30 ft are destroyed instantly.` };
+    return fail('Turn Undead requires a target.');
   },
 
   'hellish-rebuke': async (ctx, characterId, targetId) => {
@@ -150,7 +170,7 @@ export const RESOURCE_HANDLERS: Record<string, ResourceHandler> = {
       saved = saveResult.data && typeof saveResult.data === 'object' ? (saveResult.data as Record<string, unknown>).success === true : false;
     }
     const finalDamage = saved ? Math.floor(damage / 2) : damage;
-    const result = await ctx.deps.inflict_damage(finalDamage, actualTarget.id, 'fire', { skipTargetDerivedReductions: true });
+    const result = await ctx.deps.inflict_damage(finalDamage, actualTarget.id, 'fire');
     return { success: true, data: { damage: finalDamage, saveDC, saved }, message: `Hellish Rebuke deals ${finalDamage} fire damage to ${actualTarget.name}${saved ? ' (halved by successful DEX save)' : ''}.${result.message ? ' ' + result.message : ''}` };
   },
 

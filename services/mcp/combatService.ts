@@ -13,7 +13,7 @@ import { parseDiceFormula } from '../../utils/dice';
 import { resolveAdvantage } from '../../utils/combatUtils';
 import { getEffects, applyEffects, SaveRollContext, AttackRollContext, AttackDamageContext } from '../effectDispatcher';
 import { breakConcentration as engineBreakConcentration, checkConcentrationExpiry } from '../spellcastingEngine';
-import { initBattleMap, autoPlaceParty, autoPlaceEnemies, placeToken, findFreeCell } from '../gridService';
+import { initBattleMap, autoPlaceParty, autoPlaceEnemies, placeToken, findFreeCell, isInRange } from '../gridService';
 
 /** Dependencies required by the CombatService. */
 export interface CombatDeps {
@@ -28,7 +28,7 @@ export interface CombatService {
   next_turn(autoResolveEnemies?: boolean): Promise<MCPResponse>;
   end_combat(): Promise<MCPResponse>;
   enemy_attack(enemyId: string, targetId?: string, attackIndex?: number): Promise<MCPResponse>;
-  make_save(targetId: string, stat: string, dc: number, spellContext?: { isMagical?: boolean; isCharm?: boolean }): Promise<MCPResponse>;
+  make_save(targetId: string, stat: string, dc: number, spellContext?: { isMagical?: boolean; isCharm?: boolean; isPoison?: boolean; isFrightened?: boolean; isSeen?: boolean }): Promise<MCPResponse>;
   roll_death_save(targetId?: string): Promise<MCPResponse>;
   getCurrentTurnInfo(): { name: string; type: 'player' | 'enemy'; id: string } | null;
   updateInitiativeDeathStatus(id: string, isDead: boolean): void;
@@ -196,6 +196,10 @@ function clearEndOfCombatConditions(target: Character | Enemy): string[] {
   if (!target.conditions || target.conditions.length === 0) return [];
   const removed: string[] = [];
   target.conditions = target.conditions.filter(c => {
+    if (c.expiresAfterTurn) {
+      removed.push(c.id);
+      return false;
+    }
     if (c.duration == null || c.durationUnit === 'round') {
       if (c.durationUnit === 'round' || c.duration === null) {
         removed.push(c.id);
@@ -273,6 +277,22 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       damageImmunities: overrides.damageImmunities ?? template?.damageImmunities,
       damageVulnerabilities: overrides.damageVulnerabilities ?? template?.damageVulnerabilities,
     };
+  }
+
+  function beginPlayerTurn(entry: InitiativeEntry | undefined): string {
+    if (!entry || entry.type !== 'player') return '';
+    const player = state.party.find(c => c.id === entry.id);
+    if (!player) return '';
+    player.reactionAvailable = true;
+    player.reactionUsedThisTurn = false;
+    player.recklessAttacking = false;
+    if (player.class.toLowerCase() === 'fighter' && player.subclassId === 'champion' && player.level >= 18 && player.hp.current > 0 && player.hp.current <= player.hp.max / 2) {
+      const healed = Math.max(0, 5 + getMod(player.stats.con));
+      const previous = player.hp.current;
+      player.hp.current = Math.min(player.hp.max, previous + healed);
+      return `${player.name}'s Survivor restores ${player.hp.current - previous} HP.`;
+    }
+    return '';
   }
 
   function initializeDeathSaves(character: Character): void {
@@ -449,6 +469,12 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       const initiative: InitiativeEntry[] = [];
 
       for (const char of state.party) {
+        char.reactionAvailable = true;
+        char.reactionUsedThisTurn = false;
+        if (char.class.toLowerCase() === 'fighter' && char.subclassId === 'battle-master' && char.level >= 15) {
+          const superiority = char.resources?.find(r => r.id === 'superiority-dice');
+          if (superiority && superiority.current === 0) superiority.current = 1;
+        }
         if (char.deathSaves?.isStable) continue;
         let roll = cryptoRoll(20);
         if (char.class.toLowerCase() === 'barbarian' && char.level >= 7) {
@@ -507,6 +533,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       }
 
       const firstActor = initiative[0];
+      const turnEffect = beginPlayerTurn(firstActor);
       const initiativeStr = initiative.map(e =>
         `${e.type === 'player' ? '👤' : '👾'} ${e.name}: ${e.initiative}`
       ).join('\n');
@@ -514,7 +541,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       return {
         success: true,
         data: { combat: state.combat, currentTurn: firstActor?.name || 'Unknown' },
-        message: `⚔️ COMBAT BEGINS! Round 1.\n\nInitiative Order:\n${initiativeStr}\n\n**${firstActor?.name} goes first!**`
+        message: `⚔️ COMBAT BEGINS! Round 1.\n\nInitiative Order:\n${initiativeStr}\n\n**${firstActor?.name} goes first!**${turnEffect ? `\n${turnEffect}` : ''}`
       };
     },
 
@@ -527,6 +554,13 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       const currentEntry = combat.initiative[combat.turnIndex];
       if (currentEntry) {
         currentEntry.hasActedThisTurn = true;
+        for (const entity of [...state.party, ...combat.enemies]) {
+          for (const condition of [...(entity.conditions ?? [])]) {
+            if (condition.expiresAfterTurn?.actorId === currentEntry.id && combat.round > condition.expiresAfterTurn.appliedRound) {
+              removeCondition(entity, condition.id, condition.source);
+            }
+          }
+        }
 
         const combatant = currentEntry.type === 'player'
           ? state.party.find(c => c.id === currentEntry.id)
@@ -664,12 +698,6 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
         this.syncInitiativeConditions();
         combat.turnIndex = 0;
 
-        // New round — clear all per-turn player flags. Reckless Attack only
-        // applies during the barbarian's own turn; a new round ends that stance.
-        for (const player of state.party) {
-          player.recklessAttacking = false;
-        }
-
         const endCheck = this.checkCombatEndConditions();
         if (endCheck.ended) {
           combat.isActive = false;
@@ -680,6 +708,8 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
           }
         }
 
+        const turnEffect = beginPlayerTurn(combat.initiative[0]);
+        if (turnEffect) expiryMessages.push(turnEffect);
         if (autoResolveEnemies && combat.initiative[0]?.type === 'enemy') {
           const result = await this.resolveAllPendingEnemyTurns();
           const expiryText = expiryMessages.length > 0 ? '\n\n' + expiryMessages.join('\n') : '';
@@ -703,17 +733,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
 
       combat.turnIndex = nextIdx;
 
-      const newCombatant = combat.initiative[nextIdx];
-      if (newCombatant?.type === 'player') {
-        const player = state.party.find(c => c.id === newCombatant.id);
-        if (player) {
-          player.reactionAvailable = true;
-          player.reactionUsedThisTurn = false;
-          // Reckless Attack only applies during the barbarian's own turn — clear it
-          // when their next turn starts so attackers no longer have advantage.
-          player.recklessAttacking = false;
-        }
-      }
+      const turnEffect = beginPlayerTurn(combat.initiative[nextIdx]);
 
       if (autoResolveEnemies && combat.initiative[combat.turnIndex]?.type === 'enemy') {
         const result = await this.resolveAllPendingEnemyTurns();
@@ -733,7 +753,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       return {
         success: true,
         data: { combat },
-        message: `**${next.name}'s turn.**${saveText}`
+        message: `**${next.name}'s turn.**${turnEffect ? `\n${turnEffect}` : ''}${saveText}`
       };
     },
 
@@ -771,6 +791,9 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       }
       if (enemy.isDead) {
         return fail(`${enemy.name} is already defeated.`);
+      }
+      if (isIncapacitated(enemy) || isUnconscious(enemy) || enemy.conditions?.some(c => c.id.startsWith('turned-'))) {
+        return fail(`${enemy.name} cannot attack while incapacitated or turned.`);
       }
 
       const initEntry = state.combat.initiative.find(e => e.id === enemy.id);
@@ -850,18 +873,20 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       for (let i = 0; i < diceCount; i++) damageResults.push(cryptoRoll(diceSides));
       const damageTotal = damageResults.reduce((a, b) => a + b, 0) + flatMod;
 
-      await deps.inflict_damage(damageTotal, target.id, attack.damageType, { skipTargetDerivedReductions: true });
+      const damageResult = await deps.inflict_damage(damageTotal, target.id, attack.damageType);
+      if (!damageResult.success) return damageResult;
+      const appliedDamage = Number(damageResult.data?.damage ?? damageTotal);
 
       const critStr = isCrit ? ' **CRITICAL HIT!**' : '';
       return {
         success: true,
         data: {
           roll, attackRoll, targetAc, isHit: true, isCritical: isCrit,
-          damage: damageTotal, damageResults, damageDice: attack.damageDice,
+          damage: appliedDamage, damageResults, damageDice: attack.damageDice,
           enemy: enemy.name, target: target.name
         },
         message: `${enemy.name} attacks ${target.name} with ${attack.name}: **HIT${critStr}**` +
-          ` (Rolled ${attackRoll} vs AC ${targetAc}) dealing **${damageTotal}** ${attack.damageType} damage!` +
+          ` (Rolled ${attackRoll} vs AC ${targetAc}) dealing **${appliedDamage}** ${attack.damageType} damage!` +
           ` ${target.name}: ${target.hp.current}/${target.hp.max} HP.`
       };
     },
@@ -915,7 +940,8 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
         let auraSource = '';
         for (const member of state.party) {
           if (member.id === partyTarget.id) continue;
-          if (member.hp.current <= 0) continue;
+          if (member.hp.current <= 0 || isUnconscious(member)) continue;
+          if (state.battleMap && !isInRange(state.battleMap, member.id, partyTarget.id, member.level >= 18 ? 30 : 10)) continue;
           const auraEffects = getEffects(member, 'aura-of-protection');
           if (auraEffects.length > 0) {
             const chaMod = getMod(member.stats.cha);
@@ -928,7 +954,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
         }
         // Paladin also benefits from their own aura
         const selfAura = getEffects(partyTarget, 'aura-of-protection');
-        if (partyTarget.hp.current > 0 && selfAura.length > 0) {
+        if (partyTarget.hp.current > 0 && !isUnconscious(partyTarget) && selfAura.length > 0) {
           const chaMod = getMod(partyTarget.stats.cha);
           const bonus = Math.max(chaMod, 1);
           if (bonus > auraBonus) {
@@ -940,6 +966,10 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
           totalMod += auraBonus;
         }
 
+        if (partyTarget.class.toLowerCase() === 'barbarian' && partyTarget.raging && mappedStat === 'str') {
+          afterEffects.hasAdvantage = true;
+          (afterEffects.advantageSources ??= []).push('Rage');
+        }
         let advantageNote = '';
         if (afterEffects.hasAdvantage) {
           const second = cryptoRoll(20);
@@ -1044,6 +1074,12 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
         };
       }
 
+      if (enemy.conditions?.some(c => c.id.startsWith('turned-'))) {
+        currentEntry.hasActedThisTurn = true;
+        const advanceResult = await this.next_turn(false);
+        return { success: true, data: { skipped: true, ...advanceResult.data }, message: `${enemy.name} is turned and cannot attack. ${advanceResult.message}` };
+      }
+
       const target = this.selectEnemyTarget();
       if (!target) {
         currentEntry.hasActedThisTurn = true;
@@ -1126,6 +1162,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
     async player_attack(attackerId, weaponName, targetId, isOffHand, isSneakAttack, sharpshooter, greatWeaponMaster, reckless, divineSmite) {
       const attacker = deps.getTarget(attackerId);
       if (!attacker) return fail(`Attacker "${attackerId}" not found.`, ErrorCodes.NOT_FOUND);
+      if (isIncapacitated(attacker) || isUnconscious(attacker)) return fail(`${attacker.name} cannot attack while incapacitated.`);
 
       const enemy = state.combat?.enemies.find(e => fuzzyMatchEntity(e, targetId));
       if (!enemy) return fail(`Target "${targetId}" not found in combat.`, ErrorCodes.NOT_FOUND);
@@ -1141,14 +1178,17 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       const isRanged = weaponItem?.stats?.properties?.includes('ranged')
         || ['bow', 'crossbow', 'javelin', 'dart', 'sling'].some(s => weaponName.toLowerCase().includes(s));
 
+      const isFinesse = weaponItem?.stats?.properties?.some(p => p.toLowerCase().includes('finesse')) ?? false;
       const abilityMod = isRanged
         ? getMod(attacker.stats?.dex ?? 10)
-        : isMonk && isUnarmed && !attacker.inventory.some(i => i.equipped && (i.type === 'armor' || i.type === 'shield'))
+        : (isFinesse || (isMonk && isUnarmed && !attacker.inventory.some(i => i.equipped && (i.type === 'armor' || i.type === 'shield'))))
           ? Math.max(getMod(attacker.stats?.str ?? 10), getMod(attacker.stats?.dex ?? 10))
           : getMod(attacker.stats?.str ?? 10);
       const profBonus = getProficiencyBonus(attacker as unknown as Character);
       let atkBonus = abilityMod + profBonus;
-      if (sharpshooter || greatWeaponMaster) atkBonus -= 5;
+      const useSharpshooter = !!sharpshooter && isRanged && attacker.feats?.includes('sharpshooter');
+      const useGreatWeaponMaster = !!greatWeaponMaster && !isRanged && attacker.feats?.includes('great-weapon-master') && weaponItem?.stats?.properties?.some(p => p.toLowerCase().includes('heavy'));
+      if (useSharpshooter || useGreatWeaponMaster) atkBonus -= 5;
 
       let roll = cryptoRoll(20);
       // Barbarian Reckless Attack: when declared on a melee STR attack, grant advantage
@@ -1225,7 +1265,7 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
       const dieSides = parsed.sides;
       const flatMod = parsed.bonus;
 
-      const hasGWF = (getEffects(attacker, 'gwf-reroll').length > 0 || attacker.fightingStyle === 'great-weapon-fighting' || attacker.fightingStyleTwo === 'great-weapon-fighting') && !isOffHand;
+      const hasGWF = !isRanged && !isOffHand && !!weaponItem?.stats?.properties?.some(p => /two.handed/i.test(p)) && (getEffects(attacker, 'gwf-reroll').length > 0 || attacker.fightingStyle === 'great-weapon-fighting' || attacker.fightingStyleTwo === 'great-weapon-fighting');
       const damageResults: number[] = [];
       for (let i = 0; i < diceCount; i++) {
         let v = cryptoRoll(dieSides);
@@ -1243,11 +1283,11 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
         damageTotal += abilityMod;
       }
 
-      if (sharpshooter && isRanged) damageTotal += 10;
-      if (greatWeaponMaster && !isRanged) damageTotal += 10;
+      if (useSharpshooter) damageTotal += 10;
+      if (useGreatWeaponMaster) damageTotal += 10;
 
-      if (isSneakAttack) {
-        const sneakSources = getEffects(attacker, 'sneak-attack');
+      const sneakSources = getEffects(attacker, 'sneak-attack');
+      if (isSneakAttack && sneakSources.length > 0 && (isRanged || isFinesse)) {
         const sneakDiceFromData = sneakSources[0]?.payload.extraDiceAtLevel as Record<string, number> | undefined;
         let sneakDice: number;
         if (sneakDiceFromData) {
@@ -1282,44 +1322,53 @@ export function createCombatService(state: GameState, deps: CombatDeps): CombatS
         }
       }
 
-      if (divineSmite && divineSmite.slotLevel && !isRanged && !isOffHand) {
+      let radiantDamage = 0;
+      if (attacker.class.toLowerCase() === 'paladin' && attacker.level >= 11 && !isRanged && !isUnarmed && weaponItem?.type === 'weapon') {
+        for (let i = 0; i < (isCrit ? 2 : 1); i++) radiantDamage += cryptoRoll(8);
+      }
+      if (divineSmite && divineSmite.slotLevel && !isRanged && !isUnarmed && weaponItem?.type === 'weapon') {
         // Divine Smite: Paladin L2 feature — expend a spell slot for extra radiant damage.
         // Gate on paladin class; require an available slot BEFORE rolling any smite dice
         // (previously dice were added unconditionally, granting free smites with 0 slots).
         // Base dice: 2d8 at L1, +1d8 per slot level above 1, capped at 5d8 total (per SRD).
         // +1d8 vs fiend/undead is a separate bonus on top of the cap. Doubled on crit.
-        const hasDivineSmite = attacker.class === 'paladin' && attacker.level >= 2;
+        const hasDivineSmite = attacker.class.toLowerCase() === 'paladin' && attacker.level >= 2;
         const smiteSlotLevel = Math.min(Math.max(Math.floor(divineSmite.slotLevel), 1), 9);
         const slotId = `spell-slot-${smiteSlotLevel}`;
         const slot = (attacker.resources || []).find(r => r.id === slotId);
         if (hasDivineSmite && slot && slot.current > 0) {
           slot.current -= 1;
-          const baseSmiteDice = Math.min(1 + smiteSlotLevel, 6);
+          const baseSmiteDice = Math.min(1 + smiteSlotLevel, 5);
           const isFiendOrUndead = enemy.type === 'fiend' || enemy.type === 'undead';
-          const extraSmiteDie = isFiendOrUndead ? 1 : 0;
-          const smiteDice = isCrit ? 2 * baseSmiteDice : baseSmiteDice;
-          for (let i = 0; i < smiteDice + extraSmiteDie; i++) {
-            damageTotal += cryptoRoll(8);
-          }
-          damageTotal = Math.round(damageTotal);
+          const smiteDice = (baseSmiteDice + (isFiendOrUndead ? 1 : 0)) * (isCrit ? 2 : 1);
+          for (let i = 0; i < smiteDice; i++) radiantDamage += cryptoRoll(8);
         }
       }
 
       const dmgResult = await deps.inflict_damage(damageTotal, enemy.id, dmgType);
       if (!dmgResult.success) return dmgResult;
 
-      const xpLine = typeof dmgResult.data?.xpLine === 'string' ? dmgResult.data.xpLine as string : '';
+      let dealtRadiant = 0;
+      let xpLine = typeof dmgResult.data?.xpLine === 'string' ? dmgResult.data.xpLine as string : '';
+      if (radiantDamage > 0 && !enemy.isDead) {
+        const radiantResult = await deps.inflict_damage(radiantDamage, enemy.id, 'radiant');
+        if (!radiantResult.success) return radiantResult;
+        dealtRadiant = Number(radiantResult.data?.damage ?? 0);
+        if (typeof radiantResult.data?.xpLine === 'string') xpLine = radiantResult.data.xpLine;
+      }
+      const dealtWeapon = Number(dmgResult.data?.damage ?? damageTotal);
+      const totalDealt = dealtWeapon + dealtRadiant;
       const critText = isCrit ? ' **CRITICAL HIT!**' : '';
       const offHandText = isOffHand ? ' (off-hand)' : '';
       return {
         success: true,
         data: {
           ...baseData, isHit: true,
-          damage: damageTotal, damageResults, damageDice, damageType: dmgType,
+          damage: totalDealt, damageResults, damageDice, damageType: dmgType, radiantDamage: dealtRadiant,
           targetNewHp: enemy.hp.current, targetDefeated: enemy.isDead,
           xpAwarded: !!xpLine, xpLine,
         },
-        message: `You attack ${enemy.name} with ${weaponName}${offHandText}: **HIT${critText}** (Rolled ${attackRoll} vs AC ${enemyAc}) dealing **${damageTotal}** ${dmgType} damage! ${enemy.name}: ${enemy.hp.current}/${enemy.hp.max} HP.${xpLine ? ' ' + xpLine : ''}`
+        message: `You attack ${enemy.name} with ${weaponName}${offHandText}: **HIT${critText}** (Rolled ${attackRoll} vs AC ${enemyAc}) dealing **${dealtWeapon}** ${dmgType}${dealtRadiant ? ` plus ${dealtRadiant} radiant` : ''} damage! ${enemy.name}: ${enemy.hp.current}/${enemy.hp.max} HP.${xpLine ? ' ' + xpLine : ''}`
       };
     },
   };

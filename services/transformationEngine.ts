@@ -117,6 +117,8 @@ function createTransformationState(
       attacks: []
     },
     transformedInto: beastForm.name,
+    formAc: beastForm.ac,
+    formSpeed: beastForm.beastFields?.speed,
     transformationType,
     duration,
     casterId: character.id

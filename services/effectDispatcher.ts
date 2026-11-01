@@ -83,7 +83,7 @@ export interface SaveRollContext extends HookContext {
   stat: string;
   character: Character;
   source?: string;
-  spellContext?: { spellName?: string; isMagical?: boolean; isCharm?: boolean };
+  spellContext?: { spellName?: string; isMagical?: boolean; isCharm?: boolean; isPoison?: boolean; isFrightened?: boolean; isSeen?: boolean };
   hasAdvantage: boolean;
   extraModifier: number;
   proficiencyIncluded?: boolean;
@@ -286,7 +286,7 @@ const HOOK_REGISTRY: Record<HookName, ReducerEntry[]> = {
       reduce: (ctx, payload, character) => {
         const dmgCtx = ctx as unknown as AttackDamageContext;
         const condition = payload.condition as string | undefined;
-        if (condition === 'raging' && !character.raging) return ctx;
+        if (condition === 'raging' && (!character.raging || dmgCtx.isRanged)) return ctx;
         if (condition === 'always') { /* unconditional */ }
         if (condition && condition !== 'raging' && condition !== 'always') return ctx;
         const bonusExpr = (payload.amount as string) || '0';
@@ -310,7 +310,7 @@ const HOOK_REGISTRY: Record<HookName, ReducerEntry[]> = {
       kind: 'crit-bonus-dice',
       reduce: (ctx, payload) => {
         const dmgCtx = ctx as unknown as AttackDamageContext;
-        if (!dmgCtx.isCrit) return ctx;
+        if (!dmgCtx.isCrit || dmgCtx.isRanged) return ctx;
         const count = (payload.count as number) || 1;
         const asExtras = dmgCtx as unknown as Record<string, unknown>;
         asExtras._extraCritDiceCount = ((asExtras._extraCritDiceCount as number) || 0) + count;
@@ -322,6 +322,10 @@ const HOOK_REGISTRY: Record<HookName, ReducerEntry[]> = {
       reduce: (ctx, payload, character) => {
         const dmgCtx = ctx as unknown as AttackDamageContext;
         if (dmgCtx.isRanged) return ctx;
+        const weapon = character.inventory.find(item => item.type === 'weapon' && item.name.toLowerCase() === dmgCtx.weaponName.toLowerCase());
+        const properties = weapon?.stats?.properties ?? [];
+        const equippedWeapons = character.inventory.filter(item => item.type === 'weapon' && item.equipped);
+        if (!weapon || properties.some(p => /two.handed/i.test(p)) || equippedWeapons.some(item => item !== weapon)) return ctx;
         // Marker-based idempotency (see Archery reducer above) — prevents Champion L10
         // double-apply and honors `fightingStyleTwo`.
         const marker = dmgCtx as unknown as Record<string, unknown>;
@@ -393,7 +397,7 @@ const HOOK_REGISTRY: Record<HookName, ReducerEntry[]> = {
     },
     {
       kind: 'advantage-on-save',
-      reduce: (ctx, payload) => {
+      reduce: (ctx, payload, character) => {
         const saveCtx = ctx as unknown as SaveRollContext;
         const against = (payload.against as string) || '';
         const stat = (payload.stat as string) || '';
@@ -401,7 +405,7 @@ const HOOK_REGISTRY: Record<HookName, ReducerEntry[]> = {
         if (stat && saveCtx.stat.toLowerCase() !== stat.toLowerCase()) return ctx;
         if (stats.length > 0 && !stats.some(s => s.toLowerCase() === saveCtx.stat.toLowerCase())) return ctx;
         if (!saveCtx.advantageSources) saveCtx.advantageSources = [];
-        if (against === 'poison') {
+        if (against === 'poison' && saveCtx.spellContext?.isPoison) {
           saveCtx.hasAdvantage = true;
           saveCtx.advantageSources.push((payload.name as string) || 'Poison Resistance advantage');
         } else if (against === 'magic') {
@@ -412,10 +416,10 @@ const HOOK_REGISTRY: Record<HookName, ReducerEntry[]> = {
         } else if (against === 'charmed' && saveCtx.spellContext?.isCharm) {
           saveCtx.hasAdvantage = true;
           saveCtx.advantageSources.push((payload.name as string) || 'Fey Ancestry advantage');
-        } else if (against === 'frightened') {
+        } else if (against === 'frightened' && saveCtx.spellContext?.isFrightened) {
           saveCtx.hasAdvantage = true;
           saveCtx.advantageSources.push((payload.name as string) || 'Brave advantage');
-        } else if (against === 'seen-effect') {
+        } else if (against === 'seen-effect' && saveCtx.spellContext?.isSeen && !character.conditions?.some(c => ['blinded', 'deafened', 'incapacitated'].includes(c.id))) {
           saveCtx.hasAdvantage = true;
           saveCtx.advantageSources.push((payload.name as string) || 'Danger Sense advantage');
         }
