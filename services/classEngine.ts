@@ -233,6 +233,45 @@ export function getDamageResistances(character: Character): string[] {
   return result;
 }
 
+/** Declarative max/reset rules for every tracked resource pool, keyed by resource id.
+ *  `max` receives the character level and CHA modifier; `reset` receives the level.
+ *  Replaces the per-source if/else chains — adding a resource is now one entry here. */
+const RESOURCE_RULES: Record<string, { max: (level: number, chaMod: number) => number; reset: (level: number) => 'short' | 'long' }> = {
+  'ki': { max: level => level, reset: () => 'short' },
+  'sorcery-points': { max: level => level, reset: () => 'long' },
+  'lay-on-hands-pool': { max: level => 5 * level, reset: () => 'long' },
+  'rage': {
+    max: level => level >= 20 ? 9999 : level >= 17 ? 6 : level >= 12 ? 5 : level >= 6 ? 4 : level >= 3 ? 3 : 2,
+    reset: () => 'long'
+  },
+  'divine-sense': { max: (_level, chaMod) => Math.max(1, 1 + chaMod), reset: () => 'long' },
+  'bardic-inspiration': { max: (_level, chaMod) => Math.max(1, chaMod), reset: level => level >= 5 ? 'short' : 'long' },
+  'second-wind': { max: () => 1, reset: () => 'short' },
+  'action-surge': { max: level => level >= 17 ? 2 : 1, reset: () => 'short' },
+  'channel-divinity': { max: level => level >= 18 ? 3 : level >= 6 ? 2 : 1, reset: () => 'short' },
+  'wild-shape': { max: level => level >= 20 ? 9999 : 2, reset: () => 'short' },
+  'indomitable': { max: level => level >= 17 ? 3 : level >= 13 ? 2 : 1, reset: () => 'long' },
+  'arcane-recovery': { max: () => 1, reset: () => 'long' },
+  'superiority-dice': { max: level => level >= 15 ? 6 : level >= 7 ? 5 : 4, reset: () => 'short' },
+  'tides-of-chaos': { max: () => 1, reset: () => 'long' },
+  'relentless-endurance': { max: () => 1, reset: () => 'long' },
+  'hellish-rebuke': { max: () => 1, reset: () => 'long' },
+  'breath-weapon': { max: () => 1, reset: () => 'short' },
+};
+
+/** Resolves a resource id's max/reset via RESOURCE_RULES, falling back to a flat
+ *  default (max 1, caller-supplied reset) for any id not present in the table. */
+function resolveResource(
+  id: string,
+  level: number,
+  chaMod: number,
+  defaultReset: 'short' | 'long'
+): { max: number; resetOn: 'short' | 'long' } {
+  const rule = RESOURCE_RULES[id];
+  if (!rule) return { max: 1, resetOn: defaultReset };
+  return { max: rule.max(level, chaMod), resetOn: rule.reset(level) };
+}
+
 /** Rebuilds the character's full resource pool list (class features, spell slots, racial traits), preserving existing current values within max bounds. */
 export function recalculateResourcePools(character: Character): ResourcePool[] {
   const resources: ResourcePool[] = [];
@@ -245,55 +284,7 @@ export function recalculateResourcePools(character: Character): ResourcePool[] {
   if (classDef) {
     for (const feat of classDef.features) {
       if (feat.level <= level && feat.kind === 'resource' && feat.grantsResource && !resources.some(r => r.id === feat.grantsResource)) {
-        let max = 1;
-        let resetOn: 'short' | 'long' = 'long';
-
-        if (feat.grantsResource === 'ki') {
-          max = level;
-          resetOn = 'short';
-        } else if (feat.grantsResource === 'sorcery-points') {
-          max = level;
-          resetOn = 'long';
-        } else if (feat.grantsResource === 'lay-on-hands-pool') {
-          max = 5 * level;
-          resetOn = 'long';
-        } else if (feat.grantsResource === 'rage') {
-          resetOn = 'long';
-          if (level >= 20) max = 9999;
-          else if (level >= 17) max = 6;
-          else if (level >= 12) max = 5;
-          else if (level >= 6) max = 4;
-          else if (level >= 3) max = 3;
-          else max = 2;
-        } else if (feat.grantsResource === 'divine-sense') {
-          max = Math.max(1, 1 + chaMod);
-          resetOn = 'long';
-        } else if (feat.grantsResource === 'bardic-inspiration') {
-          max = Math.max(1, chaMod);
-          resetOn = level >= 5 ? 'short' : 'long';
-        } else if (feat.grantsResource === 'second-wind') {
-          max = 1;
-          resetOn = 'short';
-        } else if (feat.grantsResource === 'action-surge') {
-          max = level >= 17 ? 2 : 1;
-          resetOn = 'short';
-        } else if (feat.grantsResource === 'channel-divinity') {
-          resetOn = 'short';
-          if (level >= 18) max = 3;
-          else if (level >= 6) max = 2;
-          else max = 1;
-        } else if (feat.grantsResource === 'wild-shape') {
-          resetOn = 'short';
-          max = level >= 20 ? 9999 : 2;
-        } else if (feat.grantsResource === 'indomitable') {
-          resetOn = 'long';
-          if (level >= 17) max = 3;
-          else if (level >= 13) max = 2;
-          else max = 1;
-        } else if (feat.grantsResource === 'arcane-recovery') {
-          max = 1;
-          resetOn = 'long';
-        }
+        const { max, resetOn } = resolveResource(feat.grantsResource, level, chaMod, 'long');
 
         resources.push({
           id: feat.grantsResource,
@@ -381,16 +372,7 @@ export function recalculateResourcePools(character: Character): ResourcePool[] {
   if (subclassDef) {
     for (const feat of subclassDef.features) {
       if (feat.level <= level && feat.kind === 'resource' && feat.grantsResource) {
-        let max = 1;
-        let resetOn: 'short' | 'long' = 'long';
-
-        if (feat.grantsResource === 'superiority-dice') {
-          max = level >= 15 ? 6 : level >= 7 ? 5 : 4;
-          resetOn = 'short';
-        } else if (feat.grantsResource === 'tides-of-chaos') {
-          max = 1;
-          resetOn = 'long';
-        }
+        const { max, resetOn } = resolveResource(feat.grantsResource, level, chaMod, 'long');
 
         // Don't duplicate if already added by class features
         if (!resources.find(r => r.id === feat.grantsResource)) {
@@ -412,11 +394,7 @@ export function recalculateResourcePools(character: Character): ResourcePool[] {
   if (raceDef) {
     for (const t of raceDef.traits) {
       if (t.kind === 'resource' && t.grantsResource) {
-        const max = 1;
-        let resetOn: 'short' | 'long' = 'short';
-        if (t.grantsResource === 'relentless-endurance' || t.grantsResource === 'hellish-rebuke') {
-          resetOn = 'long';
-        }
+        const { max, resetOn } = resolveResource(t.grantsResource, level, chaMod, 'short');
         resources.push({
           id: t.grantsResource,
           name: t.name,
